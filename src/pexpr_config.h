@@ -200,6 +200,9 @@ static_assert(sizeof(uint32) == 4, "Invalid bytesize configuration");
 static_assert(sizeof(int64) == 8, "Invalid bytesize configuration");
 static_assert(sizeof(uint64) == 8, "Invalid bytesize configuration");
 
+template <typename T>
+using Ptr = std::shared_ptr<T>;
+
 /* Precise vector types */
 using Vector2f = std::array<float, 2>;
 using Vector3f = std::array<float, 2>;

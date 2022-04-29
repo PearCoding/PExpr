@@ -28,8 +28,10 @@ project(pexpr
 # For whatever reason Ignis might be used as a subproject...
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 	set(PEXPR_SUBPROJECT OFF)
+	set(PEXPR_NOT_SUBPROJECT ON)
 else()
 	set(PEXPR_SUBPROJECT ON)
+	set(PEXPR_NOT_SUBPROJECT OFF)
 endif()
 
 # Set corresponding output directory
@@ -42,9 +44,8 @@ set(CMAKE_DEBUG_POSTFIX  "_d")
 
 message(STATUS "Building pexpr ${pexpr_VERSION}")
 
-if(NOT PEXPR_SUBPROJECT)
-    include(CTest)
-endif()
+option(PEXPR_WITH_ASSERTS "Build with asserts even in release. It is always enabled on debug" OFF)
+option(PEXPR_WITH_TESTS "Build tests" PEXPR_NOT_SUBPROJECT)
 
 # Enable folders for Visual Studio
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -58,3 +59,8 @@ endif()
 
 # Traverse to underlying directories
 add_subdirectory(src)
+
+if(PEXPR_WITH_TESTS)
+    include(CTest)
+	add_subdirectory(test)
+endif()

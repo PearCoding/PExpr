@@ -36,6 +36,13 @@ enum class TokenType {
 
 class Token {
 public:
+    inline Token()
+        : Location(0)
+        , Type(TokenType::Error)
+        , Value{}
+    {
+    }
+
     inline Token(size_t location, TokenType type)
         : Location(location)
         , Type(type)
@@ -70,5 +77,7 @@ public:
     size_t Location;
     TokenType Type;
     std::variant<bool, Integer, Number, std::string> Value;
+
+    static std::string_view toString(TokenType type);
 };
 } // namespace PExpr

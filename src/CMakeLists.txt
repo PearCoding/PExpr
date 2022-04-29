@@ -2,8 +2,10 @@ set(PUBLIC
     pexpr_config.h
     PExpr.h
     Enums.h
+    Expression.h
     Logger.h
     LogListener.h
+    StringVisitor.h
 )
 
 set(SRC
@@ -14,6 +16,9 @@ set(SRC
     internal/ConsoleLogListener.h
     internal/Lexer.cpp
     internal/Lexer.h
+    internal/Parser.cpp
+    internal/Parser.h
+    internal/Token.cpp
     internal/Token.h
 )
 

@@ -1,25 +1,29 @@
 #pragma once
 
 namespace PExpr {
-enum class Type {
+enum class ElementaryType {
+    Unspecified,
     Boolean,
     Integer,
-    Float,
+    Number,
     Vec2,
     Vec3,
     Vec4,
     String
 };
 
-enum class Operation {
+enum class UnaryOperation {
+    Neg, // -
+    Not, // !
+};
+
+enum class BinaryOperation {
     Add,          // +
     Sub,          // -
     Mul,          // *
     Div,          // /
     Pow,          // ^
     Mod,          // %
-    Neg,          // -
-    Not,          // !
     And,          // &&
     Or,           // ||
     Less,         // <
@@ -28,7 +32,14 @@ enum class Operation {
     GreaterEqual, // >=
     Equal,        // ==
     NotEqual,     // !=
-    Call,         // foo(...)
-    Element       // foo.swizzle
 };
-}
+
+enum class ExpressionType {
+    Variable,
+    Const,
+    Unary,
+    Binary,
+    Call,
+    Access
+};
+} // namespace PExpr
