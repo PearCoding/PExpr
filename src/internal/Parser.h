@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Lexer.h"
+#include <array>
 
 namespace PExpr {
 class Expression;
@@ -12,8 +13,12 @@ public:
 
     Ptr<Expression> parse();
 
+    inline bool hasError() const { return mHasError; }
+
 protected:
     bool expect(TokenType type);
+    template <size_t N>
+    void error(const std::array<TokenType, N>&);
     void eat(TokenType type);
     bool accept(TokenType type);
     void next();
@@ -21,5 +26,6 @@ protected:
 
     Lexer& mLexer;
     std::array<Token, 2> mCurrentToken;
+    bool mHasError;
 };
 } // namespace PExpr

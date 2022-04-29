@@ -22,6 +22,15 @@ private:
     ExpressionType mType;
 };
 
+// Special expression used if an error occured while parsing
+class ErrorExpression : public Expression {
+public:
+    inline ErrorExpression()
+        : Expression(ExpressionType::Error)
+    {
+    }
+};
+
 class VariableExpression : public Expression {
 public:
     inline VariableExpression(const std::string& name)

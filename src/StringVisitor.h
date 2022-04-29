@@ -21,7 +21,7 @@ public:
         case ExpressionType::Access:
             return dump(std::reinterpret_pointer_cast<AccessExpression>(expr));
         default:
-            return {};
+            return "ERROR";
         }
     };
 

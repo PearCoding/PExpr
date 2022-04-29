@@ -35,6 +35,7 @@ enum class BinaryOperation {
 };
 
 enum class ExpressionType {
+    Error,
     Variable,
     Const,
     Unary,

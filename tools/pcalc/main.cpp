@@ -21,6 +21,8 @@ int main(int argc, char** argv)
     Parser parser(lexer);
 
     auto ast = parser.parse();
+    if (parser.hasError())
+        return EXIT_FAILURE;
 
     if (ast == nullptr) {
         std::cout << "No input" << std::endl;

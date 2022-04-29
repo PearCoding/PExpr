@@ -2,16 +2,20 @@
 #include "Expression.h"
 #include "Logger.h"
 
+#include <array>
+
 namespace PExpr {
 Parser::Parser(Lexer& lexer)
     : mLexer(lexer)
     , mCurrentToken()
+    , mHasError(false)
 {
 }
 
 Ptr<Expression> parse_translation_unit(Parser& parser);
 Ptr<Expression> Parser::parse()
 {
+    mHasError = false;
     for (size_t i = 0; i < mCurrentToken.size(); ++i)
         mCurrentToken[i] = mLexer.next();
     return parse_translation_unit(*this);
@@ -20,10 +24,28 @@ Ptr<Expression> Parser::parse()
 bool Parser::expect(TokenType type)
 {
     bool same = cur().Type == type;
-    if (!same)
+    if (!same) {
         PEXPR_LOG(LogLevel::Error) << "At " << cur().Location << ": Expected '" << Token::toString(type) << "' but got '" << Token::toString(cur().Type) << "'" << std::endl;
+        mHasError = true;
+    }
+
     next();
     return same;
+}
+
+template <size_t N>
+void Parser::error(const std::array<TokenType, N>& types)
+{
+    mHasError = true;
+
+    std::string expectation;
+    for (size_t i = 0; i < types.size(); ++i) {
+        expectation += Token::toString(types[i]);
+        if (i != types.size() - 1)
+            expectation += ", ";
+    }
+
+    PEXPR_LOG(LogLevel::Error) << "At " << cur().Location << ": Expected {" << expectation << "} but got '" << Token::toString(cur().Type) << "'" << std::endl;
 }
 
 void Parser::eat(TokenType type)
@@ -172,7 +194,7 @@ private:
     inline Ptr<Expression> p_call_expression()
     {
         const std::string funcName = std::get<std::string>(P.cur(0).Value);
-        
+
         P.expect(TokenType::Identifier);
         P.expect(TokenType::OpenParanthese);
 
@@ -198,7 +220,7 @@ private:
     inline Ptr<Expression> p_primary_expression()
     {
         if (P.accept(TokenType::OpenParanthese)) {
-            auto expr = p_expression();
+            auto expr = p_logical_expression();
             P.expect(TokenType::ClosedParanthese);
 
             if (P.cur(0).Type == TokenType::Dot) {
@@ -221,14 +243,18 @@ private:
         if (P.accept(TokenType::String))
             return std::make_shared<ConstExpression>(ElementaryType::String, value.Value);
 
-        P.expect(TokenType::Identifier);
-        auto var = std::make_shared<VariableExpression>(std::get<std::string>(value.Value));
+        if (P.accept(TokenType::Identifier)) {
+            auto var = std::make_shared<VariableExpression>(std::get<std::string>(value.Value));
 
-        if (P.cur(0).Type == TokenType::Dot) {
-            auto swizzle = p_swizzle();
-            return std::make_shared<AccessExpression>(var, swizzle);
+            if (P.cur(0).Type == TokenType::Dot) {
+                auto swizzle = p_swizzle();
+                return std::make_shared<AccessExpression>(var, swizzle);
+            }
+            return var;
         }
-        return var;
+
+        P.error(std::array<TokenType, 5>{ TokenType::Boolean, TokenType::Float, TokenType::Integer, TokenType::String, TokenType::Identifier });
+        return std::make_shared<ErrorExpression>();
     }
 
     std::string p_swizzle()
