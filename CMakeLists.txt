@@ -46,6 +46,7 @@ message(STATUS "Building pexpr ${pexpr_VERSION}")
 
 option(PEXPR_WITH_ASSERTS "Build with asserts even in release. It is always enabled on debug" OFF)
 option(PEXPR_WITH_TESTS "Build tests" PEXPR_NOT_SUBPROJECT)
+option(PEXPR_WITH_TOOLS "Build tools" PEXPR_NOT_SUBPROJECT)
 
 # Enable folders for Visual Studio
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -59,6 +60,9 @@ endif()
 
 # Traverse to underlying directories
 add_subdirectory(src)
+if(PEXPR_WITH_TESTS)
+	add_subdirectory(tools)
+endif()
 
 if(PEXPR_WITH_TESTS)
     include(CTest)
