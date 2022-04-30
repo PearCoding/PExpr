@@ -10,95 +10,95 @@ class Expression {
 public:
     Expression() = delete;
 
+    inline size_t location() const { return mLocation; }
+
     inline ExpressionType type() const { return mType; }
+    inline ElementaryType returnType() const { return mReturnType; }
+    inline void setReturnType(ElementaryType type) { mReturnType = type; }
+
+    inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
 
 protected:
-    inline explicit Expression(ExpressionType type)
-        : mType(type)
+    inline Expression(size_t loc, ExpressionType type)
+        : mLocation(loc)
+        , mType(type)
+        , mReturnType(ElementaryType::Unspecified)
     {
     }
 
 private:
+    size_t mLocation;
     ExpressionType mType;
+    ElementaryType mReturnType;
 };
 
 // Special expression used if an error occured while parsing
 class ErrorExpression : public Expression {
 public:
-    inline ErrorExpression()
-        : Expression(ExpressionType::Error)
+    inline ErrorExpression(size_t loc)
+        : Expression(loc, ExpressionType::Error)
     {
     }
 };
 
 class VariableExpression : public Expression {
 public:
-    inline VariableExpression(const std::string& name)
-        : Expression(ExpressionType::Variable)
+    inline VariableExpression(size_t loc, const std::string& name)
+        : Expression(loc, ExpressionType::Variable)
         , mName(name)
-        , mVariableType(ElementaryType::Unspecified)
     {
     }
 
     inline const std::string& name() const { return mName; }
-    inline ElementaryType variableType() const { return mVariableType; }
-
-    // Will be used in later stages
-    inline bool isUnspecified() const { return mVariableType == ElementaryType::Unspecified; }
-    inline void setVariableType(ElementaryType type) { mVariableType = type; }
 
 private:
     std::string mName;
-    ElementaryType mVariableType;
 };
 
 class ConstExpression : public Expression {
 public:
     using ValueVariant = std::variant<bool, Integer, Number, std::string>;
 
-    inline ConstExpression(ElementaryType type, const ValueVariant& value)
-        : Expression(ExpressionType::Const)
-        , mValueType(type)
+    inline ConstExpression(size_t loc, ElementaryType type, const ValueVariant& value)
+        : Expression(loc, ExpressionType::Const)
         , mValue(value)
     {
         PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a specified type as a constant");
+        setReturnType(type);
     }
-
-    inline ElementaryType valueType() const { return mValueType; }
 
     inline bool getBool() const
     {
-        PEXPR_ASSERT(mValueType == ElementaryType::Boolean, "Trying to get a constant which is not a boolean");
+        PEXPR_ASSERT(returnType() == ElementaryType::Boolean, "Trying to get a constant which is not a boolean");
         return std::get<bool>(mValue);
     }
 
     inline Integer getInteger() const
     {
-        PEXPR_ASSERT(mValueType == ElementaryType::Integer, "Trying to get a constant which is not a integer");
+        PEXPR_ASSERT(returnType() == ElementaryType::Integer, "Trying to get a constant which is not a integer");
         return std::get<Integer>(mValue);
     }
 
     inline Number getNumber() const
     {
-        PEXPR_ASSERT(mValueType == ElementaryType::Number, "Trying to get a constant which is not a number");
+        PEXPR_ASSERT(returnType() == ElementaryType::Number, "Trying to get a constant which is not a number");
         return std::get<Number>(mValue);
     }
 
     inline std::string getString() const
     {
-        PEXPR_ASSERT(mValueType == ElementaryType::String, "Trying to get a constant which is not a string");
+        PEXPR_ASSERT(returnType() == ElementaryType::String, "Trying to get a constant which is not a string");
         return std::get<std::string>(mValue);
     }
 
 private:
-    ElementaryType mValueType;
     ValueVariant mValue;
 };
 
 class UnaryExpression : public Expression {
 public:
-    inline UnaryExpression(UnaryOperation op, const Ptr<Expression>& expr)
-        : Expression(ExpressionType::Unary)
+    inline UnaryExpression(size_t loc, UnaryOperation op, const Ptr<Expression>& expr)
+        : Expression(loc, ExpressionType::Unary)
         , mOperation(op)
         , mExpr(expr)
     {
@@ -115,8 +115,8 @@ private:
 
 class BinaryExpression : public Expression {
 public:
-    inline BinaryExpression(BinaryOperation op, const Ptr<Expression>& left, const Ptr<Expression>& right)
-        : Expression(ExpressionType::Binary)
+    inline BinaryExpression(size_t loc, BinaryOperation op, const Ptr<Expression>& left, const Ptr<Expression>& right)
+        : Expression(loc, ExpressionType::Binary)
         , mOperation(op)
         , mLeft(left)
         , mRight(right)
@@ -138,15 +138,15 @@ class CallExpression : public Expression {
 public:
     using ParameterList = std::vector<Ptr<Expression>>;
 
-    inline CallExpression(const std::string& name, const ParameterList& parameters)
-        : Expression(ExpressionType::Call)
+    inline CallExpression(size_t loc, const std::string& name, const ParameterList& parameters)
+        : Expression(loc, ExpressionType::Call)
         , mName(name)
         , mParameters(parameters)
     {
     }
 
-    inline CallExpression(const std::string& name, ParameterList&& parameters)
-        : Expression(ExpressionType::Call)
+    inline CallExpression(size_t loc, const std::string& name, ParameterList&& parameters)
+        : Expression(loc, ExpressionType::Call)
         , mName(name)
         , mParameters(std::move(parameters))
     {
@@ -162,8 +162,8 @@ private:
 
 class AccessExpression : public Expression {
 public:
-    inline AccessExpression(const Ptr<Expression>& expr, const std::string& swizzle)
-        : Expression(ExpressionType::Access)
+    inline AccessExpression(size_t loc, const Ptr<Expression>& expr, const std::string& swizzle)
+        : Expression(loc, ExpressionType::Access)
         , mExpr(expr)
         , mSwizzle(swizzle)
     {

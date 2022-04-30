@@ -33,65 +33,27 @@ private:
 
     static std::string dump(const Ptr<ConstExpression>& expr)
     {
-        if (expr->valueType() == ElementaryType::Boolean)
+        if (expr->returnType() == ElementaryType::Boolean)
             return expr->getBool() ? "true" : "false";
-        if (expr->valueType() == ElementaryType::Integer)
+        if (expr->returnType() == ElementaryType::Integer)
             return std::to_string(expr->getInteger());
-        if (expr->valueType() == ElementaryType::Number)
+        if (expr->returnType() == ElementaryType::Number)
             return std::to_string(expr->getNumber());
-        if (expr->valueType() == ElementaryType::String)
+        if (expr->returnType() == ElementaryType::String)
             return "\"" + expr->getString() + "\"";
         return "UNKNOWN";
     }
 
     static std::string dump(const Ptr<UnaryExpression>& expr)
     {
-        std::string inner = "(" + visit(expr->inner()) + ")";
-        switch (expr->op()) {
-        case UnaryOperation::Neg:
-            return "-" + inner;
-        case UnaryOperation::Not:
-            return "!" + inner;
-        default:
-            return "Invalid";
-        }
+        return std::string(toString(expr->op())) + "(" + visit(expr->inner()) + ")";
     }
+
     static std::string dump(const Ptr<BinaryExpression>& expr)
     {
-        std::string left  = "(" + visit(expr->left()) + ")";
-        std::string right = "(" + visit(expr->right()) + ")";
-        switch (expr->op()) {
-        case BinaryOperation::Add:
-            return left + "+" + right;
-        case BinaryOperation::Sub:
-            return left + "-" + right;
-        case BinaryOperation::Mul:
-            return left + "*" + right;
-        case BinaryOperation::Div:
-            return left + "/" + right;
-        case BinaryOperation::Pow:
-            return left + "^" + right;
-        case BinaryOperation::Mod:
-            return left + "%" + right;
-        case BinaryOperation::And:
-            return left + "&&" + right;
-        case BinaryOperation::Or:
-            return left + "||" + right;
-        case BinaryOperation::Less:
-            return left + "<" + right;
-        case BinaryOperation::Greater:
-            return left + ">" + right;
-        case BinaryOperation::LessEqual:
-            return left + "<=" + right;
-        case BinaryOperation::GreaterEqual:
-            return left + ">=" + right;
-        case BinaryOperation::Equal:
-            return left + "==" + right;
-        case BinaryOperation::NotEqual:
-            return left + "!=" + right;
-        default:
-            return "Invalid";
-        }
+        return "(" + visit(expr->left()) + ")"
+               + std::string(toString(expr->op()))
+               + "(" + visit(expr->right()) + ")";
     }
     static std::string dump(const Ptr<CallExpression>& expr)
     {

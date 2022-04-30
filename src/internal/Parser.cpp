@@ -101,75 +101,81 @@ private:
 
     inline Ptr<Expression> p_logical_expression()
     {
-        auto left = p_equality_expression();
+        auto left  = p_equality_expression();
+        size_t loc = P.cur().Location;
         if (P.accept(TokenType::And))
-            return std::make_shared<BinaryExpression>(BinaryOperation::And, left, p_logical_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::And, left, p_logical_expression());
         if (P.accept(TokenType::Or))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Or, left, p_logical_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Or, left, p_logical_expression());
 
         return left;
     }
 
     inline Ptr<Expression> p_equality_expression()
     {
-        auto left = p_relational_expression();
+        auto left  = p_relational_expression();
+        size_t loc = P.cur().Location;
         if (P.accept(TokenType::Equal))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Equal, left, p_equality_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Equal, left, p_equality_expression());
         if (P.accept(TokenType::NotEqual))
-            return std::make_shared<BinaryExpression>(BinaryOperation::NotEqual, left, p_equality_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::NotEqual, left, p_equality_expression());
 
         return left;
     }
 
     inline Ptr<Expression> p_relational_expression()
     {
-        auto left = p_additive_expression();
+        auto left  = p_additive_expression();
+        size_t loc = P.cur().Location;
         if (P.accept(TokenType::Less))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Less, left, p_relational_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Less, left, p_relational_expression());
         if (P.accept(TokenType::Greater))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Greater, left, p_relational_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Greater, left, p_relational_expression());
         if (P.accept(TokenType::LessEqual))
-            return std::make_shared<BinaryExpression>(BinaryOperation::LessEqual, left, p_relational_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::LessEqual, left, p_relational_expression());
         if (P.accept(TokenType::GreaterEqual))
-            return std::make_shared<BinaryExpression>(BinaryOperation::GreaterEqual, left, p_relational_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::GreaterEqual, left, p_relational_expression());
 
         return left;
     }
 
     inline Ptr<Expression> p_additive_expression()
     {
-        auto left = p_multiplicative_expression();
+        auto left  = p_multiplicative_expression();
+        size_t loc = P.cur().Location;
         if (P.accept(TokenType::Plus))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Add, left, p_additive_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Add, left, p_additive_expression());
         if (P.accept(TokenType::Minus))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Sub, left, p_additive_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Sub, left, p_additive_expression());
 
         return left;
     }
 
     inline Ptr<Expression> p_multiplicative_expression()
     {
-        auto left = p_unary_expression();
+        auto left  = p_unary_expression();
+        size_t loc = P.cur().Location;
         if (P.accept(TokenType::Mul))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Mul, left, p_multiplicative_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mul, left, p_multiplicative_expression());
         if (P.accept(TokenType::Div))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Div, left, p_multiplicative_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Div, left, p_multiplicative_expression());
         if (P.accept(TokenType::Mod))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Mod, left, p_multiplicative_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mod, left, p_multiplicative_expression());
         if (P.accept(TokenType::Pow))
-            return std::make_shared<BinaryExpression>(BinaryOperation::Pow, left, p_multiplicative_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Pow, left, p_multiplicative_expression());
 
         return left;
     }
 
     inline Ptr<Expression> p_unary_expression()
     {
+        size_t loc = P.cur().Location;
         if (P.accept(TokenType::Plus))
             return p_unary_expression(); // Ignore
         if (P.accept(TokenType::Minus))
-            return std::make_shared<UnaryExpression>(UnaryOperation::Neg, p_unary_expression());
+            return std::make_shared<UnaryExpression>(loc, UnaryOperation::Neg, p_unary_expression());
         if (P.accept(TokenType::ExclamationMark))
-            return std::make_shared<UnaryExpression>(UnaryOperation::Not, p_unary_expression());
+            return std::make_shared<UnaryExpression>(loc, UnaryOperation::Not, p_unary_expression());
 
         return p_postfix_expression();
     }
@@ -181,9 +187,10 @@ private:
             && P.cur(1).Type == TokenType::OpenParanthese) {
             auto call = p_call_expression();
 
-            if (P.cur(0).Type == TokenType::Dot) {
+            if (P.cur().Type == TokenType::Dot) {
+                size_t loc   = P.cur().Location;
                 auto swizzle = p_swizzle();
-                return std::make_shared<AccessExpression>(call, swizzle);
+                return std::make_shared<AccessExpression>(loc, call, swizzle);
             }
             return call;
         }
@@ -193,7 +200,8 @@ private:
 
     inline Ptr<Expression> p_call_expression()
     {
-        const std::string funcName = std::get<std::string>(P.cur(0).Value);
+        const size_t loc           = P.cur().Location;
+        const std::string funcName = std::get<std::string>(P.cur().Value);
 
         P.expect(TokenType::Identifier);
         P.expect(TokenType::OpenParanthese);
@@ -205,7 +213,7 @@ private:
             P.expect(TokenType::ClosedParanthese);
         }
 
-        return std::make_shared<CallExpression>(funcName, std::move(parameters));
+        return std::make_shared<CallExpression>(loc, funcName, std::move(parameters));
     }
 
     inline void p_parameter_list(std::vector<Ptr<Expression>>& list)
@@ -223,38 +231,40 @@ private:
             auto expr = p_logical_expression();
             P.expect(TokenType::ClosedParanthese);
 
-            if (P.cur(0).Type == TokenType::Dot) {
+            if (P.cur().Type == TokenType::Dot) {
+                size_t loc   = P.cur().Location;
                 auto swizzle = p_swizzle();
-                return std::make_shared<AccessExpression>(expr, swizzle);
+                return std::make_shared<AccessExpression>(loc, expr, swizzle);
             }
             return expr;
         }
 
         const auto value = P.cur();
         if (P.accept(TokenType::Boolean))
-            return std::make_shared<ConstExpression>(ElementaryType::Boolean, value.Value);
+            return std::make_shared<ConstExpression>(value.Location, ElementaryType::Boolean, value.Value);
 
         if (P.accept(TokenType::Float))
-            return std::make_shared<ConstExpression>(ElementaryType::Number, value.Value);
+            return std::make_shared<ConstExpression>(value.Location, ElementaryType::Number, value.Value);
 
         if (P.accept(TokenType::Integer))
-            return std::make_shared<ConstExpression>(ElementaryType::Integer, value.Value);
+            return std::make_shared<ConstExpression>(value.Location, ElementaryType::Integer, value.Value);
 
         if (P.accept(TokenType::String))
-            return std::make_shared<ConstExpression>(ElementaryType::String, value.Value);
+            return std::make_shared<ConstExpression>(value.Location, ElementaryType::String, value.Value);
 
         if (P.accept(TokenType::Identifier)) {
-            auto var = std::make_shared<VariableExpression>(std::get<std::string>(value.Value));
+            auto var = std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));
 
-            if (P.cur(0).Type == TokenType::Dot) {
+            if (P.cur().Type == TokenType::Dot) {
+                size_t loc   = P.cur().Location;
                 auto swizzle = p_swizzle();
-                return std::make_shared<AccessExpression>(var, swizzle);
+                return std::make_shared<AccessExpression>(loc, var, swizzle);
             }
             return var;
         }
 
         P.error(std::array<TokenType, 5>{ TokenType::Boolean, TokenType::Float, TokenType::Integer, TokenType::String, TokenType::Identifier });
-        return std::make_shared<ErrorExpression>();
+        return std::make_shared<ErrorExpression>(value.Location);
     }
 
     std::string p_swizzle()

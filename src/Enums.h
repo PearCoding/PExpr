@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 namespace PExpr {
 enum class ElementaryType {
     Unspecified,
@@ -43,4 +45,8 @@ enum class ExpressionType {
     Call,
     Access
 };
+
+std::string_view toString(ElementaryType type);
+std::string_view toString(UnaryOperation op);
+std::string_view toString(BinaryOperation op);
 } // namespace PExpr
