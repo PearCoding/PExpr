@@ -15,6 +15,28 @@ enum class ElementaryType {
     String
 };
 
+inline bool isConvertible(ElementaryType from, ElementaryType to)
+{
+    if (from == ElementaryType::Unspecified || to == ElementaryType::Unspecified)
+        return false;
+
+    if (from == to)
+        return true;
+
+    // We only allow implicit conversion from integer to float, but not back!
+    return from == ElementaryType::Integer && to == ElementaryType::Number;
+}
+
+inline bool isArray(ElementaryType type)
+{
+    return type == ElementaryType::Vec2 || type == ElementaryType::Vec3 || type == ElementaryType::Vec4;
+}
+
+inline bool isArithmetic(ElementaryType type)
+{
+    return type == ElementaryType::Integer || type == ElementaryType::Number || isArray(type);
+}
+
 enum class UnaryOperation {
     Pos, // +
     Neg, // -

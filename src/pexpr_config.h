@@ -207,38 +207,7 @@ template <typename T>
 using Ptr = std::shared_ptr<T>;
 
 /* Precise vector types */
-using Vector2f = std::array<float, 2>;
-using Vector3f = std::array<float, 2>;
-using Vector4f = std::array<float, 2>;
-
-/* Useful constants */
-constexpr float FltEps = std::numeric_limits<float>::epsilon();
-constexpr float FltInf = std::numeric_limits<float>::infinity();
-constexpr float FltMax = std::numeric_limits<float>::max();
-
-constexpr float Pi     = 3.14159265358979323846f;
-constexpr float InvPi  = 0.31830988618379067154f; // 1/pi
-constexpr float Inv2Pi = 0.15915494309189533577f; // 1/(2pi)
-constexpr float Inv4Pi = 0.07957747154594766788f; // 1/(4pi)
-constexpr float Pi2    = 1.57079632679489661923f; // pi half
-constexpr float Pi4    = 0.78539816339744830961f; // pi quarter
-constexpr float Sqrt2  = 1.41421356237309504880f;
-
-constexpr float Deg2Rad = Pi / 180.0f;
-constexpr float Rad2Deg = 180.0f * InvPi;
-
-/// Clamps a between b and c.
-template <typename T>
-inline T clamp(const T& a, const T& b, const T& c)
-{
-    return (a < b) ? b : ((a > c) ? c : a);
-}
-
-/// Transform string to lowercase
-inline std::string to_lowercase(const std::string& str)
-{
-    std::string tmp = str;
-    std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](const std::string::value_type& v) { return static_cast<std::string::value_type>(::tolower((int)v)); });
-    return tmp;
-}
+using Vec2 = std::array<Number, 2>;
+using Vec3 = std::array<Number, 3>;
+using Vec4 = std::array<Number, 4>;
 } // namespace PExpr
