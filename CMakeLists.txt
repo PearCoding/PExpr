@@ -7,7 +7,7 @@ endif()
 # Prevent in source builds
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 	if(NOT DEFINED WITH_IN_SOURCE_BUILD)
-		messag(FATAL_ERROR "CMake generation for pexpr is not allowed within the source directory! Define WITH_IN_SOURCE_BUILD if absolutely necessary!" )
+		messag(FATAL_ERROR "CMake generation for PExpr is not allowed within the source directory! Define WITH_IN_SOURCE_BUILD if absolutely necessary!" )
 	endif()
 endif()
 
@@ -21,7 +21,7 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-project(pexpr
+project(PExpr
 	VERSION 0.1
 	DESCRIPTION "Simple inline expressions for mathmatical operations")
 
@@ -42,7 +42,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_DEBUG_POSTFIX  "_d")
 
-message(STATUS "Building pexpr ${pexpr_VERSION}")
+message(STATUS "Building PExpr ${PExpr_VERSION}")
 
 option(PEXPR_WITH_ASSERTS "Build with asserts even in release. It is always enabled on debug" OFF)
 option(PEXPR_WITH_TESTS "Build tests" PEXPR_NOT_SUBPROJECT)
