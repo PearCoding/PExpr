@@ -14,6 +14,9 @@ int main(int argc, char** argv)
 
     std::stringstream stream(input);
     Environment env;
+    env.registerVariable("Pi", ElementaryType::Number);
+    env.registerVariable("Eps", ElementaryType::Number);
+
     auto ast = env.parse(stream);
 
     if (ast == nullptr)
