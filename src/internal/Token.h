@@ -2,8 +2,6 @@
 
 #include "pexpr_config.h"
 
-#include <variant>
-
 namespace PExpr {
 enum class TokenType {
     Error,
@@ -76,7 +74,7 @@ public:
 
     size_t Location;
     TokenType Type;
-    std::variant<bool, Integer, Number, std::string> Value;
+    ValueVariant Value;
 
     static std::string_view toString(TokenType type);
 };

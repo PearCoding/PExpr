@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pexpr_config.h"
 #include <string_view>
 
 namespace PExpr {

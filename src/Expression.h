@@ -1,9 +1,6 @@
 #pragma once
 
 #include "Enums.h"
-#include "pexpr_config.h"
-
-#include <variant>
 
 namespace PExpr {
 class Expression {
@@ -57,8 +54,6 @@ private:
 
 class ConstExpression : public Expression {
 public:
-    using ValueVariant = std::variant<bool, Integer, Number, std::string>;
-
     inline ConstExpression(size_t loc, ElementaryType type, const ValueVariant& value)
         : Expression(loc, ExpressionType::Const)
         , mValue(value)

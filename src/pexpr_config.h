@@ -167,6 +167,7 @@ private:                                           \
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace PExpr {
@@ -199,6 +200,8 @@ static_assert(sizeof(int32) == 4, "Invalid bytesize configuration");
 static_assert(sizeof(uint32) == 4, "Invalid bytesize configuration");
 static_assert(sizeof(int64) == 8, "Invalid bytesize configuration");
 static_assert(sizeof(uint64) == 8, "Invalid bytesize configuration");
+
+using ValueVariant = std::variant<bool, Integer, Number, std::string>;
 
 template <typename T>
 using Ptr = std::shared_ptr<T>;
