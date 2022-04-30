@@ -197,6 +197,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
 
+    // The access operator also allows expanding e.g., vec2.xyxy -> vec4 operations
     if (isArray(innerType)) {
         const auto& swizzle = expr->swizzle();
 
@@ -206,11 +207,22 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
         if (innerType == ElementaryType::Vec4)
             vec_size = 4;
 
+        bool isValid = true;
+        for (char c : swizzle) {
+            isValid = (c == 'x' || c == 'r'
+                       || c == 'y' || c == 'g'
+                       || (vec_size > 2 && c == 'z') || (vec_size > 2 && c == 'b')
+                       || (vec_size > 3 && c == 'w') || (vec_size > 3 && c == 'a'));
+
+            if (!isValid)
+                break;
+        }
+
         PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
-        if (swizzle.size() > vec_size) {
-            PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Expected a maximum of " << vec_size << " components but got " << swizzle.size() << std::endl;
+        if (!isValid) {
+            PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Invalid access components '" << swizzle << "' given" << std::endl;
         } else {
-            switch (vec_size) {
+            switch (swizzle.size()) {
             case 1:
                 expr->setReturnType(ElementaryType::Number);
                 break;
@@ -224,7 +236,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
                 expr->setReturnType(ElementaryType::Vec4);
                 break;
             default:
-                PEXPR_ASSERT(false, "Component count switch is invalid!"); // Should never happen
+                PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Expected a maximum of 4 components but got " << swizzle.size() << std::endl;
                 break;
             }
         }
