@@ -28,13 +28,13 @@ inline bool isArithmetic(ElementaryType type)
 
 inline void typeError(const Ptr<UnaryExpression>& expr, ElementaryType type)
 {
-    PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Can not use operator '" << toString(expr->op())
+    PEXPR_LOG(LogLevel::Error) << expr->location() << ": Can not use operator '" << toString(expr->op())
                                << "' with type '" << toString(type) << "'" << std::endl;
 }
 
 inline void typeError(const Ptr<BinaryExpression>& expr, ElementaryType left, ElementaryType right)
 {
-    PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Can not use operator '" << toString(expr->op())
+    PEXPR_LOG(LogLevel::Error) << expr->location() << ": Can not use operator '" << toString(expr->op())
                                << "' with types '" << toString(left) << "' and '" << toString(right) << "'" << std::endl;
 }
 
@@ -70,7 +70,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
-        PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Unknown identifier '" << expr->name() << "' found" << std::endl;
+        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Unknown identifier '" << expr->name() << "' found" << std::endl;
         return ElementaryType::Unspecified;
     }
 }
@@ -242,7 +242,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
         // Compose error message
         if (expr->isUnspecified()) {
             std::stringstream output;
-            output << "At " << expr->location() << ": Call to function '" << expr->name() << "(" << printArgs(fromArgs) << ")' not found" << std::endl
+            output << expr->location() << ": Call to function '" << expr->name() << "(" << printArgs(fromArgs) << ")' not found" << std::endl
                    << "  Available signatures are: " << std::endl;
 
             for (auto it = def.value().first; it != def.value().second; ++it)
@@ -251,7 +251,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
             PEXPR_LOG(LogLevel::Error) << output.str();
         }
     } else {
-        PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown" << std::endl;
+        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown" << std::endl;
     }
 
     return expr->returnType();
@@ -286,7 +286,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
 
         PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
         if (!isValid) {
-            PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Invalid access components '" << swizzle << "' given" << std::endl;
+            PEXPR_LOG(LogLevel::Error) << expr->location() << ": Invalid access components '" << swizzle << "' given" << std::endl;
         } else {
             switch (swizzle.size()) {
             case 1:
@@ -302,12 +302,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
                 expr->setReturnType(ElementaryType::Vec4);
                 break;
             default:
-                PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Expected a maximum of 4 components but got " << swizzle.size() << std::endl;
+                PEXPR_LOG(LogLevel::Error) << expr->location() << ": Expected a maximum of 4 components but got " << swizzle.size() << std::endl;
                 break;
             }
         }
     } else {
-        PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Access operator is only defined for vector types" << std::endl;
+        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Access operator is only defined for vector types" << std::endl;
     }
 
     return expr->returnType();

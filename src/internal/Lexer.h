@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Location.h"
 #include "Token.h"
 
 #include <istream>
@@ -11,7 +12,7 @@ public:
 
     Token next();
 
-    inline size_t currentPosition() const { return mPosition; }
+    inline const Location& loc() const { return mLocation; }
 
 private:
     void eat();
@@ -31,7 +32,7 @@ private:
 
     std::istream& mStream;
     uint8_t mChar;
-    size_t mPosition;
+    Location mLocation;
     std::string mTemp; // Contains identifiers etc
 };
 } // namespace PExpr

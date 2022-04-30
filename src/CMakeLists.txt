@@ -7,6 +7,7 @@ set(PUBLIC
     Environment.cpp
     Environment.h
     Expression.h
+    Location.h
     Logger.h
     LogListener.h
     StringVisitor.h

@@ -31,7 +31,10 @@ bool Parser::expect(TokenType type)
 {
     bool same = cur().Type == type;
     if (!same) {
-        PEXPR_LOG(LogLevel::Error) << "At " << cur().Location << ": Expected '" << Token::toString(type) << "' but got '" << Token::toString(cur().Type) << "'" << std::endl;
+        if (cur().Type == TokenType::Eof)
+            PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected '" << Token::toString(type) << "' but input terminated early" << std::endl;
+        else
+            PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected '" << Token::toString(type) << "' but got '" << Token::toString(cur().Type) << "'" << std::endl;
         mHasError = true;
     }
 
@@ -51,7 +54,10 @@ void Parser::error(const std::array<TokenType, N>& types)
             expectation += ", ";
     }
 
-    PEXPR_LOG(LogLevel::Error) << "At " << cur().Location << ": Expected {" << expectation << "} but got '" << Token::toString(cur().Type) << "'" << std::endl;
+    if (cur().Type == TokenType::Eof)
+        PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected {" << expectation << "} but input terminated early" << std::endl;
+    else
+        PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected {" << expectation << "} but got '" << Token::toString(cur().Type) << "'" << std::endl;
 }
 
 void Parser::eat(TokenType type)
@@ -112,8 +118,8 @@ private:
 
     inline Ptr<Expression> p_logical_expression()
     {
-        auto left  = p_equality_expression();
-        size_t loc = P.cur().Location;
+        auto left      = p_equality_expression();
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::And))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::And, left, p_logical_expression());
         if (P.accept(TokenType::Or))
@@ -124,8 +130,8 @@ private:
 
     inline Ptr<Expression> p_equality_expression()
     {
-        auto left  = p_relational_expression();
-        size_t loc = P.cur().Location;
+        auto left      = p_relational_expression();
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::Equal))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::Equal, left, p_equality_expression());
         if (P.accept(TokenType::NotEqual))
@@ -136,8 +142,8 @@ private:
 
     inline Ptr<Expression> p_relational_expression()
     {
-        auto left  = p_additive_expression();
-        size_t loc = P.cur().Location;
+        auto left      = p_additive_expression();
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::Less))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::Less, left, p_relational_expression());
         if (P.accept(TokenType::Greater))
@@ -152,8 +158,8 @@ private:
 
     inline Ptr<Expression> p_additive_expression()
     {
-        auto left  = p_multiplicative_expression();
-        size_t loc = P.cur().Location;
+        auto left      = p_multiplicative_expression();
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::Plus))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::Add, left, p_additive_expression());
         if (P.accept(TokenType::Minus))
@@ -164,8 +170,8 @@ private:
 
     inline Ptr<Expression> p_multiplicative_expression()
     {
-        auto left  = p_unary_expression();
-        size_t loc = P.cur().Location;
+        auto left      = p_unary_expression();
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::Mul))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mul, left, p_multiplicative_expression());
         if (P.accept(TokenType::Div))
@@ -180,7 +186,7 @@ private:
 
     inline Ptr<Expression> p_unary_expression()
     {
-        size_t loc = P.cur().Location;
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::Plus))
             return std::make_shared<UnaryExpression>(loc, UnaryOperation::Pos, p_unary_expression());
         if (P.accept(TokenType::Minus))
@@ -199,8 +205,8 @@ private:
             auto call = p_call_expression();
 
             if (P.cur().Type == TokenType::Dot) {
-                size_t loc   = P.cur().Location;
-                auto swizzle = p_swizzle();
+                const auto loc = P.cur().Location;
+                auto swizzle   = p_swizzle();
                 return std::make_shared<AccessExpression>(loc, call, swizzle);
             }
             return call;
@@ -211,7 +217,7 @@ private:
 
     inline Ptr<Expression> p_call_expression()
     {
-        const size_t loc           = P.cur().Location;
+        const auto loc             = P.cur().Location;
         const std::string funcName = std::get<std::string>(P.cur().Value);
 
         P.expect(TokenType::Identifier);
@@ -243,8 +249,8 @@ private:
             P.expect(TokenType::ClosedParanthese);
 
             if (P.cur().Type == TokenType::Dot) {
-                size_t loc   = P.cur().Location;
-                auto swizzle = p_swizzle();
+                const auto loc = P.cur().Location;
+                auto swizzle   = p_swizzle();
                 return std::make_shared<AccessExpression>(loc, expr, swizzle);
             }
             return expr;
@@ -267,8 +273,8 @@ private:
             auto var = std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));
 
             if (P.cur().Type == TokenType::Dot) {
-                size_t loc   = P.cur().Location;
-                auto swizzle = p_swizzle();
+                const auto loc = P.cur().Location;
+                auto swizzle   = p_swizzle();
                 return std::make_shared<AccessExpression>(loc, var, swizzle);
             }
             return var;

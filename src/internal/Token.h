@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pexpr_config.h"
+#include "Location.h"
 
 namespace PExpr {
 enum class TokenType {
@@ -41,7 +41,7 @@ public:
     {
     }
 
-    inline Token(size_t location, TokenType type)
+    inline Token(const Location& location, TokenType type)
         : Location(location)
         , Type(type)
         , Value{}
@@ -72,7 +72,7 @@ public:
         return *this;
     }
 
-    size_t Location;
+    PExpr::Location Location;
     TokenType Type;
     ValueVariant Value;
 

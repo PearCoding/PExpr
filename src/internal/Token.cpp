@@ -6,9 +6,9 @@ std::string_view Token::toString(TokenType type)
     switch (type) {
     default:
     case TokenType::Error:
-        return "ERROR";
+        return "Error";
     case TokenType::Eof:
-        return "EOF";
+        return "EndOfStream";
     case TokenType::Float:
         return "Float";
     case TokenType::Integer:

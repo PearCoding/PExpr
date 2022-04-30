@@ -5,7 +5,7 @@ namespace PExpr {
 Lexer::Lexer(std::istream& stream)
     : mStream(stream)
     , mChar(0)
-    , mPosition(0)
+    , mLocation(0)
     , mTemp{}
 {
     eat();
@@ -19,65 +19,65 @@ Token Lexer::next()
         eatSpaces();
 
         if (eof())
-            return Token(mPosition, TokenType::Eof);
+            return Token(mLocation, TokenType::Eof);
 
         if (accept('('))
-            return Token(mPosition - 1, TokenType::OpenParanthese);
+            return Token(mLocation - 1, TokenType::OpenParanthese);
         if (accept(')'))
-            return Token(mPosition - 1, TokenType::ClosedParanthese);
+            return Token(mLocation - 1, TokenType::ClosedParanthese);
         if (accept('+'))
-            return Token(mPosition - 1, TokenType::Plus);
+            return Token(mLocation - 1, TokenType::Plus);
         if (accept('-'))
-            return Token(mPosition - 1, TokenType::Minus);
+            return Token(mLocation - 1, TokenType::Minus);
         if (accept('*'))
-            return Token(mPosition - 1, TokenType::Mul);
+            return Token(mLocation - 1, TokenType::Mul);
         if (accept('/')) {
             if (accept('*')) {
                 eatComments();
                 continue;
             }
-            return Token(mPosition - 1, TokenType::Div);
+            return Token(mLocation - 1, TokenType::Div);
         }
         if (accept('%'))
-            return Token(mPosition - 1, TokenType::Mod);
+            return Token(mLocation - 1, TokenType::Mod);
         if (accept('^'))
-            return Token(mPosition - 1, TokenType::Pow);
+            return Token(mLocation - 1, TokenType::Pow);
         if (accept('.'))
-            return Token(mPosition - 1, TokenType::Dot);
+            return Token(mLocation - 1, TokenType::Dot);
         if (accept(','))
-            return Token(mPosition - 1, TokenType::Comma);
+            return Token(mLocation - 1, TokenType::Comma);
 
         if (accept('=')) {
             if (accept('='))
-                return Token(mPosition - 2, TokenType::Equal);
+                return Token(mLocation - 2, TokenType::Equal);
         }
 
         if (accept('&')) {
             if (accept('&'))
-                return Token(mPosition - 2, TokenType::And);
+                return Token(mLocation - 2, TokenType::And);
         }
 
         if (accept('|')) {
             if (accept('|'))
-                return Token(mPosition - 2, TokenType::Or);
+                return Token(mLocation - 2, TokenType::Or);
         }
 
         if (accept('!')) {
             if (accept('='))
-                return Token(mPosition - 2, TokenType::NotEqual);
-            return Token(mPosition - 1, TokenType::ExclamationMark);
+                return Token(mLocation - 2, TokenType::NotEqual);
+            return Token(mLocation - 1, TokenType::ExclamationMark);
         }
 
         if (accept('<')) {
             if (accept('='))
-                return Token(mPosition - 2, TokenType::Less);
-            return Token(mPosition - 1, TokenType::LessEqual);
+                return Token(mLocation - 2, TokenType::Less);
+            return Token(mLocation - 1, TokenType::LessEqual);
         }
 
         if (accept('>')) {
             if (accept('='))
-                return Token(mPosition - 2, TokenType::Greater);
-            return Token(mPosition - 1, TokenType::GreaterEqual);
+                return Token(mLocation - 2, TokenType::Greater);
+            return Token(mLocation - 1, TokenType::GreaterEqual);
         }
 
         if (accept('\"'))
@@ -94,22 +94,22 @@ Token Lexer::next()
                 append();
 
             if (mTemp == "true")
-                return Token(mPosition - mTemp.size(), TokenType::Boolean).With(true);
+                return Token(mLocation - mTemp.size(), TokenType::Boolean).With(true);
             if (mTemp == "false")
-                return Token(mPosition - mTemp.size(), TokenType::Boolean).With(false);
+                return Token(mLocation - mTemp.size(), TokenType::Boolean).With(false);
 
-            return Token(mPosition - mTemp.size(), TokenType::Identifier).With(mTemp);
+            return Token(mLocation - mTemp.size(), TokenType::Identifier).With(mTemp);
         }
 
         append();
-        PEXPR_LOG(LogLevel::Error) << "At " << mPosition << ": Unknown token '" << mTemp << "'" << std::endl;
-        return Token(mPosition, TokenType::Error);
+        PEXPR_LOG(LogLevel::Error) << mLocation << ": Unknown token '" << mTemp << "'" << std::endl;
+        return Token(mLocation, TokenType::Error);
     }
 }
 
 void Lexer::eat()
 {
-    ++mPosition;
+    ++mLocation;
     mChar = mStream.get();
 }
 
@@ -134,7 +134,7 @@ void Lexer::eatComments()
 
 Token Lexer::parseNumber()
 {
-    const size_t startLoc = mPosition;
+    const Location startLoc = mLocation;
 
     int base = 10;
     // Prefix starting with '0'
@@ -173,7 +173,7 @@ Token Lexer::parseNumber()
 
     // Check digits
     if (base < 10 && std::find_if(digit_ptr, last_ptr, invalid_digit) != last_ptr)
-        PEXPR_LOG(LogLevel::Error) << "At " << startLoc << ": Invalid literal '" << mTemp << "'" << std::endl;
+        PEXPR_LOG(LogLevel::Error) << startLoc << ": Invalid literal '" << mTemp << "'" << std::endl;
 
     if (exp || fractional)
         return Token(startLoc, TokenType::Float).With(Number(std::strtod(digit_ptr, nullptr)));
@@ -182,16 +182,16 @@ Token Lexer::parseNumber()
 
 Token Lexer::parseString(uint8_t mark)
 {
-    const size_t startLoc = mPosition;
-    
+    const Location startLoc = mLocation;
+
     std::string str;
     while (true) {
         size_t pos = mTemp.size();
         while (!eof() && peek() != mark)
             appendChar();
         if (eof() || !accept(mark)) {
-            PEXPR_LOG(LogLevel::Error) << "At " << mPosition << ": Unterminated string literal" << std::endl;
-            return Token(mPosition, TokenType::Error);
+            PEXPR_LOG(LogLevel::Error) << mLocation << ": Unterminated string literal" << std::endl;
+            return Token(mLocation, TokenType::Error);
         }
         str += mTemp.substr(pos, mTemp.size() - (pos + 1));
         eatSpaces();
@@ -262,7 +262,7 @@ void Lexer::appendChar()
             std::string uni_val;
             for (size_t i = 0; i < length; ++i) {
                 if (eof()) {
-                    PEXPR_LOG(LogLevel::Error) << "At " << mPosition - 1 << ": Invalid use of Unicode escape sequence" << std::endl;
+                    PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Invalid use of Unicode escape sequence" << std::endl;
                     break;
                 }
 
@@ -276,12 +276,12 @@ void Lexer::appendChar()
                 try {
                     uni = std::stoul(uni_val, &r, 16);
                 } catch (const std::exception&) {
-                    PEXPR_LOG(LogLevel::Error) << "At " << mPosition - 1 << ": Given Unicode escape sequence is invalid" << std::endl;
+                    PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Given Unicode escape sequence is invalid" << std::endl;
                     break;
                 }
 
                 if (r != length) {
-                    PEXPR_LOG(LogLevel::Error) << "At " << mPosition - 1 << ": Given Unicode escape sequence is invalid" << std::endl;
+                    PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Given Unicode escape sequence is invalid" << std::endl;
                 } else if (length != 2) {
                     if (uni <= 0x7F) {
                         mTemp += (char)uni;
@@ -301,17 +301,17 @@ void Lexer::appendChar()
                         mTemp += char(0x80 | ((d & 0xFC0) >> 6));
                         mTemp += char(0x80 | (d & 0x3F));
                     } else {
-                        PEXPR_LOG(LogLevel::Error) << "At " << mPosition - 1 << ": Given Unicode range" << std::endl;
+                        PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Given Unicode range" << std::endl;
                     }
                 } else { // Binary
                     mTemp += (char)uni;
                 }
             } else {
-                PEXPR_LOG(LogLevel::Error) << "At " << mPosition - 1 << ": Invalid length of Unicode escape sequence" << std::endl;
+                PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Invalid length of Unicode escape sequence" << std::endl;
             }
         } break;
         default:
-            PEXPR_LOG(LogLevel::Error) << "At " << mPosition - 1 << ": Invalid escape sequence '\\" << peek() << "'" << std::endl;
+            PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Invalid escape sequence '\\" << peek() << "'" << std::endl;
             eat();
             break;
         }

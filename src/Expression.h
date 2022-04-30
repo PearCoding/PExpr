@@ -1,13 +1,14 @@
 #pragma once
 
 #include "Enums.h"
+#include "Location.h"
 
 namespace PExpr {
 class Expression {
 public:
     Expression() = delete;
 
-    inline size_t location() const { return mLocation; }
+    inline const Location& location() const { return mLocation; }
 
     inline ExpressionType type() const { return mType; }
     inline ElementaryType returnType() const { return mReturnType; }
@@ -16,7 +17,7 @@ public:
     inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
 
 protected:
-    inline Expression(size_t loc, ExpressionType type)
+    inline Expression(const Location& loc, ExpressionType type)
         : mLocation(loc)
         , mType(type)
         , mReturnType(ElementaryType::Unspecified)
@@ -24,7 +25,7 @@ protected:
     }
 
 private:
-    size_t mLocation;
+    Location mLocation;
     ExpressionType mType;
     ElementaryType mReturnType;
 };
@@ -32,7 +33,7 @@ private:
 // Special expression used if an error occured while parsing
 class ErrorExpression : public Expression {
 public:
-    inline ErrorExpression(size_t loc)
+    inline ErrorExpression(const Location& loc)
         : Expression(loc, ExpressionType::Error)
     {
     }
@@ -40,7 +41,7 @@ public:
 
 class VariableExpression : public Expression {
 public:
-    inline VariableExpression(size_t loc, const std::string& name)
+    inline VariableExpression(const Location& loc, const std::string& name)
         : Expression(loc, ExpressionType::Variable)
         , mName(name)
     {
@@ -54,7 +55,7 @@ private:
 
 class ConstExpression : public Expression {
 public:
-    inline ConstExpression(size_t loc, ElementaryType type, const ValueVariant& value)
+    inline ConstExpression(const Location& loc, ElementaryType type, const ValueVariant& value)
         : Expression(loc, ExpressionType::Const)
         , mValue(value)
     {
@@ -92,7 +93,7 @@ private:
 
 class UnaryExpression : public Expression {
 public:
-    inline UnaryExpression(size_t loc, UnaryOperation op, const Ptr<Expression>& expr)
+    inline UnaryExpression(const Location& loc, UnaryOperation op, const Ptr<Expression>& expr)
         : Expression(loc, ExpressionType::Unary)
         , mOperation(op)
         , mExpr(expr)
@@ -110,7 +111,7 @@ private:
 
 class BinaryExpression : public Expression {
 public:
-    inline BinaryExpression(size_t loc, BinaryOperation op, const Ptr<Expression>& left, const Ptr<Expression>& right)
+    inline BinaryExpression(const Location& loc, BinaryOperation op, const Ptr<Expression>& left, const Ptr<Expression>& right)
         : Expression(loc, ExpressionType::Binary)
         , mOperation(op)
         , mLeft(left)
@@ -133,14 +134,14 @@ class CallExpression : public Expression {
 public:
     using ParameterList = std::vector<Ptr<Expression>>;
 
-    inline CallExpression(size_t loc, const std::string& name, const ParameterList& parameters)
+    inline CallExpression(const Location& loc, const std::string& name, const ParameterList& parameters)
         : Expression(loc, ExpressionType::Call)
         , mName(name)
         , mParameters(parameters)
     {
     }
 
-    inline CallExpression(size_t loc, const std::string& name, ParameterList&& parameters)
+    inline CallExpression(const Location& loc, const std::string& name, ParameterList&& parameters)
         : Expression(loc, ExpressionType::Call)
         , mName(name)
         , mParameters(std::move(parameters))
@@ -157,7 +158,7 @@ private:
 
 class AccessExpression : public Expression {
 public:
-    inline AccessExpression(size_t loc, const Ptr<Expression>& expr, const std::string& swizzle)
+    inline AccessExpression(const Location& loc, const Ptr<Expression>& expr, const std::string& swizzle)
         : Expression(loc, ExpressionType::Access)
         , mExpr(expr)
         , mSwizzle(swizzle)
