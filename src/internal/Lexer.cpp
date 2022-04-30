@@ -110,7 +110,7 @@ Token Lexer::next()
 void Lexer::eat()
 {
     ++mLocation;
-    mChar = mStream.get();
+    mChar = (uint8)mStream.get();
 }
 
 void Lexer::eatSpaces()
