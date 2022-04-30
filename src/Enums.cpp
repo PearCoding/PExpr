@@ -29,6 +29,8 @@ std::string_view toString(ElementaryType type)
 std::string_view toString(UnaryOperation op)
 {
     switch (op) {
+    case UnaryOperation::Pos:
+        return "+";
     case UnaryOperation::Neg:
         return "-";
     case UnaryOperation::Not:

@@ -9,7 +9,7 @@ public:
     ~Environment();
 
     void registerVariable(const std::string& name, ElementaryType type);
-    Ptr<Expression> parse(std::istream& stream) const;
+    Ptr<Expression> parse(std::istream& stream, bool skipTypeChecking = false) const;
 
 private:
     std::unique_ptr<class EnvironmentPrivate> mInternal;

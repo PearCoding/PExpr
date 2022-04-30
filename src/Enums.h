@@ -15,6 +15,7 @@ enum class ElementaryType {
 };
 
 enum class UnaryOperation {
+    Pos, // +
     Neg, // -
     Not, // !
 };

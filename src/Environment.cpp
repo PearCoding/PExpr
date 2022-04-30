@@ -23,7 +23,7 @@ void Environment::registerVariable(const std::string& name, ElementaryType type)
     mInternal->VariableContainer.registerVariable(name, type);
 }
 
-Ptr<Expression> Environment::parse(std::istream& stream) const
+Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) const
 {
     Lexer lexer(stream);
     Parser parser(lexer);
@@ -33,12 +33,15 @@ Ptr<Expression> Environment::parse(std::istream& stream) const
     if (!expr || parser.hasError())
         return nullptr;
 
-    TypeChecker checker(mInternal->VariableContainer);
-    auto retType = checker.handle(expr);
-    if (retType == ElementaryType::Unspecified)
-        return nullptr;
+    if (!skipTypeChecking) {
+        TypeChecker checker(mInternal->VariableContainer);
+        auto retType = checker.handle(expr);
+        if (retType == ElementaryType::Unspecified)
+            return nullptr;
 
-    expr->setReturnType(retType);
+        expr->setReturnType(retType);
+    }
+
     return expr;
 }
 

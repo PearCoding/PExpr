@@ -26,14 +26,14 @@ inline bool isArithmetic(ElementaryType type)
 
 inline void typeError(const Ptr<UnaryExpression>& expr, ElementaryType type)
 {
-    PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Can not use operator " << toString(expr->op())
-                               << " with " << toString(type) << std::endl;
+    PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Can not use operator '" << toString(expr->op())
+                               << "' with type '" << toString(type) << "'" << std::endl;
 }
 
 inline void typeError(const Ptr<BinaryExpression>& expr, ElementaryType left, ElementaryType right)
 {
-    PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Can not use operator " << toString(expr->op())
-                               << " with " << toString(left) << " and " << toString(right) << std::endl;
+    PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Can not use operator '" << toString(expr->op())
+                               << "' with types '" << toString(left) << "' and '" << toString(right) << "'" << std::endl;
 }
 
 TypeChecker::TypeChecker(const VariableContainer& variables)
@@ -86,13 +86,14 @@ ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
         return innerType; // Error was caught somewhere else
 
     switch (expr->op()) {
+    case UnaryOperation::Pos:
     case UnaryOperation::Neg:
-        if (isConvertible(innerType, ElementaryType::Number))
+        if (isArithmetic(innerType))
             expr->setReturnType(innerType);
         break;
     case UnaryOperation::Not:
         if (isConvertible(innerType, ElementaryType::Boolean))
-            expr->setReturnType(innerType);
+            expr->setReturnType(ElementaryType::Boolean);
         break;
     default:
         break;
@@ -106,11 +107,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
 {
-    auto leftType = handle(expr->left());
-    if (leftType == ElementaryType::Unspecified)
-        return leftType; // Error was caught somewhere else
+    auto leftType  = handle(expr->left());
     auto rightType = handle(expr->right());
-    if (rightType == ElementaryType::Unspecified)
+    if (leftType == ElementaryType::Unspecified || rightType == ElementaryType::Unspecified)
         return rightType; // Error was caught somewhere else
 
     switch (expr->op()) {
@@ -156,13 +155,21 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
         break;
     case BinaryOperation::And:
     case BinaryOperation::Or:
+        if (isConvertible(leftType, ElementaryType::Boolean) && isConvertible(rightType, ElementaryType::Boolean))
+            expr->setReturnType(ElementaryType::Boolean);
+        break;
     case BinaryOperation::Less:
     case BinaryOperation::Greater:
     case BinaryOperation::LessEqual:
     case BinaryOperation::GreaterEqual:
+        if (isConvertible(leftType, ElementaryType::Boolean) && isConvertible(rightType, ElementaryType::Boolean))
+            expr->setReturnType(ElementaryType::Boolean);
+        if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
+            expr->setReturnType(ElementaryType::Boolean);
+        break;
     case BinaryOperation::Equal:
     case BinaryOperation::NotEqual:
-        if (isConvertible(leftType, ElementaryType::Boolean) && isConvertible(rightType, ElementaryType::Boolean))
+        if (isConvertible(leftType, rightType) || isConvertible(rightType, leftType))
             expr->setReturnType(ElementaryType::Boolean);
         break;
     default:
@@ -180,13 +187,17 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     std::vector<ElementaryType> args;
     args.reserve(expr->parameters().size());
 
+    bool invalid = false;
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
         auto type = handle(expr->parameters().at(i));
         if (type == ElementaryType::Unspecified)
-            return type; // Error was caught somewhere else
+            invalid = true;
         args.push_back(type);
     }
 
+    if (invalid)
+        return ElementaryType::Unspecified; // Error was caught somewhere else
+    
     // TODO
     return expr->returnType();
 }

@@ -171,7 +171,7 @@ private:
     {
         size_t loc = P.cur().Location;
         if (P.accept(TokenType::Plus))
-            return p_unary_expression(); // Ignore
+            return std::make_shared<UnaryExpression>(loc, UnaryOperation::Pos, p_unary_expression());
         if (P.accept(TokenType::Minus))
             return std::make_shared<UnaryExpression>(loc, UnaryOperation::Neg, p_unary_expression());
         if (P.accept(TokenType::ExclamationMark))
