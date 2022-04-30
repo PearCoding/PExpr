@@ -1,12 +1,12 @@
 #pragma once
 
+#include "DefContainer.h"
 #include "Expression.h"
-#include "VariableContainer.h"
 
 namespace PExpr {
 class TypeChecker {
 public:
-    explicit TypeChecker(const VariableContainer& variables);
+    explicit TypeChecker(const DefContainer& defs);
 
     ElementaryType handle(const Ptr<Expression>& expr);
 
@@ -18,6 +18,6 @@ private:
     ElementaryType handleNode(const Ptr<CallExpression>& expr);
     ElementaryType handleNode(const Ptr<AccessExpression>& expr);
 
-    const VariableContainer& mVariables;
+    const DefContainer& mDefinitions;
 };
 } // namespace PExpr

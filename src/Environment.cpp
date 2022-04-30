@@ -1,12 +1,12 @@
 #include "Environment.h"
+#include "internal/DefContainer.h"
 #include "internal/Parser.h"
 #include "internal/TypeChecker.h"
-#include "internal/VariableContainer.h"
 
 namespace PExpr {
 class EnvironmentPrivate {
 public:
-    PExpr::VariableContainer VariableContainer;
+    DefContainer Definitions;
 };
 
 Environment::Environment()
@@ -18,9 +18,14 @@ Environment::~Environment()
 {
 }
 
-void Environment::registerVariable(const std::string& name, ElementaryType type)
+void Environment::registerDef(const VariableDef& def)
 {
-    mInternal->VariableContainer.registerVariable(name, type);
+    mInternal->Definitions.registerDef(def);
+}
+
+void Environment::registerDef(const FunctionDef& def)
+{
+    mInternal->Definitions.registerDef(def);
 }
 
 Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) const
@@ -34,7 +39,7 @@ Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) 
         return nullptr;
 
     if (!skipTypeChecking) {
-        TypeChecker checker(mInternal->VariableContainer);
+        TypeChecker checker(mInternal->Definitions);
         auto retType = checker.handle(expr);
         if (retType == ElementaryType::Unspecified)
             return nullptr;

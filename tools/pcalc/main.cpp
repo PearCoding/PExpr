@@ -14,8 +14,11 @@ int main(int argc, char** argv)
 
     std::stringstream stream(input);
     Environment env;
-    env.registerVariable("Pi", ElementaryType::Number);
-    env.registerVariable("Eps", ElementaryType::Number);
+    env.registerDef(ConstantDef("Pi", ElementaryType::Number, 3.141592));
+    env.registerDef(ConstantDef("Eps", ElementaryType::Number, (Number)FltEps));
+
+    env.registerDef(FunctionDef("sin", ElementaryType::Number, { ElementaryType::Number }));
+    env.registerDef(FunctionDef("cos", ElementaryType::Number, { ElementaryType::Number }));
 
     auto ast = env.parse(stream);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Definitions.h"
 #include "Expression.h"
 
 namespace PExpr {
@@ -8,7 +9,9 @@ public:
     Environment();
     ~Environment();
 
-    void registerVariable(const std::string& name, ElementaryType type);
+    void registerDef(const VariableDef& def);
+    void registerDef(const FunctionDef& def);
+
     Ptr<Expression> parse(std::istream& stream, bool skipTypeChecking = false) const;
 
 private:

@@ -1,6 +1,8 @@
 #include "TypeChecker.h"
 #include "Logger.h"
 
+#include <algorithm>
+
 namespace PExpr {
 inline bool isConvertible(ElementaryType from, ElementaryType to)
 {
@@ -36,8 +38,8 @@ inline void typeError(const Ptr<BinaryExpression>& expr, ElementaryType left, El
                                << "' with types '" << toString(left) << "' and '" << toString(right) << "'" << std::endl;
 }
 
-TypeChecker::TypeChecker(const VariableContainer& variables)
-    : mVariables(variables)
+TypeChecker::TypeChecker(const DefContainer& defs)
+    : mDefinitions(defs)
 {
 }
 
@@ -63,11 +65,10 @@ ElementaryType TypeChecker::handle(const Ptr<Expression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
 {
-    if (mVariables.hasVariable(expr->name())) {
-        auto type = mVariables.checkVariable(expr->name());
-
-        expr->setReturnType(type);
-        return type;
+    auto def = mDefinitions.checkVariable(expr->name());
+    if (def.has_value()) {
+        expr->setReturnType(def.value().type());
+        return def.value().type();
     } else {
         PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Unknown identifier '" << expr->name() << "' found" << std::endl;
         return ElementaryType::Unspecified;
@@ -182,23 +183,77 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
     return expr->returnType();
 }
 
+inline std::string printArgs(const std::vector<ElementaryType>& args)
+{
+    std::stringstream stream;
+
+    for (size_t i = 0; i < args.size(); ++i) {
+        stream << toString(args[i]);
+        if (i != args.size() - 1)
+            stream << ", ";
+    }
+
+    return stream.str();
+}
+
 ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
 {
-    std::vector<ElementaryType> args;
-    args.reserve(expr->parameters().size());
+    std::vector<ElementaryType> fromArgs;
+    fromArgs.reserve(expr->parameters().size());
 
     bool invalid = false;
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
         auto type = handle(expr->parameters().at(i));
         if (type == ElementaryType::Unspecified)
             invalid = true;
-        args.push_back(type);
+        fromArgs.push_back(type);
     }
 
     if (invalid)
         return ElementaryType::Unspecified; // Error was caught somewhere else
-    
-    // TODO
+
+    auto def = mDefinitions.checkFunction(expr->name());
+    if (def.has_value()) {
+        // First check for exact matches
+        for (auto it = def.value().first; it != def.value().second; ++it) {
+            const auto& toArgs = it->second.arguments();
+
+            bool found = std::equal(fromArgs.begin(), fromArgs.end(), toArgs.begin());
+            if (found) {
+                expr->setReturnType(it->second.returnType());
+                break;
+            }
+        }
+
+        // Second check (if failed) with conversions
+        if (expr->isUnspecified()) {
+            for (auto it = def.value().first; it != def.value().second; ++it) {
+                const auto& toArgs = it->second.arguments();
+
+                bool found = std::equal(fromArgs.begin(), fromArgs.end(), toArgs.begin(),
+                                        isConvertible);
+                if (found) {
+                    expr->setReturnType(it->second.returnType());
+                    break;
+                }
+            }
+        }
+
+        // Compose error message
+        if (expr->isUnspecified()) {
+            std::stringstream output;
+            output << "At " << expr->location() << ": Call to function '" << expr->name() << "(" << printArgs(fromArgs) << ")' not found" << std::endl
+                   << "  Available signatures are: " << std::endl;
+
+            for (auto it = def.value().first; it != def.value().second; ++it)
+                output << "    '" << it->first << "(" << printArgs(it->second.arguments()) << ")'" << std::endl;
+
+            PEXPR_LOG(LogLevel::Error) << output.str();
+        }
+    } else {
+        PEXPR_LOG(LogLevel::Error) << "At " << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown" << std::endl;
+    }
+
     return expr->returnType();
 }
 

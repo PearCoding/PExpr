@@ -1,6 +1,7 @@
 set(PUBLIC
     pexpr_config.h
     PExpr.h
+    Definitions.h
     Enums.cpp
     Enums.h
     Environment.cpp
@@ -17,6 +18,7 @@ set(SRC
 
     internal/ConsoleLogListener.cpp
     internal/ConsoleLogListener.h
+    internal/DefContainer.h
     internal/Lexer.cpp
     internal/Lexer.h
     internal/Parser.cpp
@@ -25,7 +27,6 @@ set(SRC
     internal/Token.h
     internal/TypeChecker.cpp
     internal/TypeChecker.h
-    internal/VariableContainer.h
 )
 
 add_library(pexpr ${SRC})
