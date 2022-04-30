@@ -16,8 +16,14 @@ Ptr<Expression> parse_translation_unit(Parser& parser);
 Ptr<Expression> Parser::parse()
 {
     mHasError = false;
-    for (size_t i = 0; i < mCurrentToken.size(); ++i)
+    for (size_t i = 0; i < mCurrentToken.size(); ++i) {
         mCurrentToken[i] = mLexer.next();
+        if (mCurrentToken[i].Type == TokenType::Error) {
+            mHasError = true;
+            return nullptr;
+        }
+    }
+
     return parse_translation_unit(*this);
 }
 
@@ -68,7 +74,12 @@ void Parser::next()
 {
     for (size_t i = 1; i < mCurrentToken.size(); ++i)
         mCurrentToken[i - 1] = mCurrentToken[i];
-    mCurrentToken[mCurrentToken.size() - 1] = mLexer.next();
+
+    const auto nextToken                    = mLexer.next();
+    mCurrentToken[mCurrentToken.size() - 1] = nextToken;
+
+    if (nextToken.Type == TokenType::Error)
+        mHasError = true;
 }
 
 // --------------------------------------- Grammar
@@ -84,7 +95,7 @@ public:
     inline Ptr<Expression> parse()
     {
         auto expr = p_expression();
-        if (P.cur().Type != TokenType::Eof)
+        if (!P.hasError() && P.cur().Type != TokenType::Eof)
             PEXPR_LOG(LogLevel::Error) << "Parsing stopped before end of stream!" << std::endl;
 
         return expr;
@@ -263,7 +274,9 @@ private:
             return var;
         }
 
-        P.error(std::array<TokenType, 5>{ TokenType::Boolean, TokenType::Float, TokenType::Integer, TokenType::String, TokenType::Identifier });
+        // Only print error if error was not introduced by lexer
+        if (P.cur().Type != TokenType::Error)
+            P.error(std::array<TokenType, 5>{ TokenType::Boolean, TokenType::Float, TokenType::Integer, TokenType::String, TokenType::Identifier });
         return std::make_shared<ErrorExpression>(value.Location);
     }
 

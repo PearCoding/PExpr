@@ -22,62 +22,62 @@ Token Lexer::next()
             return Token(mPosition, TokenType::Eof);
 
         if (accept('('))
-            return Token(mPosition, TokenType::OpenParanthese);
+            return Token(mPosition - 1, TokenType::OpenParanthese);
         if (accept(')'))
-            return Token(mPosition, TokenType::ClosedParanthese);
+            return Token(mPosition - 1, TokenType::ClosedParanthese);
         if (accept('+'))
-            return Token(mPosition, TokenType::Plus);
+            return Token(mPosition - 1, TokenType::Plus);
         if (accept('-'))
-            return Token(mPosition, TokenType::Minus);
+            return Token(mPosition - 1, TokenType::Minus);
         if (accept('*'))
-            return Token(mPosition, TokenType::Mul);
+            return Token(mPosition - 1, TokenType::Mul);
         if (accept('/')) {
             if (accept('*')) {
                 eatComments();
                 continue;
             }
-            return Token(mPosition, TokenType::Div);
+            return Token(mPosition - 1, TokenType::Div);
         }
         if (accept('%'))
-            return Token(mPosition, TokenType::Mod);
+            return Token(mPosition - 1, TokenType::Mod);
         if (accept('^'))
-            return Token(mPosition, TokenType::Pow);
+            return Token(mPosition - 1, TokenType::Pow);
         if (accept('.'))
-            return Token(mPosition, TokenType::Dot);
+            return Token(mPosition - 1, TokenType::Dot);
         if (accept(','))
-            return Token(mPosition, TokenType::Comma);
+            return Token(mPosition - 1, TokenType::Comma);
 
         if (accept('=')) {
             if (accept('='))
-                return Token(mPosition, TokenType::Equal);
+                return Token(mPosition - 2, TokenType::Equal);
         }
 
         if (accept('&')) {
             if (accept('&'))
-                return Token(mPosition, TokenType::And);
+                return Token(mPosition - 2, TokenType::And);
         }
 
         if (accept('|')) {
             if (accept('|'))
-                return Token(mPosition, TokenType::Or);
+                return Token(mPosition - 2, TokenType::Or);
         }
 
         if (accept('!')) {
             if (accept('='))
-                return Token(mPosition, TokenType::NotEqual);
-            return Token(mPosition, TokenType::ExclamationMark);
+                return Token(mPosition - 2, TokenType::NotEqual);
+            return Token(mPosition - 1, TokenType::ExclamationMark);
         }
 
         if (accept('<')) {
             if (accept('='))
-                return Token(mPosition, TokenType::Less);
-            return Token(mPosition, TokenType::LessEqual);
+                return Token(mPosition - 2, TokenType::Less);
+            return Token(mPosition - 1, TokenType::LessEqual);
         }
 
         if (accept('>')) {
             if (accept('='))
-                return Token(mPosition, TokenType::Greater);
-            return Token(mPosition, TokenType::GreaterEqual);
+                return Token(mPosition - 2, TokenType::Greater);
+            return Token(mPosition - 1, TokenType::GreaterEqual);
         }
 
         if (accept('\"'))
@@ -94,11 +94,11 @@ Token Lexer::next()
                 append();
 
             if (mTemp == "true")
-                return Token(mPosition, TokenType::Boolean).With(true);
+                return Token(mPosition - mTemp.size(), TokenType::Boolean).With(true);
             if (mTemp == "false")
-                return Token(mPosition, TokenType::Boolean).With(false);
+                return Token(mPosition - mTemp.size(), TokenType::Boolean).With(false);
 
-            return Token(mPosition, TokenType::Identifier).With(mTemp);
+            return Token(mPosition - mTemp.size(), TokenType::Identifier).With(mTemp);
         }
 
         append();
@@ -134,6 +134,8 @@ void Lexer::eatComments()
 
 Token Lexer::parseNumber()
 {
+    const size_t startLoc = mPosition;
+
     int base = 10;
     // Prefix starting with '0'
     if (accept('0')) {
@@ -171,16 +173,17 @@ Token Lexer::parseNumber()
 
     // Check digits
     if (base < 10 && std::find_if(digit_ptr, last_ptr, invalid_digit) != last_ptr)
-        PEXPR_LOG(LogLevel::Error) << "At " << mPosition << ": Invalid literal '" << mTemp << "'" << std::endl;
+        PEXPR_LOG(LogLevel::Error) << "At " << startLoc << ": Invalid literal '" << mTemp << "'" << std::endl;
 
     if (exp || fractional)
-        return Token(mPosition, TokenType::Float).With(Number(std::strtod(digit_ptr, nullptr)));
-    return Token(mPosition, TokenType::Integer).With(Integer(std::strtoull(digit_ptr, nullptr, base)));
+        return Token(startLoc, TokenType::Float).With(Number(std::strtod(digit_ptr, nullptr)));
+    return Token(startLoc, TokenType::Integer).With(Integer(std::strtoull(digit_ptr, nullptr, base)));
 }
 
 Token Lexer::parseString(uint8_t mark)
 {
-    size_t strPos = 0;
+    const size_t startLoc = mPosition;
+    
     std::string str;
     while (true) {
         size_t pos = mTemp.size();
@@ -190,13 +193,12 @@ Token Lexer::parseString(uint8_t mark)
             PEXPR_LOG(LogLevel::Error) << "At " << mPosition << ": Unterminated string literal" << std::endl;
             return Token(mPosition, TokenType::Error);
         }
-        strPos = mPosition;
         str += mTemp.substr(pos, mTemp.size() - (pos + 1));
         eatSpaces();
         if (!accept(mark))
             break;
     }
-    return Token(strPos, TokenType::String).With(str);
+    return Token(startLoc, TokenType::String).With(str);
 }
 
 void Lexer::append()
