@@ -5,7 +5,7 @@
 
 #include <algorithm>
 
-namespace PExpr {
+namespace PExpr::internal {
 class DefContainer {
 public:
     using FunctionMap = std::unordered_multimap<std::string, FunctionDef>;

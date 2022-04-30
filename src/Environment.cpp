@@ -4,13 +4,8 @@
 #include "internal/TypeChecker.h"
 
 namespace PExpr {
-class EnvironmentPrivate {
-public:
-    DefContainer Definitions;
-};
-
 Environment::Environment()
-    : mInternal(std::make_unique<EnvironmentPrivate>())
+    : mDefinitions()
 {
 }
 
@@ -20,18 +15,18 @@ Environment::~Environment()
 
 void Environment::registerDef(const VariableDef& def)
 {
-    mInternal->Definitions.registerDef(def);
+    mDefinitions.registerDef(def);
 }
 
 void Environment::registerDef(const FunctionDef& def)
 {
-    mInternal->Definitions.registerDef(def);
+    mDefinitions.registerDef(def);
 }
 
 Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) const
 {
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    internal::Lexer lexer(stream);
+    internal::Parser parser(lexer);
 
     auto expr = parser.parse();
 
@@ -39,7 +34,7 @@ Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) 
         return nullptr;
 
     if (!skipTypeChecking) {
-        TypeChecker checker(mInternal->Definitions);
+        internal::TypeChecker checker(mDefinitions);
         auto retType = checker.handle(expr);
         if (retType == ElementaryType::Unspecified)
             return nullptr;

@@ -5,7 +5,7 @@
 
 namespace PExpr {
 Logger::Logger()
-    : mConsoleLogListener(std::make_shared<ConsoleLogListener>(
+    : mConsoleLogListener(std::make_shared<internal::ConsoleLogListener>(
 #ifdef PEXPR_OS_LINUX
         true
 #else

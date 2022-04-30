@@ -1,6 +1,6 @@
 #include "ConsoleLogListener.h"
 
-namespace PExpr {
+namespace PExpr::internal {
 
 constexpr const char* const ANSI_BLACK         = "\u001b[0;30m";
 constexpr const char* const ANSI_RED           = "\u001b[0;31m";
@@ -61,4 +61,4 @@ void ConsoleLogListener::writeEntry(char c)
 {
     std::cout.put(c);
 }
-} // namespace PExpr
+} // namespace PExpr::internal

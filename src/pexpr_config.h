@@ -188,7 +188,7 @@ using uint32 = uint32_t;
 using int64  = int64_t;
 using uint64 = uint64_t;
 
-using Integer = uint64;
+using Integer = int64;
 using Number  = double;
 
 /* Checks */

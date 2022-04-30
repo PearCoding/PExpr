@@ -2,6 +2,7 @@
 
 #include "Definitions.h"
 #include "Expression.h"
+#include "internal/Transpiler.h"
 
 namespace PExpr {
 class Environment {
@@ -14,7 +15,14 @@ public:
 
     Ptr<Expression> parse(std::istream& stream, bool skipTypeChecking = false) const;
 
+    template <typename Payload>
+    inline Payload transpile(const Ptr<Expression>& expr, TranspileVisitor<Payload>* visitor) const
+    {
+        internal::Transpiler<Payload> transpiler(mDefinitions, visitor);
+        return transpiler.handle(expr);
+    }
+
 private:
-    std::unique_ptr<class EnvironmentPrivate> mInternal;
+    internal::DefContainer mDefinitions;
 };
 } // namespace PExpr

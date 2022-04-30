@@ -2,7 +2,7 @@
 
 #include "Location.h"
 
-namespace PExpr {
+namespace PExpr::internal {
 enum class TokenType {
     Error,
     Eof,              // End

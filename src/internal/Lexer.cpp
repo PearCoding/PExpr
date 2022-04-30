@@ -1,7 +1,7 @@
 #include "Lexer.h"
 #include "Logger.h"
 
-namespace PExpr {
+namespace PExpr::internal {
 Lexer::Lexer(std::istream& stream)
     : mStream(stream)
     , mChar(0)

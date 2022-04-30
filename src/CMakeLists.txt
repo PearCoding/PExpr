@@ -11,6 +11,7 @@ set(PUBLIC
     Logger.h
     LogListener.h
     StringVisitor.h
+    TranspileVisitor.h
 )
 
 set(SRC
@@ -26,6 +27,7 @@ set(SRC
     internal/Parser.h
     internal/Token.cpp
     internal/Token.h
+    internal/Transpiler.h
     internal/TypeChecker.cpp
     internal/TypeChecker.h
 )

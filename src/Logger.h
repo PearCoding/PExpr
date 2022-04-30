@@ -16,7 +16,10 @@ enum class LogLevel {
 };
 
 class LogListener;
+
+namespace internal {
 class ConsoleLogListener;
+}
 class Logger {
 public:
     class StreamBuf final : public std::streambuf {
@@ -104,7 +107,7 @@ public:
 
 private:
     std::vector<std::shared_ptr<LogListener>> mListener;
-    std::shared_ptr<ConsoleLogListener> mConsoleLogListener;
+    std::shared_ptr<internal::ConsoleLogListener> mConsoleLogListener;
 
     LogLevel mVerbosity;
     bool mQuiet;

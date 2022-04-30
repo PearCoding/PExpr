@@ -11,11 +11,6 @@ static std::unordered_map<std::string_view, Number> Constants = {
     { "Pi", 3.14159265358979323846 }
 };
 
-inline Number convNumber(const ValueBlock& A, ElementaryType type)
-{
-    return type == ElementaryType::Integer ? Number(std::get<Integer>(A)) : std::get<Number>(A);
-}
-
 template <typename Func>
 inline ValueBlock unaryCwise(const ValueBlock& A, ElementaryType fromType, Func func)
 {
@@ -43,23 +38,16 @@ inline ValueBlock unaryCwise(const ValueBlock& A, ElementaryType fromType, Func 
 }
 
 template <typename Func>
-inline ValueBlock binaryCwise(const ValueBlock& A, ElementaryType AType, const ValueBlock& B, ElementaryType BType, Func func)
+inline ValueBlock binaryCwise(const ValueBlock& A, const ValueBlock& B, ElementaryType arithType, Func func)
 {
-    auto convANumber = [&]() {
-        return convNumber(A, AType);
-    };
-    auto convBNumber = [&]() {
-        return convNumber(B, BType);
-    };
-
-    switch (AType) {
+    switch (arithType) {
     // Not defined for below
     default:
         return Number(0);
     case ElementaryType::Integer:
-        return func(convANumber(), convBNumber());
+        return func(std::get<Integer>(A), std::get<Integer>(B));
     case ElementaryType::Number:
-        return func(convANumber(), convBNumber());
+        return func(std::get<Number>(A), std::get<Number>(B));
     case ElementaryType::Vec2:
         return Vec2{ func(std::get<Vec2>(A)[0], std::get<Vec2>(B)[0]),
                      func(std::get<Vec2>(A)[1], std::get<Vec2>(B)[1]) };
@@ -75,46 +63,19 @@ inline ValueBlock binaryCwise(const ValueBlock& A, ElementaryType AType, const V
     }
 }
 
-inline ValueBlock scale(const ValueBlock& A, ElementaryType AType, Number scale)
-{
-    switch (AType) {
-    // Not defined for below
-    default:
-        return Number(0);
-    case ElementaryType::Vec2:
-        return Vec2{ std::get<Vec2>(A)[0] * scale,
-                     std::get<Vec2>(A)[1] * scale };
-    case ElementaryType::Vec3:
-        return Vec3{ std::get<Vec3>(A)[0] * scale,
-                     std::get<Vec3>(A)[1] * scale,
-                     std::get<Vec3>(A)[2] * scale };
-    case ElementaryType::Vec4:
-        return Vec4{ std::get<Vec4>(A)[0] * scale,
-                     std::get<Vec4>(A)[1] * scale,
-                     std::get<Vec4>(A)[2] * scale,
-                     std::get<Vec4>(A)[3] * scale };
-    }
-}
-
 template <typename Func>
-inline bool comp(const ValueBlock& A, ElementaryType AType, const ValueBlock& B, ElementaryType BType, bool allowSpecial, Func func)
+inline bool comp(const ValueBlock& A, const ValueBlock& B, ElementaryType type, Func func)
 {
-    if (AType == ElementaryType::Integer && BType == ElementaryType::Integer)
-        return func(std::get<Integer>(A), std::get<Integer>(B));
-    else if (isConvertible(AType, BType) || isConvertible(BType, AType))
-        return func(convNumber(A, AType), convNumber(B, BType));
-    else if (AType != BType)
-        return false;
-
-    if (!allowSpecial)
-        return false;
-
-    switch (AType) {
+    switch (type) {
     // Not defined for below
     default:
         return false;
     case ElementaryType::Boolean:
         return func(std::get<bool>(A), std::get<bool>(B));
+    case ElementaryType::Integer:
+        return func(std::get<Integer>(A), std::get<Integer>(B));
+    case ElementaryType::Number:
+        return func(std::get<Number>(A), std::get<Number>(B));
     case ElementaryType::String:
         return func(std::get<std::string>(A), std::get<std::string>(B));
     case ElementaryType::Vec2:
@@ -134,8 +95,9 @@ inline ValueBlock func1Cwise(const ValueBlock& A, ElementaryType fromType, Func 
     default:
         return Number(0);
     case ElementaryType::Integer:
+        return func(std::get<Integer>(A));
     case ElementaryType::Number:
-        return Number(func(convNumber(A, fromType)));
+        return func(std::get<Number>(A));
     case ElementaryType::Vec2:
         return Vec2{ func(std::get<Vec2>(A)[0]),
                      func(std::get<Vec2>(A)[1]) };
@@ -150,221 +112,183 @@ inline ValueBlock func1Cwise(const ValueBlock& A, ElementaryType fromType, Func 
                      func(std::get<Vec4>(A)[3]) };
     }
 }
-
-class CalcVisitor {
+class CalcVisitor : public TranspileVisitor<ValueBlock> {
 public:
-    static ValueBlock calc(const Ptr<Expression>& expr)
+    ValueBlock onVariable(const std::string& name, ElementaryType) override
     {
-        switch (expr->type()) {
-        case ExpressionType::Variable:
-            return calcNode(std::reinterpret_pointer_cast<VariableExpression>(expr));
-        case ExpressionType::Const:
-            return calcNode(std::reinterpret_pointer_cast<ConstExpression>(expr));
-        case ExpressionType::Unary:
-            return calcNode(std::reinterpret_pointer_cast<UnaryExpression>(expr));
-        case ExpressionType::Binary:
-            return calcNode(std::reinterpret_pointer_cast<BinaryExpression>(expr));
-        case ExpressionType::Call:
-            return calcNode(std::reinterpret_pointer_cast<CallExpression>(expr));
-        case ExpressionType::Access:
-            return calcNode(std::reinterpret_pointer_cast<AccessExpression>(expr));
+        return Constants.at(name);
+    }
+
+    ValueBlock onInteger(Integer v) override { return v; }
+    ValueBlock onNumber(Number v) override { return v; }
+    ValueBlock onBool(bool v) override { return v; }
+    ValueBlock onString(const std::string& v) override { return v; }
+
+    /// Implicit casts. Currently only int -> num
+    ValueBlock onCast(const ValueBlock& v, ElementaryType, ElementaryType) override
+    {
+        return Number(std::get<Integer>(v));
+    }
+
+    /// +a, -a. Only called for arithmetic types
+    ValueBlock onPosNeg(bool isNeg, ElementaryType arithType, const ValueBlock& v) override
+    {
+        if (isNeg)
+            return unaryCwise(v, arithType, [](auto&& a) { return -a; });
+        else
+            return v;
+    }
+
+    // !a. Only called for bool
+    ValueBlock onNot(const ValueBlock& v) override
+    {
+        return !std::get<bool>(v);
+    }
+
+    /// a+b, a-b. Only called for arithmetic types. Both types are the same! Vectorized types should apply component wise
+    ValueBlock onAddSub(bool isSub, ElementaryType arithType, const ValueBlock& a, const ValueBlock& b) override
+    {
+        if (isSub)
+            return binaryCwise(a, b, arithType, [](auto&& a, auto&& b) { return a - b; });
+        else
+            return binaryCwise(a, b, arithType, [](auto&& a, auto&& b) { return a + b; });
+    }
+
+    /// a*b, a/b. Only called for arithmetic types. Both types are the same! Vectorized types should apply component wise
+    ValueBlock onMulDiv(bool isDiv, ElementaryType arithType, const ValueBlock& a, const ValueBlock& b) override
+    {
+        if (isDiv)
+            return binaryCwise(a, b, arithType, [](auto&& a, auto&& b) { return a / b; });
+        else
+            return binaryCwise(a, b, arithType, [](auto&& a, auto&& b) { return a * b; });
+    }
+
+    /// a*f, f*a, a/f. A is an arithmetic type, f is 'num', except when a is 'int' then f is 'int' as well. Order of a*f or f*a does not matter
+    ValueBlock onScale(bool isDiv, ElementaryType aType, const ValueBlock& a, const ValueBlock& f) override
+    {
+        if (isDiv) {
+            return func1Cwise(a, aType, [&](auto&& v) { return v / std::get<Number>(f); });
+        } else {
+            if (aType == ElementaryType::Integer)
+                return std::get<Integer>(a) * std::get<Integer>(f);
+            else
+                return func1Cwise(a, aType, [&](auto&& v) { return v * std::get<Number>(f); });
+        }
+    }
+
+    /// a^f A is an arithmetic type, f is 'num', except when a is 'int' then f is 'int' as well. Vectorized types should apply component wise
+    ValueBlock onPow(ElementaryType aType, const ValueBlock& a, const ValueBlock& f) override
+    {
+        if (aType == ElementaryType::Integer)
+            return Integer(std::pow(std::get<Integer>(a), std::get<Integer>(f)));
+        else
+            return func1Cwise(a, aType, [&](auto&& v) { return Number(std::pow(v, std::get<Number>(f))); });
+    }
+
+    // a % b. Only called for int
+    ValueBlock onMod(const ValueBlock& a, const ValueBlock& b) override
+    {
+        return std::get<Integer>(a) % std::get<Integer>(b);
+    }
+
+    // a&&b, a||b. Only called for bool types
+    ValueBlock onAndOr(bool isOr, const ValueBlock& a, const ValueBlock& b) override
+    {
+        if (isOr)
+            return std::get<bool>(a) || std::get<bool>(b);
+        else
+            return std::get<bool>(a) && std::get<bool>(b);
+    }
+
+    /// a < b... Boolean operation. a & b are of the same type. Only called for scaler arithmetic types (int, num)
+    ValueBlock onRelOp(RelationalOp op, ElementaryType scalarArithType, const ValueBlock& a, const ValueBlock& b) override
+    {
+        switch (op) {
+        case RelationalOp::Less:
+            return comp(a, b, scalarArithType, [](auto&& x, auto&& y) { return x < y; });
+        case RelationalOp::Greater:
+            return comp(a, b, scalarArithType, [](auto&& x, auto&& y) { return x > y; });
+        case RelationalOp::LessEqual:
+            return comp(a, b, scalarArithType, [](auto&& x, auto&& y) { return x <= y; });
+        case RelationalOp::GreaterEqual:
+            return comp(a, b, scalarArithType, [](auto&& x, auto&& y) { return x >= y; });
         default:
-            return Number(0);
+            PEXPR_ASSERT(false, "Should not reach this point");
+            return false;
         }
-    };
-
-private:
-    static ValueBlock calcNode(const Ptr<VariableExpression>& expr)
-    {
-        if (Constants.count(expr->name()))
-            return Constants.at(expr->name());
-
-        PEXPR_ASSERT(false, "Should not reach this point");
-        return Number(0); // Error should be caught in type checking
     }
 
-    static ValueBlock calcNode(const Ptr<ConstExpression>& expr)
+    /// a==b, a!=b. For vectorized types it should check that all equal componont wise. The negation a!=b should behave as !(a==b)
+    ValueBlock onEqual(bool isNeg, ElementaryType type, const ValueBlock& a, const ValueBlock& b) override
     {
-        if (expr->returnType() == ElementaryType::Boolean)
-            return expr->getBool();
-        if (expr->returnType() == ElementaryType::Integer)
-            return expr->getInteger();
-        if (expr->returnType() == ElementaryType::Number)
-            return expr->getNumber();
-        if (expr->returnType() == ElementaryType::String)
-            return expr->getString();
-
-        PEXPR_ASSERT(false, "Should not reach this point");
-        return Number(0); // Error should be caught in type checking
+        bool res = comp(a, b, type, [](auto&& x, auto&& y) { return x == y; });
+        return isNeg ? !res : res;
     }
 
-    static ValueBlock calcNode(const Ptr<UnaryExpression>& expr)
-    {
-        auto A = calc(expr->inner());
-        switch (expr->op()) {
-        case UnaryOperation::Pos:
-            return A;
-        case UnaryOperation::Neg:
-            return unaryCwise(A, expr->inner()->returnType(), [](Number i) { return -i; });
-        case UnaryOperation::Not:
-            return !std::get<bool>(A);
-        }
-
-        PEXPR_ASSERT(false, "Should not reach this point");
-        return Number(0); // Error should be caught in type checking
-    }
-
-    static ValueBlock calcNode(const Ptr<BinaryExpression>& expr)
-    {
-        auto A     = calc(expr->left());
-        auto AType = expr->left()->returnType();
-        auto B     = calc(expr->right());
-        auto BType = expr->right()->returnType();
-
-        switch (expr->op()) {
-        case BinaryOperation::Add:
-            if (AType == ElementaryType::Integer && BType == ElementaryType::Integer)
-                return std::get<Integer>(A) + std::get<Integer>(B);
-            else
-                return binaryCwise(A, AType, B, BType, [](Number a, Number b) { return a + b; });
-        case BinaryOperation::Sub:
-            if (AType == ElementaryType::Integer && BType == ElementaryType::Integer)
-                return std::get<Integer>(A) - std::get<Integer>(B);
-            else
-                return binaryCwise(A, AType, B, BType, [](Number a, Number b) { return a - b; });
-        case BinaryOperation::Mul:
-            if (AType == ElementaryType::Integer && BType == ElementaryType::Integer)
-                return std::get<Integer>(A) * std::get<Integer>(B);
-            else if (isConvertible(AType, BType) || isConvertible(BType, AType))
-                return binaryCwise(A, AType, B, BType, [](Number a, Number b) { return a * b; });
-            else if (isConvertible(AType, ElementaryType::Number) && isArray(BType))
-                return scale(B, BType, convNumber(A, AType));
-            else if (isConvertible(BType, ElementaryType::Number) && isArray(AType))
-                return scale(A, AType, convNumber(B, BType));
-            break;
-        case BinaryOperation::Div:
-            if (AType == ElementaryType::Integer && BType == ElementaryType::Integer)
-                return std::get<Integer>(A) / Number(std::get<Integer>(B));
-            else if (isConvertible(AType, BType) || isConvertible(BType, AType))
-                return binaryCwise(A, AType, B, BType, [](Number a, Number b) { return a / b; });
-            else if (isConvertible(BType, ElementaryType::Number) && isArray(AType))
-                return scale(A, AType, 1 / convNumber(B, BType));
-            break;
-        case BinaryOperation::Pow:
-            if (AType == ElementaryType::Integer && BType == ElementaryType::Integer)
-                return Integer(std::pow(std::get<Integer>(A), std::get<Integer>(B)));
-            else
-                return Integer(std::pow(convNumber(A, AType), convNumber(B, BType)));
-        case BinaryOperation::Mod:
-            return std::get<Integer>(A) % std::get<Integer>(B);
-        case BinaryOperation::And:
-            return std::get<bool>(A) && std::get<bool>(B);
-        case BinaryOperation::Or:
-            return std::get<bool>(A) || std::get<bool>(B);
-        case BinaryOperation::Less:
-            return comp(A, AType, B, BType, false, [](auto&& a, auto&& b) { return a < b; });
-        case BinaryOperation::Greater:
-            return comp(A, AType, B, BType, false, [](auto&& a, auto&& b) { return a > b; });
-        case BinaryOperation::LessEqual:
-            return comp(A, AType, B, BType, false, [](auto&& a, auto&& b) { return a <= b; });
-        case BinaryOperation::GreaterEqual:
-            return comp(A, AType, B, BType, false, [](auto&& a, auto&& b) { return a >= b; });
-        case BinaryOperation::Equal:
-            return comp(A, AType, B, BType, true, [](auto&& a, auto&& b) { return a == b; });
-        case BinaryOperation::NotEqual:
-            return !comp(A, AType, B, BType, true, [](auto&& a, auto&& b) { return a == b; });
-        }
-
-        PEXPR_ASSERT(false, "Should not reach this point");
-        return Number(0); // Error should be caught in type checking
-    }
-
-    static ValueBlock calcNode(const Ptr<CallExpression>& expr)
+    /// name(...). Call to a function. Necessary casts are already handled.
+    ValueBlock onFunctionCall(const std::string& name,
+                              ElementaryType, const std::vector<ElementaryType>& argumentTypes,
+                              const std::vector<ValueBlock>& argumentPayloads) override
     {
         using NumFunc = Number (*)(Number);
-
-        const std::string& funcName = expr->name();
-
-        std::vector<ElementaryType> types;
-        std::vector<ValueBlock> args;
-        types.reserve(expr->parameters().size());
-        args.reserve(expr->parameters().size());
-
-        for (const auto& e : expr->parameters()) {
-            types.push_back(e->returnType());
-            args.push_back(calc(e));
-        }
-
-        if (funcName == "vec2") {
-            return Vec2{ convNumber(args[0], types[0]), convNumber(args[1], types[1]) };
-        } else if (funcName == "vec3") {
-            return Vec3{ convNumber(args[0], types[0]), convNumber(args[1], types[1]), convNumber(args[2], types[2]) };
-        } else if (funcName == "vec4") {
-            return Vec4{ convNumber(args[0], types[0]), convNumber(args[1], types[1]), convNumber(args[2], types[2]), convNumber(args[3], types[3]) };
-        } else if (funcName == "sin") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::sin);
-        } else if (funcName == "cos") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::cos);
-        } else if (funcName == "tan") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::tan);
-        } else if (funcName == "asin") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::asin);
-        } else if (funcName == "acos") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::acos);
-        } else if (funcName == "atan") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::atan);
-        } else if (funcName == "exp") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::exp);
-        } else if (funcName == "log") {
-            return func1Cwise(args[0], types[0], (NumFunc)std::log);
+        if (name == "vec2") {
+            return Vec2{ std::get<Number>(argumentPayloads[0]), std::get<Number>(argumentPayloads[1]) };
+        } else if (name == "vec3") {
+            return Vec3{ std::get<Number>(argumentPayloads[0]), std::get<Number>(argumentPayloads[1]), std::get<Number>(argumentPayloads[2]) };
+        } else if (name == "vec4") {
+            return Vec4{ std::get<Number>(argumentPayloads[0]), std::get<Number>(argumentPayloads[1]), std::get<Number>(argumentPayloads[2]), std::get<Number>(argumentPayloads[3]) };
+        } else if (name == "sin") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::sin);
+        } else if (name == "cos") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::cos);
+        } else if (name == "tan") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::tan);
+        } else if (name == "asin") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::asin);
+        } else if (name == "acos") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::acos);
+        } else if (name == "atan") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::atan);
+        } else if (name == "exp") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::exp);
+        } else if (name == "log") {
+            return func1Cwise(argumentPayloads[0], argumentTypes[0], (NumFunc)std::log);
         }
 
         PEXPR_ASSERT(false, "Should not reach this point");
         return Number(0); // Error should be caught in type checking
     }
 
-    static ValueBlock calcNode(const Ptr<AccessExpression>& expr)
+    /// a.xyz Access operator for vector types
+    ValueBlock onAccess(const ValueBlock& v, size_t inputSize, const std::vector<uint8>& outputPermutation) override
     {
-        ValueBlock A    = calc(expr->inner());
         const auto getC = [&](size_t i) {
-            switch (expr->inner()->returnType()) {
+            switch (inputSize) {
             default:
                 return Number(0);
-            case ElementaryType::Vec2:
-                return std::get<Vec2>(A)[i];
-            case ElementaryType::Vec3:
-                return std::get<Vec3>(A)[i];
-            case ElementaryType::Vec4:
-                return std::get<Vec4>(A)[i];
+            case 2:
+                return std::get<Vec2>(v)[i];
+            case 3:
+                return std::get<Vec3>(v)[i];
+            case 4:
+                return std::get<Vec4>(v)[i];
             }
         };
-        const auto charC = [](char c) {
-            if (c == 'x' || c == 'r')
-                return 0;
-            if (c == 'y' || c == 'g')
-                return 1;
-            if (c == 'z' || c == 'b')
-                return 2;
-            else
-                return 3;
-        };
 
-        const std::string swizzle = expr->swizzle();
-
-        if (swizzle.size() == 1) {
-            return Number(getC(charC(swizzle[0])));
-        } else if (swizzle.size() == 2) {
-            return Vec2{ getC(charC(swizzle[0])),
-                         getC(charC(swizzle[1])) };
-        } else if (swizzle.size() == 3) {
-            return Vec3{ getC(charC(swizzle[0])),
-                         getC(charC(swizzle[1])),
-                         getC(charC(swizzle[2])) };
+        if (outputPermutation.size() == 1) {
+            return Number(getC(outputPermutation[0]));
+        } else if (outputPermutation.size() == 2) {
+            return Vec2{ getC(outputPermutation[0]),
+                         getC(outputPermutation[1]) };
+        } else if (outputPermutation.size() == 3) {
+            return Vec3{ getC(outputPermutation[0]),
+                         getC(outputPermutation[1]),
+                         getC(outputPermutation[2]) };
         } else {
-            return Vec4{ getC(charC(swizzle[0])),
-                         getC(charC(swizzle[1])),
-                         getC(charC(swizzle[2])),
-                         getC(charC(swizzle[3])) };
+            return Vec4{ getC(outputPermutation[0]),
+                         getC(outputPermutation[1]),
+                         getC(outputPermutation[2]),
+                         getC(outputPermutation[3]) };
         }
     }
 };
@@ -407,7 +331,8 @@ int main(int argc, char** argv)
     if (ast == nullptr)
         return EXIT_FAILURE;
 
-    auto ret = CalcVisitor::calc(ast);
+    CalcVisitor visitor;
+    auto ret = env.transpile(ast, &visitor);
 
     std::visit(
         [](auto&& arg) {

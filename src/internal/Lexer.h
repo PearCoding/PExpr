@@ -5,7 +5,7 @@
 
 #include <istream>
 
-namespace PExpr {
+namespace PExpr::internal {
 class Lexer {
 public:
     Lexer(std::istream& stream);

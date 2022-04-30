@@ -2,7 +2,7 @@
 
 #include "LogListener.h"
 
-namespace PExpr {
+namespace PExpr::internal {
 class ConsoleLogListener : public LogListener {
 public:
     ConsoleLogListener(bool useAnsi = true);

@@ -9,3 +9,4 @@
 #include "LogListener.h"
 #include "Logger.h"
 #include "StringVisitor.h"
+#include "TranspileVisitor.h"

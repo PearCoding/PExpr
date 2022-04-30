@@ -1,10 +1,10 @@
 #pragma once
 
+#include "Expression.h"
 #include "Lexer.h"
 #include <array>
 
-namespace PExpr {
-class Expression;
+namespace PExpr::internal {
 class Parser {
     friend class ParserGrammar;
 
@@ -28,4 +28,4 @@ protected:
     std::array<Token, 2> mCurrentToken;
     bool mHasError;
 };
-} // namespace PExpr
+} // namespace PExpr::internal

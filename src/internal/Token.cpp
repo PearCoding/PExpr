@@ -1,6 +1,6 @@
 #include "Token.h"
 
-namespace PExpr {
+namespace PExpr::internal {
 std::string_view Token::toString(TokenType type)
 {
     switch (type) {

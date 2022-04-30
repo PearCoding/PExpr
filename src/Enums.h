@@ -37,6 +37,20 @@ inline bool isArithmetic(ElementaryType type)
     return type == ElementaryType::Integer || type == ElementaryType::Number || isArray(type);
 }
 
+inline uint8 typeArraySize(ElementaryType type)
+{
+    switch (type) {
+    default:
+        return 1;
+    case ElementaryType::Vec2:
+        return 2;
+    case ElementaryType::Vec3:
+        return 3;
+    case ElementaryType::Vec4:
+        return 4;
+    }
+}
+
 enum class UnaryOperation {
     Pos, // +
     Neg, // -

@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-namespace PExpr {
+namespace PExpr::internal {
 inline void typeError(const Ptr<UnaryExpression>& expr, ElementaryType type)
 {
     PEXPR_LOG(LogLevel::Error) << expr->location() << ": Can not use operator '" << toString(expr->op())

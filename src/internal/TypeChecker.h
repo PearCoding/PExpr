@@ -3,7 +3,7 @@
 #include "DefContainer.h"
 #include "Expression.h"
 
-namespace PExpr {
+namespace PExpr::internal {
 class TypeChecker {
 public:
     explicit TypeChecker(const DefContainer& defs);

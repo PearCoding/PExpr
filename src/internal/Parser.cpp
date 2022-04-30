@@ -1,10 +1,7 @@
 #include "Parser.h"
-#include "Expression.h"
 #include "Logger.h"
 
-#include <array>
-
-namespace PExpr {
+namespace PExpr::internal {
 Parser::Parser(Lexer& lexer)
     : mLexer(lexer)
     , mCurrentToken()
