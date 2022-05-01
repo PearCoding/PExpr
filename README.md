@@ -1,4 +1,4 @@
-# PExpr
+# PExpr [![Build](https://github.com/PearCoding/PExpr/actions/workflows/build.yml/badge.svg)](https://github.com/PearCoding/PExpr/actions/workflows/build.yml)
 
 A fairly simple inline expression optimized to be transpiled to other languages.
 The intended field of application is computer graphics, hpc and other math frameworks.
