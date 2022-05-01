@@ -255,16 +255,16 @@ private:
 
         const auto value = P.cur();
         if (P.accept(TokenType::Boolean))
-            return std::make_shared<ConstExpression>(value.Location, ElementaryType::Boolean, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Boolean, value.Value);
 
         if (P.accept(TokenType::Float))
-            return std::make_shared<ConstExpression>(value.Location, ElementaryType::Number, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Number, value.Value);
 
         if (P.accept(TokenType::Integer))
-            return std::make_shared<ConstExpression>(value.Location, ElementaryType::Integer, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Integer, value.Value);
 
         if (P.accept(TokenType::String))
-            return std::make_shared<ConstExpression>(value.Location, ElementaryType::String, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::String, value.Value);
 
         if (P.accept(TokenType::Identifier)) {
             auto var = std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));

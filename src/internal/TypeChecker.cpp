@@ -26,8 +26,8 @@ ElementaryType TypeChecker::handle(const Ptr<Expression>& expr)
     switch (expr->type()) {
     case ExpressionType::Variable:
         return handleNode(std::reinterpret_pointer_cast<VariableExpression>(expr));
-    case ExpressionType::Const:
-        return handleNode(std::reinterpret_pointer_cast<ConstExpression>(expr));
+    case ExpressionType::Literal:
+        return handleNode(std::reinterpret_pointer_cast<LiteralExpression>(expr));
     case ExpressionType::Unary:
         return handleNode(std::reinterpret_pointer_cast<UnaryExpression>(expr));
     case ExpressionType::Binary:
@@ -53,7 +53,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<ConstExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<LiteralExpression>& expr)
 {
     return expr->returnType();
 }
@@ -63,6 +63,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
     auto innerType = handle(expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
+
+    expr->setReturnType(ElementaryType::Unspecified);
 
     switch (expr->op()) {
     case UnaryOperation::Pos:
@@ -90,6 +92,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
     auto rightType = handle(expr->right());
     if (leftType == ElementaryType::Unspecified || rightType == ElementaryType::Unspecified)
         return rightType; // Error was caught somewhere else
+
+    expr->setReturnType(ElementaryType::Unspecified);
 
     switch (expr->op()) {
     case BinaryOperation::Add:
@@ -190,11 +194,13 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     if (invalid)
         return ElementaryType::Unspecified; // Error was caught somewhere else
 
+    expr->setReturnType(ElementaryType::Unspecified);
+
     auto def = mDefinitions.checkFunction(expr->name());
     if (def.has_value()) {
         // First check for exact matches
         for (auto it = def.value().first; it != def.value().second; ++it) {
-            const auto& toArgs = it->second.arguments();
+            const auto& toArgs = it->second.parameters();
 
             bool found = std::equal(fromArgs.begin(), fromArgs.end(), toArgs.begin());
             if (found) {
@@ -206,7 +212,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
         // Second check (if failed) with conversions
         if (expr->isUnspecified()) {
             for (auto it = def.value().first; it != def.value().second; ++it) {
-                const auto& toArgs = it->second.arguments();
+                const auto& toArgs = it->second.parameters();
 
                 bool found = std::equal(fromArgs.begin(), fromArgs.end(), toArgs.begin(),
                                         isConvertible);
@@ -224,7 +230,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
                    << "  Available signatures are: " << std::endl;
 
             for (auto it = def.value().first; it != def.value().second; ++it)
-                output << "    '" << it->first << "(" << printArgs(it->second.arguments()) << ")'" << std::endl;
+                output << "    '" << it->first << "(" << printArgs(it->second.parameters()) << ")'" << std::endl;
 
             PEXPR_LOG(LogLevel::Error) << output.str();
         }
@@ -240,6 +246,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
     auto innerType = handle(expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
+
+    expr->setReturnType(ElementaryType::Unspecified);
 
     // The access operator also allows expanding e.g., vec2.xyxy -> vec4 operations
     if (isArray(innerType)) {
@@ -290,4 +298,4 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
 
     return expr->returnType();
 }
-} // namespace PExpr
+} // namespace PExpr::internal

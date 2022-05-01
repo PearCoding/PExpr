@@ -200,7 +200,7 @@ public:
             return std::get<bool>(a) && std::get<bool>(b);
     }
 
-    /// a < b... Boolean operation. a & b are of the same type. Only called for scaler arithmetic types (int, num)
+    /// a < b... Boolean operation. a & b are of the same type. Only called for scalar arithmetic types (int, num)
     ValueBlock onRelOp(RelationalOp op, ElementaryType scalarArithType, const ValueBlock& a, const ValueBlock& b) override
     {
         switch (op) {
@@ -301,10 +301,9 @@ int main(int argc, char** argv)
         input += " ";
     }
 
-    std::stringstream stream(input);
     Environment env;
     for (auto c : Constants)
-        env.registerDef(ConstantDef(std::string(c.first), ElementaryType::Number, c.second));
+        env.registerDef(VariableDef(std::string(c.first), ElementaryType::Number));
 
     env.registerDef(FunctionDef("vec2", ElementaryType::Vec2, { ElementaryType::Number, ElementaryType::Number }));
     env.registerDef(FunctionDef("vec3", ElementaryType::Vec3, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }));
@@ -326,7 +325,7 @@ int main(int argc, char** argv)
     addDynFunc1("exp");
     addDynFunc1("log");
 
-    auto ast = env.parse(stream);
+    auto ast = env.parse(input);
 
     if (ast == nullptr)
         return EXIT_FAILURE;

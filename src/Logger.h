@@ -4,9 +4,11 @@
 
 #include <mutex>
 #include <streambuf>
+#include <string_view>
 #include <vector>
 
 namespace PExpr {
+/// Available verbosity levels.
 enum class LogLevel {
     Debug = 0,
     Info,
@@ -20,6 +22,8 @@ class LogListener;
 namespace internal {
 class ConsoleLogListener;
 }
+
+/// Simple logging class
 class Logger {
 public:
     class StreamBuf final : public std::streambuf {
@@ -37,7 +41,7 @@ public:
         bool mIgnore;
     };
 
-    // A closure used to make calls threadsafe. Never capture the ostream, else threadsafety is not guaranteed
+    /// A closure used to make calls threadsafe. Never capture the ostream, else threadsafety is not guaranteed
     class LogClosure {
     public:
         inline explicit LogClosure(Logger& logger)
@@ -71,20 +75,29 @@ public:
     Logger();
     ~Logger() = default;
 
-    Logger& operator=(const Logger&);
+    /// String representation of the given log level
+    static std::string_view levelString(LogLevel l);
 
-    static const char* levelString(LogLevel l);
-
+    /// Add a custom listener.
     void addListener(const std::shared_ptr<LogListener>& listener);
+    /// Remove a custom listener.
     void removeListener(const std::shared_ptr<LogListener>& listener);
 
+    /// Set level of verbosity.
+    /// Only message of greater or same level will be forwarded to the available listeners.
     inline void setVerbosity(LogLevel level) { mVerbosity = level; }
+    /// Current level of verbosity.
+    /// Only message of greater or same level will be forwarded to the available listeners.
     inline LogLevel verbosity() const { return mVerbosity; }
 
+    /// If true, the internal output to the console will be prohibited.
     void setQuiet(bool b);
+    /// If true, the internal output to the console will be prohibited.
     inline bool isQuiet() const { return mQuiet; }
 
+    /// If true, the internal console will use ASCII colors.
     void enableAnsiTerminal(bool b);
+    /// If true, the internal console will use ASCII colors.
     bool isUsingAnsiTerminal() const;
 
     std::ostream& startEntry(LogLevel level);
@@ -121,6 +134,9 @@ private:
 };
 } // namespace PExpr
 
+/// Global logger instance.
 #define PEXPR_LOGGER (PExpr::Logger::instance())
+/// Unsafe logging function. Not threadsafe.
 #define PEXPR_LOG_UNSAFE(l) (PExpr::Logger::log((l)))
+/// Threadsafe logging function.
 #define PEXPR_LOG(l) (PExpr::Logger::threadsafe().log((l)))

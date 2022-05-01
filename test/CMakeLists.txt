@@ -9,3 +9,4 @@ endmacro(push_test)
 
 push_test(lexer lexer.cpp)
 push_test(parser parser.cpp)
+push_test(stringvisitor stringvisitor.cpp)

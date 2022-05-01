@@ -4,6 +4,8 @@
 #include <string>
 
 namespace PExpr {
+
+/// A log listener which can be registred to the current logger.
 class LogListener {
 public:
     LogListener()          = default;

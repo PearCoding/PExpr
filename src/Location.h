@@ -6,6 +6,7 @@
 #include <sstream>
 
 namespace PExpr {
+/// Location within the given expression stream.
 class Location {
 public:
     inline explicit Location(size_t pos)

@@ -26,19 +26,7 @@ Logger::Logger()
     addListener(mConsoleLogListener);
 }
 
-Logger& Logger::operator=(const Logger& other)
-{
-    if (this == &other)
-        return *this;
-
-    mVerbosity          = other.mVerbosity;
-    mQuiet              = other.mQuiet;
-    mConsoleLogListener = other.mConsoleLogListener;
-    mListener           = other.mListener;
-    return *this;
-}
-
-static const char* const levelStr[] = {
+static std::string_view levelStr[] = {
     "Debug  ",
     "Info   ",
     "Warning",
@@ -46,7 +34,7 @@ static const char* const levelStr[] = {
     "Fatal  "
 };
 
-const char* Logger::levelString(LogLevel l)
+std::string_view Logger::levelString(LogLevel l)
 {
     return levelStr[(int)l];
 }

@@ -3,6 +3,7 @@
 #include "Expression.h"
 
 namespace PExpr {
+/// Simple visitor which will construct a parsable representation of the given AST.
 class StringVisitor {
 public:
     static std::string visit(const Ptr<Expression>& expr)
@@ -10,8 +11,8 @@ public:
         switch (expr->type()) {
         case ExpressionType::Variable:
             return dump(std::reinterpret_pointer_cast<VariableExpression>(expr));
-        case ExpressionType::Const:
-            return dump(std::reinterpret_pointer_cast<ConstExpression>(expr));
+        case ExpressionType::Literal:
+            return dump(std::reinterpret_pointer_cast<LiteralExpression>(expr));
         case ExpressionType::Unary:
             return dump(std::reinterpret_pointer_cast<UnaryExpression>(expr));
         case ExpressionType::Binary:
@@ -31,7 +32,7 @@ private:
         return expr->name();
     }
 
-    static std::string dump(const Ptr<ConstExpression>& expr)
+    static std::string dump(const Ptr<LiteralExpression>& expr)
     {
         if (expr->returnType() == ElementaryType::Boolean)
             return expr->getBool() ? "true" : "false";

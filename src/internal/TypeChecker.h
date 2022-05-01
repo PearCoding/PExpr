@@ -12,7 +12,7 @@ public:
 
 private:
     ElementaryType handleNode(const Ptr<VariableExpression>& expr);
-    ElementaryType handleNode(const Ptr<ConstExpression>& expr);
+    ElementaryType handleNode(const Ptr<LiteralExpression>& expr);
     ElementaryType handleNode(const Ptr<UnaryExpression>& expr);
     ElementaryType handleNode(const Ptr<BinaryExpression>& expr);
     ElementaryType handleNode(const Ptr<CallExpression>& expr);

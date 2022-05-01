@@ -4,98 +4,50 @@
 #include <vector>
 
 namespace PExpr {
+
+/// A general purpose variable. The actual value is defined externally.
 class VariableDef {
 public:
+    /// Construct a definition for a variable with a given name and type.
     inline VariableDef(const std::string& name, ElementaryType type)
-        : VariableDef(name, type, false)
-    {
-    }
-
-    VariableDef(const VariableDef&) = default;
-    VariableDef(VariableDef&&)      = default;
-
-    VariableDef& operator=(const VariableDef&) = default;
-    VariableDef& operator=(VariableDef&&) = default;
-
-    inline const std::string& name() const { return mName; }
-    inline ElementaryType type() const { return mType; }
-    inline bool isConstant() const { return mIsConstant; }
-
-protected:
-    inline VariableDef(const std::string& name, ElementaryType type, bool isConstant)
         : mName(name)
         , mType(type)
-        , mIsConstant(isConstant)
     {
         PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
-private:
-    std::string mName;
-    ElementaryType mType;
-    bool mIsConstant;
-};
-
-class ConstantDef : public VariableDef {
-public:
-    inline ConstantDef(const std::string& name, ElementaryType type, const ValueVariant& value)
-        : VariableDef(name, type, true)
-        , mValue(value)
-    {
-    }
-
+    /// The identifier the variable is named with.
     inline const std::string& name() const { return mName; }
+    /// The type of the variable.
     inline ElementaryType type() const { return mType; }
 
-    inline const ValueVariant& value() const { return mValue; }
-
-    inline bool asBool() const
-    {
-        PEXPR_ASSERT(type() == ElementaryType::Boolean, "Trying to get a constant which is not a boolean");
-        return std::get<bool>(mValue);
-    }
-
-    inline Integer asInteger() const
-    {
-        PEXPR_ASSERT(type() == ElementaryType::Integer, "Trying to get a constant which is not a integer");
-        return std::get<Integer>(mValue);
-    }
-
-    inline Number asNumber() const
-    {
-        PEXPR_ASSERT(type() == ElementaryType::Number, "Trying to get a constant which is not a number");
-        return std::get<Number>(mValue);
-    }
-
-    inline std::string asString() const
-    {
-        PEXPR_ASSERT(type() == ElementaryType::String, "Trying to get a constant which is not a string");
-        return std::get<std::string>(mValue);
-    }
-
 private:
     std::string mName;
     ElementaryType mType;
-    ValueVariant mValue;
 };
 
+/// A general purpose function definition with a fixed signature.
 class FunctionDef {
 public:
-    inline FunctionDef(const std::string& name, ElementaryType retType, const std::vector<ElementaryType>& args)
+    /// Construct a function definition with a given name, return type and parameter types.
+    inline FunctionDef(const std::string& name, ElementaryType retType, const std::vector<ElementaryType>& params)
         : mName(name)
         , mReturnType(retType)
-        , mArguments(args)
+        , mParameters(params)
     {
         PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
+    /// The identifier the function is named with.
     inline const std::string& name() const { return mName; }
+    /// The type of the return value.
     inline ElementaryType returnType() const { return mReturnType; }
-    inline const std::vector<ElementaryType>& arguments() const { return mArguments; }
+    /// The all parameter types the function has to be called with.
+    inline const std::vector<ElementaryType>& parameters() const { return mParameters; }
 
 private:
     std::string mName;
     ElementaryType mReturnType;
-    std::vector<ElementaryType> mArguments;
+    std::vector<ElementaryType> mParameters;
 };
 } // namespace PExpr

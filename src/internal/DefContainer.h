@@ -52,7 +52,7 @@ public:
 
         bool unique = true;
         for (auto it = pair.first; it != pair.second; ++it) {
-            if (std::equal(def.arguments().begin(), def.arguments().end(), it->second.arguments().begin())) {
+            if (std::equal(def.parameters().begin(), def.parameters().end(), it->second.parameters().begin())) {
                 unique = false;
                 break;
             }

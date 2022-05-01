@@ -34,15 +34,27 @@ Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) 
         return nullptr;
 
     if (!skipTypeChecking) {
-        internal::TypeChecker checker(mDefinitions);
-        auto retType = checker.handle(expr);
-        if (retType == ElementaryType::Unspecified)
+        if (!doTypeChecking(expr))
             return nullptr;
-
-        expr->setReturnType(retType);
     }
 
     return expr;
 }
 
+Ptr<Expression> Environment::parse(const std::string& str, bool skipTypeChecking) const
+{
+    std::stringstream stream(str);
+    return parse(stream, skipTypeChecking);
+}
+
+bool Environment::doTypeChecking(const Ptr<Expression>& expr) const
+{
+    internal::TypeChecker checker(mDefinitions);
+    auto retType = checker.handle(expr);
+    if (retType == ElementaryType::Unspecified)
+        return false;
+
+    expr->setReturnType(retType);
+    return true;
+}
 } // namespace PExpr

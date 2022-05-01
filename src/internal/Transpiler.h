@@ -21,8 +21,8 @@ public:
         switch (expr->type()) {
         case ExpressionType::Variable:
             return handleNode(std::reinterpret_pointer_cast<VariableExpression>(expr));
-        case ExpressionType::Const:
-            return handleNode(std::reinterpret_pointer_cast<ConstExpression>(expr));
+        case ExpressionType::Literal:
+            return handleNode(std::reinterpret_pointer_cast<LiteralExpression>(expr));
         case ExpressionType::Unary:
             return handleNode(std::reinterpret_pointer_cast<UnaryExpression>(expr));
         case ExpressionType::Binary:
@@ -59,7 +59,7 @@ private:
         return Payload{};
     }
 
-    Payload handleNode(const Ptr<ConstExpression>& expr)
+    Payload handleNode(const Ptr<LiteralExpression>& expr)
     {
         switch (expr->returnType()) {
         case ElementaryType::Boolean:
@@ -233,7 +233,7 @@ private:
 
         // First check for exact matches
         for (auto it = funcs.value().first; it != funcs.value().second; ++it) {
-            const auto& toArgs = it->second.arguments();
+            const auto& toArgs = it->second.parameters();
 
             bool found = std::equal(types.begin(), types.end(), toArgs.begin());
             if (found) {
@@ -245,7 +245,7 @@ private:
         // Second check (if failed) with conversions
         if (funcdef == nullptr) {
             for (auto it = funcs.value().first; it != funcs.value().second; ++it) {
-                const auto& toArgs = it->second.arguments();
+                const auto& toArgs = it->second.parameters();
 
                 bool found = std::equal(types.begin(), types.end(), toArgs.begin(),
                                         isConvertible);
@@ -265,12 +265,12 @@ private:
         // Handle implicit casts
         for (size_t i = 0; i < args.size(); ++i) {
             ElementaryType fromType = types[i];
-            ElementaryType toType   = funcdef->arguments().at(i);
+            ElementaryType toType   = funcdef->parameters().at(i);
 
             args[i] = handleCast(args[i], fromType, toType);
         }
 
-        return mVisitor->onFunctionCall(funcName, funcdef->returnType(), funcdef->arguments(), args);
+        return mVisitor->onFunctionCall(funcName, funcdef->returnType(), funcdef->parameters(), args);
     }
 
     Payload handleNode(const Ptr<AccessExpression>& expr)
