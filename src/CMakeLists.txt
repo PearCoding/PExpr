@@ -1,10 +1,8 @@
 set(PUBLIC
-    pexpr_config.h
+    PExpr_Config.h
     PExpr.h
     Definitions.h
-    Enums.cpp
     Enums.h
-    Environment.cpp
     Environment.h
     Expression.h
     Location.h
@@ -12,22 +10,24 @@ set(PUBLIC
     LogListener.h
     StringVisitor.h
     TranspileVisitor.h
+    internal/ConsoleLogListener.h
+    internal/DefContainer.h
+    internal/Transpiler.h
 )
 
 set(SRC
     ${PUBLIC}
+    Enums.cpp
+    Environment.cpp
     Logger.cpp
 
     internal/ConsoleLogListener.cpp
-    internal/ConsoleLogListener.h
-    internal/DefContainer.h
-    internal/Lexer.cpp
     internal/Lexer.h
+    internal/Lexer.cpp
     internal/Parser.cpp
     internal/Parser.h
     internal/Token.cpp
     internal/Token.h
-    internal/Transpiler.h
     internal/TypeChecker.cpp
     internal/TypeChecker.h
 )
@@ -44,3 +44,11 @@ if(PEXPR_WITH_ASSERTS)
 endif()
 target_compile_features(pexpr PUBLIC cxx_std_17)
 set_target_properties(pexpr PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+install(TARGETS pexpr 
+        LIBRARY DESTINATION lib
+)
+install(
+    DIRECTORY ${CMAKE_SOURCE_DIR}/src/
+    DESTINATION include/PExpr
+    FILES_MATCHING PATTERN "*.h*")

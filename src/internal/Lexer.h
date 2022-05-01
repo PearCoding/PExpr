@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Location.h"
+#include "../Location.h"
 #include "Token.h"
 
 #include <istream>

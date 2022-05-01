@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Definitions.h"
-#include "Logger.h"
+#include "../Definitions.h"
+#include "../Logger.h"
 
 #include <algorithm>
 

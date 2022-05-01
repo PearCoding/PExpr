@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pexpr_config.h"
+#include "PExpr_Config.h"
 
 #include "Definitions.h"
 #include "Enums.h"

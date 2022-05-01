@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LogListener.h"
+#include "../LogListener.h"
 
 namespace PExpr::internal {
 class ConsoleLogListener : public LogListener {

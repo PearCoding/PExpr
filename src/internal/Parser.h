@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Expression.h"
+#include "../Expression.h"
 #include "Lexer.h"
 #include <array>
 

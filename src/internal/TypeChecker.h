@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DefContainer.h"
-#include "Expression.h"
+#include "../Expression.h"
 
 namespace PExpr::internal {
 class TypeChecker {
