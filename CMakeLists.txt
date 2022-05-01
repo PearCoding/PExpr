@@ -44,9 +44,10 @@ set(CMAKE_DEBUG_POSTFIX  "_d")
 
 message(STATUS "Building PExpr ${PExpr_VERSION}")
 
-option(PEXPR_WITH_ASSERTS "Build with asserts even in release. It is always enabled on debug" OFF)
-option(PEXPR_WITH_TESTS "Build tests" PEXPR_NOT_SUBPROJECT)
-option(PEXPR_WITH_TOOLS "Build tools" PEXPR_NOT_SUBPROJECT)
+option(PEXPR_WITH_ASSERTS 		"Build with asserts even in release. It is always enabled on debug" OFF)
+option(PEXPR_WITH_TESTS 		"Build tests" ${PEXPR_NOT_SUBPROJECT})
+option(PEXPR_WITH_TOOLS 		"Build tools" ${PEXPR_NOT_SUBPROJECT})
+option(PEXPR_WITH_DOCUMENTATION "Build documentation with doxygen." ${PEXPR_NOT_SUBPROJECT})
 
 # Enable folders for Visual Studio
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -67,4 +68,9 @@ endif()
 if(PEXPR_WITH_TESTS)
     include(CTest)
 	add_subdirectory(test)
+endif()
+
+# Documentation
+if(PEXPR_WITH_DOCUMENTATION)
+	include(cmake/Documentation.cmake)
 endif()

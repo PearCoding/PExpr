@@ -23,9 +23,10 @@ namespace internal {
 class ConsoleLogListener;
 }
 
-/// Simple logging class
+/// Simple logging class.
 class Logger {
 public:
+    /// Buffer used by the logging class.
     class StreamBuf final : public std::streambuf {
     public:
         inline StreamBuf(Logger& logger, bool ignore)
@@ -41,7 +42,7 @@ public:
         bool mIgnore;
     };
 
-    /// A closure used to make calls threadsafe. Never capture the ostream, else threadsafety is not guaranteed
+    /// A closure used to make calls threadsafe. Never capture the ostream, else threadsafety is not guaranteed.
     class LogClosure {
     public:
         inline explicit LogClosure(Logger& logger)
@@ -75,7 +76,7 @@ public:
     Logger();
     ~Logger() = default;
 
-    /// String representation of the given log level
+    /// String representation of the given log level.
     static std::string_view levelString(LogLevel l);
 
     /// Add a custom listener.
