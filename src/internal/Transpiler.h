@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DefContainer.h"
 #include "../TranspileVisitor.h"
+#include "DefContainer.h"
 
 namespace PExpr::internal {
 template <typename Payload>
@@ -50,7 +50,7 @@ private:
 
     Payload handleNode(const Ptr<VariableExpression>& expr)
     {
-        auto p = mDefinitions.checkVariable(expr->name());
+        auto p = mDefinitions.lookupVariable(expr->location(), expr->name());
 
         if (p.has_value())
             return mVisitor->onVariable(p.value().name(), p.value().type());
@@ -227,37 +227,9 @@ private:
             args.push_back(handle(e));
         }
 
-        auto funcs = mDefinitions.checkFunction(funcName);
+        auto def = mDefinitions.lookupFunction(expr->location(), funcName, types);
 
-        const FunctionDef* funcdef = nullptr;
-
-        // First check for exact matches
-        for (auto it = funcs.value().first; it != funcs.value().second; ++it) {
-            const auto& toArgs = it->second.parameters();
-
-            bool found = std::equal(types.begin(), types.end(), toArgs.begin());
-            if (found) {
-                funcdef = &it->second;
-                break;
-            }
-        }
-
-        // Second check (if failed) with conversions
-        if (funcdef == nullptr) {
-            for (auto it = funcs.value().first; it != funcs.value().second; ++it) {
-                const auto& toArgs = it->second.parameters();
-
-                bool found = std::equal(types.begin(), types.end(), toArgs.begin(),
-                                        isConvertible);
-                if (found) {
-                    funcdef = &it->second;
-                    break;
-                }
-            }
-        }
-
-        // Something is broken if we got so far, but got no function definition available
-        if (funcdef == nullptr) {
+        if (!def.has_value()) {
             PEXPR_ASSERT(false, "Should have been caught by the typechecker!");
             return Payload{};
         }
@@ -265,12 +237,12 @@ private:
         // Handle implicit casts
         for (size_t i = 0; i < args.size(); ++i) {
             ElementaryType fromType = types[i];
-            ElementaryType toType   = funcdef->parameters().at(i);
+            ElementaryType toType   = def.value().parameters().at(i);
 
             args[i] = handleCast(args[i], fromType, toType);
         }
 
-        return mVisitor->onFunctionCall(funcName, funcdef->returnType(), funcdef->parameters(), args);
+        return mVisitor->onFunctionCall(funcName, def.value().returnType(), def.value().parameters(), args);
     }
 
     Payload handleNode(const Ptr<AccessExpression>& expr)

@@ -293,6 +293,34 @@ public:
     }
 };
 
+static std::optional<VariableDef> variableLookup(const VariableLookup& lkp)
+{
+    if (Constants.count(lkp.name()))
+        return VariableDef(lkp.name(), ElementaryType::Number);
+    return {};
+}
+
+static std::optional<FunctionDef> functionLookup(const FunctionLookup& lkp)
+{
+    if (lkp.name() == "vec2" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number }))
+        return FunctionDef("vec2", ElementaryType::Vec2, { ElementaryType::Number, ElementaryType::Number });
+    if (lkp.name() == "vec3" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }))
+        return FunctionDef("vec3", ElementaryType::Vec3, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number });
+    if (lkp.name() == "vec4" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }))
+        return FunctionDef("vec4", ElementaryType::Vec4, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number, ElementaryType::Number });
+
+    if (lkp.parameters().size() == 1 && isArithmetic(lkp.parameters()[0])) {
+        if (lkp.name() == "sin" || lkp.name() == "cos" || lkp.name() == "tan"
+            || lkp.name() == "asin" || lkp.name() == "acos" || lkp.name() == "atan"
+            || lkp.name() == "exp" || lkp.name() == "log") {
+            ElementaryType type = lkp.parameters()[0] != ElementaryType::Integer ? lkp.parameters()[0] : ElementaryType::Number;
+            return FunctionDef(lkp.name(), type, { type });
+        }
+    }
+
+    return {};
+}
+
 int main(int argc, char** argv)
 {
     std::string input;
@@ -302,28 +330,8 @@ int main(int argc, char** argv)
     }
 
     Environment env;
-    for (auto c : Constants)
-        env.registerDef(VariableDef(std::string(c.first), ElementaryType::Number));
-
-    env.registerDef(FunctionDef("vec2", ElementaryType::Vec2, { ElementaryType::Number, ElementaryType::Number }));
-    env.registerDef(FunctionDef("vec3", ElementaryType::Vec3, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }));
-    env.registerDef(FunctionDef("vec4", ElementaryType::Vec4, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }));
-
-    auto addDynFunc1 = [&](const std::string& name) {
-        env.registerDef(FunctionDef(name, ElementaryType::Number, { ElementaryType::Number }));
-        env.registerDef(FunctionDef(name, ElementaryType::Vec2, { ElementaryType::Vec2 }));
-        env.registerDef(FunctionDef(name, ElementaryType::Vec3, { ElementaryType::Vec3 }));
-        env.registerDef(FunctionDef(name, ElementaryType::Vec4, { ElementaryType::Vec4 }));
-    };
-
-    addDynFunc1("sin");
-    addDynFunc1("cos");
-    addDynFunc1("tan");
-    addDynFunc1("asin");
-    addDynFunc1("acos");
-    addDynFunc1("atan");
-    addDynFunc1("exp");
-    addDynFunc1("log");
+    env.registerVariableLookupFunction(variableLookup);
+    env.registerFunctionLookupFunction(functionLookup);
 
     auto ast = env.parse(input);
 

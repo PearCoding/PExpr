@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Definitions.h"
+#include "Lookup.h"
 #include "Expression.h"
 #include "internal/Transpiler.h"
 
@@ -13,12 +13,13 @@ public:
     /// Destroys an environment.
     ~Environment();
 
-    /// Register a variable.
-    /// If a variable of the same name is already present, it will be silently replaced.
-    void registerDef(const VariableDef& def);
-    /// Register a function.
-    /// Multiple function defs with the same name are allowed, but the signature (parameter types) have to be unique.
-    void registerDef(const FunctionDef& def);
+    /// Register a variable lookup function.
+    /// Callback has to return a valid variable definition if variable exists.
+    void registerVariableLookupFunction(const VariableLookupFunction& def);
+
+    /// Register a function lookup function.
+    /// Callback has to return a valid function definition if function exists with exact or convertible signature.
+    void registerFunctionLookupFunction(const FunctionLookupFunction& def);
 
     /// Parse the stream until eof and return the corresponding AST tree.
     /// If skipTypeChecking is true, no typechecking will be performed and no variables or functions have to be defined in advance.

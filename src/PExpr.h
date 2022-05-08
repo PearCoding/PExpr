@@ -8,5 +8,6 @@
 #include "Expression.h"
 #include "LogListener.h"
 #include "Logger.h"
+#include "Lookup.h"
 #include "StringVisitor.h"
 #include "TranspileVisitor.h"

@@ -43,7 +43,7 @@ ElementaryType TypeChecker::handle(const Ptr<Expression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
 {
-    auto def = mDefinitions.checkVariable(expr->name());
+    auto def = mDefinitions.lookupVariable(expr->location(), expr->name());
     if (def.has_value()) {
         expr->setReturnType(def.value().type());
         return def.value().type();
@@ -183,60 +183,20 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     std::vector<ElementaryType> fromArgs;
     fromArgs.reserve(expr->parameters().size());
 
-    bool invalid = false;
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
         auto type = handle(expr->parameters().at(i));
         if (type == ElementaryType::Unspecified)
-            invalid = true;
+            return ElementaryType::Unspecified; // Error was caught somewhere else
         fromArgs.push_back(type);
     }
 
-    if (invalid)
-        return ElementaryType::Unspecified; // Error was caught somewhere else
-
     expr->setReturnType(ElementaryType::Unspecified);
 
-    auto def = mDefinitions.checkFunction(expr->name());
-    if (def.has_value()) {
-        // First check for exact matches
-        for (auto it = def.value().first; it != def.value().second; ++it) {
-            const auto& toArgs = it->second.parameters();
-
-            bool found = std::equal(fromArgs.begin(), fromArgs.end(), toArgs.begin());
-            if (found) {
-                expr->setReturnType(it->second.returnType());
-                break;
-            }
-        }
-
-        // Second check (if failed) with conversions
-        if (expr->isUnspecified()) {
-            for (auto it = def.value().first; it != def.value().second; ++it) {
-                const auto& toArgs = it->second.parameters();
-
-                bool found = std::equal(fromArgs.begin(), fromArgs.end(), toArgs.begin(),
-                                        isConvertible);
-                if (found) {
-                    expr->setReturnType(it->second.returnType());
-                    break;
-                }
-            }
-        }
-
-        // Compose error message
-        if (expr->isUnspecified()) {
-            std::stringstream output;
-            output << expr->location() << ": Call to function '" << expr->name() << "(" << printArgs(fromArgs) << ")' not found" << std::endl
-                   << "  Available signatures are: " << std::endl;
-
-            for (auto it = def.value().first; it != def.value().second; ++it)
-                output << "    '" << it->first << "(" << printArgs(it->second.parameters()) << ")'" << std::endl;
-
-            PEXPR_LOG(LogLevel::Error) << output.str();
-        }
-    } else {
-        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown" << std::endl;
-    }
+    auto def = mDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs);
+    if (def.has_value())
+        expr->setReturnType(def.value().returnType());
+    else
+        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown or ambigous" << std::endl;
 
     return expr->returnType();
 }

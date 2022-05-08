@@ -13,14 +13,14 @@ Environment::~Environment()
 {
 }
 
-void Environment::registerDef(const VariableDef& def)
+void Environment::registerVariableLookupFunction(const VariableLookupFunction& cb)
 {
-    mDefinitions.registerDef(def);
+    mDefinitions.addVariableLookupFunction(cb);
 }
 
-void Environment::registerDef(const FunctionDef& def)
+void Environment::registerFunctionLookupFunction(const FunctionLookupFunction& cb)
 {
-    mDefinitions.registerDef(def);
+    mDefinitions.addFunctionLookupFunction(cb);
 }
 
 Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) const

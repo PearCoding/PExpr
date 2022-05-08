@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Enums.h"
+#include "Location.h"
+
 #include <vector>
 
 namespace PExpr {
@@ -50,4 +52,5 @@ private:
     ElementaryType mReturnType;
     std::vector<ElementaryType> mParameters;
 };
+
 } // namespace PExpr

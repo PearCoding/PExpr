@@ -1,71 +1,43 @@
 #pragma once
 
-#include "../Definitions.h"
+#include "../Lookup.h"
 #include "../Logger.h"
-
-#include <algorithm>
 
 namespace PExpr::internal {
 class DefContainer {
 public:
-    using FunctionMap = std::unordered_multimap<std::string, FunctionDef>;
-
-    inline bool hasVariable(const std::string& name) const
+    inline void addVariableLookupFunction(const VariableLookupFunction& func)
     {
-        return mVarMap.count(name) > 0;
+        mVars.emplace_back(func);
     }
 
-    inline std::optional<VariableDef> checkVariable(const std::string& name) const
+    inline std::optional<VariableDef> lookupVariable(const Location& loc, const std::string& name) const
     {
-        if (hasVariable(name))
-            return mVarMap.at(name);
-        else
-            return {};
-    }
-
-    inline bool hasFunction(const std::string& name) const
-    {
-        return mFuncMap.count(name) > 0;
-    }
-
-    inline std::optional<std::pair<FunctionMap::const_iterator, FunctionMap::const_iterator>>
-    checkFunction(const std::string& name) const
-    {
-        if (hasFunction(name))
-            return mFuncMap.equal_range(name);
-        else
-            return {};
-    }
-
-    inline void registerDef(const VariableDef& def)
-    {
-        PEXPR_ASSERT(!def.name().empty(), "Expected a vaild variable name");
-        mVarMap.emplace(def.name(), def);
-    }
-
-    inline void registerDef(const FunctionDef& def)
-    {
-        PEXPR_ASSERT(!def.name().empty(), "Expected a vaild function name");
-
-        // Check if signature is unique
-        auto pair = mFuncMap.equal_range(def.name());
-
-        bool unique = true;
-        for (auto it = pair.first; it != pair.second; ++it) {
-            if (std::equal(def.parameters().begin(), def.parameters().end(), it->second.parameters().begin())) {
-                unique = false;
-                break;
-            }
+        for (const auto& cb : mVars) {
+            auto res = cb(VariableLookup(loc, name));
+            if (res.has_value())
+                return res;
         }
+        return {};
+    }
 
-        if (!unique)
-            PEXPR_LOG(LogLevel::Error) << "Trying to add function '" << def.name() << "' with an already registred signature" << std::endl;
-        else
-            mFuncMap.emplace(def.name(), def);
+    inline void addFunctionLookupFunction(const FunctionLookupFunction& func)
+    {
+        mFuncs.emplace_back(func);
+    }
+
+    inline std::optional<FunctionDef> lookupFunction(const Location& loc, const std::string& name, const std::vector<ElementaryType>& params) const
+    {
+        for (const auto& cb : mFuncs) {
+            auto res = cb(FunctionLookup(loc, name, params));
+            if (res.has_value())
+                return res;
+        }
+        return {};
     }
 
 private:
-    std::unordered_map<std::string, VariableDef> mVarMap;
-    std::unordered_multimap<std::string, FunctionDef> mFuncMap;
+    std::vector<VariableLookupFunction> mVars;
+    std::vector<FunctionLookupFunction> mFuncs;
 };
-} // namespace PExpr
+} // namespace PExpr::internal
