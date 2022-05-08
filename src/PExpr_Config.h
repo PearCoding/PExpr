@@ -65,7 +65,7 @@
 
 #ifdef PEXPR_CC_MSC
 #define PEXPR_DEBUG_BREAK() __debugbreak()
-#define PEXPR_FUNCTION_NAME __FUNCSPEXPR__
+#define PEXPR_FUNCTION_NAME __FUNCSIG__
 #define PEXPR_BEGIN_IGNORE_WARNINGS PEXPR_PRAGMA(warning(push, 0))
 #define PEXPR_END_IGNORE_WARNINGS PEXPR_PRAGMA(warning(pop))
 #else // FIXME: Really use cpu dependent assembler?
@@ -90,7 +90,7 @@
 #if defined(PEXPR_WITH_ASSERTS) || (!defined(PEXPR_NO_ASSERTS) && defined(PEXPR_DEBUG))
 #include <assert.h>
 #define _PEXPR_ASSERT_MSG(msg)                                 \
-    std::cerr << "[IGNIS] ASSERT | " << __FILE__               \
+    std::cerr << "[PExpr] ASSERT | " << __FILE__               \
               << ":" << __LINE__ << " " << PEXPR_FUNCTION_NAME \
               << " | " << (msg) << std::endl
 #ifndef PEXPR_DEBUG
