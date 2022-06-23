@@ -98,7 +98,7 @@ private:
         if (atype != btype) {
             if (atype == ElementaryType::Integer && btype == ElementaryType::Number)
                 return handleAddSub(isSub, handleCast(a, atype, ElementaryType::Number), ElementaryType::Number, b, btype);
-            else if (atype == ElementaryType::Integer && btype == ElementaryType::Number)
+            else if (atype == ElementaryType::Number && btype == ElementaryType::Integer)
                 return handleAddSub(isSub, a, atype, handleCast(b, btype, ElementaryType::Number), ElementaryType::Number);
 
             PEXPR_ASSERT(false, "Should have been caught by the typechecker!");
@@ -113,7 +113,7 @@ private:
         if (atype != btype) {
             if (atype == ElementaryType::Integer && btype == ElementaryType::Number)
                 return handleMulDiv(isDiv, handleCast(a, atype, ElementaryType::Number), ElementaryType::Number, b, btype);
-            else if (atype == ElementaryType::Integer && btype == ElementaryType::Number)
+            else if (atype == ElementaryType::Number && btype == ElementaryType::Integer)
                 return handleMulDiv(isDiv, a, atype, handleCast(b, btype, ElementaryType::Number), ElementaryType::Number);
 
             PEXPR_ASSERT(false, "Should have been caught by the typechecker!");
