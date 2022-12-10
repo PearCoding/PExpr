@@ -101,9 +101,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
         if (isArithmetic(leftType) && isArithmetic(rightType)) {
             if (leftType == rightType)
                 expr->setReturnType(leftType);
-            if (isConvertible(leftType, rightType))
+            else if (isConvertible(leftType, rightType))
                 expr->setReturnType(rightType);
-            if (isConvertible(rightType, leftType))
+            else if (isConvertible(rightType, leftType))
                 expr->setReturnType(leftType);
         }
         break;
@@ -112,13 +112,13 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
         if (isArithmetic(leftType) && isArithmetic(rightType)) {
             if (leftType == rightType)
                 expr->setReturnType(leftType);
-            if (isConvertible(leftType, rightType))
+            else if (isConvertible(leftType, rightType))
                 expr->setReturnType(rightType);
-            if (isConvertible(rightType, leftType))
+            else if (isConvertible(rightType, leftType))
                 expr->setReturnType(leftType);
-            if (isArray(leftType) && isConvertible(rightType, ElementaryType::Number))
+            else if (isArray(leftType) && isConvertible(rightType, ElementaryType::Number))
                 expr->setReturnType(leftType); // vec * f, vec / f
-            if (expr->op() != BinaryOperation::Div && isArray(rightType) && isConvertible(leftType, ElementaryType::Number))
+            else if (expr->op() != BinaryOperation::Div && isArray(rightType) && isConvertible(leftType, ElementaryType::Number))
                 expr->setReturnType(rightType); // f * vec
         }
         break;
@@ -126,9 +126,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
         if (isArithmetic(leftType) && isArithmetic(rightType)) {
             if (leftType == rightType && leftType == ElementaryType::Integer)
                 expr->setReturnType(leftType); // i ^ i
-            if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
+            else if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
                 expr->setReturnType(ElementaryType::Number); // f ^ f
-            if (isArray(leftType) && isConvertible(rightType, ElementaryType::Number))
+            else if (isArray(leftType) && isConvertible(rightType, ElementaryType::Number))
                 expr->setReturnType(leftType); // vec ^ f
         }
         break;
@@ -147,7 +147,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
     case BinaryOperation::GreaterEqual:
         if (isConvertible(leftType, ElementaryType::Boolean) && isConvertible(rightType, ElementaryType::Boolean))
             expr->setReturnType(ElementaryType::Boolean);
-        if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
+        else if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
             expr->setReturnType(ElementaryType::Boolean);
         break;
     case BinaryOperation::Equal:
