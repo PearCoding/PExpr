@@ -338,6 +338,10 @@ int main(int argc, char** argv)
     if (ast == nullptr)
         return EXIT_FAILURE;
 
+#if 0
+    std::cout << StringVisitor::visit(ast) << std::endl;
+#endif
+
     CalcVisitor visitor;
     auto ret = env.transpile(ast, &visitor);
 

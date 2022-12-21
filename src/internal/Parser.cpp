@@ -110,81 +110,61 @@ private:
         if (P.cur().Type == TokenType::Eof)
             return nullptr;
 
-        return p_logical_expression();
+        return p_binary_expression();
     }
 
-    inline Ptr<Expression> p_logical_expression()
+    static inline std::pair<BinaryOperation, int> binaryOpFromToken(TokenType type)
     {
-        auto left      = p_equality_expression();
-        const auto loc = P.cur().Location;
-        if (P.accept(TokenType::And))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::And, left, p_logical_expression());
-        if (P.accept(TokenType::Or))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Or, left, p_logical_expression());
-
-        return left;
+        switch (type) {
+        case TokenType::Or:
+            return { BinaryOperation::Or, 6 };
+        case TokenType::And:
+            return { BinaryOperation::And, 5 };
+        case TokenType::Equal:
+            return { BinaryOperation::Equal, 4 };
+        case TokenType::NotEqual:
+            return { BinaryOperation::NotEqual, 4 };
+        case TokenType::Less:
+            return { BinaryOperation::Less, 4 };
+        case TokenType::Greater:
+            return { BinaryOperation::Greater, 4 };
+        case TokenType::LessEqual:
+            return { BinaryOperation::LessEqual, 4 };
+        case TokenType::GreaterEqual:
+            return { BinaryOperation::GreaterEqual, 4 };
+        case TokenType::Plus:
+            return { BinaryOperation::Add, 3 };
+        case TokenType::Minus:
+            return { BinaryOperation::Sub, 3 };
+        case TokenType::Mul:
+            return { BinaryOperation::Mul, 2 };
+        case TokenType::Div:
+            return { BinaryOperation::Div, 2 };
+        case TokenType::Mod:
+            return { BinaryOperation::Mod, 2 };
+        case TokenType::Pow:
+            return { BinaryOperation::Pow, 1 };
+        default:
+            return { BinaryOperation::Add, -1 };
+        }
     }
 
-    inline Ptr<Expression> p_equality_expression()
+    inline Ptr<Expression> p_binary_expression(int max_precedence = 6 /*Max precedence*/)
     {
-        auto left      = p_relational_expression();
-        const auto loc = P.cur().Location;
-        if (P.accept(TokenType::Equal))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Equal, left, p_equality_expression());
-        if (P.accept(TokenType::NotEqual))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::NotEqual, left, p_equality_expression());
+        auto left = p_unary_expression();
+        while (true) {
+            const auto loc = P.cur().Location;
+            const auto bin = binaryOpFromToken(P.cur().Type);
+            const auto op  = std::get<0>(bin);
+            const int prec = std::get<1>(bin);
 
-        return left;
-    }
+            if (prec > max_precedence || prec <= 0)
+                break;
+            P.next();
 
-    inline Ptr<Expression> p_relational_expression()
-    {
-        auto left      = p_additive_expression();
-        const auto loc = P.cur().Location;
-        if (P.accept(TokenType::Less))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Less, left, p_relational_expression());
-        if (P.accept(TokenType::Greater))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Greater, left, p_relational_expression());
-        if (P.accept(TokenType::LessEqual))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::LessEqual, left, p_relational_expression());
-        if (P.accept(TokenType::GreaterEqual))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::GreaterEqual, left, p_relational_expression());
-
-        return left;
-    }
-
-    inline Ptr<Expression> p_additive_expression()
-    {
-        auto left      = p_multiplicative_expression();
-        const auto loc = P.cur().Location;
-        if (P.accept(TokenType::Plus))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Add, left, p_additive_expression());
-        if (P.accept(TokenType::Minus))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Sub, left, p_additive_expression());
-
-        return left;
-    }
-
-    inline Ptr<Expression> p_multiplicative_expression()
-    {
-        auto left      = p_powmod_expression();
-        const auto loc = P.cur().Location;
-        if (P.accept(TokenType::Mul))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mul, left, p_multiplicative_expression());
-        if (P.accept(TokenType::Div))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Div, left, p_multiplicative_expression());
-
-        return left;
-    }
-
-    inline Ptr<Expression> p_powmod_expression()
-    {
-        auto left      = p_unary_expression();
-        const auto loc = P.cur().Location;
-        if (P.accept(TokenType::Mod))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mod, left, p_powmod_expression());
-        if (P.accept(TokenType::Pow))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Pow, left, p_powmod_expression());
+            auto right = p_binary_expression(prec - 1);
+            left       = std::make_shared<BinaryExpression>(loc, op, left, right);
+        }
 
         return left;
     }
@@ -241,7 +221,7 @@ private:
     inline void p_parameter_list(std::vector<Ptr<Expression>>& list)
     {
         do {
-            auto expr = p_logical_expression();
+            auto expr = p_binary_expression();
             PEXPR_ASSERT(expr != nullptr, "Got empty parameter value");
             list.push_back(expr);
         } while (P.accept(TokenType::Comma));
@@ -250,7 +230,7 @@ private:
     inline Ptr<Expression> p_primary_expression()
     {
         if (P.accept(TokenType::OpenParanthese)) {
-            auto expr = p_logical_expression();
+            auto expr = p_binary_expression();
             P.expect(TokenType::ClosedParanthese);
 
             if (P.cur().Type == TokenType::Dot) {
@@ -306,4 +286,4 @@ Ptr<Expression> parse_translation_unit(Parser& parser)
 {
     return ParserGrammar(parser).parse();
 }
-} // namespace PExpr
+} // namespace PExpr::internal
