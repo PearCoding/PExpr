@@ -167,16 +167,24 @@ private:
 
     inline Ptr<Expression> p_multiplicative_expression()
     {
-        auto left      = p_unary_expression();
+        auto left      = p_powmod_expression();
         const auto loc = P.cur().Location;
         if (P.accept(TokenType::Mul))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mul, left, p_multiplicative_expression());
         if (P.accept(TokenType::Div))
             return std::make_shared<BinaryExpression>(loc, BinaryOperation::Div, left, p_multiplicative_expression());
+
+        return left;
+    }
+
+    inline Ptr<Expression> p_powmod_expression()
+    {
+        auto left      = p_unary_expression();
+        const auto loc = P.cur().Location;
         if (P.accept(TokenType::Mod))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mod, left, p_multiplicative_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Mod, left, p_powmod_expression());
         if (P.accept(TokenType::Pow))
-            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Pow, left, p_multiplicative_expression());
+            return std::make_shared<BinaryExpression>(loc, BinaryOperation::Pow, left, p_powmod_expression());
 
         return left;
     }

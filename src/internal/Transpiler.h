@@ -119,11 +119,7 @@ private:
             PEXPR_ASSERT(false, "Should have been caught by the typechecker!");
             return Payload{};
         } else {
-            // i/i behaves like f/f (no integer division)
-            if (atype == ElementaryType::Integer)
-                return handleMulDiv(isDiv, handleCast(a, atype, ElementaryType::Number), ElementaryType::Number, handleCast(b, btype, ElementaryType::Number), ElementaryType::Number);
-            else
-                return mVisitor->onMulDiv(isDiv, atype, a, b);
+            return mVisitor->onMulDiv(isDiv, atype, a, b);
         }
     }
 
