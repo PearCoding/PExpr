@@ -90,7 +90,7 @@ Token Lexer::next()
 
         if (std::isalpha(peek()) || peek() == '_') {
             append();
-            while (std::isalnum(peek()) || peek() == '_')
+            while ((std::isalnum(peek()) || peek() == '_') && !eof())
                 append();
 
             if (mTemp == "true")
