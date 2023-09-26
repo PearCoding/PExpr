@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Expression.h"
+#include "../Closure.h"
 #include "Lexer.h"
 #include <array>
 
@@ -11,7 +11,7 @@ class Parser {
 public:
     Parser(Lexer& lexer);
 
-    Ptr<Expression> parse();
+    Ptr<Closure> parse();
 
     inline bool hasError() const { return mHasError; }
 

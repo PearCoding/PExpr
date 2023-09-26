@@ -9,16 +9,16 @@ std::string_view Token::toString(TokenType type)
         return "Error";
     case TokenType::Eof:
         return "EndOfStream";
-    case TokenType::Float:
-        return "Float";
-    case TokenType::Integer:
-        return "Integer";
-    case TokenType::String:
-        return "String";
+    case TokenType::NumberLiteral:
+        return "NumberLiteral";
+    case TokenType::IntegerLiteral:
+        return "IntegerLiteral";
+    case TokenType::StringLiteral:
+        return "StringLiteral";
     case TokenType::Identifier:
         return "Identifier";
-    case TokenType::Boolean:
-        return "Boolean";
+    case TokenType::BooleanLiteral:
+        return "BooleanLiteral";
     case TokenType::Plus:
         return "+";
     case TokenType::Minus:
@@ -41,6 +41,10 @@ std::string_view Token::toString(TokenType type)
         return "(";
     case TokenType::ClosedParanthese:
         return ")";
+    case TokenType::OpenBraces:
+        return "{";
+    case TokenType::ClosedBraces:
+        return "}";
     case TokenType::And:
         return "&&";
     case TokenType::Or:
@@ -57,6 +61,30 @@ std::string_view Token::toString(TokenType type)
         return "==";
     case TokenType::NotEqual:
         return "!=";
+    case TokenType::Assign:
+        return "=";
+    case TokenType::If:
+        return "if";
+    case TokenType::Elif:
+        return "elif";
+    case TokenType::Else:
+        return "else";
+    case TokenType::Mutable:
+        return "mut";
+    case TokenType::BooleanType:
+        return "bool";
+    case TokenType::IntegerType:
+        return "int";
+    case TokenType::NumberType:
+        return "num";
+    case TokenType::Vec2Type:
+        return "vec2";
+    case TokenType::Vec3Type:
+        return "vec3";
+    case TokenType::Vec4Type:
+        return "vec4";
+    case TokenType::StringType:
+        return "str";
     }
 }
-} // namespace PExpr
+} // namespace PExpr::internal

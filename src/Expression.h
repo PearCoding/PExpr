@@ -213,4 +213,48 @@ private:
     std::string mSwizzle;
 };
 
+class Closure;
+/// Basic closure embedded in braces {}
+class ClosureExpression : public Expression {
+public:
+    inline ClosureExpression(const Location& loc, const Ptr<Closure>& closure)
+        : Expression(loc, ExpressionType::Closure)
+        , mClosure(closure)
+    {
+        PEXPR_ASSERT(closure != nullptr, "Expected valid pointer for losure");
+    }
+
+    inline Ptr<Closure> closure() const { return mClosure; }
+
+private:
+    Ptr<Closure> mClosure;
+};
+
+/// Call to an if, elif and else block.
+class BranchExpression : public Expression {
+public:
+    struct SingleBranch {
+        Ptr<Expression> Condition;
+        Ptr<Closure> Body;
+    };
+    using ClosureList = std::vector<SingleBranch>;
+    inline BranchExpression(const Location& loc, const ClosureList& branches, const Ptr<Closure>& else_closure)
+        : Expression(loc, ExpressionType::Unary)
+        , mBranches(branches)
+        , mElseClosure(else_closure)
+    {
+        PEXPR_ASSERT(!branches.empty(), "Expected a minimum of one condition");
+        PEXPR_ASSERT(else_closure != nullptr, "Expected valid pointer for else closure");
+    }
+
+    /// The actual unary operation of this expression.
+    inline const ClosureList& branches() const { return mBranches; }
+    /// The else expression
+    inline Ptr<Closure> elseClosure() const { return mElseClosure; }
+
+private:
+    ClosureList mBranches;
+    Ptr<Closure> mElseClosure;
+};
+
 } // namespace PExpr

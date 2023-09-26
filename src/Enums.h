@@ -13,7 +13,7 @@ enum class ElementaryType {
     Vec2,        /// 'vec2' Represented as two 'double's internally.
     Vec3,        /// 'vec3' Represented as three 'double's internally.
     Vec4,        /// 'vec4' Represented as four 'double's internally.
-    String       /// 'vec2' Represented as 'std::string' internally.
+    String       /// 'str' Represented as 'std::string' internally.
 };
 
 /// Checks if a conversion from one type to another is possible.
@@ -89,7 +89,9 @@ enum class ExpressionType {
     Unary,    /// Unary operation.
     Binary,   /// Binary operation.
     Call,     /// Call to a function.
-    Access    /// Component swizzle operation.
+    Access,   /// Component swizzle operation.
+    Closure,  /// {adfasdfl; a} enclosed closure
+    Branch    /// If, elif and else block
 };
 
 /// Returns printable representation of the given type.

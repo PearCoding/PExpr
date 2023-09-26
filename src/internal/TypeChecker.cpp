@@ -21,7 +21,27 @@ TypeChecker::TypeChecker(const DefContainer& defs)
 {
 }
 
-ElementaryType TypeChecker::handle(const Ptr<Expression>& expr)
+ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
+{
+    mDynamicDefinitions = DefContainer{};
+    return handleNode(closure);
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
+{
+    for (auto statement : closure->statements())
+        handleNode(statement);
+
+    return handleNode(closure->expression());
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<Statement>& statement)
+{
+    // TODO
+    return ElementaryType::Unspecified;
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<Expression>& expr)
 {
     switch (expr->type()) {
     case ExpressionType::Variable:
@@ -36,15 +56,55 @@ ElementaryType TypeChecker::handle(const Ptr<Expression>& expr)
         return handleNode(std::reinterpret_pointer_cast<CallExpression>(expr));
     case ExpressionType::Access:
         return handleNode(std::reinterpret_pointer_cast<AccessExpression>(expr));
+    case ExpressionType::Closure:
+        return handleNode(std::reinterpret_pointer_cast<ClosureExpression>(expr));
+    case ExpressionType::Branch:
+        return handleNode(std::reinterpret_pointer_cast<BranchExpression>(expr));
     default:
         return ElementaryType::Unspecified;
     }
 }
 
+ElementaryType TypeChecker::handleNode(const Ptr<ClosureExpression>& expr)
+{
+    auto def            = mDynamicDefinitions;
+    ElementaryType type = handleNode(expr->closure());
+    mDynamicDefinitions = std::move(def);
+    return type;
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
+{
+    const ElementaryType elseType = handleNode(expr->elseClosure());
+
+    for (const auto& branch : expr->branches()) {
+        const ElementaryType conditionType = handleNode(branch.Condition);
+        if (isConvertible(conditionType, ElementaryType::Boolean)) {
+            branch.Condition->setReturnType(ElementaryType::Boolean);
+        } else {
+            PEXPR_LOG(LogLevel::Error) << branch.Condition->location() << ": Expected condition to evaluate to bool" << std::endl;
+            return ElementaryType::Unspecified;
+        }
+
+        const ElementaryType bodyType = handleNode(branch.Body);
+
+        if (isConvertible(bodyType, elseType)) {
+            branch.Body->expression()->setReturnType(elseType);
+        } else {
+            PEXPR_LOG(LogLevel::Error) << branch.Condition->location() << ": Expected all branch bodies to evaluate to the type " << toString(elseType) << std::endl;
+            return ElementaryType::Unspecified;
+        }
+    }
+
+    return elseType;
+}
+
 ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
 {
-    auto def = mDefinitions.lookupVariable(expr->location(), expr->name());
-    if (def.has_value()) {
+    if (const auto def = mDefinitions.lookupVariable(expr->location(), expr->name()); def.has_value()) {
+        expr->setReturnType(def.value().type());
+        return def.value().type();
+    } else if (const auto def = mDynamicDefinitions.lookupVariable(expr->location(), expr->name()); def.has_value()) {
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
@@ -60,7 +120,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<LiteralExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
 {
-    auto innerType = handle(expr->inner());
+    auto innerType = handleNode(expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
 
@@ -88,8 +148,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
 {
-    auto leftType  = handle(expr->left());
-    auto rightType = handle(expr->right());
+    auto leftType  = handleNode(expr->left());
+    auto rightType = handleNode(expr->right());
     if (leftType == ElementaryType::Unspecified || rightType == ElementaryType::Unspecified)
         return rightType; // Error was caught somewhere else
 
@@ -184,7 +244,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     fromArgs.reserve(expr->parameters().size());
 
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
-        auto type = handle(expr->parameters().at(i));
+        auto type = handleNode(expr->parameters().at(i));
         if (type == ElementaryType::Unspecified)
             return ElementaryType::Unspecified; // Error was caught somewhere else
         fromArgs.push_back(type);
@@ -203,7 +263,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
 {
-    auto innerType = handle(expr->inner());
+    auto innerType = handleNode(expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
 

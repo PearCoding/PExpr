@@ -6,11 +6,11 @@ namespace PExpr::internal {
 enum class TokenType {
     Error,
     Eof,              // End
-    Float,            // 123.45e-6 (Number)
-    Integer,          // 123 (Integer)
-    String,           // "abc" (String)
+    NumberLiteral,    // 123.45e-6 (Number)
+    IntegerLiteral,   // 123 (Integer)
+    StringLiteral,    // "abc" (String)
     Identifier,       // ABC (String)
-    Boolean,          // true, false (Boolean)
+    BooleanLiteral,   // true, false (Boolean)
     Plus,             // +
     Minus,            // -
     Mul,              // *
@@ -22,6 +22,8 @@ enum class TokenType {
     ExclamationMark,  // !
     OpenParanthese,   // (
     ClosedParanthese, // )
+    OpenBraces,       // {
+    ClosedBraces,     // }
     And,              // &&
     Or,               // ||
     Less,             // <
@@ -30,6 +32,23 @@ enum class TokenType {
     GreaterEqual,     // >=
     Equal,            // ==
     NotEqual,         // !=
+    Colon,            // :
+    Semicolon,        // ;
+    Assign,           // =
+
+    If,   // if
+    Elif, // elif
+    Else, // else
+
+    Mutable, // Mut
+
+    BooleanType, // bool
+    IntegerType, // int
+    NumberType,  // num
+    Vec2Type,    // vec2
+    Vec3Type,    // vec3
+    Vec4Type,    // vec4
+    StringType,  // str
 };
 
 class Token {
@@ -78,4 +97,4 @@ public:
 
     static std::string_view toString(TokenType type);
 };
-} // namespace PExpr
+} // namespace PExpr::internal

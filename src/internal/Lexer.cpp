@@ -25,12 +25,20 @@ Token Lexer::next()
             return Token(mLocation - 1, TokenType::OpenParanthese);
         if (accept(')'))
             return Token(mLocation - 1, TokenType::ClosedParanthese);
+        if (accept('{'))
+            return Token(mLocation - 1, TokenType::OpenBraces);
+        if (accept('}'))
+            return Token(mLocation - 1, TokenType::ClosedBraces);
         if (accept('+'))
             return Token(mLocation - 1, TokenType::Plus);
         if (accept('-'))
             return Token(mLocation - 1, TokenType::Minus);
         if (accept('*'))
             return Token(mLocation - 1, TokenType::Mul);
+        if (accept(':'))
+            return Token(mLocation - 1, TokenType::Colon);
+        if (accept(';'))
+            return Token(mLocation - 1, TokenType::Semicolon);
         if (accept('/')) {
             if (accept('*')) {
                 eatComments();
@@ -48,6 +56,8 @@ Token Lexer::next()
             return Token(mLocation - 1, TokenType::Comma);
 
         if (accept('=')) {
+            if (peek() != '=')
+                return Token(mLocation - 1, TokenType::Assign);
             if (accept('='))
                 return Token(mLocation - 2, TokenType::Equal);
         }
@@ -94,9 +104,31 @@ Token Lexer::next()
                 append();
 
             if (mTemp == "true")
-                return Token(mLocation - mTemp.size(), TokenType::Boolean).With(true);
+                return Token(mLocation - mTemp.size(), TokenType::BooleanLiteral).With(true);
             if (mTemp == "false")
-                return Token(mLocation - mTemp.size(), TokenType::Boolean).With(false);
+                return Token(mLocation - mTemp.size(), TokenType::BooleanLiteral).With(false);
+            if (mTemp == "if")
+                return Token(mLocation - mTemp.size(), TokenType::If);
+            if (mTemp == "elif")
+                return Token(mLocation - mTemp.size(), TokenType::Elif);
+            if (mTemp == "else")
+                return Token(mLocation - mTemp.size(), TokenType::Else);
+            if (mTemp == "mut")
+                return Token(mLocation - mTemp.size(), TokenType::Mutable);
+            if (mTemp == "bool")
+                return Token(mLocation - mTemp.size(), TokenType::BooleanType);
+            if (mTemp == "int")
+                return Token(mLocation - mTemp.size(), TokenType::IntegerType);
+            if (mTemp == "num")
+                return Token(mLocation - mTemp.size(), TokenType::NumberType);
+            if (mTemp == "vec2")
+                return Token(mLocation - mTemp.size(), TokenType::Vec2Type);
+            if (mTemp == "vec3")
+                return Token(mLocation - mTemp.size(), TokenType::Vec3Type);
+            if (mTemp == "vec4")
+                return Token(mLocation - mTemp.size(), TokenType::Vec4Type);
+            if (mTemp == "str")
+                return Token(mLocation - mTemp.size(), TokenType::StringType);
 
             return Token(mLocation - mTemp.size(), TokenType::Identifier).With(mTemp);
         }
@@ -176,8 +208,8 @@ Token Lexer::parseNumber()
         PEXPR_LOG(LogLevel::Error) << startLoc << ": Invalid literal '" << mTemp << "'" << std::endl;
 
     if (exp || fractional)
-        return Token(startLoc, TokenType::Float).With(Number(std::strtod(digit_ptr, nullptr)));
-    return Token(startLoc, TokenType::Integer).With(Integer(std::strtoull(digit_ptr, nullptr, base)));
+        return Token(startLoc, TokenType::NumberLiteral).With(Number(std::strtod(digit_ptr, nullptr)));
+    return Token(startLoc, TokenType::IntegerLiteral).With(Integer(std::strtoull(digit_ptr, nullptr, base)));
 }
 
 Token Lexer::parseString(uint8_t mark)
@@ -198,7 +230,7 @@ Token Lexer::parseString(uint8_t mark)
         if (!accept(mark))
             break;
     }
-    return Token(startLoc, TokenType::String).With(str);
+    return Token(startLoc, TokenType::StringLiteral).With(str);
 }
 
 void Lexer::append()
@@ -336,4 +368,4 @@ bool Lexer::accept(uint8_t c)
     }
 }
 
-} // namespace PExpr
+} // namespace PExpr::internal

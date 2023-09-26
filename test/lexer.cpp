@@ -10,15 +10,15 @@ int main(int, char**)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::OpenParanthese)
         return EXIT_FAILURE;
-    if (lexer.next().Type != TokenType::Integer)
+    if (lexer.next().Type != TokenType::IntegerLiteral)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::Mul)
         return EXIT_FAILURE;
-    if (lexer.next().Type != TokenType::Float)
+    if (lexer.next().Type != TokenType::NumberLiteral)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::Mul)
         return EXIT_FAILURE;
-    if (lexer.next().Type != TokenType::Float)
+    if (lexer.next().Type != TokenType::NumberLiteral)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::ClosedParanthese)
         return EXIT_FAILURE;

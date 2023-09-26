@@ -9,8 +9,8 @@ Parser::Parser(Lexer& lexer)
 {
 }
 
-Ptr<Expression> parse_translation_unit(Parser& parser);
-Ptr<Expression> Parser::parse()
+Ptr<Closure> parse_translation_unit(Parser& parser);
+Ptr<Closure> Parser::parse()
 {
     mHasError = false;
     for (size_t i = 0; i < mCurrentToken.size(); ++i) {
@@ -95,20 +95,86 @@ public:
 
     Parser& P;
 
-    inline Ptr<Expression> parse()
+    inline Ptr<Closure> parse()
     {
-        auto expr = p_expression();
+        auto closure = p_closure();
         if (!P.hasError() && P.cur().Type != TokenType::Eof)
             PEXPR_LOG(LogLevel::Error) << "Parsing stopped before end of stream!" << std::endl;
 
-        return expr;
+        return closure;
     }
 
 private:
-    inline Ptr<Expression> p_expression()
+    inline Ptr<Closure> p_closure()
     {
         if (P.cur().Type == TokenType::Eof)
             return nullptr;
+
+        Ptr<Closure> closure = std::make_shared<Closure>(P.cur().Location);
+
+        while (true) {
+            if (P.accept(TokenType::Mutable)) {
+                // Variable
+                closure->addStatement(p_variable_statement(true));
+            } else if (P.cur(0).Type == TokenType::Identifier) {
+                if (P.cur(1).Type == TokenType::Assign) {
+                    // Variable
+                    closure->addStatement(p_variable_statement(false));
+                } else if (P.cur(1).Type == TokenType::OpenParanthese) {
+                    // Function
+                    closure->addStatement(p_function_statement());
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        closure->setExpression(p_expression());
+        return closure;
+    }
+
+    // Statements
+    inline Ptr<Statement> p_variable_statement(bool mutable_)
+    {
+        const auto loc            = P.cur().Location;
+        const std::string varName = std::get<std::string>(P.cur().Value);
+
+        P.expect(TokenType::Identifier);
+        P.expect(TokenType::Assign);
+
+        const auto expr = p_expression();
+
+        P.expect(TokenType::Semicolon);
+
+        auto statement = std::make_shared<Statement>(loc, varName, Statement::ParameterList{}, expr);
+        statement->makeMutable(mutable_);
+        return statement;
+    }
+
+    inline Ptr<Statement> p_function_statement()
+    {
+        const auto loc             = P.cur().Location;
+        const std::string funcName = std::get<std::string>(P.cur().Value);
+
+        P.expect(TokenType::Identifier);
+        P.expect(TokenType::OpenParanthese);
+
+        // TODO: Parameterlist
+        P.expect(TokenType::ClosedParanthese);
+        P.expect(TokenType::Assign);
+
+        const auto expr = p_expression();
+
+        P.expect(TokenType::Semicolon);
+
+        return std::make_shared<Statement>(loc, funcName, Statement::ParameterList{}, expr);
+    }
+
+    // Expressions
+    inline Ptr<Expression> p_expression()
+    {
 
         return p_binary_expression();
     }
@@ -227,8 +293,55 @@ private:
         } while (P.accept(TokenType::Comma));
     }
 
+    inline Ptr<Expression> p_if_branch()
+    {
+        const auto loc = P.cur().Location;
+        BranchExpression::ClosureList branches;
+
+        P.expect(TokenType::If);
+        const auto firstCondition = p_expression();
+        P.expect(TokenType::OpenBraces);
+        const auto firstClosure = p_closure();
+        P.expect(TokenType::ClosedBraces);
+
+        branches.push_back(BranchExpression::SingleBranch{ firstCondition, firstClosure });
+
+        while (P.cur().Type == TokenType::Elif) {
+            P.expect(TokenType::Elif);
+            const auto condition = p_expression();
+            P.expect(TokenType::OpenBraces);
+            const auto closure = p_closure();
+            P.expect(TokenType::ClosedBraces);
+
+            branches.push_back(BranchExpression::SingleBranch{ condition, closure });
+        }
+
+        P.expect(TokenType::Else);
+        P.expect(TokenType::OpenBraces);
+        const auto elseClosure = p_closure();
+        P.expect(TokenType::ClosedBraces);
+
+        return std::make_shared<BranchExpression>(loc, branches, elseClosure);
+    }
+
     inline Ptr<Expression> p_primary_expression()
     {
+        if (P.cur(0).Type == TokenType::If) {
+            return p_if_branch();
+        }
+
+        if (P.accept(TokenType::OpenBraces)) {
+            auto closure = p_closure();
+            P.expect(TokenType::ClosedBraces);
+
+            if (P.cur().Type == TokenType::Dot) {
+                const auto loc = P.cur().Location;
+                auto swizzle   = p_swizzle();
+                return std::make_shared<AccessExpression>(loc, std::make_shared<ClosureExpression>(closure->location(), closure), swizzle);
+            }
+            return std::make_shared<ClosureExpression>(closure->location(), closure);
+        }
+
         if (P.accept(TokenType::OpenParanthese)) {
             auto expr = p_binary_expression();
             P.expect(TokenType::ClosedParanthese);
@@ -242,16 +355,16 @@ private:
         }
 
         const auto value = P.cur();
-        if (P.accept(TokenType::Boolean))
+        if (P.accept(TokenType::BooleanLiteral))
             return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Boolean, value.Value);
 
-        if (P.accept(TokenType::Float))
+        if (P.accept(TokenType::NumberLiteral))
             return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Number, value.Value);
 
-        if (P.accept(TokenType::Integer))
+        if (P.accept(TokenType::IntegerLiteral))
             return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Integer, value.Value);
 
-        if (P.accept(TokenType::String))
+        if (P.accept(TokenType::StringLiteral))
             return std::make_shared<LiteralExpression>(value.Location, ElementaryType::String, value.Value);
 
         if (P.accept(TokenType::Identifier)) {
@@ -267,7 +380,7 @@ private:
 
         // Only print error if error was not introduced by lexer
         if (P.cur().Type != TokenType::Error)
-            P.error(std::array<TokenType, 5>{ TokenType::Boolean, TokenType::Float, TokenType::Integer, TokenType::String, TokenType::Identifier });
+            P.error(std::array<TokenType, 5>{ TokenType::BooleanLiteral, TokenType::NumberLiteral, TokenType::IntegerLiteral, TokenType::StringLiteral, TokenType::Identifier });
         return std::make_shared<ErrorExpression>(value.Location);
     }
 
@@ -282,7 +395,7 @@ private:
     }
 };
 
-Ptr<Expression> parse_translation_unit(Parser& parser)
+Ptr<Closure> parse_translation_unit(Parser& parser)
 {
     return ParserGrammar(parser).parse();
 }

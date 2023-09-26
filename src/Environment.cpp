@@ -23,7 +23,7 @@ void Environment::registerFunctionLookupFunction(const FunctionLookupFunction& c
     mDefinitions.addFunctionLookupFunction(cb);
 }
 
-Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) const
+Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) const
 {
     internal::Lexer lexer(stream);
     internal::Parser parser(lexer);
@@ -41,20 +41,20 @@ Ptr<Expression> Environment::parse(std::istream& stream, bool skipTypeChecking) 
     return expr;
 }
 
-Ptr<Expression> Environment::parse(const std::string& str, bool skipTypeChecking) const
+Ptr<Closure> Environment::parse(const std::string& str, bool skipTypeChecking) const
 {
     std::stringstream stream(str);
     return parse(stream, skipTypeChecking);
 }
 
-bool Environment::doTypeChecking(const Ptr<Expression>& expr) const
+bool Environment::doTypeChecking(const Ptr<Closure>& closure) const
 {
     internal::TypeChecker checker(mDefinitions);
-    auto retType = checker.handle(expr);
+    auto retType = checker.handle(closure);
     if (retType == ElementaryType::Unspecified)
         return false;
 
-    expr->setReturnType(retType);
+    closure->expression()->setReturnType(retType);
     return true;
 }
 } // namespace PExpr
