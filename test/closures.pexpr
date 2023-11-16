@@ -18,5 +18,5 @@ fn a(r: num) = {
 };
 
 // The source file is a top-level closure
-k = 2345
+k = 2345;
 k * a(42.1234)

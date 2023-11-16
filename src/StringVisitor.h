@@ -71,7 +71,7 @@ private:
     {
         std::stringstream stream;
         stream << "fn " << statement->name() << "(";
-        for (size_t i = 0; statement->parameters().size(); ++i) {
+        for (size_t i = 0; i < statement->parameters().size(); ++i) {
             const auto param = statement->parameters().at(i);
             stream << param.Name;
             if (param.Type != ElementaryType::Unspecified)
