@@ -11,11 +11,19 @@ public:
 
     inline explicit Transpiler(const DefContainer& defs, Visitor* visitor)
         : mDefinitions(defs)
+        , mDynamicDefinitions()
         , mVisitor(visitor)
     {
         PEXPR_ASSERT(visitor != nullptr, "Expected a valid pointer to a visitor");
     }
 
+    Payload handle(const Ptr<Closure>& closure)
+    {
+        Payload payload{};
+        return payload;
+    }
+
+private:
     Payload handle(const Ptr<Expression>& expr)
     {
         switch (expr->type()) {
@@ -37,7 +45,12 @@ public:
         }
     }
 
-private:
+    void handleNode(const Ptr<Statement>& statement, Payload& payload)
+    {
+        // TODO
+        return;
+    }
+
     Payload handleCast(const Payload& a, ElementaryType from, ElementaryType to)
     {
         if (from == to) {
@@ -281,6 +294,7 @@ private:
     }
 
     const DefContainer& mDefinitions;
+    DefContainer mDynamicDefinitions;
     Visitor* mVisitor;
 };
 

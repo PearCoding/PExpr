@@ -91,7 +91,13 @@ enum class ExpressionType {
     Call,     /// Call to a function.
     Access,   /// Component swizzle operation.
     Closure,  /// {adfasdfl; a} enclosed closure
-    Branch    /// If, elif and else block
+    Branch,   /// If, elif and else block
+};
+
+enum class StatementType {
+    Error,    /// Internally used statement type.
+    Variable, /// New or redefinition of a variable
+    Function, /// New definition of a function
 };
 
 /// Returns printable representation of the given type.

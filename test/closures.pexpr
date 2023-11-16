@@ -1,0 +1,22 @@
+// A closure contains multiple statements accessible only to the closure and child closures
+closure1 = {
+    fn a() = 42;
+    mut k = 1111;
+    a(22) * k
+};
+
+// Every closure has to end with an expression
+//- closure1_err = {
+//-     fn a() = 42;
+//-     mut k = 1111;
+//- };
+
+// Use closures to construct complex functions
+fn a(r: num) = {
+    Pi = 3.141592;
+    Pi * r * r
+};
+
+// The source file is a top-level closure
+k = 2345
+k * a(42.1234)

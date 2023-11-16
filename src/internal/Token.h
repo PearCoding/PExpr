@@ -40,7 +40,8 @@ enum class TokenType {
     Elif, // elif
     Else, // else
 
-    Mutable, // Mut
+    Mutable,  // mut
+    Function, // fn
 
     BooleanType, // bool
     IntegerType, // int

@@ -17,7 +17,7 @@ public:
 private:
     void eat();
     void eatSpaces();
-    void eatComments();
+    void eatComments(bool multiline);
     Token parseNumber();
     Token parseString(uint8_t mark);
 

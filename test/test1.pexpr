@@ -1,0 +1,4 @@
+fn test() = 23+123*Pi;
+mut k = 2;
+k = k*3;
+test() * 22 * k

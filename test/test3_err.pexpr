@@ -1,0 +1,8 @@
+fn test() = {
+    r = 1234;
+    rr = 12345;
+    // r * rr // Missing an output expression!
+};
+mut k = 2;
+k = k*3;
+test() * {fas * 22}.xz * k

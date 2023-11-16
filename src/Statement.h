@@ -9,33 +9,64 @@ class Statement {
     friend class Environment;
 
 public:
-    using ParameterList = std::vector<ElementaryType>;
-
-    Statement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression)
-        : mLocation(loc)
-        , mName(name)
-        , mParameters(parameters)
-        , mExpression(expression)
-        , mIsMutable(false)
-    {
-    }
+    Statement() = delete;
 
     /// The location this expression is assosciated with.
     inline const Location& location() const { return mLocation; }
 
     inline const std::string& name() const { return mName; }
-    inline const ParameterList& parameters() const { return mParameters; }
     inline Ptr<Expression> expression() const { return mExpression; }
 
-    inline bool isVariable() const { return mParameters.empty(); }
-    inline bool isMutable() const { return mIsMutable; }
-    inline void makeMutable(bool b = true) { mIsMutable = b; }
+    inline StatementType type() const { return mType; }
+
+protected:
+    Statement(const Location& loc, const std::string& name, const Ptr<Expression>& expression, StatementType type)
+        : mLocation(loc)
+        , mName(name)
+        , mExpression(expression)
+        , mType(type)
+    {
+    }
 
 private:
     const Location mLocation;
     const std::string mName;
-    const ParameterList mParameters;
     const Ptr<Expression> mExpression;
-    bool mIsMutable;
+    const StatementType mType;
+};
+
+class VariableStatement : public Statement {
+public:
+    VariableStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expression)
+        : Statement(loc, name, expression, StatementType::Variable)
+        , mIsMutable(mutable_)
+    {
+    }
+
+    inline bool isMutable() const { return mIsMutable; }
+
+private:
+    const bool mIsMutable;
+};
+
+class FunctionStatement : public Statement {
+public:
+    struct Parameter {
+        std::string Name;
+        ElementaryType Type;
+    };
+
+    using ParameterList = std::vector<Parameter>;
+
+    FunctionStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression)
+        : Statement(loc, name, expression, StatementType::Function)
+        , mParameters(parameters)
+    {
+    }
+
+    inline const ParameterList& parameters() const { return mParameters; }
+
+private:
+    const ParameterList mParameters;
 };
 } // namespace PExpr

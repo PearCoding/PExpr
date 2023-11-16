@@ -116,13 +116,13 @@ private:
             if (P.accept(TokenType::Mutable)) {
                 // Variable
                 closure->addStatement(p_variable_statement(true));
+            } else if (P.accept(TokenType::Function)) {
+                // Function
+                closure->addStatement(p_function_statement());
             } else if (P.cur(0).Type == TokenType::Identifier) {
                 if (P.cur(1).Type == TokenType::Assign) {
                     // Variable
                     closure->addStatement(p_variable_statement(false));
-                } else if (P.cur(1).Type == TokenType::OpenParanthese) {
-                    // Function
-                    closure->addStatement(p_function_statement());
                 } else {
                     break;
                 }
@@ -148,9 +148,30 @@ private:
 
         P.expect(TokenType::Semicolon);
 
-        auto statement = std::make_shared<Statement>(loc, varName, Statement::ParameterList{}, expr);
-        statement->makeMutable(mutable_);
-        return statement;
+        return std::make_shared<VariableStatement>(mutable_, loc, varName, expr);
+    }
+
+    inline FunctionStatement::ParameterList p_parameter_def_list()
+    {
+        FunctionStatement::ParameterList list;
+
+        if (P.cur().Type == TokenType::ClosedParanthese)
+            return list; // Empty parameter list
+
+        do {
+            const std::string paramName = std::get<std::string>(P.cur().Value);
+            P.expect(TokenType::Identifier);
+
+            if (P.cur().Type == TokenType::Colon) {
+                P.expect(TokenType::Colon);
+                const ElementaryType type = p_elementary_type();
+                list.push_back(FunctionStatement::Parameter{ paramName, type });
+            } else {
+                list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
+            }
+        } while (P.accept(TokenType::Comma));
+
+        return list;
     }
 
     inline Ptr<Statement> p_function_statement()
@@ -161,7 +182,8 @@ private:
         P.expect(TokenType::Identifier);
         P.expect(TokenType::OpenParanthese);
 
-        // TODO: Parameterlist
+        const auto parameters = p_parameter_def_list();
+
         P.expect(TokenType::ClosedParanthese);
         P.expect(TokenType::Assign);
 
@@ -169,13 +191,12 @@ private:
 
         P.expect(TokenType::Semicolon);
 
-        return std::make_shared<Statement>(loc, funcName, Statement::ParameterList{}, expr);
+        return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr);
     }
 
     // Expressions
     inline Ptr<Expression> p_expression()
     {
-
         return p_binary_expression();
     }
 
@@ -380,7 +401,7 @@ private:
 
         // Only print error if error was not introduced by lexer
         if (P.cur().Type != TokenType::Error)
-            P.error(std::array<TokenType, 5>{ TokenType::BooleanLiteral, TokenType::NumberLiteral, TokenType::IntegerLiteral, TokenType::StringLiteral, TokenType::Identifier });
+            P.error(std::array<TokenType, 8>{ TokenType::OpenParanthese, TokenType::OpenBraces, TokenType::If, TokenType::BooleanLiteral, TokenType::NumberLiteral, TokenType::IntegerLiteral, TokenType::StringLiteral, TokenType::Identifier });
         return std::make_shared<ErrorExpression>(value.Location);
     }
 
@@ -392,6 +413,38 @@ private:
             return std::get<std::string>(token.Value);
         else
             return {};
+    }
+
+    inline ElementaryType p_elementary_type()
+    {
+        switch (P.cur().Type) {
+        case TokenType::BooleanType:
+            P.next();
+            return ElementaryType::Boolean;
+        case TokenType::IntegerType:
+            P.next();
+            return ElementaryType::Integer;
+        case TokenType::NumberType:
+            P.next();
+            return ElementaryType::Number;
+        case TokenType::Vec2Type:
+            P.next();
+            return ElementaryType::Vec2;
+        case TokenType::Vec3Type:
+            P.next();
+            return ElementaryType::Vec3;
+        case TokenType::Vec4Type:
+            P.next();
+            return ElementaryType::Vec4;
+        case TokenType::StringType:
+            P.next();
+            return ElementaryType::String;
+        default:
+            P.error(std::array<TokenType, 7>{ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType,
+                                              TokenType::Vec2Type, TokenType::Vec3Type, TokenType::Vec4Type,
+                                              TokenType::StringType });
+            return ElementaryType::Unspecified;
+        }
     }
 };
 

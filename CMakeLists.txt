@@ -22,10 +22,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 project(PExpr
-	VERSION 0.1
+	VERSION 0.2
 	DESCRIPTION "Simple inline expressions for mathmatical operations")
 
-# For whatever reason Ignis might be used as a subproject...
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 	set(PEXPR_SUBPROJECT OFF)
 	set(PEXPR_NOT_SUBPROJECT ON)

@@ -10,34 +10,33 @@ namespace PExpr {
 class Location {
 public:
     inline explicit Location(size_t pos)
-        : mPosition(pos)
+        : mColumn(pos)
+        , mLine(1)
     {
     }
 
-    inline size_t position() const { return mPosition; }
+    inline size_t line() const { return mLine; }
+    inline size_t column() const { return mColumn; }
     inline Location& operator++()
     {
-        mPosition++;
+        mColumn++;
         return *this;
     }
 
-    inline std::string asPrefix() const
+    inline void newLine()
     {
-        std::stringstream stream;
-        stream << "("
-               << std::setw(3)
-               << mPosition
-               << ")";
-        return stream.str();
+        mLine++;
+        mColumn = 0;
     }
 
 private:
-    size_t mPosition;
+    size_t mColumn;
+    size_t mLine;
 };
 
 inline Location operator+(const Location& loc, size_t i)
 {
-    return Location(loc.position() + i);
+    return Location(loc.column() + i);
 }
 
 inline Location operator+(size_t i, const Location& loc)
@@ -47,14 +46,12 @@ inline Location operator+(size_t i, const Location& loc)
 
 inline Location operator-(const Location& loc, size_t i)
 {
-    return Location(loc.position() - i);
+    return Location(loc.column() - i);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Location& loc)
 {
-    os << "("
-       << loc.position()
-       << ")";
+    os << "(:" << loc.line() << ":" << loc.column() << ")";
     return os;
 }
 } // namespace PExpr

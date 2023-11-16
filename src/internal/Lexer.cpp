@@ -41,7 +41,10 @@ Token Lexer::next()
             return Token(mLocation - 1, TokenType::Semicolon);
         if (accept('/')) {
             if (accept('*')) {
-                eatComments();
+                eatComments(true);
+                continue;
+            } else if (accept('/')) {
+                eatComments(false);
                 continue;
             }
             return Token(mLocation - 1, TokenType::Div);
@@ -115,6 +118,8 @@ Token Lexer::next()
                 return Token(mLocation - mTemp.size(), TokenType::Else);
             if (mTemp == "mut")
                 return Token(mLocation - mTemp.size(), TokenType::Mutable);
+            if (mTemp == "fn")
+                return Token(mLocation - mTemp.size(), TokenType::Function);
             if (mTemp == "bool")
                 return Token(mLocation - mTemp.size(), TokenType::BooleanType);
             if (mTemp == "int")
@@ -142,6 +147,8 @@ Token Lexer::next()
 void Lexer::eat()
 {
     ++mLocation;
+    if (peek() == '\n')
+        mLocation.newLine();
     mChar = (uint8)mStream.get();
 }
 
@@ -151,16 +158,23 @@ void Lexer::eatSpaces()
         eat();
 }
 
-void Lexer::eatComments()
+void Lexer::eatComments(bool multiline)
 {
-    while (true) {
-        while (!eof() && peek() != '*')
+    if (multiline) {
+        while (true) {
+            while (!eof() && peek() != '*')
+                eat();
+            if (eof())
+                break;
             eat();
-        if (eof())
-            break;
-        eat();
-        if (accept('/'))
-            break;
+            if (accept('/'))
+                break;
+        }
+    } else {
+        while (!eof() && peek() != '\n')
+            eat();
+        if (!eof())
+            eat();
     }
 }
 

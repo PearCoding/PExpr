@@ -71,6 +71,8 @@ std::string_view Token::toString(TokenType type)
         return "else";
     case TokenType::Mutable:
         return "mut";
+    case TokenType::Function:
+        return "fn";
     case TokenType::BooleanType:
         return "bool";
     case TokenType::IntegerType:
