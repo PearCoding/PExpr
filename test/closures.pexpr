@@ -14,7 +14,7 @@ closure1 = {
 // Use closures to construct complex functions
 fn a(r: num) = {
     Pi = 3.141592;
-    Pi * r * r
+    Pi * r * r; // <-- The trailing ; will trigger a warning!
 };
 
 // The source file is a top-level closure

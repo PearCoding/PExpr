@@ -139,6 +139,7 @@ private:
 
         closure->setExpression(p_expression());
         
+        // TODO: The location of the warning is incorrect and slightly off (a single token wide)
         if (P.accept(TokenType::Semicolon)) {
             PEXPR_LOG(LogLevel::Warning) << P.cur().Location << ": Trailing '" << Token::toString(TokenType::Semicolon) << "' at the end of an expression" << std::endl;
         }

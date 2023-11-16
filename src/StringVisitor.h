@@ -133,7 +133,7 @@ private:
 
     static std::string dump(const Ptr<ClosureExpression>& expr)
     {
-        return "{ " + visit(expr->closure()) + " }";
+        return "{\n" + visit(expr->closure()) + "\n}";
     }
 
     static std::string dump(const Ptr<BranchExpression>& expr)
