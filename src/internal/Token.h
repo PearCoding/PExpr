@@ -70,24 +70,28 @@ public:
 
     Token& With(bool b)
     {
+        PEXPR_ASSERT(Type != TokenType::Error, "Expected a valid constructor call");
         Value = b;
         return *this;
     }
 
     Token& With(Integer v)
     {
+        PEXPR_ASSERT(Type != TokenType::Error, "Expected a valid constructor call");
         Value = v;
         return *this;
     }
 
     Token& With(Number v)
     {
+        PEXPR_ASSERT(Type != TokenType::Error, "Expected a valid constructor call");
         Value = v;
         return *this;
     }
 
     Token& With(const std::string& str)
     {
+        PEXPR_ASSERT(Type != TokenType::Error, "Expected a valid constructor call");
         Value = str;
         return *this;
     }

@@ -131,7 +131,18 @@ private:
             }
         }
 
+        if (P.cur().Type == TokenType::ClosedBraces) {
+            P.signalError();
+            PEXPR_LOG(LogLevel::Error) << P.cur().Location << ": Expected an expression at the end of a closure but got '" << Token::toString(TokenType::ClosedBraces) << "' instead" << std::endl;
+            return closure;
+        }
+
         closure->setExpression(p_expression());
+        
+        if (P.accept(TokenType::Semicolon)) {
+            PEXPR_LOG(LogLevel::Warning) << P.cur().Location << ": Trailing '" << Token::toString(TokenType::Semicolon) << "' at the end of an expression" << std::endl;
+        }
+ 
         return closure;
     }
 

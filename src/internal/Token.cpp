@@ -4,7 +4,7 @@ namespace PExpr::internal {
 std::string_view Token::toString(TokenType type)
 {
     switch (type) {
-    default:
+    // default:
     case TokenType::Error:
         return "Error";
     case TokenType::Eof:
@@ -35,6 +35,10 @@ std::string_view Token::toString(TokenType type)
         return ".";
     case TokenType::Comma:
         return ",";
+    case TokenType::Colon:
+        return ":";
+    case TokenType::Semicolon:
+        return ";";
     case TokenType::ExclamationMark:
         return "!";
     case TokenType::OpenParanthese:

@@ -21,24 +21,25 @@ Token Lexer::next()
         if (eof())
             return Token(mLocation, TokenType::Eof);
 
+        const Location prevLoc = mLocation;
         if (accept('('))
-            return Token(mLocation - 1, TokenType::OpenParanthese);
+            return Token(prevLoc, TokenType::OpenParanthese);
         if (accept(')'))
-            return Token(mLocation - 1, TokenType::ClosedParanthese);
+            return Token(prevLoc, TokenType::ClosedParanthese);
         if (accept('{'))
-            return Token(mLocation - 1, TokenType::OpenBraces);
+            return Token(prevLoc, TokenType::OpenBraces);
         if (accept('}'))
-            return Token(mLocation - 1, TokenType::ClosedBraces);
+            return Token(prevLoc, TokenType::ClosedBraces);
         if (accept('+'))
-            return Token(mLocation - 1, TokenType::Plus);
+            return Token(prevLoc, TokenType::Plus);
         if (accept('-'))
-            return Token(mLocation - 1, TokenType::Minus);
+            return Token(prevLoc, TokenType::Minus);
         if (accept('*'))
-            return Token(mLocation - 1, TokenType::Mul);
+            return Token(prevLoc, TokenType::Mul);
         if (accept(':'))
-            return Token(mLocation - 1, TokenType::Colon);
+            return Token(prevLoc, TokenType::Colon);
         if (accept(';'))
-            return Token(mLocation - 1, TokenType::Semicolon);
+            return Token(prevLoc, TokenType::Semicolon);
         if (accept('/')) {
             if (accept('*')) {
                 eatComments(true);
@@ -47,50 +48,50 @@ Token Lexer::next()
                 eatComments(false);
                 continue;
             }
-            return Token(mLocation - 1, TokenType::Div);
+            return Token(prevLoc, TokenType::Div);
         }
         if (accept('%'))
-            return Token(mLocation - 1, TokenType::Mod);
+            return Token(prevLoc, TokenType::Mod);
         if (accept('^'))
-            return Token(mLocation - 1, TokenType::Pow);
+            return Token(prevLoc, TokenType::Pow);
         if (accept('.'))
-            return Token(mLocation - 1, TokenType::Dot);
+            return Token(prevLoc, TokenType::Dot);
         if (accept(','))
-            return Token(mLocation - 1, TokenType::Comma);
+            return Token(prevLoc, TokenType::Comma);
 
         if (accept('=')) {
             if (peek() != '=')
-                return Token(mLocation - 1, TokenType::Assign);
+                return Token(prevLoc, TokenType::Assign);
             if (accept('='))
-                return Token(mLocation - 2, TokenType::Equal);
+                return Token(prevLoc, TokenType::Equal);
         }
 
         if (accept('&')) {
             if (accept('&'))
-                return Token(mLocation - 2, TokenType::And);
+                return Token(prevLoc, TokenType::And);
         }
 
         if (accept('|')) {
             if (accept('|'))
-                return Token(mLocation - 2, TokenType::Or);
+                return Token(prevLoc, TokenType::Or);
         }
 
         if (accept('!')) {
             if (accept('='))
-                return Token(mLocation - 2, TokenType::NotEqual);
-            return Token(mLocation - 1, TokenType::ExclamationMark);
+                return Token(prevLoc, TokenType::NotEqual);
+            return Token(prevLoc, TokenType::ExclamationMark);
         }
 
         if (accept('<')) {
             if (accept('='))
-                return Token(mLocation - 2, TokenType::Less);
-            return Token(mLocation - 1, TokenType::LessEqual);
+                return Token(prevLoc, TokenType::Less);
+            return Token(prevLoc, TokenType::LessEqual);
         }
 
         if (accept('>')) {
             if (accept('='))
-                return Token(mLocation - 2, TokenType::Greater);
-            return Token(mLocation - 1, TokenType::GreaterEqual);
+                return Token(prevLoc, TokenType::Greater);
+            return Token(prevLoc, TokenType::GreaterEqual);
         }
 
         if (accept('\"'))
@@ -107,40 +108,40 @@ Token Lexer::next()
                 append();
 
             if (mTemp == "true")
-                return Token(mLocation - mTemp.size(), TokenType::BooleanLiteral).With(true);
+                return Token(prevLoc, TokenType::BooleanLiteral).With(true);
             if (mTemp == "false")
-                return Token(mLocation - mTemp.size(), TokenType::BooleanLiteral).With(false);
+                return Token(prevLoc, TokenType::BooleanLiteral).With(false);
             if (mTemp == "if")
-                return Token(mLocation - mTemp.size(), TokenType::If);
+                return Token(prevLoc, TokenType::If);
             if (mTemp == "elif")
-                return Token(mLocation - mTemp.size(), TokenType::Elif);
+                return Token(prevLoc, TokenType::Elif);
             if (mTemp == "else")
-                return Token(mLocation - mTemp.size(), TokenType::Else);
+                return Token(prevLoc, TokenType::Else);
             if (mTemp == "mut")
-                return Token(mLocation - mTemp.size(), TokenType::Mutable);
+                return Token(prevLoc, TokenType::Mutable);
             if (mTemp == "fn")
-                return Token(mLocation - mTemp.size(), TokenType::Function);
+                return Token(prevLoc, TokenType::Function);
             if (mTemp == "bool")
-                return Token(mLocation - mTemp.size(), TokenType::BooleanType);
+                return Token(prevLoc, TokenType::BooleanType);
             if (mTemp == "int")
-                return Token(mLocation - mTemp.size(), TokenType::IntegerType);
+                return Token(prevLoc, TokenType::IntegerType);
             if (mTemp == "num")
-                return Token(mLocation - mTemp.size(), TokenType::NumberType);
+                return Token(prevLoc, TokenType::NumberType);
             if (mTemp == "vec2")
-                return Token(mLocation - mTemp.size(), TokenType::Vec2Type);
+                return Token(prevLoc, TokenType::Vec2Type);
             if (mTemp == "vec3")
-                return Token(mLocation - mTemp.size(), TokenType::Vec3Type);
+                return Token(prevLoc, TokenType::Vec3Type);
             if (mTemp == "vec4")
-                return Token(mLocation - mTemp.size(), TokenType::Vec4Type);
+                return Token(prevLoc, TokenType::Vec4Type);
             if (mTemp == "str")
-                return Token(mLocation - mTemp.size(), TokenType::StringType);
+                return Token(prevLoc, TokenType::StringType);
 
-            return Token(mLocation - mTemp.size(), TokenType::Identifier).With(mTemp);
+            return Token(prevLoc, TokenType::Identifier).With(mTemp);
         }
 
         append();
-        PEXPR_LOG(LogLevel::Error) << mLocation << ": Unknown token '" << mTemp << "'" << std::endl;
-        return Token(mLocation, TokenType::Error);
+        PEXPR_LOG(LogLevel::Error) << prevLoc << ": Unknown token '" << mTemp << "'" << std::endl;
+        return Token(prevLoc, TokenType::Error);
     }
 }
 
@@ -255,6 +256,8 @@ void Lexer::append()
 
 void Lexer::appendChar()
 {
+    const Location prevLoc = mLocation;
+
     if (peek() == '\\') {
         eat();
 
@@ -308,7 +311,7 @@ void Lexer::appendChar()
             std::string uni_val;
             for (size_t i = 0; i < length; ++i) {
                 if (eof()) {
-                    PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Invalid use of Unicode escape sequence" << std::endl;
+                    PEXPR_LOG(LogLevel::Error) << prevLoc << ": Invalid use of Unicode escape sequence" << std::endl;
                     break;
                 }
 
@@ -322,12 +325,12 @@ void Lexer::appendChar()
                 try {
                     uni = std::stoul(uni_val, &r, 16);
                 } catch (const std::exception&) {
-                    PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Given Unicode escape sequence is invalid" << std::endl;
+                    PEXPR_LOG(LogLevel::Error) << prevLoc << ": Given Unicode escape sequence is invalid" << std::endl;
                     break;
                 }
 
                 if (r != length) {
-                    PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Given Unicode escape sequence is invalid" << std::endl;
+                    PEXPR_LOG(LogLevel::Error) << prevLoc << ": Given Unicode escape sequence is invalid" << std::endl;
                 } else if (length != 2) {
                     if (uni <= 0x7F) {
                         mTemp += (char)uni;
@@ -347,17 +350,17 @@ void Lexer::appendChar()
                         mTemp += char(0x80 | ((d & 0xFC0) >> 6));
                         mTemp += char(0x80 | (d & 0x3F));
                     } else {
-                        PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Given Unicode range" << std::endl;
+                        PEXPR_LOG(LogLevel::Error) << prevLoc << ": Given Unicode range" << std::endl;
                     }
                 } else { // Binary
                     mTemp += (char)uni;
                 }
             } else {
-                PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Invalid length of Unicode escape sequence" << std::endl;
+                PEXPR_LOG(LogLevel::Error) << prevLoc << ": Invalid length of Unicode escape sequence" << std::endl;
             }
         } break;
         default:
-            PEXPR_LOG(LogLevel::Error) << mLocation - 1 << ": Invalid escape sequence '\\" << peek() << "'" << std::endl;
+            PEXPR_LOG(LogLevel::Error) << prevLoc << ": Invalid escape sequence '\\" << peek() << "'" << std::endl;
             eat();
             break;
         }

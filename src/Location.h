@@ -14,6 +14,12 @@ public:
         , mLine(1)
     {
     }
+    
+    inline explicit Location(size_t line, size_t col)
+        : mColumn(col)
+        , mLine(line)
+    {
+    }
 
     inline size_t line() const { return mLine; }
     inline size_t column() const { return mColumn; }
@@ -36,17 +42,12 @@ private:
 
 inline Location operator+(const Location& loc, size_t i)
 {
-    return Location(loc.column() + i);
+    return Location(loc.line(), loc.column() + i);
 }
 
 inline Location operator+(size_t i, const Location& loc)
 {
     return loc + i;
-}
-
-inline Location operator-(const Location& loc, size_t i)
-{
-    return Location(loc.column() - i);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Location& loc)

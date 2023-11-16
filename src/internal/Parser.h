@@ -15,6 +15,8 @@ public:
 
     inline bool hasError() const { return mHasError; }
 
+    inline void signalError() { mHasError = true; }
+
 protected:
     bool expect(TokenType type);
     template <size_t N>
