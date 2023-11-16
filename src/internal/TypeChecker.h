@@ -1,12 +1,13 @@
 #pragma once
 
 #include "../Closure.h"
-#include "DefContainer.h"
+#include "SymbolTable.h"
 
 namespace PExpr::internal {
+/// @brief Checks types and resolves symbol lookups
 class TypeChecker {
 public:
-    explicit TypeChecker(const DefContainer& defs);
+    explicit TypeChecker(const SymbolTable& defs);
 
     ElementaryType handle(const Ptr<Closure>& closure);
 
@@ -24,7 +25,7 @@ private:
     ElementaryType handleNode(const Ptr<CallExpression>& expr);
     ElementaryType handleNode(const Ptr<AccessExpression>& expr);
 
-    DefContainer mDynamicDefinitions;
-    const DefContainer& mDefinitions;
+    SymbolTable mDynamicDefinitions;
+    const SymbolTable& mDefinitions;
 };
 } // namespace PExpr::internal

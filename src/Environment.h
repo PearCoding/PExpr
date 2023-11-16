@@ -42,11 +42,11 @@ public:
     template <typename Payload>
     inline Payload transpile(const Ptr<Closure>& closure, TranspileVisitor<Payload>* visitor) const
     {
-        internal::Transpiler<Payload> transpiler(mDefinitions, visitor);
+        internal::Transpiler<Payload> transpiler(mGlobals, visitor);
         return transpiler.handle(closure);
     }
 
 private:
-    internal::DefContainer mDefinitions;
+    internal::SymbolTable mGlobals;
 };
 } // namespace PExpr

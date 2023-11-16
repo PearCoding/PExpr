@@ -16,14 +16,14 @@ inline void typeError(const Ptr<BinaryExpression>& expr, ElementaryType left, El
                                << "' with types '" << toString(left) << "' and '" << toString(right) << "'" << std::endl;
 }
 
-TypeChecker::TypeChecker(const DefContainer& defs)
+TypeChecker::TypeChecker(const SymbolTable& defs)
     : mDefinitions(defs)
 {
 }
 
 ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
 {
-    mDynamicDefinitions = DefContainer{};
+    mDynamicDefinitions = SymbolTable{};
     return handleNode(closure);
 }
 

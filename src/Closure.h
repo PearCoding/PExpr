@@ -1,19 +1,25 @@
 #pragma once
 
 #include "Statement.h"
+#include "internal/SymbolTable.h"
 
 namespace PExpr {
 class Closure {
 public:
     using StatementList = std::vector<Ptr<Statement>>;
 
-    explicit Closure(const Location& loc)
-        : mLocation(loc)
+    explicit Closure(const Location& loc, Closure* parent = nullptr)
+        : mParent(parent)
+        , mSymbols(parent ? &parent->mSymbols : nullptr)
+        , mLocation(loc)
     {
     }
 
     /// The location this expression is assosciated with.
     inline const Location& location() const { return mLocation; }
+
+    inline bool isTranslationUnit() const { return mParent == nullptr; }
+    inline Closure* parent() const { return mParent; }
 
     inline const StatementList& statements() const { return mStatement; }
     inline Ptr<Expression> expression() const { return mExpression; }
@@ -31,7 +37,13 @@ public:
         mExpression = expr;
     }
 
+    // Internal usage
+    inline internal::SymbolTable& symbols() { return mSymbols; }
+
 private:
+    Closure* mParent;
+    internal::SymbolTable mSymbols;
+
     Location mLocation;
     StatementList mStatement;
     Ptr<Expression> mExpression;

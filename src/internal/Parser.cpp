@@ -9,8 +9,8 @@ Parser::Parser(Lexer& lexer)
 {
 }
 
-Ptr<Closure> parse_translation_unit(Parser& parser);
-Ptr<Closure> Parser::parse()
+Ptr<Closure> parse_translation_unit(Parser& parser, const SymbolTable* globals);
+Ptr<Closure> Parser::parse(const SymbolTable* globals)
 {
     mHasError = false;
     for (size_t i = 0; i < mCurrentToken.size(); ++i) {
@@ -21,7 +21,7 @@ Ptr<Closure> Parser::parse()
         }
     }
 
-    return parse_translation_unit(*this);
+    return parse_translation_unit(*this, globals);
 }
 
 bool Parser::expect(TokenType type)
@@ -88,8 +88,9 @@ void Parser::next()
 // --------------------------------------- Grammar
 class ParserGrammar {
 public:
-    inline explicit ParserGrammar(Parser& parser)
+    inline explicit ParserGrammar(Parser& parser, const SymbolTable* globals)
         : P(parser)
+        , mGlobals(globals)
     {
     }
 
@@ -105,12 +106,18 @@ public:
     }
 
 private:
+    Closure* mCurrentClosure = nullptr;
+    const SymbolTable* mGlobals;
+
     inline Ptr<Closure> p_closure()
     {
         if (P.cur().Type == TokenType::Eof)
             return nullptr;
 
-        Ptr<Closure> closure = std::make_shared<Closure>(P.cur().Location);
+        Ptr<Closure> closure = std::make_shared<Closure>(P.cur().Location, mCurrentClosure);
+        mCurrentClosure      = closure.get();
+        if(mCurrentClosure->isTranslationUnit())
+            mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
 
         while (true) {
             if (P.accept(TokenType::Mutable)) {
@@ -138,12 +145,14 @@ private:
         }
 
         closure->setExpression(p_expression());
-        
+
         // TODO: The location of the warning is incorrect and slightly off (a single token wide)
         if (P.accept(TokenType::Semicolon)) {
             PEXPR_LOG(LogLevel::Warning) << P.cur().Location << ": Trailing '" << Token::toString(TokenType::Semicolon) << "' at the end of an expression" << std::endl;
         }
- 
+
+        mCurrentClosure = mCurrentClosure->parent();
+
         return closure;
     }
 
@@ -160,6 +169,9 @@ private:
 
         P.expect(TokenType::Semicolon);
 
+        // TODO: Check for mutability and reassignment
+        // TODO: Add to symbol table!
+
         return std::make_shared<VariableStatement>(mutable_, loc, varName, expr);
     }
 
@@ -169,7 +181,6 @@ private:
 
         if (P.cur().Type == TokenType::ClosedParanthese)
             return list; // Empty parameter list
-
         do {
             const std::string paramName = std::get<std::string>(P.cur().Value);
             P.expect(TokenType::Identifier);
@@ -202,6 +213,9 @@ private:
         const auto expr = p_expression();
 
         P.expect(TokenType::Semicolon);
+
+        // TODO: Check reassignment within the same closure
+        // TODO: Add to symbol table!
 
         return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr);
     }
@@ -460,8 +474,8 @@ private:
     }
 };
 
-Ptr<Closure> parse_translation_unit(Parser& parser)
+Ptr<Closure> parse_translation_unit(Parser& parser, const SymbolTable* globals)
 {
-    return ParserGrammar(parser).parse();
+    return ParserGrammar(parser, globals).parse();
 }
 } // namespace PExpr::internal

@@ -11,7 +11,7 @@ class Parser {
 public:
     Parser(Lexer& lexer);
 
-    Ptr<Closure> parse();
+    Ptr<Closure> parse(const SymbolTable* globals);
 
     inline bool hasError() const { return mHasError; }
 

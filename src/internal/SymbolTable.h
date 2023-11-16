@@ -1,11 +1,16 @@
 #pragma once
 
-#include "../Lookup.h"
 #include "../Logger.h"
+#include "../Lookup.h"
 
 namespace PExpr::internal {
-class DefContainer {
+class SymbolTable {
 public:
+    inline explicit SymbolTable(SymbolTable* parent = nullptr)
+        : mParent(parent)
+    {
+    }
+
     inline void addVariableLookupFunction(const VariableLookupFunction& func)
     {
         mVars.emplace_back(func);
@@ -18,7 +23,8 @@ public:
             if (res.has_value())
                 return res;
         }
-        return {};
+
+        return mParent ? mParent->lookupVariable(loc, name) : std::nullopt;
     }
 
     inline void addFunctionLookupFunction(const FunctionLookupFunction& func)
@@ -33,10 +39,15 @@ public:
             if (res.has_value())
                 return res;
         }
-        return {};
+
+        return mParent ? mParent->lookupFunction(loc, name, params) : std::nullopt;
     }
 
+    inline const SymbolTable* parent() const { return mParent; }
+    inline void setParent(const SymbolTable* tbl) { mParent = tbl; }
+
 private:
+    const SymbolTable* mParent;
     std::vector<VariableLookupFunction> mVars;
     std::vector<FunctionLookupFunction> mFuncs;
 };

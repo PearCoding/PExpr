@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../TranspileVisitor.h"
-#include "DefContainer.h"
+#include "SymbolTable.h"
 
 namespace PExpr::internal {
 template <typename Payload>
@@ -9,7 +9,7 @@ class Transpiler {
 public:
     using Visitor = TranspileVisitor<Payload>;
 
-    inline explicit Transpiler(const DefContainer& defs, Visitor* visitor)
+    inline explicit Transpiler(const SymbolTable& defs, Visitor* visitor)
         : mDefinitions(defs)
         , mDynamicDefinitions()
         , mVisitor(visitor)
@@ -293,8 +293,8 @@ private:
         return mVisitor->onAccess(A, inputSize, outputPermutation);
     }
 
-    const DefContainer& mDefinitions;
-    DefContainer mDynamicDefinitions;
+    const SymbolTable& mDefinitions;
+    SymbolTable mDynamicDefinitions;
     Visitor* mVisitor;
 };
 

@@ -1,11 +1,11 @@
 #include "Environment.h"
-#include "internal/DefContainer.h"
 #include "internal/Parser.h"
+#include "internal/SymbolTable.h"
 #include "internal/TypeChecker.h"
 
 namespace PExpr {
 Environment::Environment()
-    : mDefinitions()
+    : mGlobals()
 {
 }
 
@@ -15,12 +15,12 @@ Environment::~Environment()
 
 void Environment::registerVariableLookupFunction(const VariableLookupFunction& cb)
 {
-    mDefinitions.addVariableLookupFunction(cb);
+    mGlobals.addVariableLookupFunction(cb);
 }
 
 void Environment::registerFunctionLookupFunction(const FunctionLookupFunction& cb)
 {
-    mDefinitions.addFunctionLookupFunction(cb);
+    mGlobals.addFunctionLookupFunction(cb);
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) const
@@ -28,7 +28,7 @@ Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) con
     internal::Lexer lexer(stream);
     internal::Parser parser(lexer);
 
-    auto expr = parser.parse();
+    auto expr = parser.parse(&mGlobals);
 
     if (!expr || parser.hasError())
         return nullptr;
@@ -49,7 +49,7 @@ Ptr<Closure> Environment::parse(const std::string& str, bool skipTypeChecking) c
 
 bool Environment::doTypeChecking(const Ptr<Closure>& closure) const
 {
-    internal::TypeChecker checker(mDefinitions);
+    internal::TypeChecker checker(mGlobals);
     auto retType = checker.handle(closure);
     if (retType == ElementaryType::Unspecified)
         return false;
