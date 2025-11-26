@@ -3,4 +3,6 @@
  multiline
  comment
  */
+extern fn test() -> num;
+k = 134;
 test() * 22 * k

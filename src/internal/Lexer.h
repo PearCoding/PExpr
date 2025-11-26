@@ -18,8 +18,8 @@ private:
     void eat();
     void eatSpaces();
     void eatComments(bool multiline);
-    Token parseNumber();
-    Token parseString(uint8_t mark);
+    [[nodiscard]] Token parseNumber();
+    [[nodiscard]] Token parseString(uint8_t mark);
 
     void appendDigits(int base);
 
@@ -27,12 +27,12 @@ private:
     void appendChar();
     bool accept(uint8_t c);
 
-    inline uint8_t peek() const { return mChar; }
-    inline bool eof() const { return mStream.eof(); }
+    [[nodiscard]] inline uint8_t peek() const { return mChar; }
+    [[nodiscard]] inline bool eof() const { return mStream.eof(); }
 
     std::istream& mStream;
     uint8_t mChar;
     Location mLocation;
     std::string mTemp; // Contains identifiers etc
 };
-} // namespace PExpr
+} // namespace PExpr::internal

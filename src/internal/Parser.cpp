@@ -123,9 +123,13 @@ private:
             if (P.accept(TokenType::Mutable)) {
                 // Variable
                 closure->addStatement(p_variable_statement(true));
+            } else if (P.accept(TokenType::Extern)) {
+                // Function (extern)
+                P.accept(TokenType::Function);
+                closure->addStatement(p_function_statement(true));
             } else if (P.accept(TokenType::Function)) {
-                // Function
-                closure->addStatement(p_function_statement());
+                // Function (intern)
+                closure->addStatement(p_function_statement(false));
             } else if (P.cur(0).Type == TokenType::Identifier) {
                 if (P.cur(1).Type == TokenType::Assign) {
                     // Variable
@@ -194,7 +198,7 @@ private:
         return list;
     }
 
-    inline Ptr<Statement> p_function_statement()
+    inline Ptr<Statement> p_function_statement(bool is_extern)
     {
         const auto loc             = P.cur().Location;
         const std::string funcName = std::get<std::string>(P.cur().Value);
@@ -205,13 +209,23 @@ private:
         const auto parameters = p_parameter_def_list();
 
         P.expect(TokenType::ClosedParentheses);
-        P.expect(TokenType::Assign);
 
-        const auto expr = p_expression();
+        ElementaryType returnType = ElementaryType::Unspecified;
+        if (P.accept(TokenType::ArrowRight))
+            returnType = p_elementary_type();
+
+        Ptr<Expression> expr;
+        if (!is_extern) {
+            P.expect(TokenType::Assign);
+            expr = p_expression();
+        } else if (returnType == ElementaryType::Unspecified) {
+            P.signalError();
+            PEXPR_LOG(LogLevel::Error) << P.cur().Location << ": Expected an explicit return type for the given function" << std::endl;
+        }
 
         P.expect(TokenType::Semicolon);
 
-        return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr);
+        return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr, returnType);
     }
 
     // Expressions

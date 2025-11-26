@@ -6,7 +6,7 @@
 namespace PExpr::internal {
 class SymbolTable {
 public:
-    inline explicit SymbolTable(SymbolTable* parent = nullptr)
+    inline explicit SymbolTable(const SymbolTable* parent = nullptr)
         : mParent(parent)
     {
     }

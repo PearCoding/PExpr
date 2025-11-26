@@ -12,12 +12,12 @@ public:
     Statement() = delete;
 
     /// The location this expression is associated with.
-    inline const Location& location() const { return mLocation; }
+    [[nodiscard]] inline const Location& location() const { return mLocation; }
 
-    inline const std::string& name() const { return mName; }
-    inline Ptr<Expression> expression() const { return mExpression; }
+    [[nodiscard]] inline const std::string& name() const { return mName; }
+    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
 
-    inline StatementType type() const { return mType; }
+    [[nodiscard]] inline StatementType type() const { return mType; }
 
 protected:
     Statement(const Location& loc, const std::string& name, const Ptr<Expression>& expression, StatementType type)
@@ -43,7 +43,7 @@ public:
     {
     }
 
-    inline bool isMutable() const { return mIsMutable; }
+    [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
 
 private:
     const bool mIsMutable;
@@ -58,15 +58,28 @@ public:
 
     using ParameterList = std::vector<Parameter>;
 
-    FunctionStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression)
+    FunctionStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression, ElementaryType returnType)
         : Statement(loc, name, expression, StatementType::Function)
         , mParameters(parameters)
+        , mReturnType(returnType)
     {
     }
 
     inline const ParameterList& parameters() const { return mParameters; }
+    [[nodiscard]] inline bool isExtern() const { return this->expression() == nullptr; }
+
+    /// Return the actual return type if unspecified or the specified version
+    /// The return type must be specified if the function is declared extern
+    [[nodiscard]] inline ElementaryType returnType() const
+    {
+        if (mReturnType == ElementaryType::Unspecified && !isExtern())
+            return this->expression()->returnType();
+        else
+            return mReturnType;
+    }
 
 private:
     const ParameterList mParameters;
+    const ElementaryType mReturnType;
 };
 } // namespace PExpr

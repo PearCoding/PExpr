@@ -24,7 +24,7 @@ TypeChecker::TypeChecker(const SymbolTable& defs)
 
 ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
 {
-    mDynamicDefinitions = SymbolTable{};
+    mDynamicDefinitions = SymbolTable(&mDefinitions);
     return handleNode(closure);
 }
 
@@ -76,7 +76,8 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         }
 
         // Type-check the function body to determine the return type
-        const auto returnType = handleNode(funcStmt->expression());
+        const auto explicitReturnType = funcStmt->returnType();
+        const auto returnType         = funcStmt->isExtern() ? explicitReturnType : handleNode(funcStmt->expression());
 
         // Restore dynamic definitions (function itself will be registered below if successful)
         mDynamicDefinitions = std::move(savedDefs);
@@ -86,13 +87,18 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             return;
         }
 
+        if (returnType != explicitReturnType) {
+            PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Given explicit return type '" << toString(explicitReturnType) << "' in function '" << funcStmt->name() << "' does not match the return type '" << toString(returnType) << "' of the defining expression" << std::endl;
+            return;
+        }
+
         // Register the function in the dynamic symbol table so it can be called later.
         PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
         mDynamicDefinitions.addFunctionLookupFunction([fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
             if (lookup.name() != fdef.name())
                 return std::nullopt;
-            // Require exact parameter match for user-defined functions
-            if (lookup.matchParameter(fdef.parameters(), true))
+            // Check if the parameters match
+            if (lookup.matchParameter(fdef.parameters(), false))
                 return fdef;
             return std::nullopt;
         });
@@ -163,10 +169,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
 {
-    if (const auto def = mDefinitions.lookupVariable(expr->location(), expr->name()); def.has_value()) {
-        expr->setReturnType(def.value().type());
-        return def.value().type();
-    } else if (const auto def = mDynamicDefinitions.lookupVariable(expr->location(), expr->name()); def.has_value()) {
+    if (const auto def = mDynamicDefinitions.lookupVariable(expr->location(), expr->name()); def.has_value()) {
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
@@ -314,8 +317,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
 
     expr->setReturnType(ElementaryType::Unspecified);
 
-    auto def = mDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs);
-    if (def.has_value())
+    if (const auto def = mDynamicDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value())
         expr->setReturnType(def.value().returnType());
     else
         PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown or ambigous" << std::endl;

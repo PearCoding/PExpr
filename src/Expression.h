@@ -17,16 +17,16 @@ public:
     Expression() = delete;
 
     /// The location this expression is assosciated with.
-    inline const Location& location() const { return mLocation; }
+    [[nodiscard]] inline const Location& location() const { return mLocation; }
 
     /// The type of expression. Depending on this value it is safe to cast to other "child" classes.
-    inline ExpressionType type() const { return mType; }
+    [[nodiscard]] inline ExpressionType type() const { return mType; }
 
     /// The type this expression evaluates to. If no type checking is performed yet, this defaults to 'unspecified'.
-    inline ElementaryType returnType() const { return mReturnType; }
+    [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
 
     /// True if the type this expression evaluates to is yet 'unspecified'.
-    inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
+    [[nodiscard]] inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
 
 protected:
     inline Expression(const Location& loc, ExpressionType type)
@@ -64,7 +64,7 @@ public:
     {
     }
 
-    inline const std::string& name() const { return mName; }
+    [[nodiscard]] inline const std::string& name() const { return mName; }
 
 private:
     std::string mName;
@@ -83,7 +83,7 @@ public:
 
     /// Return the literal value as 'bool'. Undefined behaviour if underlying literal is not a 'bool'.
     /// The type of this literal is given by returnType().
-    inline bool getBool() const
+    [[nodiscard]] inline bool getBool() const
     {
         PEXPR_ASSERT(returnType() == ElementaryType::Boolean, "Trying to get a constant which is not a boolean");
         return std::get<bool>(mValue);
@@ -91,7 +91,7 @@ public:
 
     /// Return the literal value as 'int'. Undefined behaviour if underlying literal is not an 'int'.
     /// The type of this literal is given by returnType().
-    inline Integer getInteger() const
+    [[nodiscard]] inline Integer getInteger() const
     {
         PEXPR_ASSERT(returnType() == ElementaryType::Integer, "Trying to get a constant which is not a integer");
         return std::get<Integer>(mValue);
@@ -99,7 +99,7 @@ public:
 
     /// Return the literal value as 'num'. Undefined behaviour if underlying literal is not a 'num'.
     /// The type of this literal is given by returnType().
-    inline Number getNumber() const
+    [[nodiscard]] inline Number getNumber() const
     {
         PEXPR_ASSERT(returnType() == ElementaryType::Number, "Trying to get a constant which is not a number");
         return std::get<Number>(mValue);
@@ -107,7 +107,7 @@ public:
 
     /// Return the literal value as 'str'. Undefined behaviour if underlying literal is not a 'str'.
     /// The type of this literal is given by returnType().
-    inline std::string getString() const
+    [[nodiscard]] inline std::string getString() const
     {
         PEXPR_ASSERT(returnType() == ElementaryType::String, "Trying to get a constant which is not a string");
         return std::get<std::string>(mValue);
@@ -129,9 +129,9 @@ public:
     }
 
     /// The actual unary operation of this expression.
-    inline UnaryOperation op() const { return mOperation; }
+    [[nodiscard]] inline UnaryOperation op() const { return mOperation; }
     /// The inner expression the unary operation is applied to.
-    inline Ptr<Expression> inner() const { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
 
 private:
     UnaryOperation mOperation;
@@ -151,11 +151,11 @@ public:
     }
 
     /// The actual binary operation of this expression.
-    inline BinaryOperation op() const { return mOperation; }
+    [[nodiscard]] inline BinaryOperation op() const { return mOperation; }
     /// The left expression the binary operation is applied to.
-    inline Ptr<Expression> left() const { return mLeft; }
+    [[nodiscard]] inline Ptr<Expression> left() const { return mLeft; }
     /// The right expression the binary operation is applied to.
-    inline Ptr<Expression> right() const { return mRight; }
+    [[nodiscard]] inline Ptr<Expression> right() const { return mRight; }
 
 private:
     BinaryOperation mOperation;
@@ -183,9 +183,9 @@ public:
     }
 
     /// Name of the function.
-    inline const std::string& name() const { return mName; }
+    [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The parameters of the given function.
-    inline const ParameterList& parameters() const { return mParameters; }
+    [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
 
 private:
     std::string mName;
@@ -205,9 +205,9 @@ public:
     }
 
     /// The inner expression the access operation is applied to.
-    inline Ptr<Expression> inner() const { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
     /// A character coded swizzle. E.g., xzy will return a 'vec3' with [x, z, y].
-    inline const std::string& swizzle() const { return mSwizzle; }
+    [[nodiscard]] inline const std::string& swizzle() const { return mSwizzle; }
 
 private:
     Ptr<Expression> mExpr;
@@ -225,7 +225,7 @@ public:
         PEXPR_ASSERT(closure != nullptr, "Expected valid pointer for closure");
     }
 
-    inline Ptr<Closure> closure() const { return mClosure; }
+    [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
 
 private:
     Ptr<Closure> mClosure;
@@ -249,9 +249,9 @@ public:
     }
 
     /// The actual unary operation of this expression.
-    inline const ClosureList& branches() const { return mBranches; }
+    [[nodiscard]] inline const ClosureList& branches() const { return mBranches; }
     /// The else expression
-    inline Ptr<Closure> elseClosure() const { return mElseClosure; }
+    [[nodiscard]] inline Ptr<Closure> elseClosure() const { return mElseClosure; }
 
 private:
     ClosureList mBranches;

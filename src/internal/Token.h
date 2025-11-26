@@ -36,12 +36,15 @@ enum class TokenType {
     Semicolon,         // ;
     Assign,            // =
 
+    ArrowRight, // ->
+
     If,   // if
     Elif, // elif
     Else, // else
 
     Mutable,  // mut
     Function, // fn
+    Extern,   // extern
 
     BooleanType, // bool
     IntegerType, // int

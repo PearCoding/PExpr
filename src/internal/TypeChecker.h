@@ -9,21 +9,21 @@ class TypeChecker {
 public:
     explicit TypeChecker(const SymbolTable& defs);
 
-    ElementaryType handle(const Ptr<Closure>& closure);
+    [[nodiscard]] ElementaryType handle(const Ptr<Closure>& closure);
 
 private:
-    ElementaryType handleNode(const Ptr<Closure>& closure);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure);
     void handleNode(const Ptr<Statement>& statement);
 
-    ElementaryType handleNode(const Ptr<Expression>& expr);
-    ElementaryType handleNode(const Ptr<ClosureExpression>& expr);
-    ElementaryType handleNode(const Ptr<BranchExpression>& expr);
-    ElementaryType handleNode(const Ptr<VariableExpression>& expr);
-    ElementaryType handleNode(const Ptr<LiteralExpression>& expr);
-    ElementaryType handleNode(const Ptr<UnaryExpression>& expr);
-    ElementaryType handleNode(const Ptr<BinaryExpression>& expr);
-    ElementaryType handleNode(const Ptr<CallExpression>& expr);
-    ElementaryType handleNode(const Ptr<AccessExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<Expression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<ClosureExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<BranchExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<VariableExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<LiteralExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<UnaryExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<BinaryExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<CallExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<AccessExpression>& expr);
 
     SymbolTable mDynamicDefinitions;
     const SymbolTable& mDefinitions;

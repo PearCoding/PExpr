@@ -32,8 +32,12 @@ Token Lexer::next()
             return Token(prevLoc, TokenType::ClosedBraces);
         if (accept('+'))
             return Token(prevLoc, TokenType::Plus);
-        if (accept('-'))
-            return Token(prevLoc, TokenType::Minus);
+        if (accept('-')) {
+            if (accept('>'))
+                return Token(prevLoc, TokenType::ArrowRight);
+            else
+                return Token(prevLoc, TokenType::Minus);
+        }
         if (accept('*'))
             return Token(prevLoc, TokenType::Mul);
         if (accept(':'))
@@ -121,6 +125,8 @@ Token Lexer::next()
                 return Token(prevLoc, TokenType::Mutable);
             if (mTemp == "fn")
                 return Token(prevLoc, TokenType::Function);
+            if (mTemp == "extern")
+                return Token(prevLoc, TokenType::Extern);
             if (mTemp == "bool")
                 return Token(prevLoc, TokenType::BooleanType);
             if (mTemp == "int")

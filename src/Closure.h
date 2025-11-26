@@ -16,13 +16,13 @@ public:
     }
 
     /// The location this expression is associated with.
-    inline const Location& location() const { return mLocation; }
+    [[nodiscard]] inline const Location& location() const { return mLocation; }
 
-    inline bool isTranslationUnit() const { return mParent == nullptr; }
-    inline Closure* parent() const { return mParent; }
+    [[nodiscard]] inline bool isTranslationUnit() const { return mParent == nullptr; }
+    [[nodiscard]] inline Closure* parent() const { return mParent; }
 
-    inline const StatementList& statements() const { return mStatement; }
-    inline Ptr<Expression> expression() const { return mExpression; }
+    [[nodiscard]] inline const StatementList& statements() const { return mStatement; }
+    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
 
     inline void addStatement(const Ptr<Statement>& statement)
     {
@@ -38,7 +38,7 @@ public:
     }
 
     // Internal usage
-    inline internal::SymbolTable& symbols() { return mSymbols; }
+    [[nodiscard]] inline internal::SymbolTable& symbols() { return mSymbols; }
 
 private:
     Closure* mParent;

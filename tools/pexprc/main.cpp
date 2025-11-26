@@ -1,0 +1,29 @@
+#include <cmath>
+#include <fstream>
+#include <iostream>
+
+#include "PExpr.h"
+
+using namespace PExpr;
+
+int main(int argc, char** argv)
+{
+    std::stringstream sourceFiles;
+    for (int i = 1; i < argc; ++i) {
+        std::ifstream f(argv[i]);
+        sourceFiles << f.rdbuf();
+    }
+
+    Environment env;
+    auto ast = env.parse(sourceFiles);
+
+    if (ast == nullptr)
+        return EXIT_FAILURE;
+
+    ssa::SSAMapper mapper;
+    auto program = mapper.map(ast);
+
+    std::cout << program.dump() << std::endl;
+
+    return EXIT_SUCCESS;
+}

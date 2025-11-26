@@ -19,6 +19,7 @@ set(SRC
     Enums.cpp
     Environment.cpp
     Logger.cpp
+    SSAMapper.cpp
 
     internal/ConsoleLogListener.cpp
     internal/Lexer.h

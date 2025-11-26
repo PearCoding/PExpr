@@ -11,9 +11,9 @@ class Parser {
 public:
     Parser(Lexer& lexer);
 
-    Ptr<Closure> parse(const SymbolTable* globals);
+    [[nodiscard]] Ptr<Closure> parse(const SymbolTable* globals);
 
-    inline bool hasError() const { return mHasError; }
+    [[nodiscard]] inline bool hasError() const { return mHasError; }
 
     inline void signalError() { mHasError = true; }
 
@@ -24,7 +24,7 @@ protected:
     void eat(TokenType type);
     bool accept(TokenType type);
     void next();
-    inline const Token& cur(size_t i = 0) const { return mCurrentToken[i]; }
+    [[nodiscard]] inline const Token& cur(size_t i = 0) const { return mCurrentToken[i]; }
 
     Lexer& mLexer;
     std::array<Token, 2> mCurrentToken;

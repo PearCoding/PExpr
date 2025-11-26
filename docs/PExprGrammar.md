@@ -18,14 +18,14 @@ statement
 ---------
 There are two kinds of statements handled inside a closure:
 - variable_statement (mutable or immutable)
-- function_statement
+- function_statement (extern or intern)
 
 statement ::= variable_statement | function_statement
 
 variable_statement ::= Identifier [ ':' elementary_type ] '=' expression ';'
                      | 'mut' Identifier [ ':' elementary_type ] '=' expression ';'
 
-function_statement ::= 'fn' Identifier '(' parameter_def_list ')' [ '->' elementary_type ] '=' expression ';'
+function_statement ::= [ 'extern' ] 'fn' Identifier '(' parameter_def_list ')' [ '->' elementary_type ] '=' expression ';'
 
 parameter_def_list (for function declarations)
 ----------------------------------------------
