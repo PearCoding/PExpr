@@ -1,6 +1,6 @@
-[] SSA generation with https://compilers.cs.uni-saarland.de/projects/ssaconstr/
-[] Register allocation
-[] Constant folding
-[] Dead-code elimination
-[] Global value numbering
-[] Partial-redundancy elimination
+- [ ] SSA generation with https://compilers.cs.uni-saarland.de/projects/ssaconstr/
+- [ ] Register allocation
+- [ ] Constant folding
+- [ ] Dead-code elimination
+- [ ] Global value numbering
+- [ ] Partial-redundancy elimination
