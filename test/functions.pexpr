@@ -2,8 +2,8 @@
 fn a() = 42;
 // A function can never be changed after definition!
 //- fn a() = 1234; // Error!
-// A function can have generic parameters
-fn a(x) = x * 42;
+// [NOT SUPPORTED FOR NOW] A function can have generic parameters
+// fn a(x) = x * 42;
 // A function can also specifiy the type of the parameter
 fn a(x:int) = x * 111;
 // A function can be overloaded. It will trigger an error if the exact same signature already exists

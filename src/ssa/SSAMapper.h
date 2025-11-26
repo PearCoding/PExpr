@@ -21,10 +21,10 @@ public:
                       Constant };
 
     SSAValue() = default;
-    SSAValue(Kind k, std::string n)
+    SSAValue(Kind k, std::string n, ElementaryType type)
         : Kind(k)
         , Name(std::move(n))
-        , Type(PExpr::ElementaryType::Unspecified)
+        , Type(type)
     {
     }
 
@@ -81,6 +81,7 @@ struct SSAFunction {
     std::string Name;
     std::vector<std::string> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
+    PExpr::ElementaryType ReturnType = PExpr::ElementaryType::Unspecified;
 
     std::string dump() const;
 };

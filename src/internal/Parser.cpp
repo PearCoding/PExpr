@@ -186,13 +186,13 @@ private:
             const std::string paramName = std::get<std::string>(P.cur().Value);
             P.expect(TokenType::Identifier);
 
-            if (P.cur().Type == TokenType::Colon) {
+            // if (P.cur().Type == TokenType::Colon) {
                 P.expect(TokenType::Colon);
                 const ElementaryType type = p_elementary_type();
                 list.push_back(FunctionStatement::Parameter{ paramName, type });
-            } else {
-                list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
-            }
+            // } else {
+            //     list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
+            // }
         } while (P.accept(TokenType::Comma));
 
         return list;

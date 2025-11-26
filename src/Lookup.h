@@ -47,6 +47,10 @@ public:
     /// Return true if given set of parameters is compatible with the parameters in the lookup.
     inline bool matchParameter(const std::vector<ElementaryType>& params, bool exactOnly = false) const
     {
+        // Do the number of parameters even match?
+        if (mParameters.size() != params.size())
+            return false;
+
         // First check for exact matches
         if (std::equal(mParameters.begin(), mParameters.end(), params.begin()))
             return true;

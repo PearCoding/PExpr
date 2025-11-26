@@ -2,9 +2,9 @@
 #include <sstream>
 #include <string>
 
-#include "SSAMapper.h"
 #include "internal/Lexer.h"
 #include "internal/Parser.h"
+#include "ssa/SSAMapper.h"
 
 using namespace PExpr;
 using namespace PExpr::ssa;

@@ -51,7 +51,7 @@ TEST_CASE("Parser: closure with variable and expression", "[parser]")
 
     REQUIRE(!parser.hasError());
     const std::string out = StringVisitor::visit(ast);
-    REQUIRE(out.find("mut x = 1;") != std::string::npos);
+    REQUIRE(out.find("mut x:int = 1;") != std::string::npos);
     REQUIRE(out.find("(x)+(2)") != std::string::npos);
 }
 

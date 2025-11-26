@@ -90,7 +90,7 @@ std::string SSAInstrAssign::dump() const
         ss << OperatorName;
         break;
     case OpKind::Access:
-        ss << "access:" << OperatorName;
+        ss << "access[" << OperatorName << "]";
         break;
     case OpKind::Nop:
         ss << "nop";
@@ -153,12 +153,15 @@ std::string SSAFunction::dump() const
             ss << ", ";
         ss << Parameters[i];
     }
-    ss << ")\n";
+    ss << ")";
+    if (ReturnType != PExpr::ElementaryType::Unspecified)
+        ss << ":" << PExpr::toString(ReturnType);
+    ss << std::endl;
 
     if (!Body.empty()) {
         for (const auto& instr : Body)
-            ss << "  " << instr->dump() << "\n";
-        ss << "endfn\n";
+            ss << "  " << instr->dump() << std::endl;
+        ss << "endfn" << std::endl;
     }
     return ss.str();
 }
@@ -167,15 +170,13 @@ std::string SSAProgram::dump() const
 {
     std::stringstream ss;
     for (const auto& f : Functions)
-        ss << f.dump() << "\n";
+        ss << f.dump() << std::endl;
     for (const auto& instr : Body)
-        ss << instr->dump() << "\n";
+        ss << instr->dump() << std::endl;
     return ss.str();
 }
 
-//
 // SSAMapper implementation
-//
 
 SSAMapper::SSAMapper() = default;
 
@@ -225,7 +226,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         auto var     = std::reinterpret_pointer_cast<VariableStatement>(stmt);
         SSAValue rhs = mapExpression(var->expression());
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()));
+        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), var->expression()->returnType());
         // propagate type from RHS if available
         tgt.Type     = rhs.Type;
         asg.Target   = tgt;
@@ -242,6 +243,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         func.Parameters.reserve(f->parameters().size());
         for (const auto& p : f->parameters())
             func.Parameters.push_back(p.Name);
+        func.ReturnType = f->returnType();
 
         // map function body using a nested mapper so temporaries are local
         if (f->expression() && f->expression()->type() == ExpressionType::Closure) {
@@ -269,7 +271,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         // unsupported - emit comment as an assign to a dummy temp
         {
             SSAInstrAssign asg;
-            asg.Target   = SSAValue(SSAValue::Kind::Temp, fresh("tmp"));
+            asg.Target   = SSAValue(SSAValue::Kind::Temp, fresh("tmp"), ElementaryType::Unspecified);
             asg.Operator = SSAInstrAssign::OpKind::Nop;
             mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         }
@@ -280,7 +282,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
 SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
 {
     if (!expr)
-        return SSAValue{ SSAValue::Kind::Constant, "nil" };
+        return SSAValue{ SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified };
 
     // reuse cached value if present
     auto it = mExprValues.find(expr.get());
@@ -309,7 +311,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         default:
             sval = "unknown";
         }
-        result = SSAValue(SSAValue::Kind::Constant, sval);
+        result = SSAValue(SSAValue::Kind::Constant, sval, lit->returnType());
     } break;
     case ExpressionType::Variable: {
         auto v = std::reinterpret_pointer_cast<VariableExpression>(expr);
@@ -318,15 +320,15 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         if (cit != mCounters.end()) {
             std::stringstream ss;
             ss << v->name() << "." << cit->second;
-            result = SSAValue(SSAValue::Kind::Named, ss.str());
+            result = SSAValue(SSAValue::Kind::Named, ss.str(), v->returnType());
         } else {
-            result = SSAValue(SSAValue::Kind::Named, v->name());
+            result = SSAValue(SSAValue::Kind::Named, v->name(), v->returnType());
         }
     } break;
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
         SSAValue inner = mapExpression(u->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"));
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), u->returnType());
         SSAInstrAssign asg;
         asg.Target       = tgt;
         asg.Operator     = SSAInstrAssign::OpKind::Unary;
@@ -339,7 +341,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         auto b     = std::reinterpret_pointer_cast<BinaryExpression>(expr);
         SSAValue L = mapExpression(b->left());
         SSAValue R = mapExpression(b->right());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"));
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), b->returnType());
         SSAInstrAssign asg;
         asg.Target       = tgt;
         asg.Operator     = SSAInstrAssign::OpKind::Binary;
@@ -354,7 +356,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         args.reserve(c->parameters().size());
         for (const auto& p : c->parameters())
             args.push_back(mapExpression(p));
-        SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()));
+        SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());
         auto call          = std::make_shared<SSAInstrCall>();
         call->Target       = tgt;
         call->FunctionName = c->name();
@@ -365,7 +367,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
     case ExpressionType::Access: {
         auto a      = std::reinterpret_pointer_cast<AccessExpression>(expr);
         SSAValue in = mapExpression(a->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"));
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), a->returnType());
         SSAInstrAssign asg;
         asg.Target       = tgt;
         asg.Operator     = SSAInstrAssign::OpKind::Access;
@@ -386,7 +388,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         for (const auto& instr : prog.Body)
             func.Body.push_back(instr);
         mProgram.Functions.push_back(std::move(func));
-        SSAValue tgt(SSAValue::Kind::Temp, func.Name);
+        SSAValue tgt(SSAValue::Kind::Temp, func.Name, c->returnType());
         result = tgt;
     } break;
     case ExpressionType::Branch: {
@@ -400,7 +402,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
             for (const auto& instr : prog.Body)
                 mProgram.Body.push_back(instr);
             // try to extract last return value if present
-            SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil");
+            SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
             if (!prog.Body.empty()) {
                 // inspect last instr; if SSAInstrReturn, use its value
                 auto last = prog.Body.back();
@@ -414,14 +416,14 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         auto elseProg = inner.map(br->elseClosure());
         for (const auto& instr : elseProg.Body)
             mProgram.Body.push_back(instr);
-        SSAValue elseVal = SSAValue(SSAValue::Kind::Constant, "nil");
+        SSAValue elseVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
         if (!elseProg.Body.empty()) {
             auto last = elseProg.Body.back();
             if (auto ret = dynamic_cast<SSAInstrReturn*>(last.get()))
                 elseVal = ret->Value;
         }
         // create phi
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("phi"));
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("phi"), branchVals.front().Type);
         auto phi     = std::make_shared<SSAInstrPhi>();
         phi->Target  = tgt;
         phi->Sources = branchVals;
@@ -430,7 +432,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         result = tgt;
     } break;
     default:
-        result = SSAValue{ SSAValue::Kind::Constant, "unknown" };
+        result = SSAValue{ SSAValue::Kind::Constant, "unknown", ElementaryType::Unspecified };
         break;
     }
 

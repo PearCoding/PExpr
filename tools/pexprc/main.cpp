@@ -25,5 +25,10 @@ int main(int argc, char** argv)
 
     std::cout << program.dump() << std::endl;
 
+    if (!ssa::SSAValidator::checkIfTyped(&program)) {
+        std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }

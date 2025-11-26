@@ -63,13 +63,20 @@ private:
         std::stringstream stream;
         if (statement->isMutable())
             stream << "mut ";
-        stream << statement->name() << " = " << visit(statement->expression()) << ";";
+        stream << statement->name();
+        if (!statement->expression()->isUnspecified())
+            stream << ":" << toString(statement->expression()->returnType());
+
+        stream << " = " << visit(statement->expression()) << ";";
         return stream.str();
     }
 
     static std::string dump(const Ptr<FunctionStatement>& statement)
     {
         std::stringstream stream;
+        if (statement->isExtern())
+            stream << "extern ";
+
         stream << "fn " << statement->name() << "(";
         for (size_t i = 0; i < statement->parameters().size(); ++i) {
             const auto param = statement->parameters().at(i);
@@ -81,7 +88,13 @@ private:
                 stream << ", ";
         }
 
-        stream << ") = " << visit(statement->expression()) << ";";
+        stream << ")";
+        if (statement->returnType() != ElementaryType::Unspecified)
+            stream << " -> " << toString(statement->returnType());
+
+        if (!statement->isExtern())
+            stream << " = " << visit(statement->expression());
+        stream << ";";
         return stream.str();
     }
 

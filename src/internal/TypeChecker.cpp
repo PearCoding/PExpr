@@ -76,8 +76,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         }
 
         // Type-check the function body to determine the return type
-        const auto explicitReturnType = funcStmt->returnType();
-        const auto returnType         = funcStmt->isExtern() ? explicitReturnType : handleNode(funcStmt->expression());
+        const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->expression());
 
         // Restore dynamic definitions (function itself will be registered below if successful)
         mDynamicDefinitions = std::move(savedDefs);
@@ -87,7 +86,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             return;
         }
 
-        if (returnType != explicitReturnType) {
+        if (const auto explicitReturnType = funcStmt->returnType(); returnType != explicitReturnType) {
             PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Given explicit return type '" << toString(explicitReturnType) << "' in function '" << funcStmt->name() << "' does not match the return type '" << toString(returnType) << "' of the defining expression" << std::endl;
             return;
         }

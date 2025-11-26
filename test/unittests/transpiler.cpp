@@ -87,7 +87,5 @@ TEST_CASE("Transpiler can be instantiated and returns default payload for closur
     DummyVisitor visitor;
     Transpiler<std::string> transpiler(globals, &visitor);
 
-    // Current Transpiler::handle(const Ptr<Closure>&) returns a default-constructed Payload,
-    // so for std::string we expect an empty string.
-    REQUIRE(transpiler.handle(ast) == std::string{});
+    REQUIRE(transpiler.handle(ast) == "(1+2)");
 }

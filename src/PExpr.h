@@ -9,6 +9,8 @@
 #include "LogListener.h"
 #include "Logger.h"
 #include "Lookup.h"
-#include "SSAMapper.h"
 #include "StringVisitor.h"
 #include "TranspileVisitor.h"
+
+#include "ssa/SSAMapper.h"
+#include "ssa/SSAValidator.h"
