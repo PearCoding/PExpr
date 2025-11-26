@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Definitions.h"
 #include "../TranspileVisitor.h"
 #include "SymbolTable.h"
 
@@ -19,8 +20,17 @@ public:
 
     Payload handle(const Ptr<Closure>& closure)
     {
-        Payload payload{};
-        return payload;
+        // Initialize a fresh dynamic symbol table for this translation unit
+        mDynamicDefinitions = SymbolTable(&mDefinitions);
+
+        // Process top-level statements (e.g., variable/function declarations)
+        for (const auto& stmt : closure->statements()) {
+            Payload tmp{};
+            handleNode(stmt, tmp);
+        }
+
+        // Finally transpile the closure expression and return its payload
+        return handle(closure->expression());
     }
 
 private:
@@ -45,10 +55,77 @@ private:
         }
     }
 
-    void handleNode(const Ptr<Statement>& statement, Payload& payload)
+    void handleNode(const Ptr<Statement>& statement, Payload& /*payload*/)
     {
-        // TODO
-        return;
+        switch (statement->type()) {
+        case StatementType::Variable: {
+            auto varStmt = std::reinterpret_pointer_cast<VariableStatement>(statement);
+
+            // Transpile initializer expression to obtain payload for the variable
+            Payload initPayload = handle(varStmt->expression());
+
+            // Register variable in dynamic symbol table so later lookups can find it.
+            // We rely on the typechecker having set the return type on the initializer.
+            const ElementaryType varType = varStmt->expression()->returnType();
+            PExpr::VariableDef def(varStmt->name(), varType);
+            mDynamicDefinitions.addVariableLookupFunction([def](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
+                if (lookup.name() == def.name())
+                    return def;
+                return std::nullopt;
+            });
+
+            // No emitted payload for statements by default
+            return;
+        } break;
+        case StatementType::Function: {
+            auto funcStmt = std::reinterpret_pointer_cast<FunctionStatement>(statement);
+
+            // Collect parameter types (may be Unspecified)
+            std::vector<ElementaryType> paramTypes;
+            paramTypes.reserve(funcStmt->parameters().size());
+            for (const auto& p : funcStmt->parameters())
+                paramTypes.push_back(p.Type);
+
+            if (!funcStmt->isExtern()) {
+                // Temporarily expose parameters as variables while transpiling the body
+                auto savedDefs = mDynamicDefinitions;
+                for (const auto& p : funcStmt->parameters()) {
+                    if (p.Type == ElementaryType::Unspecified)
+                        continue;
+                    PExpr::VariableDef paramDef(p.Name, p.Type);
+                    mDynamicDefinitions.addVariableLookupFunction([paramDef](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
+                        if (lookup.name() == paramDef.name())
+                            return paramDef;
+                        return std::nullopt;
+                    });
+                }
+
+                // Transpile function body to compute payload (if needed by visitor implementations)
+                Payload bodyPayload{}; //< TODO: What do we do with this?
+                if (funcStmt->expression())
+                    bodyPayload = handle(funcStmt->expression());
+
+                // Restore dynamic definitions
+                mDynamicDefinitions = std::move(savedDefs);
+            }
+
+            // Register the function in the dynamic symbol table so calls can be resolved.
+            const ElementaryType returnType = funcStmt->expression() ? funcStmt->expression()->returnType() : ElementaryType::Unspecified;
+            PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
+            mDynamicDefinitions.addFunctionLookupFunction([fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
+                if (lookup.name() != fdef.name())
+                    return std::nullopt;
+                // require exact parameter match for user-defined functions
+                if (lookup.matchParameter(fdef.parameters(), true))
+                    return fdef;
+                return std::nullopt;
+            });
+
+            return;
+        } break;
+        default:
+            return;
+        }
     }
 
     Payload handleCast(const Payload& a, ElementaryType from, ElementaryType to)
@@ -63,9 +140,7 @@ private:
 
     Payload handleNode(const Ptr<VariableExpression>& expr)
     {
-        auto p = mDefinitions.lookupVariable(expr->location(), expr->name());
-
-        if (p.has_value())
+        if (const auto p = mDynamicDefinitions.lookupVariable(expr->location(), expr->name()); p.has_value())
             return mVisitor->onVariable(p.value().name(), p.value().type());
 
         PEXPR_ASSERT(false, "Should have been caught by the typechecker!");
@@ -236,7 +311,7 @@ private:
             args.push_back(handle(e));
         }
 
-        auto def = mDefinitions.lookupFunction(expr->location(), funcName, types);
+        const auto def = mDynamicDefinitions.lookupFunction(expr->location(), funcName, types);
 
         if (!def.has_value()) {
             PEXPR_ASSERT(false, "Should have been caught by the typechecker!");
