@@ -8,7 +8,7 @@ int main(int, char**)
     Lexer lexer(stream);
     if (lexer.next().Type != TokenType::Identifier)
         return EXIT_FAILURE;
-    if (lexer.next().Type != TokenType::OpenParanthese)
+    if (lexer.next().Type != TokenType::OpenParentheses)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::IntegerLiteral)
         return EXIT_FAILURE;
@@ -20,7 +20,7 @@ int main(int, char**)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::NumberLiteral)
         return EXIT_FAILURE;
-    if (lexer.next().Type != TokenType::ClosedParanthese)
+    if (lexer.next().Type != TokenType::ClosedParentheses)
         return EXIT_FAILURE;
     if (lexer.next().Type != TokenType::Dot)
         return EXIT_FAILURE;

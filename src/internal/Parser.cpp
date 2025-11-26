@@ -116,7 +116,7 @@ private:
 
         Ptr<Closure> closure = std::make_shared<Closure>(P.cur().Location, mCurrentClosure);
         mCurrentClosure      = closure.get();
-        if(mCurrentClosure->isTranslationUnit())
+        if (mCurrentClosure->isTranslationUnit())
             mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
 
         while (true) {
@@ -179,7 +179,7 @@ private:
     {
         FunctionStatement::ParameterList list;
 
-        if (P.cur().Type == TokenType::ClosedParanthese)
+        if (P.cur().Type == TokenType::ClosedParentheses)
             return list; // Empty parameter list
         do {
             const std::string paramName = std::get<std::string>(P.cur().Value);
@@ -203,11 +203,11 @@ private:
         const std::string funcName = std::get<std::string>(P.cur().Value);
 
         P.expect(TokenType::Identifier);
-        P.expect(TokenType::OpenParanthese);
+        P.expect(TokenType::OpenParentheses);
 
         const auto parameters = p_parameter_def_list();
 
-        P.expect(TokenType::ClosedParanthese);
+        P.expect(TokenType::ClosedParentheses);
         P.expect(TokenType::Assign);
 
         const auto expr = p_expression();
@@ -258,6 +258,7 @@ private:
         case TokenType::Pow:
             return { BinaryOperation::Pow, 1 };
         default:
+            PEXPR_ASSERT(false, "Invalid token type enum");
             return { BinaryOperation::Add, -1 };
         }
     }
@@ -299,7 +300,7 @@ private:
     {
         // Call
         if (P.cur(0).Type == TokenType::Identifier
-            && P.cur(1).Type == TokenType::OpenParanthese) {
+            && P.cur(1).Type == TokenType::OpenParentheses) {
             auto call = p_call_expression();
 
             if (P.cur().Type == TokenType::Dot) {
@@ -319,13 +320,13 @@ private:
         const std::string funcName = std::get<std::string>(P.cur().Value);
 
         P.expect(TokenType::Identifier);
-        P.expect(TokenType::OpenParanthese);
+        P.expect(TokenType::OpenParentheses);
 
         std::vector<Ptr<Expression>> parameters;
 
-        if (!P.accept(TokenType::ClosedParanthese)) {
+        if (!P.accept(TokenType::ClosedParentheses)) {
             p_parameter_list(parameters);
-            P.expect(TokenType::ClosedParanthese);
+            P.expect(TokenType::ClosedParentheses);
         }
 
         return std::make_shared<CallExpression>(loc, funcName, std::move(parameters));
@@ -334,7 +335,7 @@ private:
     inline void p_parameter_list(std::vector<Ptr<Expression>>& list)
     {
         do {
-            auto expr = p_binary_expression();
+            auto expr = p_expression();
             PEXPR_ASSERT(expr != nullptr, "Got empty parameter value");
             list.push_back(expr);
         } while (P.accept(TokenType::Comma));
@@ -373,10 +374,12 @@ private:
 
     inline Ptr<Expression> p_primary_expression()
     {
+        // if ... { ... } else { ... }
         if (P.cur(0).Type == TokenType::If) {
             return p_if_branch();
         }
 
+        // { ... }
         if (P.accept(TokenType::OpenBraces)) {
             auto closure = p_closure();
             P.expect(TokenType::ClosedBraces);
@@ -389,9 +392,10 @@ private:
             return std::make_shared<ClosureExpression>(closure->location(), closure);
         }
 
-        if (P.accept(TokenType::OpenParanthese)) {
-            auto expr = p_binary_expression();
-            P.expect(TokenType::ClosedParanthese);
+        // ( ... )
+        if (P.accept(TokenType::OpenParentheses)) {
+            auto expr = p_expression();
+            P.expect(TokenType::ClosedParentheses);
 
             if (P.cur().Type == TokenType::Dot) {
                 const auto loc = P.cur().Location;
@@ -427,7 +431,7 @@ private:
 
         // Only print error if error was not introduced by lexer
         if (P.cur().Type != TokenType::Error)
-            P.error(std::array<TokenType, 8>{ TokenType::OpenParanthese, TokenType::OpenBraces, TokenType::If, TokenType::BooleanLiteral, TokenType::NumberLiteral, TokenType::IntegerLiteral, TokenType::StringLiteral, TokenType::Identifier });
+            P.error(std::array<TokenType, 8>{ TokenType::OpenParentheses, TokenType::OpenBraces, TokenType::If, TokenType::BooleanLiteral, TokenType::NumberLiteral, TokenType::IntegerLiteral, TokenType::StringLiteral, TokenType::Identifier });
         return std::make_shared<ErrorExpression>(value.Location);
     }
 

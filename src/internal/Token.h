@@ -5,36 +5,36 @@
 namespace PExpr::internal {
 enum class TokenType {
     Error,
-    Eof,              // End
-    NumberLiteral,    // 123.45e-6 (Number)
-    IntegerLiteral,   // 123 (Integer)
-    StringLiteral,    // "abc" (String)
-    Identifier,       // ABC (String)
-    BooleanLiteral,   // true, false (Boolean)
-    Plus,             // +
-    Minus,            // -
-    Mul,              // *
-    Div,              // /
-    Mod,              // %
-    Pow,              // ^
-    Dot,              // .
-    Comma,            // ,
-    ExclamationMark,  // !
-    OpenParanthese,   // (
-    ClosedParanthese, // )
-    OpenBraces,       // {
-    ClosedBraces,     // }
-    And,              // &&
-    Or,               // ||
-    Less,             // <
-    Greater,          // >
-    LessEqual,        // <=
-    GreaterEqual,     // >=
-    Equal,            // ==
-    NotEqual,         // !=
-    Colon,            // :
-    Semicolon,        // ;
-    Assign,           // =
+    Eof,               // End
+    NumberLiteral,     // 123.45e-6 (Number)
+    IntegerLiteral,    // 123 (Integer)
+    StringLiteral,     // "abc" (String)
+    Identifier,        // ABC (String)
+    BooleanLiteral,    // true, false (Boolean)
+    Plus,              // +
+    Minus,             // -
+    Mul,               // *
+    Div,               // /
+    Mod,               // %
+    Pow,               // ^
+    Dot,               // .
+    Comma,             // ,
+    ExclamationMark,   // !
+    OpenParentheses,   // (
+    ClosedParentheses, // )
+    OpenBraces,        // {
+    ClosedBraces,      // }
+    And,               // &&
+    Or,                // ||
+    Less,              // <
+    Greater,           // >
+    LessEqual,         // <=
+    GreaterEqual,      // >=
+    Equal,             // ==
+    NotEqual,          // !=
+    Colon,             // :
+    Semicolon,         // ;
+    Assign,            // =
 
     If,   // if
     Elif, // elif

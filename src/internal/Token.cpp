@@ -41,9 +41,9 @@ std::string_view Token::toString(TokenType type)
         return ";";
     case TokenType::ExclamationMark:
         return "!";
-    case TokenType::OpenParanthese:
+    case TokenType::OpenParentheses:
         return "(";
-    case TokenType::ClosedParanthese:
+    case TokenType::ClosedParentheses:
         return ")";
     case TokenType::OpenBraces:
         return "{";

@@ -23,9 +23,9 @@ Token Lexer::next()
 
         const Location prevLoc = mLocation;
         if (accept('('))
-            return Token(prevLoc, TokenType::OpenParanthese);
+            return Token(prevLoc, TokenType::OpenParentheses);
         if (accept(')'))
-            return Token(prevLoc, TokenType::ClosedParanthese);
+            return Token(prevLoc, TokenType::ClosedParentheses);
         if (accept('{'))
             return Token(prevLoc, TokenType::OpenBraces);
         if (accept('}'))
