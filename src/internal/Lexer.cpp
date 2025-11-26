@@ -84,14 +84,14 @@ Token Lexer::next()
 
         if (accept('<')) {
             if (accept('='))
-                return Token(prevLoc, TokenType::Less);
-            return Token(prevLoc, TokenType::LessEqual);
+                return Token(prevLoc, TokenType::LessEqual);
+            return Token(prevLoc, TokenType::Less);
         }
 
         if (accept('>')) {
             if (accept('='))
-                return Token(prevLoc, TokenType::Greater);
-            return Token(prevLoc, TokenType::GreaterEqual);
+                return Token(prevLoc, TokenType::GreaterEqual);
+            return Token(prevLoc, TokenType::Greater);
         }
 
         if (accept('\"'))

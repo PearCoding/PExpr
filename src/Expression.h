@@ -240,7 +240,7 @@ public:
     };
     using ClosureList = std::vector<SingleBranch>;
     inline BranchExpression(const Location& loc, const ClosureList& branches, const Ptr<Closure>& else_closure)
-        : Expression(loc, ExpressionType::Unary)
+        : Expression(loc, ExpressionType::Branch)
         , mBranches(branches)
         , mElseClosure(else_closure)
     {
