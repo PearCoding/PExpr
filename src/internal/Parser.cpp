@@ -157,7 +157,7 @@ private:
     }
 
     // Statements
-    inline Ptr<Statement> p_variable_statement(bool mutable_)
+    inline Ptr<Statement> p_variable_statement(bool is_mutable)
     {
         const auto loc            = P.cur().Location;
         const std::string varName = std::get<std::string>(P.cur().Value);
@@ -169,10 +169,7 @@ private:
 
         P.expect(TokenType::Semicolon);
 
-        // TODO: Check for mutability and reassignment
-        // TODO: Add to symbol table!
-
-        return std::make_shared<VariableStatement>(mutable_, loc, varName, expr);
+        return std::make_shared<VariableStatement>(is_mutable, loc, varName, expr);
     }
 
     inline FunctionStatement::ParameterList p_parameter_def_list()
@@ -213,9 +210,6 @@ private:
         const auto expr = p_expression();
 
         P.expect(TokenType::Semicolon);
-
-        // TODO: Check reassignment within the same closure
-        // TODO: Add to symbol table!
 
         return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr);
     }
@@ -298,38 +292,43 @@ private:
 
     inline Ptr<Expression> p_postfix_expression()
     {
-        // Call
-        if (P.cur(0).Type == TokenType::Identifier
-            && P.cur(1).Type == TokenType::OpenParentheses) {
-            auto call = p_call_expression();
+        auto expr = p_call_expression();
+        if (P.cur().Type == TokenType::Dot) {
+            const auto loc = P.cur().Location;
+            auto swizzle   = p_swizzle();
 
-            if (P.cur().Type == TokenType::Dot) {
-                const auto loc = P.cur().Location;
-                auto swizzle   = p_swizzle();
-                return std::make_shared<AccessExpression>(loc, call, swizzle);
+            if (!checkSwizzle(swizzle)) {
+                P.signalError();
+                PEXPR_LOG(LogLevel::Error) << loc << ": Given access '" << swizzle << "' is invalid" << std::endl;
             }
-            return call;
-        }
 
-        return p_primary_expression();
+            // TODO: Only makes sense for vectors
+            return std::make_shared<AccessExpression>(loc, expr, swizzle);
+        }
+        return expr;
     }
 
     inline Ptr<Expression> p_call_expression()
     {
-        const auto loc             = P.cur().Location;
-        const std::string funcName = std::get<std::string>(P.cur().Value);
+        if (P.cur(0).Type == TokenType::Identifier
+            && P.cur(1).Type == TokenType::OpenParentheses) {
+            const auto loc             = P.cur().Location;
+            const std::string funcName = std::get<std::string>(P.cur().Value);
 
-        P.expect(TokenType::Identifier);
-        P.expect(TokenType::OpenParentheses);
+            P.expect(TokenType::Identifier);
+            P.expect(TokenType::OpenParentheses);
 
-        std::vector<Ptr<Expression>> parameters;
+            std::vector<Ptr<Expression>> parameters;
 
-        if (!P.accept(TokenType::ClosedParentheses)) {
-            p_parameter_list(parameters);
-            P.expect(TokenType::ClosedParentheses);
+            if (!P.accept(TokenType::ClosedParentheses)) {
+                p_parameter_list(parameters);
+                P.expect(TokenType::ClosedParentheses);
+            }
+
+            return std::make_shared<CallExpression>(loc, funcName, std::move(parameters));
         }
 
-        return std::make_shared<CallExpression>(loc, funcName, std::move(parameters));
+        return p_enclosed_expression();
     }
 
     inline void p_parameter_list(std::vector<Ptr<Expression>>& list)
@@ -372,7 +371,7 @@ private:
         return std::make_shared<BranchExpression>(loc, branches, elseClosure);
     }
 
-    inline Ptr<Expression> p_primary_expression()
+    inline Ptr<Expression> p_enclosed_expression()
     {
         // if ... { ... } else { ... }
         if (P.cur(0).Type == TokenType::If) {
@@ -383,12 +382,6 @@ private:
         if (P.accept(TokenType::OpenBraces)) {
             auto closure = p_closure();
             P.expect(TokenType::ClosedBraces);
-
-            if (P.cur().Type == TokenType::Dot) {
-                const auto loc = P.cur().Location;
-                auto swizzle   = p_swizzle();
-                return std::make_shared<AccessExpression>(loc, std::make_shared<ClosureExpression>(closure->location(), closure), swizzle);
-            }
             return std::make_shared<ClosureExpression>(closure->location(), closure);
         }
 
@@ -396,15 +389,14 @@ private:
         if (P.accept(TokenType::OpenParentheses)) {
             auto expr = p_expression();
             P.expect(TokenType::ClosedParentheses);
-
-            if (P.cur().Type == TokenType::Dot) {
-                const auto loc = P.cur().Location;
-                auto swizzle   = p_swizzle();
-                return std::make_shared<AccessExpression>(loc, expr, swizzle);
-            }
             return expr;
         }
 
+        return p_primary_expression();
+    }
+
+    inline Ptr<Expression> p_primary_expression()
+    {
         const auto value = P.cur();
         if (P.accept(TokenType::BooleanLiteral))
             return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Boolean, value.Value);
@@ -418,16 +410,8 @@ private:
         if (P.accept(TokenType::StringLiteral))
             return std::make_shared<LiteralExpression>(value.Location, ElementaryType::String, value.Value);
 
-        if (P.accept(TokenType::Identifier)) {
-            auto var = std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));
-
-            if (P.cur().Type == TokenType::Dot) {
-                const auto loc = P.cur().Location;
-                auto swizzle   = p_swizzle();
-                return std::make_shared<AccessExpression>(loc, var, swizzle);
-            }
-            return var;
-        }
+        if (P.accept(TokenType::Identifier))
+            return std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));
 
         // Only print error if error was not introduced by lexer
         if (P.cur().Type != TokenType::Error)
@@ -435,7 +419,18 @@ private:
         return std::make_shared<ErrorExpression>(value.Location);
     }
 
-    std::string p_swizzle()
+    inline bool checkSwizzle(std::string_view swizzle)
+    {
+        if (swizzle.size() < 1 || swizzle.size() > 4)
+            return false;
+        for (auto c : swizzle) {
+            if (c != 'x' && c != 'y' && c != 'z' && c != 'w' && c != 'r' && c != 'g' && c != 'b' && c != 'a')
+                return false;
+        }
+        return true;
+    }
+
+    inline std::string p_swizzle()
     {
         P.expect(TokenType::Dot);
         auto token = P.cur();

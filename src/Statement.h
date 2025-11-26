@@ -11,7 +11,7 @@ class Statement {
 public:
     Statement() = delete;
 
-    /// The location this expression is assosciated with.
+    /// The location this expression is associated with.
     inline const Location& location() const { return mLocation; }
 
     inline const std::string& name() const { return mName; }

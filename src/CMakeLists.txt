@@ -41,7 +41,7 @@ target_compile_definitions(pexpr PUBLIC "$<$<CONFIG:Debug>:PEXPR_DEBUG>")
 if(PEXPR_WITH_ASSERTS)
   target_compile_definitions(pexpr PUBLIC "PEXPR_WITH_ASSERTS")
 endif()
-target_compile_features(pexpr PUBLIC cxx_std_17)
+target_compile_features(pexpr PUBLIC cxx_std_20)
 set_target_properties(pexpr PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 install(TARGETS pexpr 
