@@ -11,7 +11,6 @@ set(PUBLIC
     StringVisitor.h
     TranspileVisitor.h
     internal/ConsoleLogListener.h
-    internal/DefContainer.h
     internal/Transpiler.h
 )
 

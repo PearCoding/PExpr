@@ -45,7 +45,7 @@ private:
 };
 
 namespace internal {
-/// Special expression used if an error occured while parsing.
+/// Special expression used if an error occurred while parsing.
 class ErrorExpression : public Expression {
 public:
     inline ErrorExpression(const Location& loc)
@@ -201,6 +201,7 @@ public:
         , mSwizzle(swizzle)
     {
         PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in access expression");
+        PEXPR_ASSERT(swizzle.size() > 0 && swizzle.size() <= 4, "Only support swizzling up to 4 components");
     }
 
     /// The inner expression the access operation is applied to.
@@ -221,7 +222,7 @@ public:
         : Expression(loc, ExpressionType::Closure)
         , mClosure(closure)
     {
-        PEXPR_ASSERT(closure != nullptr, "Expected valid pointer for losure");
+        PEXPR_ASSERT(closure != nullptr, "Expected valid pointer for closure");
     }
 
     inline Ptr<Closure> closure() const { return mClosure; }

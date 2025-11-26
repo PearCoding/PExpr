@@ -90,7 +90,7 @@ enum class ExpressionType {
     Binary,   /// Binary operation.
     Call,     /// Call to a function.
     Access,   /// Component swizzle operation.
-    Closure,  /// {adfasdfl; a} enclosed closure
+    Closure,  /// An enclosed closure
     Branch,   /// If, elif and else block
 };
 

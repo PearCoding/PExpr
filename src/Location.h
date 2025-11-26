@@ -14,7 +14,7 @@ public:
         , mLine(1)
     {
     }
-    
+
     inline explicit Location(size_t line, size_t col)
         : mColumn(col)
         , mLine(line)
@@ -35,24 +35,24 @@ public:
         mColumn = 0;
     }
 
+    inline friend Location operator+(const Location& loc, size_t i)
+    {
+        return Location(loc.line(), loc.column() + i);
+    }
+
+    inline friend Location operator+(size_t i, const Location& loc)
+    {
+        return loc + i;
+    }
+
+    inline friend std::ostream& operator<<(std::ostream& os, const Location& loc)
+    {
+        os << "(:" << loc.line() << ":" << loc.column() << ")";
+        return os;
+    }
+
 private:
     size_t mColumn;
     size_t mLine;
 };
-
-inline Location operator+(const Location& loc, size_t i)
-{
-    return Location(loc.line(), loc.column() + i);
-}
-
-inline Location operator+(size_t i, const Location& loc)
-{
-    return loc + i;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const Location& loc)
-{
-    os << "(:" << loc.line() << ":" << loc.column() << ")";
-    return os;
-}
 } // namespace PExpr

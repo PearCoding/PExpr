@@ -15,7 +15,7 @@ public:
     {
     }
 
-    /// The location this expression is assosciated with.
+    /// The location this expression is associated with.
     inline const Location& location() const { return mLocation; }
 
     inline bool isTranslationUnit() const { return mParent == nullptr; }

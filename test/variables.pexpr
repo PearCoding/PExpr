@@ -1,4 +1,4 @@
-// A variable can be easily defined by assign to it
+// A variable can be easily defined by assignment
 a = 42;
 // A variable can not be changed if not defined mutable first
 mut b = 1234;

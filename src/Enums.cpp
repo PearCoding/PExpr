@@ -6,6 +6,7 @@ std::string_view toString(ElementaryType type)
 {
     switch (type) {
     default:
+        PEXPR_ASSERT(false, "Invalid elementary type");
         return "invalid";
     case ElementaryType::Unspecified:
         return "unspecified";
@@ -36,7 +37,8 @@ std::string_view toString(UnaryOperation op)
     case UnaryOperation::Not:
         return "!";
     default:
-        return "???";
+        PEXPR_ASSERT(false, "Invalid unary operation enum");
+        return "";
     }
 }
 
@@ -72,7 +74,8 @@ std::string_view toString(BinaryOperation op)
     case BinaryOperation::NotEqual:
         return "!=";
     default:
-        return "???";
+        PEXPR_ASSERT(false, "Invalid binary operation enum");
+        return "";
     }
 }
 
