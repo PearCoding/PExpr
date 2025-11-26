@@ -1,4 +1,5 @@
 #include "SSAMapper.h"
+#include "Enums.h"
 #include "Expression.h"
 #include "Statement.h"
 
@@ -7,21 +8,78 @@
 
 namespace PExpr::ssa {
 
-//
-// SSAValue / Instr dumps
-//
+// Strings
 
-std::string SSAValue::toString() const
+static inline std::string_view toInstructionString(UnaryOperation op)
+{
+    switch (op) {
+    case UnaryOperation::Pos:
+        return "pos";
+    case UnaryOperation::Neg:
+        return "neg";
+    case UnaryOperation::Not:
+        return "not";
+    default:
+        PEXPR_ASSERT(false, "Invalid unary operation enum");
+        return "";
+    }
+}
+
+static inline std::string_view toInstructionString(BinaryOperation op)
+{
+    switch (op) {
+    case BinaryOperation::Add:
+        return "add";
+    case BinaryOperation::Sub:
+        return "sub";
+    case BinaryOperation::Mul:
+        return "mul";
+    case BinaryOperation::Div:
+        return "div";
+    case BinaryOperation::Pow:
+        return "pow";
+    case BinaryOperation::Mod:
+        return "mod";
+    case BinaryOperation::And:
+        return "and";
+    case BinaryOperation::Or:
+        return "or";
+    case BinaryOperation::Less:
+        return "ls";
+    case BinaryOperation::Greater:
+        return "gt";
+    case BinaryOperation::LessEqual:
+        return "le";
+    case BinaryOperation::GreaterEqual:
+        return "ge";
+    case BinaryOperation::Equal:
+        return "eq";
+    case BinaryOperation::NotEqual:
+        return "neq";
+    default:
+        PEXPR_ASSERT(false, "Invalid binary operation enum");
+        return "";
+    }
+}
+
+// SSAValue / Instr dumps
+
+std::string SSAValue::toString(bool suffixType) const
 {
     if (Name.empty())
         return std::string("_");
+    if ((suffixType || this->Kind == Kind::Constant) && Type != PExpr::ElementaryType::Unspecified) {
+        std::stringstream ss;
+        ss << Name << ":" << std::string(PExpr::toString(Type));
+        return ss.str();
+    }
     return Name;
 }
 
 std::string SSAInstrAssign::dump() const
 {
     std::stringstream ss;
-    ss << Target.toString() << " = ";
+    ss << Target.toString(true) << " = ";
     switch (Operator) {
     case OpKind::Assign:
         ss << "assign";
@@ -45,7 +103,7 @@ std::string SSAInstrAssign::dump() const
     for (size_t i = 0; i < Operands.size(); ++i) {
         if (i)
             ss << ", ";
-        ss << Operands[i].toString();
+        ss << Operands[i].toString(false);
     }
     ss << ")";
     return ss.str();
@@ -54,11 +112,11 @@ std::string SSAInstrAssign::dump() const
 std::string SSAInstrCall::dump() const
 {
     std::stringstream ss;
-    ss << Target.toString() << " = call " << FunctionName << "(";
+    ss << Target.toString(true) << " = call " << FunctionName << "(";
     for (size_t i = 0; i < Arguments.size(); ++i) {
         if (i)
             ss << ", ";
-        ss << Arguments[i].toString();
+        ss << Arguments[i].toString(false);
     }
     ss << ")";
     return ss.str();
@@ -67,18 +125,18 @@ std::string SSAInstrCall::dump() const
 std::string SSAInstrReturn::dump() const
 {
     std::stringstream ss;
-    ss << "return " << Value.toString();
+    ss << "return " << Value.toString(false);
     return ss.str();
 }
 
 std::string SSAInstrPhi::dump() const
 {
     std::stringstream ss;
-    ss << Target.toString() << " = phi(";
+    ss << Target.toString(true) << " = phi(";
     for (size_t i = 0; i < Sources.size(); ++i) {
         if (i)
             ss << ", ";
-        ss << Sources[i].toString();
+        ss << Sources[i].toString(false);
     }
     ss << ")";
     return ss.str();
@@ -168,6 +226,8 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         SSAValue rhs = mapExpression(var->expression());
         SSAInstrAssign asg;
         SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()));
+        // propagate type from RHS if available
+        tgt.Type     = rhs.Type;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -270,7 +330,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAInstrAssign asg;
         asg.Target       = tgt;
         asg.Operator     = SSAInstrAssign::OpKind::Unary;
-        asg.OperatorName = std::string("un_") + std::string(toString(u->op()));
+        asg.OperatorName = std::string("un_") + std::string(toInstructionString(u->op()));
         asg.Operands     = { inner };
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
@@ -283,7 +343,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAInstrAssign asg;
         asg.Target       = tgt;
         asg.Operator     = SSAInstrAssign::OpKind::Binary;
-        asg.OperatorName = toString(b->op());
+        asg.OperatorName = toInstructionString(b->op());
         asg.Operands     = { L, R };
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
@@ -373,6 +433,9 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         result = SSAValue{ SSAValue::Kind::Constant, "unknown" };
         break;
     }
+
+    // attach type from AST (if typechecker ran)
+    result.Type = expr->returnType();
 
     // cache result
     mExprValues[expr.get()] = result;

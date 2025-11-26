@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Closure.h"
+#include "Enums.h"
 
 namespace PExpr::ssa {
 
@@ -23,13 +24,15 @@ public:
     SSAValue(Kind k, std::string n)
         : Kind(k)
         , Name(std::move(n))
+        , Type(PExpr::ElementaryType::Unspecified)
     {
     }
 
     Kind Kind = Kind::Named;
     std::string Name;
+    PExpr::ElementaryType Type = PExpr::ElementaryType::Unspecified;
 
-    std::string toString() const;
+    std::string toString(bool suffixType = true) const;
 };
 
 struct SSAInstr {
