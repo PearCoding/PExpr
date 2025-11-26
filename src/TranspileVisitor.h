@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PExpr_Config.h"
+#include "Enums.h"
 
 namespace PExpr {
 /// Available relational operations.

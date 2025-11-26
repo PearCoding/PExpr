@@ -1,5 +1,7 @@
 enable_testing()
 
+add_subdirectory(unittests)
+
 macro(push_basic_test name files)
 	set(TARGET pexpr_test_${name})
 	add_executable(${TARGET} ${files})
@@ -14,9 +16,7 @@ macro(push_basic_test name files)
 	add_test(NAME ${test_name} COMMAND ${TARGET})
 endmacro(push_basic_test)
 
-push_basic_test(lexer lexer.cpp)
 push_basic_test(parser parser.cpp)
-push_basic_test(stringvisitor stringvisitor.cpp)
 
 add_executable(pexpr_checker checker.cpp)
 target_link_libraries(pexpr_checker PRIVATE pexpr)

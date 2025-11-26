@@ -252,7 +252,7 @@ private:
         case TokenType::Pow:
             return { BinaryOperation::Pow, 1 };
         default:
-            PEXPR_ASSERT(false, "Invalid token type enum");
+            // Other tokens, fallthrough
             return { BinaryOperation::Add, -1 };
         }
     }
