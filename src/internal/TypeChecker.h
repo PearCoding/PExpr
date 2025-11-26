@@ -13,11 +13,11 @@ public:
 
 private:
     ElementaryType handleNode(const Ptr<Closure>& closure);
-    ElementaryType handleNode(const Ptr<Statement>& statement);
+    void handleNode(const Ptr<Statement>& statement);
+
     ElementaryType handleNode(const Ptr<Expression>& expr);
     ElementaryType handleNode(const Ptr<ClosureExpression>& expr);
     ElementaryType handleNode(const Ptr<BranchExpression>& expr);
-
     ElementaryType handleNode(const Ptr<VariableExpression>& expr);
     ElementaryType handleNode(const Ptr<LiteralExpression>& expr);
     ElementaryType handleNode(const Ptr<UnaryExpression>& expr);

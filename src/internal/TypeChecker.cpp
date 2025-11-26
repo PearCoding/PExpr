@@ -1,4 +1,5 @@
 #include "TypeChecker.h"
+#include "Definitions.h"
 #include "Logger.h"
 
 #include <algorithm>
@@ -31,14 +32,74 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
     for (auto statement : closure->statements())
         handleNode(statement);
-
     return handleNode(closure->expression());
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Statement>& statement)
+void TypeChecker::handleNode(const Ptr<Statement>& statement)
 {
-    // TODO
-    return ElementaryType::Unspecified;
+    switch (statement->type()) {
+    case StatementType::Variable: {
+        auto varStmt = std::reinterpret_pointer_cast<VariableStatement>(statement);
+        auto type    = handleNode(varStmt->expression());
+        if (type == ElementaryType::Unspecified)
+            return; // Error was caught somewhere else
+
+        // Register the variable in the dynamic symbol table so following statements
+        // and expressions can resolve it.
+        PExpr::VariableDef def(varStmt->name(), type);
+        mDynamicDefinitions.addVariableLookupFunction([def](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
+            if (lookup.name() == def.name())
+                return def;
+            return std::nullopt;
+        });
+    } break;
+    case StatementType::Function: {
+        auto funcStmt = std::reinterpret_pointer_cast<FunctionStatement>(statement);
+
+        // Collect parameter types (may include ElementaryType::Unspecified)
+        std::vector<ElementaryType> paramTypes;
+        paramTypes.reserve(funcStmt->parameters().size());
+        for (const auto& p : funcStmt->parameters())
+            paramTypes.push_back(p.Type);
+
+        // Temporarily expose parameters as variables (only when they have a specified type)
+        auto savedDefs = mDynamicDefinitions;
+        for (const auto& p : funcStmt->parameters()) {
+            if (p.Type == ElementaryType::Unspecified)
+                continue; // cannot register a parameter without a type
+            PExpr::VariableDef paramDef(p.Name, p.Type);
+            mDynamicDefinitions.addVariableLookupFunction([paramDef](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
+                if (lookup.name() == paramDef.name())
+                    return paramDef;
+                return std::nullopt;
+            });
+        }
+
+        // Type-check the function body to determine the return type
+        const auto returnType = handleNode(funcStmt->expression());
+
+        // Restore dynamic definitions (function itself will be registered below if successful)
+        mDynamicDefinitions = std::move(savedDefs);
+
+        if (returnType == ElementaryType::Unspecified) {
+            PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Could not determine return type for function '" << funcStmt->name() << "'" << std::endl;
+            return;
+        }
+
+        // Register the function in the dynamic symbol table so it can be called later.
+        PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
+        mDynamicDefinitions.addFunctionLookupFunction([fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
+            if (lookup.name() != fdef.name())
+                return std::nullopt;
+            // Require exact parameter match for user-defined functions
+            if (lookup.matchParameter(fdef.parameters(), true))
+                return fdef;
+            return std::nullopt;
+        });
+    } break;
+    default:
+        break;
+    }
 }
 
 ElementaryType TypeChecker::handleNode(const Ptr<Expression>& expr)
@@ -69,6 +130,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<ClosureExpression>& expr)
 {
     auto def            = mDynamicDefinitions;
     ElementaryType type = handleNode(expr->closure());
+    expr->setReturnType(type);
     mDynamicDefinitions = std::move(def);
     return type;
 }
