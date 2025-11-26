@@ -4,7 +4,8 @@ namespace PExpr::internal {
 std::string_view Token::toString(TokenType type)
 {
     switch (type) {
-    // default:
+    default:
+        PEXPR_ASSERT(false, "Invalid token type enum");
     case TokenType::Error:
         return "Error";
     case TokenType::Eof:
