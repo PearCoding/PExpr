@@ -293,13 +293,6 @@ public:
     }
 };
 
-static std::optional<VariableDef> variableLookup(const VariableLookup& lkp)
-{
-    if (Constants.count(lkp.name()))
-        return VariableDef(lkp.name(), ElementaryType::Number);
-    return {};
-}
-
 static std::optional<FunctionDef> functionLookup(const FunctionLookup& lkp)
 {
     if (lkp.name() == "vec2" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number }))
@@ -330,8 +323,19 @@ int main(int argc, char** argv)
     }
 
     Environment env;
-    env.registerVariableLookupFunction(variableLookup);
-    env.registerFunctionLookupFunction(functionLookup);
+    for (const auto& e : Constants)
+        env.registerVariable(std::string(e.first), ElementaryType::Number);
+    env.registerFunctionLookupFunction("vec2", functionLookup);
+    env.registerFunctionLookupFunction("vec3", functionLookup);
+    env.registerFunctionLookupFunction("vec4", functionLookup);
+    env.registerFunctionLookupFunction("sin", functionLookup);
+    env.registerFunctionLookupFunction("cos", functionLookup);
+    env.registerFunctionLookupFunction("tan", functionLookup);
+    env.registerFunctionLookupFunction("asin", functionLookup);
+    env.registerFunctionLookupFunction("acos", functionLookup);
+    env.registerFunctionLookupFunction("atan", functionLookup);
+    env.registerFunctionLookupFunction("exp", functionLookup);
+    env.registerFunctionLookupFunction("log", functionLookup);
 
     auto ast = env.parse(input);
 

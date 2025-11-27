@@ -47,11 +47,11 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         // Register the variable in the dynamic symbol table so following statements
         // and expressions can resolve it.
         PExpr::VariableDef def(varStmt->name(), type);
-        mDynamicDefinitions.addVariableLookupFunction([def](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
-            if (lookup.name() == def.name())
-                return def;
-            return std::nullopt;
-        });
+        const bool is_ok = mDynamicDefinitions.addVariable(varStmt->name(), type, varStmt->isMutable());
+        if (!is_ok) {
+            PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to reassign a value to constant variable '" << varStmt->name() << "'" << std::endl;
+            return;
+        }
     } break;
     case StatementType::Function: {
         auto funcStmt = std::reinterpret_pointer_cast<FunctionStatement>(statement);
@@ -68,11 +68,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             if (p.Type == ElementaryType::Unspecified)
                 continue; // cannot register a parameter without a type
             PExpr::VariableDef paramDef(p.Name, p.Type);
-            mDynamicDefinitions.addVariableLookupFunction([paramDef](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
-                if (lookup.name() == paramDef.name())
-                    return paramDef;
-                return std::nullopt;
-            });
+            mDynamicDefinitions.addVariable(p.Name, p.Type, false);
         }
 
         // Type-check the function body to determine the return type
@@ -93,14 +89,13 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
 
         // Register the function in the dynamic symbol table so it can be called later.
         PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
-        mDynamicDefinitions.addFunctionLookupFunction([fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
+        mDynamicDefinitions.addFunction(fdef.name(), [fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
             if (lookup.name() != fdef.name())
                 return std::nullopt;
             // Check if the parameters match
             if (lookup.matchParameter(fdef.parameters(), false))
                 return fdef;
-            return std::nullopt;
-        });
+            return std::nullopt; }, funcStmt->isExtern());
     } break;
     default:
         break;

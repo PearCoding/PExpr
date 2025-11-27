@@ -11,31 +11,35 @@ public:
     {
     }
 
-    inline void addVariableLookupFunction(const VariableLookupFunction& func)
+    inline bool addVariable(const std::string& name, ElementaryType type, bool is_mutable)
     {
-        mVars.emplace_back(func);
+        if (const auto it = mVariables.find(name); it != mVariables.end()) {
+            if (!it->second.IsMutable || it->second.Type != type)
+                return false;
+        }
+
+        mVariables[name] = VariableEntry{ type, is_mutable };
+        return true;
     }
 
     inline std::optional<VariableDef> lookupVariable(const Location& loc, const std::string& name) const
     {
-        for (const auto& cb : mVars) {
-            auto res = cb(VariableLookup(loc, name));
-            if (res.has_value())
-                return res;
-        }
+        if (const auto it = mVariables.find(name); it != mVariables.end())
+            return VariableDef(it->first, it->second.Type);
 
         return mParent ? mParent->lookupVariable(loc, name) : std::nullopt;
     }
 
-    inline void addFunctionLookupFunction(const FunctionLookupFunction& func)
+    inline void addFunction(const std::string& name, const FunctionLookupFunction& func, bool is_extern)
     {
-        mFuncs.emplace_back(func);
+        mFunctions.emplace(name, FunctionEntry{ func, is_extern });
     }
 
     inline std::optional<FunctionDef> lookupFunction(const Location& loc, const std::string& name, const std::vector<ElementaryType>& params) const
     {
-        for (const auto& cb : mFuncs) {
-            auto res = cb(FunctionLookup(loc, name, params));
+        const auto range = mFunctions.equal_range(name);
+        for (auto it = range.first; it != range.second; ++it) {
+            auto res = it->second.Callback(FunctionLookup(loc, name, params));
             if (res.has_value())
                 return res;
         }
@@ -48,7 +52,15 @@ public:
 
 private:
     const SymbolTable* mParent;
-    std::vector<VariableLookupFunction> mVars;
-    std::vector<FunctionLookupFunction> mFuncs;
+    struct VariableEntry {
+        ElementaryType Type;
+        bool IsMutable;
+    };
+    std::unordered_map<std::string, VariableEntry> mVariables;
+    struct FunctionEntry {
+        FunctionLookupFunction Callback;
+        bool IsExtern;
+    };
+    std::unordered_multimap<std::string, FunctionEntry> mFunctions;
 };
 } // namespace PExpr::internal

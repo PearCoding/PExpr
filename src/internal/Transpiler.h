@@ -68,11 +68,7 @@ private:
             // We rely on the typechecker having set the return type on the initializer.
             const ElementaryType varType = varStmt->expression()->returnType();
             PExpr::VariableDef def(varStmt->name(), varType);
-            mDynamicDefinitions.addVariableLookupFunction([def](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
-                if (lookup.name() == def.name())
-                    return def;
-                return std::nullopt;
-            });
+            mDynamicDefinitions.addVariable(varStmt->name(), varType, varStmt->isMutable());
 
             // No emitted payload for statements by default
             return;
@@ -93,11 +89,7 @@ private:
                     if (p.Type == ElementaryType::Unspecified)
                         continue;
                     PExpr::VariableDef paramDef(p.Name, p.Type);
-                    mDynamicDefinitions.addVariableLookupFunction([paramDef](const PExpr::VariableLookup& lookup) -> std::optional<PExpr::VariableDef> {
-                        if (lookup.name() == paramDef.name())
-                            return paramDef;
-                        return std::nullopt;
-                    });
+                    mDynamicDefinitions.addVariable(p.Name, p.Type, false);
                 }
 
                 // Transpile function body to compute payload (if needed by visitor implementations)
@@ -112,14 +104,13 @@ private:
             // Register the function in the dynamic symbol table so calls can be resolved.
             const ElementaryType returnType = funcStmt->expression() ? funcStmt->expression()->returnType() : ElementaryType::Unspecified;
             PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
-            mDynamicDefinitions.addFunctionLookupFunction([fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
+            mDynamicDefinitions.addFunction(fdef.name(), [fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
                 if (lookup.name() != fdef.name())
                     return std::nullopt;
                 // require exact parameter match for user-defined functions
                 if (lookup.matchParameter(fdef.parameters(), true))
                     return fdef;
-                return std::nullopt;
-            });
+                return std::nullopt; }, funcStmt->isExtern());
 
             return;
         } break;

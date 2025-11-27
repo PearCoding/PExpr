@@ -13,14 +13,14 @@ Environment::~Environment()
 {
 }
 
-void Environment::registerVariableLookupFunction(const VariableLookupFunction& cb)
+void Environment::registerVariable(const std::string& name, ElementaryType type)
 {
-    mGlobals.addVariableLookupFunction(cb);
+    mGlobals.addVariable(name, type, false);
 }
 
-void Environment::registerFunctionLookupFunction(const FunctionLookupFunction& cb)
+void Environment::registerFunctionLookupFunction(const std::string& name, const FunctionLookupFunction& cb)
 {
-    mGlobals.addFunctionLookupFunction(cb);
+    mGlobals.addFunction(name, cb, true);
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) const
