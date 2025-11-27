@@ -159,6 +159,8 @@ std::string SSAFunction::dump() const
     ss << std::endl;
 
     if (!Body.empty()) {
+        for (const auto& f : InnerFunctions)
+            ss << f.dump() << std::endl;
         for (const auto& instr : Body)
             ss << "  " << instr->dump() << std::endl;
         ss << "endfn" << std::endl;
@@ -382,13 +384,23 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAMapper inner;
         auto prog = inner.map(c->closure());
         // create a synthetic function name and register it as a function in program
+        const std::string funcName = fresh("closure");
         SSAFunction func;
-        func.Name = fresh("closure");
+        func.Name       = funcName;
+        func.ReturnType = c->returnType();
         // move inner instructions into function body
         for (const auto& instr : prog.Body)
             func.Body.push_back(instr);
+        func.InnerFunctions = std::move(prog.Functions);
         mProgram.Functions.push_back(std::move(func));
-        SSAValue tgt(SSAValue::Kind::Temp, func.Name, c->returnType());
+
+        // directly call the closure
+        SSAValue tgt(SSAValue::Kind::Temp, fresh(funcName), c->returnType());
+        auto call          = std::make_shared<SSAInstrCall>();
+        call->Target       = tgt;
+        call->FunctionName = funcName;
+        call->Arguments    = {}; // empty
+        mProgram.Body.push_back(call);
         result = tgt;
     } break;
     case ExpressionType::Branch: {

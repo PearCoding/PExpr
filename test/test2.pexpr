@@ -1,3 +1,4 @@
+extern fn make_vec3(x:num, y:num, z:num) -> vec3;
 fn test() = {
     r = 1234;
     rr = 12345;
@@ -5,4 +6,4 @@ fn test() = {
 };
 mut k = 2;
 k = k*3;
-test() * {fas * 22}.xz * k
+test() * {make_vec3(2, 1, 2) * 22}.xz * k

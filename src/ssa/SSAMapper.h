@@ -81,6 +81,7 @@ struct SSAFunction {
     std::string Name;
     std::vector<std::string> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
+    std::vector<SSAFunction> InnerFunctions;
     PExpr::ElementaryType ReturnType = PExpr::ElementaryType::Unspecified;
 
     std::string dump() const;

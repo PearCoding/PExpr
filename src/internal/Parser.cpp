@@ -187,9 +187,9 @@ private:
             P.expect(TokenType::Identifier);
 
             // if (P.cur().Type == TokenType::Colon) {
-                P.expect(TokenType::Colon);
-                const ElementaryType type = p_elementary_type();
-                list.push_back(FunctionStatement::Parameter{ paramName, type });
+            P.expect(TokenType::Colon);
+            const ElementaryType type = p_elementary_type();
+            list.push_back(FunctionStatement::Parameter{ paramName, type });
             // } else {
             //     list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
             // }
@@ -200,8 +200,14 @@ private:
 
     inline Ptr<Statement> p_function_statement(bool is_extern)
     {
-        const auto loc             = P.cur().Location;
-        const std::string funcName = std::get<std::string>(P.cur().Value);
+        const auto loc = P.cur().Location;
+
+        // TODO: Add support for constructors?
+        std::string funcName;
+        if (const auto fnptr = std::get_if<std::string>(&P.cur().Value))
+            funcName = *fnptr;
+        else
+            funcName = "_error_"; // Should fail in the next line 
 
         P.expect(TokenType::Identifier);
         P.expect(TokenType::OpenParentheses);

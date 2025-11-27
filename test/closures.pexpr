@@ -1,8 +1,14 @@
+// Use closures to construct complex functions
+fn a(r: num) = {
+    Pi = 3.141592;
+    Pi * r * r; // <-- The trailing ; will trigger a warning!
+};
+
 // A closure contains multiple statements accessible only to the closure and child closures
 closure1 = {
     fn a() = 42;
     mut k = 1111;
-    a(22) * k
+    a(22) * k * a()
 };
 
 // Every closure has to end with an expression
@@ -10,12 +16,6 @@ closure1 = {
 //-     fn a() = 42;
 //-     mut k = 1111;
 //- };
-
-// Use closures to construct complex functions
-fn a(r: num) = {
-    Pi = 3.141592;
-    Pi * r * r; // <-- The trailing ; will trigger a warning!
-};
 
 // The source file is a top-level closure
 k = 2345;
