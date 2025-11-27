@@ -84,19 +84,20 @@ std::string SSAInstrAssign::dump() const
     case OpKind::Assign:
         ss << "assign";
         break;
-    default:
     case OpKind::Unary:
+        ss << toInstructionString(UnaryOp);
+        break;
     case OpKind::Binary:
-        ss << OperatorName;
+        ss << toInstructionString(BinaryOp);
         break;
     case OpKind::Access:
-        ss << "access[" << OperatorName << "]";
+        ss << "access[" << Swizzle << "]";
         break;
     case OpKind::Nop:
         ss << "nop";
         break;
-    case OpKind::Literal:
-        ss << "lit";
+    default:
+        ss << "unknown";
         break;
     }
     ss << "(";
@@ -188,6 +189,7 @@ SSAProgram SSAMapper::map(const Ptr<Closure>& closure)
     mCounters.clear();
     mExprValues.clear();
     mapClosure(closure);
+
     return mProgram;
 }
 
@@ -246,6 +248,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         for (const auto& p : f->parameters())
             func.Parameters.push_back(p.Name);
         func.ReturnType = f->returnType();
+        func.External   = f->isExtern();
 
         // map function body using a nested mapper so temporaries are local
         if (f->expression() && f->expression()->type() == ExpressionType::Closure) {
@@ -297,23 +300,36 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
     case ExpressionType::Literal: {
         auto lit = std::reinterpret_pointer_cast<LiteralExpression>(expr);
         std::string sval;
+        SSAValue v;
+        v.Kind = SSAValue::Kind::Constant;
+        v.Type = lit->returnType();
         switch (lit->returnType()) {
         case ElementaryType::Boolean:
-            sval = lit->getBool() ? "true" : "false";
+            sval    = lit->getBool() ? "true" : "false";
+            v.Name  = sval;
+            v.Value = ValueVariant(lit->getBool());
             break;
         case ElementaryType::Integer:
-            sval = std::to_string(lit->getInteger());
+            sval    = std::to_string(lit->getInteger());
+            v.Name  = sval;
+            v.Value = ValueVariant(static_cast<Integer>(lit->getInteger()));
             break;
         case ElementaryType::Number:
-            sval = std::to_string(lit->getNumber());
+            sval    = std::to_string(lit->getNumber());
+            v.Name  = sval;
+            v.Value = ValueVariant(static_cast<Number>(lit->getNumber()));
             break;
         case ElementaryType::String:
-            sval = std::string("\"") + lit->getString() + "\"";
+            sval    = std::string("\"") + lit->getString() + "\"";
+            v.Name  = sval;
+            v.Value = ValueVariant(lit->getString());
             break;
         default:
-            sval = "unknown";
+            sval    = "unknown";
+            v.Name  = sval;
+            v.Value = ValueVariant(std::string());
         }
-        result = SSAValue(SSAValue::Kind::Constant, sval, lit->returnType());
+        result = v;
     } break;
     case ExpressionType::Variable: {
         auto v = std::reinterpret_pointer_cast<VariableExpression>(expr);
@@ -332,10 +348,10 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAValue inner = mapExpression(u->inner());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), u->returnType());
         SSAInstrAssign asg;
-        asg.Target       = tgt;
-        asg.Operator     = SSAInstrAssign::OpKind::Unary;
-        asg.OperatorName = std::string("un_") + std::string(toInstructionString(u->op()));
-        asg.Operands     = { inner };
+        asg.Target   = tgt;
+        asg.Operator = SSAInstrAssign::OpKind::Unary;
+        asg.UnaryOp  = u->op();
+        asg.Operands = { inner };
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
@@ -345,10 +361,10 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAValue R = mapExpression(b->right());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), b->returnType());
         SSAInstrAssign asg;
-        asg.Target       = tgt;
-        asg.Operator     = SSAInstrAssign::OpKind::Binary;
-        asg.OperatorName = toInstructionString(b->op());
-        asg.Operands     = { L, R };
+        asg.Target   = tgt;
+        asg.Operator = SSAInstrAssign::OpKind::Binary;
+        asg.BinaryOp = b->op();
+        asg.Operands = { L, R };
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
@@ -371,10 +387,10 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAValue in = mapExpression(a->inner());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), a->returnType());
         SSAInstrAssign asg;
-        asg.Target       = tgt;
-        asg.Operator     = SSAInstrAssign::OpKind::Access;
-        asg.OperatorName = a->swizzle();
-        asg.Operands     = { in };
+        asg.Target   = tgt;
+        asg.Operator = SSAInstrAssign::OpKind::Access;
+        asg.Swizzle  = a->swizzle();
+        asg.Operands = { in };
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
@@ -388,6 +404,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         SSAFunction func;
         func.Name       = funcName;
         func.ReturnType = c->returnType();
+        func.External   = false;
         // move inner instructions into function body
         for (const auto& instr : prog.Body)
             func.Body.push_back(instr);

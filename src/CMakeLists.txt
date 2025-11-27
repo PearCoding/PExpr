@@ -23,6 +23,7 @@ set(SRC
     Logger.cpp
     ssa/SSAMapper.cpp
     ssa/SSAValidator.cpp
+    ssa/SSAPassSSCP.cpp
 
     internal/ConsoleLogListener.cpp
     internal/Lexer.h

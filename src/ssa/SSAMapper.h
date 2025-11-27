@@ -27,12 +27,40 @@ public:
         , Type(type)
     {
     }
+    SSAValue(Kind k, std::string n, ElementaryType type, const ValueVariant& v)
+        : Kind(k)
+        , Name(std::move(n))
+        , Type(type)
+        , Value(v)
+    {
+    }
 
     Kind Kind = Kind::Named;
     std::string Name;
-    PExpr::ElementaryType Type = PExpr::ElementaryType::Unspecified;
+    ElementaryType Type = ElementaryType::Unspecified;
+    ValueVariant Value;
 
-    std::string toString(bool suffixType = true) const;
+    [[nodiscard]] std::string toString(bool suffixType = true) const;
+
+    [[nodiscard]] inline static SSAValue Constant(bool b)
+    {
+        return SSAValue(Kind::Constant, b ? "true" : "false", ElementaryType::Boolean, b);
+    }
+
+    [[nodiscard]] inline static SSAValue Constant(Integer v)
+    {
+        return SSAValue(Kind::Constant, std::to_string(v), ElementaryType::Integer, v);
+    }
+
+    [[nodiscard]] inline static SSAValue Constant(Number v)
+    {
+        return SSAValue(Kind::Constant, std::to_string(v), ElementaryType::Number, v);
+    }
+
+    [[nodiscard]] inline static SSAValue Constant(const std::string& str)
+    {
+        return SSAValue(Kind::Constant, "\"" + str + "\"", ElementaryType::String, str);
+    }
 };
 
 struct SSAInstr {
@@ -47,15 +75,18 @@ struct SSAInstrAssign : public SSAInstr {
                         CallOp,
                         Access,
                         Nop,
-                        Phi,
-                        Literal };
+                        Phi };
 
     SSAValue Target;
     OpKind Operator;
-    std::string OperatorName; // operator-specific name (e.g. "+", "neg", "xyzw" for swizzle)
+
+    // OpKind specific data
+    UnaryOperation UnaryOp   = UnaryOperation::Pos;
+    BinaryOperation BinaryOp = BinaryOperation::Add;
+    std::string Swizzle;
     std::vector<SSAValue> Operands;
 
-    std::string dump() const override;
+    [[nodiscard]] std::string dump() const override;
 };
 
 struct SSAInstrCall : public SSAInstr {
@@ -63,18 +94,18 @@ struct SSAInstrCall : public SSAInstr {
     std::string FunctionName;
     std::vector<SSAValue> Arguments;
 
-    std::string dump() const override;
+    [[nodiscard]] std::string dump() const override;
 };
 
 struct SSAInstrReturn : public SSAInstr {
     SSAValue Value;
-    std::string dump() const override;
+    [[nodiscard]] std::string dump() const override;
 };
 
 struct SSAInstrPhi : public SSAInstr {
     SSAValue Target;
     std::vector<SSAValue> Sources;
-    std::string dump() const override;
+    [[nodiscard]] std::string dump() const override;
 };
 
 struct SSAFunction {
@@ -82,16 +113,20 @@ struct SSAFunction {
     std::vector<std::string> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
     std::vector<SSAFunction> InnerFunctions;
-    PExpr::ElementaryType ReturnType = PExpr::ElementaryType::Unspecified;
+    ElementaryType ReturnType = ElementaryType::Unspecified;
 
-    std::string dump() const;
+    // Mark whether this function is external (declared but not defined).
+    // External functions are considered to have side-effects.
+    bool External = false;
+
+    [[nodiscard]] std::string dump() const;
 };
 
 struct SSAProgram {
     std::vector<std::shared_ptr<SSAInstr>> Body;
     std::vector<SSAFunction> Functions;
 
-    std::string dump() const;
+    [[nodiscard]] std::string dump() const;
 };
 
 /// SSAMapper builds an SSAProgram from a Closure AST.
@@ -100,14 +135,14 @@ public:
     SSAMapper();
 
     /// Map a closure to an SSAProgram.
-    SSAProgram map(const Ptr<Closure>& closure);
+    [[nodiscard]] SSAProgram map(const Ptr<Closure>& closure);
 
 private:
-    std::string fresh(const std::string& base);
+    [[nodiscard]] std::string fresh(const std::string& base);
 
     void mapClosure(const Ptr<Closure>& closure);
     void mapStatement(const Ptr<Statement>& stmt);
-    SSAValue mapExpression(const Ptr<Expression>& expr);
+    [[nodiscard]] SSAValue mapExpression(const Ptr<Expression>& expr);
 
     // Program under construction
     SSAProgram mProgram;
