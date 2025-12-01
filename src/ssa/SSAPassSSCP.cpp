@@ -116,6 +116,8 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         ops.push_back(resolved);
     }
 
+    // -- This section is only reached when all operands are constant!
+
     // Assignment
     if (asg->Operator == SSAInstrAssign::OpKind::Assign && ops.size() == 1)
         return ops.front();
@@ -147,7 +149,7 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         }
     }
 
-    // Binary fold (use enum)
+    // Binary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Binary && ops.size() == 2) {
         const auto& L = ops[0];
         const auto& R = ops[1];
