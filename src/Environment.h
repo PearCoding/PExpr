@@ -16,9 +16,8 @@ public:
     /// Register an inmutable variable with a specific type.
     void registerVariable(const std::string& name, ElementaryType type);
 
-    /// Register a function lookup function.
-    /// Callback has to return a valid function definition if function exists with exact or convertible signature.
-    void registerFunctionLookupFunction(const std::string& name, const FunctionLookupFunction& def);
+    /// Register an external function.
+    void registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType);
 
     /// Parse the stream until eof and return the corresponding AST tree.
     /// If skipTypeChecking is true, no typechecking will be performed and no variables or functions have to be defined in advance.

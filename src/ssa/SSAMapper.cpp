@@ -375,13 +375,13 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         for (const auto& p : c->parameters())
             args.push_back(mapExpression(p));
 
-        const std::string& targetName = c->mangledName();
-
-        SSAValue tgt(SSAValue::Kind::Temp, fresh(targetName), c->returnType());
-        auto call          = std::make_shared<SSAInstrCall>();
-        call->Target       = tgt;
-        call->FunctionName = targetName;
-        call->Arguments    = args;
+        PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
+        SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());
+        auto call                = std::make_shared<SSAInstrCall>();
+        call->Target             = tgt;
+        call->FunctionName       = c->mangledName();
+        call->PublicFunctionName = c->name();
+        call->Arguments          = args;
         mProgram.Body.push_back(call);
         result = tgt;
     } break;
@@ -416,10 +416,11 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
 
         // directly call the closure
         SSAValue tgt(SSAValue::Kind::Temp, fresh(funcName), c->returnType());
-        auto call          = std::make_shared<SSAInstrCall>();
-        call->Target       = tgt;
-        call->FunctionName = funcName;
-        call->Arguments    = {}; // empty
+        auto call                = std::make_shared<SSAInstrCall>();
+        call->Target             = tgt;
+        call->PublicFunctionName = funcName;
+        call->FunctionName       = funcName;
+        call->Arguments          = {}; // empty
         mProgram.Body.push_back(call);
         result = tgt;
     } break;

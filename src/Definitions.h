@@ -11,46 +11,70 @@ namespace PExpr {
 class VariableDef {
 public:
     /// Construct a definition for a variable with a given name and type.
-    inline VariableDef(const std::string& name, ElementaryType type)
+    inline VariableDef(const std::string& name, ElementaryType type, bool isMutable)
         : mName(name)
         , mType(type)
+        , mIsMutable(isMutable)
     {
         PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
     /// The identifier the variable is named with.
-    inline const std::string& name() const { return mName; }
+    [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The type of the variable.
-    inline ElementaryType type() const { return mType; }
+    [[nodiscard]] inline ElementaryType type() const { return mType; }
+
+    [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
 
 private:
     std::string mName;
     ElementaryType mType;
+    bool mIsMutable;
 };
 
 /// A general purpose function definition with a fixed signature.
 class FunctionDef {
 public:
     /// Construct a function definition with a given name, return type and parameter types.
-    inline FunctionDef(const std::string& name, ElementaryType retType, const std::vector<ElementaryType>& params)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, const std::vector<ElementaryType>& params, ElementaryType retType, bool isExtern)
         : mName(name)
+        , mMangledName(mangledName)
         , mReturnType(retType)
         , mParameters(params)
+        , mIsExtern(isExtern)
+    {
+        PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+    }
+
+    /// Construct a function definition with a given name, return type and parameter types.
+    inline FunctionDef(const std::string& name, const std::string& mangledName,std::vector<ElementaryType>&& params, ElementaryType retType, bool isExtern)
+        : mName(name)
+        , mMangledName(mangledName)
+        , mReturnType(retType)
+        , mParameters(std::move(params))
+        , mIsExtern(isExtern)
     {
         PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
     /// The identifier the function is named with.
-    inline const std::string& name() const { return mName; }
+    [[nodiscard]] inline const std::string& name() const { return mName; }
+    /// Unique name computed internally.
+    [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
+
     /// The type of the return value.
-    inline ElementaryType returnType() const { return mReturnType; }
+    [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
     /// The all parameter types the function has to be called with.
-    inline const std::vector<ElementaryType>& parameters() const { return mParameters; }
+    [[nodiscard]] inline const std::vector<ElementaryType>& parameters() const { return mParameters; }
+
+    [[nodiscard]] inline bool isExtern() const { return mIsExtern; }
 
 private:
     std::string mName;
+    std::string mMangledName;
     ElementaryType mReturnType;
     std::vector<ElementaryType> mParameters;
+    bool mIsExtern;
 };
 
 } // namespace PExpr

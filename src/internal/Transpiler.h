@@ -67,11 +67,7 @@ private:
             // Register variable in dynamic symbol table so later lookups can find it.
             // We rely on the typechecker having set the return type on the initializer.
             const ElementaryType varType = varStmt->expression()->returnType();
-            PExpr::VariableDef def(varStmt->name(), varType);
-            mDynamicDefinitions.addVariable(varStmt->name(), varType, varStmt->isMutable());
-
-            // No emitted payload for statements by default
-            return;
+            mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), varType, varStmt->isMutable()));
         } break;
         case StatementType::Function: {
             auto funcStmt = std::reinterpret_pointer_cast<FunctionStatement>(statement);
@@ -88,8 +84,7 @@ private:
                 for (const auto& p : funcStmt->parameters()) {
                     if (p.Type == ElementaryType::Unspecified)
                         continue;
-                    PExpr::VariableDef paramDef(p.Name, p.Type);
-                    mDynamicDefinitions.addVariable(p.Name, p.Type, false);
+                    mDynamicDefinitions.addVariable(VariableDef(p.Name, p.Type, false));
                 }
 
                 // Transpile function body to compute payload (if needed by visitor implementations)
@@ -103,19 +98,10 @@ private:
 
             // Register the function in the dynamic symbol table so calls can be resolved.
             const ElementaryType returnType = funcStmt->expression() ? funcStmt->expression()->returnType() : ElementaryType::Unspecified;
-            PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
-            mDynamicDefinitions.addFunction(fdef.name(), [fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
-                if (lookup.name() != fdef.name())
-                    return std::nullopt;
-                // require exact parameter match for user-defined functions
-                if (lookup.matchParameter(fdef.parameters(), true))
-                    return fdef;
-                return std::nullopt; }, funcStmt->isExtern());
-
-            return;
+            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern()));
         } break;
         default:
-            return;
+            break;
         }
     }
 

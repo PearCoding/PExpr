@@ -293,27 +293,6 @@ public:
     }
 };
 
-static std::optional<FunctionDef> functionLookup(const FunctionLookup& lkp)
-{
-    if (lkp.name() == "vec2" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number }))
-        return FunctionDef("vec2", ElementaryType::Vec2, { ElementaryType::Number, ElementaryType::Number });
-    if (lkp.name() == "vec3" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }))
-        return FunctionDef("vec3", ElementaryType::Vec3, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number });
-    if (lkp.name() == "vec4" && lkp.matchParameter({ ElementaryType::Number, ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }))
-        return FunctionDef("vec4", ElementaryType::Vec4, { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number, ElementaryType::Number });
-
-    if (lkp.parameters().size() == 1 && isArithmetic(lkp.parameters()[0])) {
-        if (lkp.name() == "sin" || lkp.name() == "cos" || lkp.name() == "tan"
-            || lkp.name() == "asin" || lkp.name() == "acos" || lkp.name() == "atan"
-            || lkp.name() == "exp" || lkp.name() == "log") {
-            ElementaryType type = lkp.parameters()[0] != ElementaryType::Integer ? lkp.parameters()[0] : ElementaryType::Number;
-            return FunctionDef(lkp.name(), type, { type });
-        }
-    }
-
-    return {};
-}
-
 int main(int argc, char** argv)
 {
     std::string input;
@@ -325,17 +304,17 @@ int main(int argc, char** argv)
     Environment env;
     for (const auto& e : Constants)
         env.registerVariable(std::string(e.first), ElementaryType::Number);
-    env.registerFunctionLookupFunction("vec2", functionLookup);
-    env.registerFunctionLookupFunction("vec3", functionLookup);
-    env.registerFunctionLookupFunction("vec4", functionLookup);
-    env.registerFunctionLookupFunction("sin", functionLookup);
-    env.registerFunctionLookupFunction("cos", functionLookup);
-    env.registerFunctionLookupFunction("tan", functionLookup);
-    env.registerFunctionLookupFunction("asin", functionLookup);
-    env.registerFunctionLookupFunction("acos", functionLookup);
-    env.registerFunctionLookupFunction("atan", functionLookup);
-    env.registerFunctionLookupFunction("exp", functionLookup);
-    env.registerFunctionLookupFunction("log", functionLookup);
+    env.registerFunction("vec2", { ElementaryType::Number, ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("vec3", { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("vec4", { ElementaryType::Number, ElementaryType::Number, ElementaryType::Number, ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("sin", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("cos", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("tan", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("asin", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("acos", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("atan", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("exp", { ElementaryType::Number }, ElementaryType::Number);
+    env.registerFunction("log", { ElementaryType::Number }, ElementaryType::Number);
 
     auto ast = env.parse(input);
 

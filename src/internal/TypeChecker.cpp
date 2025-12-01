@@ -1,6 +1,7 @@
 #include "TypeChecker.h"
 #include "Definitions.h"
 #include "Logger.h"
+#include "Mangler.h"
 
 #include <algorithm>
 
@@ -46,8 +47,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
 
         // Register the variable in the dynamic symbol table so following statements
         // and expressions can resolve it.
-        PExpr::VariableDef def(varStmt->name(), type);
-        const bool is_ok = mDynamicDefinitions.addVariable(varStmt->name(), type, varStmt->isMutable());
+        const bool is_ok = mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), type, varStmt->isMutable()));
         if (!is_ok) {
             PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to reassign a value to constant variable '" << varStmt->name() << "'" << std::endl;
             return;
@@ -67,8 +67,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         for (const auto& p : funcStmt->parameters()) {
             if (p.Type == ElementaryType::Unspecified)
                 continue; // cannot register a parameter without a type
-            PExpr::VariableDef paramDef(p.Name, p.Type);
-            mDynamicDefinitions.addVariable(p.Name, p.Type, false);
+            mDynamicDefinitions.addVariable(VariableDef(p.Name, p.Type, false));
         }
 
         // Type-check the function body to determine the return type
@@ -88,14 +87,8 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         }
 
         // Register the function in the dynamic symbol table so it can be called later.
-        PExpr::FunctionDef fdef(funcStmt->name(), returnType, paramTypes);
-        mDynamicDefinitions.addFunction(fdef.name(), [fdef](const PExpr::FunctionLookup& lookup) -> std::optional<PExpr::FunctionDef> {
-            if (lookup.name() != fdef.name())
-                return std::nullopt;
-            // Check if the parameters match
-            if (lookup.matchParameter(fdef.parameters(), false))
-                return fdef;
-            return std::nullopt; }, funcStmt->isExtern());
+        if (!mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern())))
+            PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Given function '" << funcStmt->name() << "' is already defined" << std::endl;
     } break;
     default:
         break;
@@ -311,10 +304,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
 
     expr->setReturnType(ElementaryType::Unspecified);
 
-    if (const auto def = mDynamicDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value())
+    if (const auto def = mDynamicDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value()) {
         expr->setReturnType(def.value().returnType());
-    else
-        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown or ambigous" << std::endl;
+        expr->setMangledName(def->mangledName());
+    } else {
+        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown or ambiguous" << std::endl;
+    }
 
     return expr->returnType();
 }

@@ -91,7 +91,8 @@ struct SSAInstrAssign : public SSAInstr {
 
 struct SSAInstrCall : public SSAInstr {
     SSAValue Target;
-    std::string FunctionName;
+    std::string FunctionName;       ///< Mangled unique name
+    std::string PublicFunctionName; ///< User given name
     std::vector<SSAValue> Arguments;
 
     [[nodiscard]] std::string dump() const override;

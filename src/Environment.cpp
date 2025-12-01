@@ -1,4 +1,5 @@
 #include "Environment.h"
+#include "internal/Mangler.h"
 #include "internal/Parser.h"
 #include "internal/SymbolTable.h"
 #include "internal/TypeChecker.h"
@@ -15,12 +16,13 @@ Environment::~Environment()
 
 void Environment::registerVariable(const std::string& name, ElementaryType type)
 {
-    mGlobals.addVariable(name, type, false);
+    mGlobals.addVariable(VariableDef(name, type, false));
 }
 
-void Environment::registerFunctionLookupFunction(const std::string& name, const FunctionLookupFunction& cb)
+void Environment::registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType)
 {
-    mGlobals.addFunction(name, cb, true);
+    const std::string mangledName = internal::makeMangledNameFromTypes(name, parameterTypes, nullptr);
+    mGlobals.addFunction(FunctionDef(name, mangledName, parameterTypes, returnType, true));
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) const

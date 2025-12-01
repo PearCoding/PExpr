@@ -168,18 +168,16 @@ class CallExpression : public Expression {
 public:
     using ParameterList = std::vector<Ptr<Expression>>;
 
-    inline CallExpression(const Location& loc, const std::string& name, const std::string& mangledName, const ParameterList& parameters)
+    inline CallExpression(const Location& loc, const std::string& name, const ParameterList& parameters)
         : Expression(loc, ExpressionType::Call)
         , mName(name)
-        , mMangledName(mangledName)
         , mParameters(parameters)
     {
     }
 
-    inline CallExpression(const Location& loc, const std::string& name, const std::string& mangledName, ParameterList&& parameters)
+    inline CallExpression(const Location& loc, const std::string& name, ParameterList&& parameters)
         : Expression(loc, ExpressionType::Call)
         , mName(name)
-        , mMangledName(mangledName)
         , mParameters(std::move(parameters))
     {
     }
@@ -188,8 +186,10 @@ public:
     [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The parameters of the given function.
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
-    /// The parser-provided mangled name.
+
+    /// The typechecker-provided mangled name.
     [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
+    inline void setMangledName(const std::string& name) { mMangledName = name; }
 
 private:
     std::string mName;
