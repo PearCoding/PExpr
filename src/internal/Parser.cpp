@@ -420,7 +420,32 @@ private:
             return expr;
         }
 
+        // [ ... ]
+        if (P.accept(TokenType::OpenSquareBracket)) {
+            auto expr = p_vector_expression();
+            P.expect(TokenType::ClosedSquareBracket);
+            return expr;
+        }
+
         return p_primary_expression();
+    }
+
+    inline Ptr<Expression> p_vector_expression()
+    {
+        const auto loc = P.cur().Location;
+        std::vector<Ptr<Expression>> vector;
+        do {
+            auto expr = p_expression();
+            PEXPR_ASSERT(expr != nullptr, "Got empty parameter value");
+            vector.push_back(expr);
+        } while (P.accept(TokenType::Comma));
+
+        if (vector.size() < 2 || vector.size() > 4) {
+            P.signalError();
+            PEXPR_LOG(LogLevel::Error) << loc << ": Invalid size vector of " << vector.size() << " given" << std::endl;
+        }
+
+        return std::make_shared<VectorExpression>(loc, std::move(vector));
     }
 
     inline Ptr<Expression> p_primary_expression()

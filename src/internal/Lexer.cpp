@@ -30,6 +30,10 @@ Token Lexer::next()
             return Token(prevLoc, TokenType::OpenBraces);
         if (accept('}'))
             return Token(prevLoc, TokenType::ClosedBraces);
+        if (accept('['))
+            return Token(prevLoc, TokenType::OpenSquareBracket);
+        if (accept(']'))
+            return Token(prevLoc, TokenType::ClosedSquareBracket);
         if (accept('+'))
             return Token(prevLoc, TokenType::Plus);
         if (accept('-')) {

@@ -42,6 +42,8 @@ public:
             return dump(std::reinterpret_pointer_cast<ClosureExpression>(expr));
         case ExpressionType::Branch:
             return dump(std::reinterpret_pointer_cast<BranchExpression>(expr));
+        case ExpressionType::Vector:
+            return dump(std::reinterpret_pointer_cast<VectorExpression>(expr));
         default:
             return "ERROR";
         }
@@ -160,6 +162,20 @@ private:
         }
 
         stream << "else { " << visit(expr->elseClosure()) << "}";
+        return stream.str();
+    }
+
+    static std::string dump(const Ptr<VectorExpression>& expr)
+    {
+        std::stringstream stream;
+
+        stream << "[" << visit(expr->entries().front());
+
+        for (size_t i = 1; i < expr->entries().size(); ++i) {
+            stream << ", " << visit(expr->entries().at(i));
+        }
+
+        stream << "]";
         return stream.str();
     }
 };

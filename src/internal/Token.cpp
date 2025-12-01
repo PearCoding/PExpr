@@ -50,6 +50,10 @@ std::string_view Token::toString(TokenType type)
         return "{";
     case TokenType::ClosedBraces:
         return "}";
+    case TokenType::OpenSquareBracket:
+        return "[";
+    case TokenType::ClosedSquareBracket:
+        return "]";
     case TokenType::And:
         return "&&";
     case TokenType::Or:

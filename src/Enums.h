@@ -92,6 +92,7 @@ enum class ExpressionType {
     Access,   /// Component swizzle operation.
     Closure,  /// An enclosed closure
     Branch,   /// If, elif and else block
+    Vector,   /// Vector [x,y,z,w]
 };
 
 enum class StatementType {
