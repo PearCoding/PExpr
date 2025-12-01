@@ -243,7 +243,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
     case StatementType::Function: {
         auto f = std::reinterpret_pointer_cast<FunctionStatement>(stmt);
         SSAFunction func;
-        func.Name = f->name();
+        func.Name = f->mangledName();
         func.Parameters.reserve(f->parameters().size());
         for (const auto& p : f->parameters())
             func.Parameters.push_back(p.Name);
@@ -374,10 +374,13 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         args.reserve(c->parameters().size());
         for (const auto& p : c->parameters())
             args.push_back(mapExpression(p));
-        SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());
+
+        const std::string& targetName = c->mangledName();
+
+        SSAValue tgt(SSAValue::Kind::Temp, fresh(targetName), c->returnType());
         auto call          = std::make_shared<SSAInstrCall>();
         call->Target       = tgt;
-        call->FunctionName = c->name();
+        call->FunctionName = targetName;
         call->Arguments    = args;
         mProgram.Body.push_back(call);
         result = tgt;

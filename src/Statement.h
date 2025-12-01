@@ -58,12 +58,15 @@ public:
 
     using ParameterList = std::vector<Parameter>;
 
-    FunctionStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression, ElementaryType returnType)
+    FunctionStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression, ElementaryType returnType, const std::string& mangledName)
         : Statement(loc, name, expression, StatementType::Function)
         , mParameters(parameters)
         , mReturnType(returnType)
+        , mMangledName(mangledName)
     {
     }
+
+    [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
 
     inline const ParameterList& parameters() const { return mParameters; }
     [[nodiscard]] inline bool isExtern() const { return this->expression() == nullptr; }
@@ -81,5 +84,6 @@ public:
 private:
     const ParameterList mParameters;
     const ElementaryType mReturnType;
+    const std::string mMangledName;
 };
 } // namespace PExpr

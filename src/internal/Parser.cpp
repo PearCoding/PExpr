@@ -2,6 +2,72 @@
 #include "Logger.h"
 
 namespace PExpr::internal {
+
+/// Encode elementary types into compact characters for mangling.
+static inline char encodeElemType(ElementaryType t)
+{
+    switch (t) {
+    case ElementaryType::Boolean:
+        return 'b';
+    case ElementaryType::Integer:
+        return 'i';
+    case ElementaryType::Number:
+        return 'n';
+    case ElementaryType::Vec2:
+        return '2';
+    case ElementaryType::Vec3:
+        return '3';
+    case ElementaryType::Vec4:
+        return '4';
+    case ElementaryType::String:
+        return 's';
+    default:
+        return 'u'; // unspecified / unknown
+    }
+}
+
+/// Build mangled name from declared parameter types (no return type).
+static inline std::string makeMangledNameFromTypes(const std::string& name, const std::vector<ElementaryType>& params, const Closure* currentClosure)
+{
+    std::string mangled = "_Z";
+    mangled += std::to_string(name.size()) + name;
+
+    // parameter encoding prefix
+    mangled += "_P";
+    for (auto t : params)
+        mangled.push_back(encodeElemType(t));
+
+    // include closure chain locations (outermost first)
+    if (currentClosure) {
+        std::vector<std::string> parts;
+        for (const Closure* c = currentClosure; c != nullptr; c = c->parent()) {
+            const Location& l = c->location();
+            std::stringstream ss;
+            ss << "L" << l.line() << "C" << l.column();
+            parts.push_back(ss.str());
+        }
+        for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+            mangled += "_" + *it;
+        }
+    }
+    return mangled;
+}
+
+/// Build mangled name from argument expressions (use their returnType() where available)
+static inline std::string makeMangledNameFromExprs(const std::string& name, const std::vector<Ptr<Expression>>& args, const Closure* currentClosure)
+{
+    // TODO: Implicit conversion from Integer to Number?
+    std::vector<ElementaryType> types;
+    types.reserve(args.size());
+    for (const auto& a : args) {
+        if (a)
+            types.push_back(a->returnType());
+        else
+            types.push_back(ElementaryType::Unspecified);
+    }
+    return makeMangledNameFromTypes(name, types, currentClosure);
+}
+
 Parser::Parser(Lexer& lexer)
     : mLexer(lexer)
     , mCurrentToken()
@@ -231,7 +297,14 @@ private:
 
         P.expect(TokenType::Semicolon);
 
-        return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr, returnType);
+        // Build mangled name from declared parameter types (do NOT include return type).
+        std::vector<ElementaryType> paramTypes;
+        paramTypes.reserve(parameters.size());
+        for (const auto& p : parameters)
+            paramTypes.push_back(p.Type);
+
+        std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
+        return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr, returnType, mangled);
     }
 
     // Expressions
@@ -345,7 +418,9 @@ private:
                 P.expect(TokenType::ClosedParentheses);
             }
 
-            return std::make_shared<CallExpression>(loc, funcName, std::move(parameters));
+            // Construct mangled name from the argument expressions (use their returnType where available).
+            std::string mangled = makeMangledNameFromExprs(funcName, parameters, mCurrentClosure);
+            return std::make_shared<CallExpression>(loc, funcName, mangled, std::move(parameters));
         }
 
         return p_enclosed_expression();

@@ -16,7 +16,7 @@ class Expression {
 public:
     Expression() = delete;
 
-    /// The location this expression is assosciated with.
+    /// The location this expression is associated with.
     [[nodiscard]] inline const Location& location() const { return mLocation; }
 
     /// The type of expression. Depending on this value it is safe to cast to other "child" classes.
@@ -168,27 +168,32 @@ class CallExpression : public Expression {
 public:
     using ParameterList = std::vector<Ptr<Expression>>;
 
-    inline CallExpression(const Location& loc, const std::string& name, const ParameterList& parameters)
+    inline CallExpression(const Location& loc, const std::string& name, const std::string& mangledName, const ParameterList& parameters)
         : Expression(loc, ExpressionType::Call)
         , mName(name)
+        , mMangledName(mangledName)
         , mParameters(parameters)
     {
     }
 
-    inline CallExpression(const Location& loc, const std::string& name, ParameterList&& parameters)
+    inline CallExpression(const Location& loc, const std::string& name, const std::string& mangledName, ParameterList&& parameters)
         : Expression(loc, ExpressionType::Call)
         , mName(name)
+        , mMangledName(mangledName)
         , mParameters(std::move(parameters))
     {
     }
 
-    /// Name of the function.
+    /// Name of the function (user visible).
     [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The parameters of the given function.
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
+    /// The parser-provided mangled name.
+    [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
 
 private:
     std::string mName;
+    std::string mMangledName;
     ParameterList mParameters;
 };
 
