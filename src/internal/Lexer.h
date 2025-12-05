@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../Location.h"
+#include "Location.h"
+#include "Reporter.h"
 #include "Token.h"
 
 #include <istream>
@@ -8,7 +9,7 @@
 namespace PExpr::internal {
 class Lexer {
 public:
-    Lexer(std::istream& stream);
+    Lexer(std::istream& stream, Reporter& reporter);
 
     Token next();
 
@@ -34,5 +35,6 @@ private:
     uint8_t mChar;
     Location mLocation;
     std::string mTemp; // Contains identifiers etc
+    Reporter& mReporter;
 };
 } // namespace PExpr::internal

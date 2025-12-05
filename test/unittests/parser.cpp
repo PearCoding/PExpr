@@ -11,9 +11,11 @@ using namespace PExpr::internal;
 
 TEST_CASE("Parser: simple arithmetic", "[parser]")
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
     std::stringstream stream("a+1");
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
     SymbolTable globals;
 
     auto ast = parser.parse(&globals);
@@ -24,10 +26,12 @@ TEST_CASE("Parser: simple arithmetic", "[parser]")
 
 TEST_CASE("Parser: complex expression parsing", "[parser]")
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
     const std::string input = "abc(231*22.231*2.42e-3).xyz*Pi-123*(K.x+sin(22^4, 1-2%2, --1))";
     std::stringstream stream(input);
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
     SymbolTable globals;
 
     auto ast = parser.parse(&globals);
@@ -41,10 +45,12 @@ TEST_CASE("Parser: complex expression parsing", "[parser]")
 
 TEST_CASE("Parser: closure with variable and expression", "[parser]")
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
     const std::string input = "let mut x = 1; x+2";
     std::stringstream stream(input);
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
     SymbolTable globals;
 
     auto ast = parser.parse(&globals);
@@ -57,10 +63,12 @@ TEST_CASE("Parser: closure with variable and expression", "[parser]")
 
 TEST_CASE("Parser: function declaration and call", "[parser]")
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
     const std::string input = "fn f(a:int) = a; f(1)";
     std::stringstream stream(input);
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
     SymbolTable globals;
 
     auto ast = parser.parse(&globals);
@@ -73,10 +81,12 @@ TEST_CASE("Parser: function declaration and call", "[parser]")
 
 TEST_CASE("Parser: branch expression (if/else)", "[parser]")
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
     const std::string input = "if true { 1 } else { 2 }";
     std::stringstream stream(input);
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
     SymbolTable globals;
 
     auto ast = parser.parse(&globals);

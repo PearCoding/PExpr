@@ -1,12 +1,14 @@
 #include "Lexer.h"
-#include "Logger.h"
+#include "Reporter.h"
+#include <sstream>
 
 namespace PExpr::internal {
-Lexer::Lexer(std::istream& stream)
+Lexer::Lexer(std::istream& stream, Reporter& reporter)
     : mStream(stream)
     , mChar(0)
     , mLocation(0)
     , mTemp{}
+    , mReporter(reporter)
 {
     eat();
 }
@@ -154,7 +156,7 @@ Token Lexer::next()
         }
 
         append();
-        PEXPR_LOG(LogLevel::Error) << prevLoc << ": Unknown token '" << mTemp << "'" << std::endl;
+        mReporter.errorf(prevLoc, "Unknown token '%s'", mTemp.c_str());
         return Token(prevLoc, TokenType::Error);
     }
 }
@@ -233,8 +235,9 @@ Token Lexer::parseNumber()
     auto invalid_digit    = [=](char c) { return c - '0' >= base; };
 
     // Check digits
-    if (base < 10 && std::find_if(digit_ptr, last_ptr, invalid_digit) != last_ptr)
-        PEXPR_LOG(LogLevel::Error) << startLoc << ": Invalid literal '" << mTemp << "'" << std::endl;
+    if (base < 10 && std::find_if(digit_ptr, last_ptr, invalid_digit) != last_ptr) {
+        mReporter.errorf(startLoc, "Invalid literal '%s'", mTemp.c_str());
+    }
 
     if (exp || fractional)
         return Token(startLoc, TokenType::NumberLiteral).With(Number(std::strtod(digit_ptr, nullptr)));
@@ -251,7 +254,7 @@ Token Lexer::parseString(uint8_t mark)
         while (!eof() && peek() != mark)
             appendChar();
         if (eof() || !accept(mark)) {
-            PEXPR_LOG(LogLevel::Error) << mLocation << ": Unterminated string literal" << std::endl;
+            mReporter.errorf(mLocation, "Unterminated string literal");
             return Token(mLocation, TokenType::Error);
         }
         str += mTemp.substr(pos, mTemp.size() - (pos + 1));
@@ -325,7 +328,7 @@ void Lexer::appendChar()
             std::string uni_val;
             for (size_t i = 0; i < length; ++i) {
                 if (eof()) {
-                    PEXPR_LOG(LogLevel::Error) << prevLoc << ": Invalid use of Unicode escape sequence" << std::endl;
+                    mReporter.errorf(prevLoc, "Invalid use of Unicode escape sequence");
                     break;
                 }
 
@@ -339,12 +342,12 @@ void Lexer::appendChar()
                 try {
                     uni = std::stoul(uni_val, &r, 16);
                 } catch (const std::exception&) {
-                    PEXPR_LOG(LogLevel::Error) << prevLoc << ": Given Unicode escape sequence is invalid" << std::endl;
+                    mReporter.errorf(prevLoc, "Given Unicode escape sequence is invalid");
                     break;
                 }
 
                 if (r != length) {
-                    PEXPR_LOG(LogLevel::Error) << prevLoc << ": Given Unicode escape sequence is invalid" << std::endl;
+                    mReporter.errorf(prevLoc, "Given Unicode escape sequence is invalid");
                 } else if (length != 2) {
                     if (uni <= 0x7F) {
                         mTemp += (char)uni;
@@ -364,17 +367,17 @@ void Lexer::appendChar()
                         mTemp += char(0x80 | ((d & 0xFC0) >> 6));
                         mTemp += char(0x80 | (d & 0x3F));
                     } else {
-                        PEXPR_LOG(LogLevel::Error) << prevLoc << ": Given Unicode range" << std::endl;
+                        mReporter.error(prevLoc, "Given Unicode range");
                     }
                 } else { // Binary
                     mTemp += (char)uni;
                 }
             } else {
-                PEXPR_LOG(LogLevel::Error) << prevLoc << ": Invalid length of Unicode escape sequence" << std::endl;
+                mReporter.errorf(prevLoc, "Invalid length of Unicode escape sequence");
             }
         } break;
         default:
-            PEXPR_LOG(LogLevel::Error) << prevLoc << ": Invalid escape sequence '\\" << peek() << "'" << std::endl;
+            mReporter.errorf(prevLoc, "Invalid escape sequence '\\%c'", peek());
             eat();
             break;
         }

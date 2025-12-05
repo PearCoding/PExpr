@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../Closure.h"
+#include "Closure.h"
 #include "Lexer.h"
+#include "Reporter.h"
 #include <array>
 
 namespace PExpr::internal {
@@ -9,7 +10,7 @@ class Parser {
     friend class ParserGrammar;
 
 public:
-    Parser(Lexer& lexer);
+    Parser(Lexer& lexer, Reporter& reporter);
 
     [[nodiscard]] Ptr<Closure> parse(const SymbolTable* globals);
 
@@ -27,6 +28,7 @@ protected:
     [[nodiscard]] inline const Token& cur(size_t i = 0) const { return mCurrentToken[i]; }
 
     Lexer& mLexer;
+    Reporter& mReporter;
     std::array<Token, 2> mCurrentToken;
     bool mHasError;
 };

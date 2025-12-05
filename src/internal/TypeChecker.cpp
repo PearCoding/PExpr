@@ -1,25 +1,25 @@
 #include "TypeChecker.h"
 #include "Definitions.h"
-#include "Logger.h"
 #include "Mangler.h"
+#include "Reporter.h"
 
 #include <algorithm>
+#include <sstream>
 
 namespace PExpr::internal {
-inline void typeError(const Ptr<UnaryExpression>& expr, ElementaryType type)
+inline void typeError(Reporter& rep, const Ptr<UnaryExpression>& expr, ElementaryType type)
 {
-    PEXPR_LOG(LogLevel::Error) << expr->location() << ": Can not use operator '" << toString(expr->op())
-                               << "' with type '" << toString(type) << "'" << std::endl;
+    rep.errorf(expr->location(), "Can not use operator '%s' with type '%s'", toString(expr->op()).data(), toString(type).data());
 }
 
-inline void typeError(const Ptr<BinaryExpression>& expr, ElementaryType left, ElementaryType right)
+inline void typeError(Reporter& rep, const Ptr<BinaryExpression>& expr, ElementaryType left, ElementaryType right)
 {
-    PEXPR_LOG(LogLevel::Error) << expr->location() << ": Can not use operator '" << toString(expr->op())
-                               << "' with types '" << toString(left) << "' and '" << toString(right) << "'" << std::endl;
+    rep.errorf(expr->location(), "Can not use operator '%s' with types '%s' and '%s'", toString(expr->op()).data(), toString(left).data(), toString(right).data());
 }
 
-TypeChecker::TypeChecker(const SymbolTable& defs)
+TypeChecker::TypeChecker(const SymbolTable& defs, Reporter& reporter)
     : mDefinitions(defs)
+    , mReporter(reporter)
 {
 }
 
@@ -58,7 +58,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
                     varStmt->replaceExpression(castExpr);
                     type = declared;
                 } else {
-                    PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Cannot implicitly convert initializer from '" << toString(type) << "' to declared type '" << toString(declared) << "' for variable '" << varStmt->name() << "'" << std::endl;
+                    mReporter.errorf(varStmt->location(), "Cannot implicitly convert initializer from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
                     return;
                 }
             }
@@ -68,7 +68,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         // and expressions can resolve it. Use the declared type if present, otherwise the inferred type.
         const bool is_ok = mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable()));
         if (!is_ok) {
-            PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to declare a new variable '" << varStmt->name() << "'" << std::endl;
+            mReporter.errorf(varStmt->location(), "Trying to declare a new variable '%s'", varStmt->name().c_str());
             return;
         }
     } break;
@@ -81,11 +81,11 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         // Check if the variable exists and can be updated
         const auto var = mDynamicDefinitions.lookupVariable(varStmt->location(), varStmt->name());
         if (!var.has_value()) {
-            PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to assign a value to unknown variable '" << varStmt->name() << "'" << std::endl;
+            mReporter.errorf(varStmt->location(), "Trying to assign a value to unknown variable '%s'", varStmt->name().c_str());
             return;
         }
         if (!var->isMutable()) {
-            PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to reassign a value to constant variable '" << varStmt->name() << "'" << std::endl;
+            mReporter.errorf(varStmt->location(), "Trying to reassign a value to constant variable '%s'", varStmt->name().c_str());
             return;
         }
     } break;
@@ -124,18 +124,19 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         mDynamicDefinitions = std::move(savedDefs);
 
         if (returnType == ElementaryType::Unspecified) {
-            PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Could not determine return type for function '" << funcStmt->name() << "'" << std::endl;
+            mReporter.errorf(funcStmt->location(), "Could not determine return type for function '%s'", funcStmt->name().c_str());
             return;
         }
 
         if (const auto explicitReturnType = funcStmt->returnType(); returnType != explicitReturnType) {
-            PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Given explicit return type '" << toString(explicitReturnType) << "' in function '" << funcStmt->name() << "' does not match the return type '" << toString(returnType) << "' of the defining expression" << std::endl;
+            mReporter.errorf(funcStmt->location(), "Given explicit return type '%s' in function '%s' does not match the return type '%s' of the defining expression", toString(explicitReturnType).data(), funcStmt->name().c_str(), toString(returnType).data());
             return;
         }
 
         // Replace provisional registration with the final signature (or add if missing)
-        if (!mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern())))
-            PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Given function '" << funcStmt->name() << "' is already defined" << std::endl;
+        if (!mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern()))) {
+            mReporter.errorf(funcStmt->location(), "Given function '%s' is already defined", funcStmt->name().c_str());
+        }
     } break;
     default:
         break;
@@ -188,7 +189,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
         if (isConvertible(conditionType, ElementaryType::Boolean)) {
             branch.Condition->setReturnType(ElementaryType::Boolean);
         } else {
-            PEXPR_LOG(LogLevel::Error) << branch.Condition->location() << ": Expected condition to evaluate to bool" << std::endl;
+            mReporter.error(branch.Condition->location(), "Expected condition to evaluate to bool");
             return ElementaryType::Unspecified;
         }
 
@@ -206,7 +207,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
         } else if (bodyType == returnType) {
             // matching type — nothing to do
         } else {
-            PEXPR_LOG(LogLevel::Error) << branch.Condition->location() << ": Expected all branch bodies to evaluate to the type " << toString(returnType) << std::endl;
+            mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type %s", toString(returnType).data());
             return ElementaryType::Unspecified;
         }
     }
@@ -221,7 +222,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
-        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Unknown identifier '" << expr->name() << "' found" << std::endl;
+        mReporter.errorf(expr->location(), "Unknown identifier '%s' found", expr->name().c_str());
         return ElementaryType::Unspecified;
     }
 }
@@ -254,7 +255,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
     }
 
     if (expr->isUnspecified())
-        typeError(expr, innerType);
+        typeError(mReporter, expr, innerType);
 
     return expr->returnType();
 }
@@ -333,7 +334,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
     }
 
     if (expr->isUnspecified())
-        typeError(expr, leftType, rightType);
+        typeError(mReporter, expr, leftType, rightType);
 
     return expr->returnType();
 }
@@ -382,8 +383,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
                     expr->replaceParameter(i, castExpr);
                     fromArgs[i] = desired;
                 } else {
-                    // Not implicitly convertible; require explicit cast from user or report error.
-                    PEXPR_LOG(LogLevel::Error) << expr->parameters().at(i)->location() << ": Cannot implicitly convert from " << toString(actual) << " to " << toString(desired) << " for function parameter " << i << std::endl;
+                    mReporter.errorf(expr->parameters().at(i)->location(), "Cannot implicitly convert from %s to %s for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
                     return ElementaryType::Unspecified;
                 }
             }
@@ -392,7 +392,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
         expr->setReturnType(def.value().returnType());
         expr->setMangledName(def->mangledName());
     } else {
-        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Function '" << expr->name() << "(" << printArgs(fromArgs) << ")' is unknown or ambiguous" << std::endl;
+        mReporter.errorf(expr->location(), "Function '%s(%s)' is unknown or ambiguous", expr->name().c_str(), printArgs(fromArgs).c_str());
     }
 
     return expr->returnType();
@@ -429,7 +429,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
 
         PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
         if (!isValid) {
-            PEXPR_LOG(LogLevel::Error) << expr->location() << ": Invalid access components '" << swizzle << "' given" << std::endl;
+            mReporter.errorf(expr->location(), "Invalid access components '%s' given", std::string(swizzle).c_str());
         } else {
             switch (swizzle.size()) {
             case 1:
@@ -445,12 +445,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
                 expr->setReturnType(ElementaryType::Vec4);
                 break;
             default:
-                PEXPR_LOG(LogLevel::Error) << expr->location() << ": Expected a maximum of 4 components but got " << swizzle.size() << std::endl;
+                mReporter.errorf(expr->location(), "Expected a maximum of 4 components but got %zu", swizzle.size());
                 break;
             }
         }
     } else {
-        PEXPR_LOG(LogLevel::Error) << expr->location() << ": Access operator is only defined for vector types" << std::endl;
+        mReporter.errorf(expr->location(), "Access operator is only defined for vector types");
     }
 
     return expr->returnType();
@@ -477,7 +477,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
             continue;
         }
 
-        PEXPR_LOG(LogLevel::Error) << orig->location() << ": Expected vector values to be convertible to " << toString(ElementaryType::Number) << std::endl;
+        mReporter.errorf(orig->location(), "Expected vector values to be convertible to %s", toString(ElementaryType::Number).data());
         return ElementaryType::Unspecified;
     }
 
@@ -509,12 +509,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<CastExpression>& expr)
     // Validate allowed conversion depending on whether the cast is explicit or implicit
     if (expr->isExplicit()) {
         if (!isExplicitConvertible(innerType, expr->toType())) {
-            PEXPR_LOG(LogLevel::Error) << expr->location() << ": Cannot cast from '" << toString(innerType) << "' to '" << toString(expr->toType()) << "'" << std::endl;
+            mReporter.errorf(expr->location(), "Cannot cast from '%s' to '%s'", toString(innerType).data(), toString(expr->toType()).data());
             return ElementaryType::Unspecified;
         }
     } else {
         if (!isConvertible(innerType, expr->toType())) {
-            PEXPR_LOG(LogLevel::Error) << expr->location() << ": Implicit conversion from '" << toString(innerType) << "' to '" << toString(expr->toType()) << "' is not allowed" << std::endl;
+            mReporter.errorf(expr->location(), "Implicit conversion from '%s' to '%s' is not allowed", toString(innerType).data(), toString(expr->toType()).data());
             return ElementaryType::Unspecified;
         }
     }

@@ -1,13 +1,14 @@
 #pragma once
 
-#include "../Closure.h"
+#include "Closure.h"
+#include "Reporter.h"
 #include "SymbolTable.h"
 
 namespace PExpr::internal {
 /// Checks types, resolves unspecified typing and resolves symbol lookups
 class TypeChecker {
 public:
-    explicit TypeChecker(const SymbolTable& defs);
+    explicit TypeChecker(const SymbolTable& defs, Reporter& reporter);
 
     [[nodiscard]] ElementaryType handle(const Ptr<Closure>& closure);
 
@@ -29,5 +30,6 @@ private:
 
     SymbolTable mDynamicDefinitions;
     const SymbolTable& mDefinitions;
+    Reporter& mReporter;
 };
 } // namespace PExpr::internal

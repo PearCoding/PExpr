@@ -10,8 +10,11 @@ using namespace PExpr::internal;
 
 static bool check_sequence(const std::string& input, const std::vector<TokenType>& expected)
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
+
     std::stringstream stream(input);
-    Lexer lexer(stream);
+    Lexer lexer(stream, reporter);
 
     for (size_t i = 0; i < expected.size(); ++i) {
         Token t = lexer.next();

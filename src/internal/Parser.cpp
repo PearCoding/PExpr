@@ -3,8 +3,9 @@
 #include "Mangler.h"
 
 namespace PExpr::internal {
-Parser::Parser(Lexer& lexer)
+Parser::Parser(Lexer& lexer, Reporter& reporter)
     : mLexer(lexer)
+    , mReporter(reporter)
     , mCurrentToken()
     , mHasError(false)
 {
@@ -30,9 +31,9 @@ bool Parser::expect(TokenType type)
     bool same = cur().Type == type;
     if (!same) {
         if (cur().Type == TokenType::Eof)
-            PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected '" << Token::toString(type) << "' but input terminated early" << std::endl;
+            mReporter.errorf(cur().Location, "Expected '%s' but input terminated early", Token::toString(type).data());
         else
-            PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected '" << Token::toString(type) << "' but got '" << Token::toString(cur().Type) << "'" << std::endl;
+            mReporter.errorf(cur().Location, "Expected '%s' but got '%s'", Token::toString(type).data(), Token::toString(cur().Type).data());
         mHasError = true;
     }
 
@@ -53,9 +54,9 @@ void Parser::error(const std::array<TokenType, N>& types)
     }
 
     if (cur().Type == TokenType::Eof)
-        PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected {" << expectation << "} but input terminated early" << std::endl;
+        mReporter.errorf(cur().Location, "Expected {%s} but input terminated early", expectation.c_str());
     else
-        PEXPR_LOG(LogLevel::Error) << cur().Location << ": Expected {" << expectation << "} but got '" << Token::toString(cur().Type) << "'" << std::endl;
+        mReporter.errorf(cur().Location, "Expected {%s} but got '%s'", expectation.c_str(), Token::toString(cur().Type).data());
 }
 
 void Parser::eat(TokenType type)
@@ -101,7 +102,7 @@ public:
     {
         auto closure = p_closure();
         if (!P.hasError() && P.cur().Type != TokenType::Eof)
-            PEXPR_LOG(LogLevel::Error) << "Parsing stopped before end of stream!" << std::endl;
+            P.mReporter.errorf(Location(0), "Parsing stopped before end of stream!");
 
         return closure;
     }
@@ -145,16 +146,15 @@ private:
 
         if (P.cur().Type == TokenType::ClosedBraces) {
             P.signalError();
-            PEXPR_LOG(LogLevel::Error) << P.cur().Location << ": Expected an expression at the end of a closure but got '" << Token::toString(TokenType::ClosedBraces) << "' instead" << std::endl;
+            P.mReporter.errorf(P.cur().Location, "Expected an expression at the end of a closure but got '%s' instead", Token::toString(TokenType::ClosedBraces).data());
             return closure;
         }
 
         closure->setExpression(p_expression());
 
         // TODO: The location of the warning is incorrect and slightly off (a single token wide)
-        if (P.accept(TokenType::Semicolon)) {
-            PEXPR_LOG(LogLevel::Warning) << P.cur().Location << ": Trailing '" << Token::toString(TokenType::Semicolon) << "' at the end of an expression" << std::endl;
-        }
+        if (P.accept(TokenType::Semicolon))
+            P.mReporter.warningf(P.cur().Location, "Trailing '%s' at the end of an expression", Token::toString(TokenType::Semicolon).data());
 
         mCurrentClosure = mCurrentClosure->parent();
 
@@ -239,7 +239,7 @@ private:
             expr = p_expression();
         } else if (returnType == ElementaryType::Unspecified) {
             P.signalError();
-            PEXPR_LOG(LogLevel::Error) << P.cur().Location << ": Expected an explicit return type for the given function" << std::endl;
+            P.mReporter.errorf(P.cur().Location, "Expected an explicit return type for the given function");
         }
 
         P.expect(TokenType::Semicolon);
@@ -339,7 +339,7 @@ private:
 
             if (!checkSwizzle(swizzle)) {
                 P.signalError();
-                PEXPR_LOG(LogLevel::Error) << loc << ": Given access '" << swizzle << "' is invalid" << std::endl;
+                P.mReporter.errorf(loc, "Given access '%s' is invalid", std::string(swizzle).c_str());
             }
 
             return std::make_shared<AccessExpression>(loc, expr, swizzle);
@@ -462,7 +462,7 @@ private:
 
         if (vector.size() < 2 || vector.size() > 4) {
             P.signalError();
-            PEXPR_LOG(LogLevel::Error) << loc << ": Invalid size vector of " << vector.size() << " given" << std::endl;
+            P.mReporter.errorf(loc, "Invalid size vector of %zu given", vector.size());
         }
 
         return std::make_shared<VectorExpression>(loc, std::move(vector));

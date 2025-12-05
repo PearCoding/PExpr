@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Lookup.h"
 #include "Closure.h"
+#include "Lookup.h"
+#include "Reporter.h"
 #include "internal/Transpiler.h"
 
 namespace PExpr {
@@ -23,17 +24,17 @@ public:
     /// If skipTypeChecking is true, no typechecking will be performed and no variables or functions have to be defined in advance.
     /// This is useful, as no returnType() will be specified and further exploration can be done at later stages.
     /// If an error was detected, a nullptr will be returned instead.
-    Ptr<Closure> parse(std::istream& stream, bool skipTypeChecking = false) const;
+    Ptr<Closure> parse(std::istream& stream, bool skipTypeChecking = false);
 
     /// Parse the given string and return the corresponding AST tree.
     /// If skipTypeChecking is true, no typechecking will be performed and no variables or functions have to be defined in advance.
     /// This is useful, as no returnType() will be specified and further exploration can be done at later stages.
     /// If an error was detected, a nullptr will be returned instead.
-    Ptr<Closure> parse(const std::string& str, bool skipTypeChecking = false) const;
+    Ptr<Closure> parse(const std::string& str, bool skipTypeChecking = false);
 
     /// A late type checking.
     /// If no error was found, true will be returned, false otherwise.
-    bool doTypeChecking(const Ptr<Closure>& closure) const;
+    bool doTypeChecking(const Ptr<Closure>& closure);
 
     /// Together will the mandatory visitor the given AST will be transpiled.
     /// The template payload has to be defined by the user.
@@ -46,5 +47,6 @@ public:
 
 private:
     internal::SymbolTable mGlobals;
+    Reporter mReporter;
 };
 } // namespace PExpr

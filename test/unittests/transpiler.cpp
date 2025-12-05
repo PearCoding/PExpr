@@ -77,9 +77,11 @@ public:
 
 TEST_CASE("Transpiler can be instantiated and returns default payload for closure", "[transpiler]")
 {
+    Reporter reporter;
+    reporter.setQuiet(true);
     std::stringstream stream("1+2");
-    Lexer lexer(stream);
-    Parser parser(lexer);
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
     SymbolTable globals;
 
     auto ast = parser.parse(&globals);

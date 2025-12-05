@@ -7,6 +7,7 @@
 namespace PExpr {
 Environment::Environment()
     : mGlobals()
+    , mReporter()
 {
 }
 
@@ -25,10 +26,10 @@ void Environment::registerFunction(const std::string& name, const std::vector<El
     mGlobals.addFunction(FunctionDef(name, mangledName, parameterTypes, returnType, true));
 }
 
-Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) const
+Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking)
 {
-    internal::Lexer lexer(stream);
-    internal::Parser parser(lexer);
+    internal::Lexer lexer(stream, mReporter);
+    internal::Parser parser(lexer, mReporter);
 
     auto expr = parser.parse(&mGlobals);
 
@@ -43,15 +44,15 @@ Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking) con
     return expr;
 }
 
-Ptr<Closure> Environment::parse(const std::string& str, bool skipTypeChecking) const
+Ptr<Closure> Environment::parse(const std::string& str, bool skipTypeChecking)
 {
     std::stringstream stream(str);
     return parse(stream, skipTypeChecking);
 }
 
-bool Environment::doTypeChecking(const Ptr<Closure>& closure) const
+bool Environment::doTypeChecking(const Ptr<Closure>& closure)
 {
-    internal::TypeChecker checker(mGlobals);
+    internal::TypeChecker checker(mGlobals, mReporter);
     auto retType = checker.handle(closure);
     if (retType == ElementaryType::Unspecified)
         return false;

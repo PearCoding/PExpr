@@ -8,10 +8,13 @@ set(PUBLIC
     Location.h
     Logger.h
     LogListener.h
+    Reporter.h
     StringVisitor.h
     TranspileVisitor.h
+    
     internal/ConsoleLogListener.h
     internal/Transpiler.h
+    
     ssa/SSAMapper.h
     ssa/SSAValidator.h
 )
@@ -21,6 +24,8 @@ set(SRC
     Enums.cpp
     Environment.cpp
     Logger.cpp
+    Reporter.cpp
+
     ssa/SSAMapper.cpp
     ssa/SSAValidator.cpp
     ssa/SSAPassSSCP.cpp
