@@ -90,6 +90,7 @@ struct SSAInstrAssign : public SSAInstr {
                         CallOp,
                         Access,
                         Vector,
+                        Cast,
                         Nop,
                         Phi };
 
@@ -162,6 +163,7 @@ private:
     void mapClosure(const Ptr<Closure>& closure);
     void mapStatement(const Ptr<Statement>& stmt);
     [[nodiscard]] SSAValue mapExpression(const Ptr<Expression>& expr);
+    [[nodiscard]] SSAValue handleCast(ElementaryType to, const SSAValue& from);
 
     // Program under construction
     SSAProgram mProgram;

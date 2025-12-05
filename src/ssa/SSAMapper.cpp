@@ -99,6 +99,9 @@ std::string SSAInstrAssign::dump() const
     case OpKind::Nop:
         ss << "nop";
         break;
+    case OpKind::Cast:
+        ss << "cast";
+        break;
     default:
         ss << "unknown";
         break;
@@ -239,6 +242,20 @@ Ptr<SSAInstr> SSAMapper::uplift(const std::string& base, Ptr<SSAInstr>& old)
     return old;
 }
 
+SSAValue SSAMapper::handleCast(ElementaryType to, const SSAValue& from)
+{
+    if (to == from.Type || !isConvertible(from.Type, to))
+        return from;
+
+    SSAInstrAssign cast;
+    SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), to);
+    cast.Target   = tgt;
+    cast.Operator = SSAInstrAssign::OpKind::Cast;
+    cast.Operands = { from };
+    mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
+    return tgt;
+}
+
 void SSAMapper::mapClosure(const Ptr<Closure>& closure)
 {
     if (!closure)
@@ -266,11 +283,9 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
     case StatementType::VariableDeclaration: {
         auto var     = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
         SSAValue rhs = mapExpression(var->expression());
+
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), var->expression()->returnType());
-        // TODO: Implicit cast
-        // propagate type from RHS if available
-        tgt.Type     = rhs.Type;
+        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -281,11 +296,9 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
     case StatementType::VariableAssignment: {
         auto var     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
         SSAValue rhs = mapExpression(var->expression());
+
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), var->expression()->returnType());
-        // TODO: Implicit cast
-        // propagate type from RHS if available
-        tgt.Type     = rhs.Type;
+        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -401,7 +414,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         std::vector<SSAValue> inners;
         inners.reserve(v->entries().size());
         for (const auto& e : v->entries())
-            inners.push_back(mapExpression(e));
+            inners.push_back(handleCast(ElementaryType::Number, mapExpression(e)));
 
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), v->returnType());
         SSAInstrAssign asg;
@@ -441,7 +454,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         std::vector<SSAValue> args;
         args.reserve(c->parameters().size());
         for (const auto& p : c->parameters())
-            args.push_back(mapExpression(p));
+            args.push_back(mapExpression(p)); // TODO: Implicit casts
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
         SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());

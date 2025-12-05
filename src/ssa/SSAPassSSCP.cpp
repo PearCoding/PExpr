@@ -210,6 +210,12 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
             return SSAValue::Constant(Vec4{ values[0], values[1], values[2], values[3] });
     }
 
+    // Cast int -> num
+    if (asg->Operator == SSAInstrAssign::OpKind::Cast) {
+        if (Integer i; getInteger(asg->Operands.front(), i))
+            return SSAValue::Constant(static_cast<Number>(i));
+    }
+
     // Unary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1) {
         const auto& o = ops[0];

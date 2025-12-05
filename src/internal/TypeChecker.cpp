@@ -393,6 +393,17 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
 {
+    for (const auto& p : expr->entries()) {
+        const auto pType = handleNode(p);
+        if (pType == ElementaryType::Unspecified)
+            return ElementaryType::Unspecified; // Error handled somewhere else
+
+        if (!isConvertible(pType, ElementaryType::Number)) {
+            PEXPR_LOG(LogLevel::Error) << p->location() << ": Expected vector values to be convertible to " << toString(ElementaryType::Number) << std::endl;
+            return ElementaryType::Unspecified;
+        }
+    }
+
     ElementaryType type;
     switch (expr->entries().size()) {
     case 2:
