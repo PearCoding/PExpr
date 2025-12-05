@@ -66,7 +66,7 @@ TEST_CASE("SSAMapper: closure captures const parent", "[ssamapper]") {
     for (const auto& f : prog.Functions) {
         if (f.Name.rfind("closure", 0) == 0) {
             found = true;
-            REQUIRE(std::find(f.AccessedConstParents.begin(), f.AccessedConstParents.end(), "k") != f.AccessedConstParents.end());
+            REQUIRE(f.AccessedConstParents.find("k") != f.AccessedConstParents.end());
             REQUIRE(f.AccessedMutableParents.empty());
         }
     }
@@ -85,8 +85,48 @@ TEST_CASE("SSAMapper: closure captures mutable parent", "[ssamapper]") {
     for (const auto& f : prog.Functions) {
         if (f.Name.rfind("closure", 0) == 0) {
             found = true;
-            REQUIRE(std::find(f.AccessedMutableParents.begin(), f.AccessedMutableParents.end(), "k") != f.AccessedMutableParents.end());
+            REQUIRE(f.AccessedMutableParents.find("k") != f.AccessedMutableParents.end());
             REQUIRE(f.AccessedConstParents.empty());
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("SSAMapper: recursion function mapping", "[ssamapper]") {
+    std::stringstream stream("fn fact(n:int) = if n < 2 { 1 } else { n * fact(n - 1) }; fact(5)");
+    Environment env;
+    auto ast = env.parse(stream);
+
+    SSAMapper mapper;
+    auto prog = mapper.map(ast);
+
+    bool foundFunc = false;
+    for (const auto& f : prog.Functions) {
+        if (f.Name.find("fact") != std::string::npos) {
+            foundFunc = true;
+            break;
+        }
+    }
+    REQUIRE(foundFunc);
+
+    auto dumped = prog.dump();
+    REQUIRE(dumped.find("call") != std::string::npos);
+}
+
+TEST_CASE("SSAMapper: shadowing does not capture outer", "[ssamapper]") {
+    std::stringstream stream("let x = 1; let c = { let x = 2; x }; c");
+    Environment env;
+    auto ast = env.parse(stream);
+
+    SSAMapper mapper;
+    auto prog = mapper.map(ast);
+
+    bool found = false;
+    for (const auto& f : prog.Functions) {
+        if (f.Name.rfind("closure", 0) == 0) {
+            found = true;
+            REQUIRE(f.AccessedConstParents.find("x") == f.AccessedConstParents.end());
+            REQUIRE(f.AccessedMutableParents.find("x") == f.AccessedMutableParents.end());
         }
     }
     REQUIRE(found);

@@ -1,0 +1,7 @@
+let x = 10;
+let g = {
+    let x = 20;
+    let h = { x + 1 };
+    h
+};
+g + x
