@@ -76,6 +76,17 @@ std::string SSAValue::toString(bool suffixType) const
     return Name;
 }
 
+std::string SSAValue::baseName() const
+{
+    PEXPR_ASSERT(Kind == SSAValue::Kind::Named, "Only named values have a base name");
+    if (Name.empty())
+        return std::string();
+    auto pos = Name.find('.');
+    if (pos == std::string::npos)
+        return Name;
+    return Name.substr(0, pos);
+}
+
 std::string SSAInstrAssign::dump() const
 {
     std::stringstream ss;
@@ -229,10 +240,10 @@ void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr
 
     auto collectNamed = [&](const SSAValue& v) {
         if (v.Kind == SSAValue::Kind::Named) {
-            const auto& n = v.Name;
-            // only consider plain names (no SSA version suffix like "x.1")
-            if (!n.empty() && n.find('.') == std::string::npos) {
-                captured.insert(n);
+            auto b = v.baseName();
+            // only consider plain (non-versioned) names; baseName == Name implies no suffix
+            if (!b.empty() && b == v.Name) {
+                captured.insert(b);
             }
         }
     };

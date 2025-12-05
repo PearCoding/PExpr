@@ -446,11 +446,8 @@ void SSAPassSSCP::run(SSAProgram& program)
                 } else if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
                     // if assignment target is Named and not a parameter => non-local write
                     if (asg->Target.Kind == SSAValue::Kind::Named) {
-                        std::string base = asg->Target.Name;
-                        auto pos         = base.find('.');
-                        if (pos != std::string::npos)
-                            base = base.substr(0, pos);
-                        bool isParam = funcParams[f.Name].find(base) != funcParams[f.Name].end();
+                        std::string base = asg->Target.baseName();
+                        bool isParam = funcParams[f.Name].contains(base);
                         if (!isParam) {
                             mSideEffectFunctions.insert(f.Name);
                             progress = true;

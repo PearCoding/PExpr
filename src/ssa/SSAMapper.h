@@ -43,6 +43,7 @@ public:
     ExtendedValueVariant Value;
 
     [[nodiscard]] std::string toString(bool suffixType = true) const;
+    [[nodiscard]] std::string baseName() const;
 
     [[nodiscard]] inline static SSAValue Constant(bool b)
     {
