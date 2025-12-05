@@ -39,9 +39,6 @@ private:
     // usage counts for SSA named/temp values
     std::unordered_map<std::string, int> mUseCount;
 
-    // set of instructions to remove (dead)
-    std::unordered_set<const SSAInstr*> mDeadInstrs;
-
     // set of function names that are considered to have side-effects (externals and those calling externals)
     std::unordered_set<std::string> mSideEffectFunctions;
 };
