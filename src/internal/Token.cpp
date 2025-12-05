@@ -80,6 +80,8 @@ std::string_view Token::toString(TokenType type)
         return "elif";
     case TokenType::Else:
         return "else";
+    case TokenType::As:
+        return "as";
     case TokenType::Let:
         return "let";
     case TokenType::Mutable:

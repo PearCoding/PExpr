@@ -44,6 +44,7 @@ enum class TokenType {
     Elif, // elif
     Else, // else
 
+    As,       // as
     Let,      // let
     Mutable,  // mut
     Function, // fn

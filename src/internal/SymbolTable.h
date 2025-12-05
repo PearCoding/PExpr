@@ -15,7 +15,7 @@ public:
 
     inline bool addVariable(const VariableDef& var)
     {
-        if (const auto it = mVariables.find(var.name()); it != mVariables.end())
+        if (mVariables.contains(var.name()))
             return false;
 
         mVariables.emplace(var.name(), var);
@@ -24,7 +24,7 @@ public:
 
     inline bool addVariable(VariableDef&& var)
     {
-        if (const auto it = mVariables.find(var.name()); it != mVariables.end())
+        if (mVariables.contains(var.name()))
             return false;
 
         const std::string name = var.name();
@@ -55,9 +55,43 @@ public:
         // Check if a function with the same name and parameters exists
         if (checkFunctionExists(func.name(), func.parameters(), true) != mFunctions.end())
             return false;
-
+ 
         const std::string name = func.name();
         mFunctions.emplace(name, std::move(func));
+        return true;
+    }
+
+    /// Replace an existing function definition (matching name + parameters) or add if not present.
+    inline bool replaceFunction(const FunctionDef& func)
+    {
+        const auto range = mFunctions.equal_range(func.name());
+        for (auto it = range.first; it != range.second; ++it) {
+            const auto& params = it->second.parameters();
+            if (params.size() == func.parameters().size() && std::equal(params.begin(), params.end(), func.parameters().begin())) {
+                // replace this overload
+                mFunctions.erase(it);
+                mFunctions.emplace(func.name(), func);
+                return true;
+            }
+        }
+        // not found -> add
+        mFunctions.emplace(func.name(), func);
+        return true;
+    }
+
+    inline bool replaceFunction(FunctionDef&& func)
+    {
+        const auto range = mFunctions.equal_range(func.name());
+        for (auto it = range.first; it != range.second; ++it) {
+            const auto& params = it->second.parameters();
+            if (params.size() == func.parameters().size() && std::equal(params.begin(), params.end(), func.parameters().begin())) {
+                mFunctions.erase(it);
+                mFunctions.emplace(func.name(), std::move(func));
+                return true;
+            }
+        }
+        // not found -> add
+        mFunctions.emplace(func.name(), std::move(func));
         return true;
     }
 

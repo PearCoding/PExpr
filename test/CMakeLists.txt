@@ -16,7 +16,7 @@ macro(push_check name file)
 endmacro(push_check)
 
 macro(push_check2 name)
-    push_check(${name} ${name}.pexpr)
+    push_check(${name} examples/${name}.pexpr)
 endmacro()
 
 push_check2(comments)

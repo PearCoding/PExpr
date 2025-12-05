@@ -42,43 +42,22 @@ public:
     ElementaryType Type = ElementaryType::Unspecified;
     ExtendedValueVariant Value;
 
-    [[nodiscard]] std::string toString(bool suffixType = true) const;
+    [[nodiscard]] std::string toString(bool showType = true) const;
     [[nodiscard]] std::string baseName() const;
 
-    [[nodiscard]] inline static SSAValue Constant(bool b)
-    {
-        return SSAValue(Kind::Constant, b ? "true" : "false", ElementaryType::Boolean, b);
-    }
+    [[nodiscard]] inline static SSAValue Constant(bool b) { return SSAValue(Kind::Constant, {}, ElementaryType::Boolean, b); }
 
-    [[nodiscard]] inline static SSAValue Constant(Integer v)
-    {
-        return SSAValue(Kind::Constant, std::to_string(v), ElementaryType::Integer, v);
-    }
+    [[nodiscard]] inline static SSAValue Constant(Integer v) { return SSAValue(Kind::Constant, {}, ElementaryType::Integer, v); }
 
-    [[nodiscard]] inline static SSAValue Constant(Number v)
-    {
-        return SSAValue(Kind::Constant, std::to_string(v), ElementaryType::Number, v);
-    }
+    [[nodiscard]] inline static SSAValue Constant(Number v) { return SSAValue(Kind::Constant, {}, ElementaryType::Number, v); }
 
-    [[nodiscard]] inline static SSAValue Constant(const std::string& str)
-    {
-        return SSAValue(Kind::Constant, "\"" + str + "\"", ElementaryType::String, str);
-    }
+    [[nodiscard]] inline static SSAValue Constant(const std::string& str) { return SSAValue(Kind::Constant, {}, ElementaryType::String, str); }
 
-    [[nodiscard]] inline static SSAValue Constant(const Vec2& v)
-    {
-        return SSAValue(Kind::Constant, "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "]", ElementaryType::Vec2, v);
-    }
+    [[nodiscard]] inline static SSAValue Constant(const Vec2& v) { return SSAValue(Kind::Constant, {}, ElementaryType::Vec2, v); }
 
-    [[nodiscard]] inline static SSAValue Constant(const Vec3& v)
-    {
-        return SSAValue(Kind::Constant, "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "]", ElementaryType::Vec2, v);
-    }
+    [[nodiscard]] inline static SSAValue Constant(const Vec3& v) { return SSAValue(Kind::Constant, {}, ElementaryType::Vec3, v); }
 
-    [[nodiscard]] inline static SSAValue Constant(const Vec4& v)
-    {
-        return SSAValue(Kind::Constant, "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "," + std::to_string(v[3]) + "]", ElementaryType::Vec2, v);
-    }
+    [[nodiscard]] inline static SSAValue Constant(const Vec4& v) { return SSAValue(Kind::Constant, {}, ElementaryType::Vec4, v); }
 };
 
 struct SSAInstr {
@@ -171,7 +150,6 @@ private:
     void mapClosure(const Ptr<Closure>& closure);
     void mapStatement(const Ptr<Statement>& stmt);
     [[nodiscard]] SSAValue mapExpression(const Ptr<Expression>& expr);
-    [[nodiscard]] SSAValue handleCast(ElementaryType to, const SSAValue& from);
 
     // Detect captured parent-level variables referenced inside a nested function/closure.
     // Scans the provided SSA instruction list, classifies plain (non-versioned) named

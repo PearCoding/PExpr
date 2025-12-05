@@ -41,13 +41,32 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
     switch (statement->type()) {
     case StatementType::VariableDeclaration: {
         auto varStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
-        auto type    = handleNode(varStmt->expression());
+
+        // Type-check the initializer expression first.
+        auto type = handleNode(varStmt->expression());
         if (type == ElementaryType::Unspecified)
             return; // Error was caught somewhere else
 
+        // If an explicit declared type is provided, validate / coerce the initializer.
+        const auto declared = varStmt->declaredType();
+        if (declared != ElementaryType::Unspecified) {
+            if (type != declared) {
+                if (isConvertible(type, declared)) {
+                    // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
+                    auto orig     = varStmt->expression();
+                    auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
+                    varStmt->replaceExpression(castExpr);
+                    type = declared;
+                } else {
+                    PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Cannot implicitly convert initializer from '" << toString(type) << "' to declared type '" << toString(declared) << "' for variable '" << varStmt->name() << "'" << std::endl;
+                    return;
+                }
+            }
+        }
+
         // Register the variable in the dynamic symbol table so following statements
-        // and expressions can resolve it.
-        const bool is_ok = mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), type, varStmt->isMutable()));
+        // and expressions can resolve it. Use the declared type if present, otherwise the inferred type.
+        const bool is_ok = mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable()));
         if (!is_ok) {
             PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to declare a new variable '" << varStmt->name() << "'" << std::endl;
             return;
@@ -79,6 +98,17 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         for (const auto& p : funcStmt->parameters())
             paramTypes.push_back(p.Type);
 
+        // Pre-register a provisional function definition so the function name is visible
+        // inside its own body (allows recursion). For extern functions we register the
+        // final signature immediately.
+        if (funcStmt->isExtern()) {
+            // extern must provide a concrete return type
+            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), paramTypes, funcStmt->returnType(), funcStmt->isExtern()));
+        } else {
+            // register with unspecified return type to allow recursive calls
+            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), paramTypes, ElementaryType::Unspecified, funcStmt->isExtern()));
+        }
+
         // Temporarily expose parameters as variables (only when they have a specified type)
         auto savedDefs = mDynamicDefinitions;
         for (const auto& p : funcStmt->parameters()) {
@@ -90,7 +120,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         // Type-check the function body to determine the return type
         const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->expression());
 
-        // Restore dynamic definitions (function itself will be registered below if successful)
+        // Restore dynamic definitions (provisional function remains in savedDefs)
         mDynamicDefinitions = std::move(savedDefs);
 
         if (returnType == ElementaryType::Unspecified) {
@@ -103,8 +133,8 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             return;
         }
 
-        // Register the function in the dynamic symbol table so it can be called later.
-        if (!mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern())))
+        // Replace provisional registration with the final signature (or add if missing)
+        if (!mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern())))
             PEXPR_LOG(LogLevel::Error) << funcStmt->location() << ": Given function '" << funcStmt->name() << "' is already defined" << std::endl;
     } break;
     default:
@@ -129,6 +159,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<Expression>& expr)
         return handleNode(std::reinterpret_pointer_cast<AccessExpression>(expr));
     case ExpressionType::Vector:
         return handleNode(std::reinterpret_pointer_cast<VectorExpression>(expr));
+    case ExpressionType::Cast:
+        return handleNode(std::reinterpret_pointer_cast<CastExpression>(expr));
     case ExpressionType::Closure:
         return handleNode(std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
@@ -149,7 +181,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<ClosureExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
 {
-    const ElementaryType elseType = handleNode(expr->elseClosure());
+    ElementaryType returnType = handleNode(expr->elseClosure());
 
     for (const auto& branch : expr->branches()) {
         const ElementaryType conditionType = handleNode(branch.Condition);
@@ -162,15 +194,25 @@ ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
 
         const ElementaryType bodyType = handleNode(branch.Body);
 
-        if (isConvertible(bodyType, elseType)) {
-            branch.Body->expression()->setReturnType(elseType);
+        if (returnType == ElementaryType::Unspecified) {
+            returnType = bodyType;
+        } else if (bodyType != returnType && isConvertible(bodyType, returnType)) {
+            // Inject a CastExpression so the branch body expression has the desired return type.
+            // This ensures later stages (SSA mapper) see an explicit cast node rather than relying
+            // on the mapper to insert SSA-level casts.
+            auto origExpr = branch.Body->expression();
+            auto castExpr = std::make_shared<CastExpression>(origExpr->location(), returnType, origExpr);
+            branch.Body->replaceExpression(castExpr);
+        } else if (bodyType == returnType) {
+            // matching type — nothing to do
         } else {
-            PEXPR_LOG(LogLevel::Error) << branch.Condition->location() << ": Expected all branch bodies to evaluate to the type " << toString(elseType) << std::endl;
+            PEXPR_LOG(LogLevel::Error) << branch.Condition->location() << ": Expected all branch bodies to evaluate to the type " << toString(returnType) << std::endl;
             return ElementaryType::Unspecified;
         }
     }
 
-    return elseType;
+    expr->setReturnType(returnType);
+    return returnType;
 }
 
 ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
@@ -314,6 +356,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     std::vector<ElementaryType> fromArgs;
     fromArgs.reserve(expr->parameters().size());
 
+    // First, type-check arguments to obtain their types.
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
         auto type = handleNode(expr->parameters().at(i));
         if (type == ElementaryType::Unspecified)
@@ -323,7 +366,29 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
 
     expr->setReturnType(ElementaryType::Unspecified);
 
+    // Lookup the function (this allows matching with implicit convertible args)
     if (const auto def = mDynamicDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value()) {
+        // For any parameter where the actual type differs from the parameter type
+        // and an implicit conversion exists, inject an implicit CastExpression
+        // (explicit=false) so downstream passes see an explicit cast node.
+        const auto& paramTypes = def->parameters();
+        for (size_t i = 0; i < expr->parameters().size() && i < paramTypes.size(); ++i) {
+            const ElementaryType desired = paramTypes[i];
+            const ElementaryType actual  = fromArgs[i];
+            if (actual != desired) {
+                if (isConvertible(actual, desired)) {
+                    auto original = expr->parameters().at(i);
+                    auto castExpr = std::make_shared<CastExpression>(original->location(), desired, original, false);
+                    expr->replaceParameter(i, castExpr);
+                    fromArgs[i] = desired;
+                } else {
+                    // Not implicitly convertible; require explicit cast from user or report error.
+                    PEXPR_LOG(LogLevel::Error) << expr->parameters().at(i)->location() << ": Cannot implicitly convert from " << toString(actual) << " to " << toString(desired) << " for function parameter " << i << std::endl;
+                    return ElementaryType::Unspecified;
+                }
+            }
+        }
+
         expr->setReturnType(def.value().returnType());
         expr->setMangledName(def->mangledName());
     } else {
@@ -393,15 +458,27 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
 {
-    for (const auto& p : expr->entries()) {
-        const auto pType = handleNode(p);
+    // Ensure each entry is type-checked and, if necessary, inject an implicit
+    // CastExpression to Number so downstream passes (SSA) see explicit casts.
+    for (size_t i = 0; i < expr->entries().size(); ++i) {
+        auto orig        = expr->entries().at(i);
+        const auto pType = handleNode(orig);
         if (pType == ElementaryType::Unspecified)
             return ElementaryType::Unspecified; // Error handled somewhere else
 
-        if (!isConvertible(pType, ElementaryType::Number)) {
-            PEXPR_LOG(LogLevel::Error) << p->location() << ": Expected vector values to be convertible to " << toString(ElementaryType::Number) << std::endl;
-            return ElementaryType::Unspecified;
+        if (pType == ElementaryType::Number)
+            continue;
+
+        // Allow implicit conversion to Number (e.g. Integer -> Number) by injecting a cast.
+        if (isConvertible(pType, ElementaryType::Number)) {
+            auto castExpr = std::make_shared<CastExpression>(orig->location(), ElementaryType::Number, orig, false);
+            expr->replaceEntry(i, castExpr);
+            // We don't need to update pType variable; CastExpression will report Number when type-checked later.
+            continue;
         }
+
+        PEXPR_LOG(LogLevel::Error) << orig->location() << ": Expected vector values to be convertible to " << toString(ElementaryType::Number) << std::endl;
+        return ElementaryType::Unspecified;
     }
 
     ElementaryType type;
@@ -419,6 +496,30 @@ ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
         return ElementaryType::Unspecified; // Should be caught somewhere else
     }
     expr->setReturnType(type);
+    return expr->returnType();
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<CastExpression>& expr)
+{
+    // Type-check inner expression first
+    const ElementaryType innerType = handleNode(expr->inner());
+    if (innerType == ElementaryType::Unspecified)
+        return innerType; // Error was reported deeper
+
+    // Validate allowed conversion depending on whether the cast is explicit or implicit
+    if (expr->isExplicit()) {
+        if (!isExplicitConvertible(innerType, expr->toType())) {
+            PEXPR_LOG(LogLevel::Error) << expr->location() << ": Cannot cast from '" << toString(innerType) << "' to '" << toString(expr->toType()) << "'" << std::endl;
+            return ElementaryType::Unspecified;
+        }
+    } else {
+        if (!isConvertible(innerType, expr->toType())) {
+            PEXPR_LOG(LogLevel::Error) << expr->location() << ": Implicit conversion from '" << toString(innerType) << "' to '" << toString(expr->toType()) << "' is not allowed" << std::endl;
+            return ElementaryType::Unspecified;
+        }
+    }
+
+    expr->setReturnType(expr->toType());
     return expr->returnType();
 }
 } // namespace PExpr::internal

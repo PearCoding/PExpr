@@ -64,16 +64,54 @@ static inline std::string_view toInstructionString(BinaryOperation op)
 
 // SSAValue / Instr dumps
 
-std::string SSAValue::toString(bool suffixType) const
+std::string SSAValue::toString(bool showType) const
 {
-    if (Name.empty())
+    std::string prefix;
+    if (this->Kind == Kind::Constant) {
+        switch (this->Type) {
+        case ElementaryType::Boolean:
+            prefix = std::get<bool>(Value) ? "true" : "false";
+            break;
+        case ElementaryType::Integer:
+            prefix = std::to_string(std::get<Integer>(Value));
+            break;
+        case ElementaryType::Number:
+            prefix = std::to_string(std::get<Number>(Value));
+            break;
+        case ElementaryType::Vec2: {
+            const auto v = std::get<Vec2>(Value);
+            prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "]";
+            break;
+        }
+        case ElementaryType::Vec3: {
+            const auto v = std::get<Vec2>(Value);
+            prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "]";
+            break;
+        }
+        case ElementaryType::Vec4: {
+            const auto v = std::get<Vec2>(Value);
+            prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "," + std::to_string(v[3]) + "]";
+            break;
+        }
+        case ElementaryType::String:
+            prefix = "\"" + std::get<std::string>(Value) + "\"";
+            break;
+        default:
+            PEXPR_ASSERT(false, "Expected specified type for SSAValue constants");
+        }
+    } else {
+        prefix = Name;
+    }
+
+    if (prefix.empty())
         return std::string("_");
-    if ((suffixType || this->Kind == Kind::Constant) && Type != PExpr::ElementaryType::Unspecified) {
+
+    if ((showType || this->Kind == Kind::Constant) && Type != PExpr::ElementaryType::Unspecified) {
         std::stringstream ss;
-        ss << Name << ":" << std::string(PExpr::toString(Type));
+        ss << prefix << ":" << std::string(PExpr::toString(Type));
         return ss.str();
     }
-    return Name;
+    return prefix;
 }
 
 std::string SSAValue::baseName() const
@@ -130,7 +168,7 @@ std::string SSAInstrAssign::dump() const
 std::string SSAInstrCall::dump() const
 {
     std::stringstream ss;
-    ss << Target.toString(true) << " = call " << FunctionName << "(";
+    ss << Target.toString(true) << " = call[" << FunctionName << "](";
     for (size_t i = 0; i < Arguments.size(); ++i) {
         if (i)
             ss << ", ";
@@ -218,20 +256,6 @@ std::string SSAMapper::fresh(const std::string& base)
     std::stringstream ss;
     ss << base << "." << c;
     return ss.str();
-}
-
-SSAValue SSAMapper::handleCast(ElementaryType to, const SSAValue& from)
-{
-    if (to == from.Type || !isConvertible(from.Type, to))
-        return from;
-
-    SSAInstrAssign cast;
-    SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), to);
-    cast.Target   = tgt;
-    cast.Operator = SSAInstrAssign::OpKind::Cast;
-    cast.Operands = { from };
-    mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
-    return tgt;
 }
 
 void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr>>& body, SSAFunction& func)
@@ -332,6 +356,9 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
     } break;
     case StatementType::FunctionDeclaration: {
         auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
+
+        // Prepare SSAFunction entry up-front and insert into program so recursive
+        // calls (or other functions mapping) can see the function entry.
         SSAFunction func;
         func.Name = f->mangledName();
         func.Parameters.reserve(f->parameters().size());
@@ -340,17 +367,24 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         func.ReturnType = f->returnType();
         func.External   = f->isExtern();
 
+        // Insert placeholder function into program so it's visible during mapping.
+        mProgram.Functions.push_back(func);
+        SSAFunction& dst = mProgram.Functions.back();
+
         // map function body using a nested mapper so temporaries are local
         if (f->expression() && f->expression()->type() == ExpressionType::Closure) {
             auto closureExpr = std::reinterpret_pointer_cast<ClosureExpression>(f->expression());
             SSAMapper inner;
             auto innerProg = inner.map(closureExpr->closure());
-            // move innerProg.mainBody into func.body
+            // move innerProg.mainBody into dst.body
             for (auto& instr : innerProg.Body)
-                func.Body.push_back(instr);
+                dst.Body.push_back(instr);
 
             // detect captured parent-level variables referenced by the inner function
-            detectCapturedParents(innerProg.Body, func);
+            detectCapturedParents(innerProg.Body, dst);
+
+            // move any inner functions discovered by the inner mapper
+            dst.InnerFunctions = std::move(innerProg.Functions);
         } else {
             // if body is not a closure, map expression into a single return instr inside function
             if (f->expression()) {
@@ -359,11 +393,11 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
                 tmp->setExpression(f->expression());
                 auto innerProg = inner.map(tmp);
                 for (auto& instr : innerProg.Body)
-                    func.Body.push_back(instr);
+                    dst.Body.push_back(instr);
+                dst.InnerFunctions = std::move(innerProg.Functions);
             }
         }
 
-        mProgram.Functions.push_back(std::move(func));
     } break;
     default:
         // unsupported - emit comment as an assign to a dummy temp
@@ -441,7 +475,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         std::vector<SSAValue> inners;
         inners.reserve(v->entries().size());
         for (const auto& e : v->entries())
-            inners.push_back(handleCast(ElementaryType::Number, mapExpression(e)));
+            inners.push_back(mapExpression(e));
 
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), v->returnType());
         SSAInstrAssign asg;
@@ -505,6 +539,23 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
+    case ExpressionType::Cast: {
+        auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
+        // Map inner expression and emit an SSA cast instruction
+        SSAValue inner = mapExpression(c->inner());
+        // If both types match do nothing else typechecker should ensure correctness
+        if (inner.Type == c->toType()) {
+            result = inner;
+        } else {
+            SSAInstrAssign cast;
+            SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), c->toType());
+            cast.Target   = tgt;
+            cast.Operator = SSAInstrAssign::OpKind::Cast;
+            cast.Operands = { inner };
+            mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
+            result = tgt;
+        }
+    } break;
     case ExpressionType::Closure: {
         auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
         // Map nested closure as a function-like entity and return a temp referencing it.
@@ -567,12 +618,19 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
             if (auto ret = dynamic_cast<SSAInstrReturn*>(last.get()))
                 elseVal = ret->Value;
         }
-        // create phi
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("phi"), branchVals.front().Type);
-        auto phi     = std::make_shared<SSAInstrPhi>();
-        phi->Target  = tgt;
+
+        // Use the BranchExpression's declared return type as the phi node type.
+        ElementaryType phiType = expr->returnType();
+
+        // create phi target with chosen type
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("phi"), phiType);
+        auto phi    = std::make_shared<SSAInstrPhi>();
+        phi->Target = tgt;
+
+        // Add sources as-is; casts should have been injected by the TypeChecker if needed.
         phi->Sources = branchVals;
         phi->Sources.push_back(elseVal);
+
         mProgram.Body.push_back(phi);
         result = tgt;
     } break;

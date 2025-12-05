@@ -172,6 +172,12 @@ private:
 
         const std::string varName = std::get<std::string>(P.cur().Value);
         P.expect(TokenType::Identifier);
+
+        // Optional explicit type annotation for declarations: ': TYPE'
+        ElementaryType declaredType = ElementaryType::Unspecified;
+        if (is_declaration && P.accept(TokenType::Colon))
+            declaredType = p_elementary_type();
+
         P.expect(TokenType::Assign);
 
         const auto expr = p_expression();
@@ -179,7 +185,7 @@ private:
         P.expect(TokenType::Semicolon);
 
         if (is_declaration)
-            return std::make_shared<VariableDeclarationStatement>(is_mutable, loc, varName, expr);
+            return std::make_shared<VariableDeclarationStatement>(is_mutable, loc, varName, expr, declaredType);
         else
             return std::make_shared<VariableAssignmentStatement>(loc, varName, expr);
     }
@@ -210,7 +216,6 @@ private:
     {
         const auto loc = P.cur().Location;
 
-        // TODO: Add support for constructors?
         std::string funcName;
         if (const auto fnptr = std::get_if<std::string>(&P.cur().Value))
             funcName = *fnptr;
@@ -337,9 +342,17 @@ private:
                 PEXPR_LOG(LogLevel::Error) << loc << ": Given access '" << swizzle << "' is invalid" << std::endl;
             }
 
-            // TODO: Only makes sense for vectors
             return std::make_shared<AccessExpression>(loc, expr, swizzle);
         }
+
+        // explicit cast syntax: "<expr> as <type>"
+        if (P.accept(TokenType::As)) {
+            // Use the expression's original location for the cast node
+            const auto loc              = expr->location();
+            const ElementaryType toType = p_elementary_type();
+            return std::make_shared<CastExpression>(loc, toType, expr);
+        }
+
         return expr;
     }
 

@@ -147,6 +147,8 @@ Token Lexer::next()
                 return Token(prevLoc, TokenType::Vec4Type);
             if (mTemp == "str")
                 return Token(prevLoc, TokenType::StringType);
+            if (mTemp == "as")
+                return Token(prevLoc, TokenType::As);
 
             return Token(prevLoc, TokenType::Identifier).With(mTemp);
         }

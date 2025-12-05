@@ -17,7 +17,7 @@ enum class ElementaryType {
 };
 
 /// Checks if a conversion from one type to another is possible.
-/// Currently only 'int' -> 'num' is defined.
+/// Currently only 'int' -> 'num' is defined (implicit conversion).
 inline bool isConvertible(ElementaryType from, ElementaryType to)
 {
     if (from == ElementaryType::Unspecified || to == ElementaryType::Unspecified)
@@ -28,6 +28,22 @@ inline bool isConvertible(ElementaryType from, ElementaryType to)
 
     // We only allow implicit conversion from integer to float, but not back!
     return from == ElementaryType::Integer && to == ElementaryType::Number;
+}
+
+/// Checks if an explicit conversion (cast) from one type to another is allowed.
+/// This is a superset of isConvertible and includes conversions that require an
+/// explicit cast by the user (for example num -> int).
+inline bool isExplicitConvertible(ElementaryType from, ElementaryType to)
+{
+    // Implicit conversions are always allowed explicitly as well.
+    if (isConvertible(from, to))
+        return true;
+
+    // Allow explicit narrowing from num to int.
+    if (from == ElementaryType::Number && to == ElementaryType::Integer)
+        return true;
+
+    return false;
 }
 
 /// Checks if given type is one of 'vec2', 'vec3' or 'vec4'.
@@ -90,6 +106,7 @@ enum class ExpressionType {
     Binary,   /// Binary operation.
     Call,     /// Call to a function.
     Access,   /// Component swizzle operation.
+    Cast,     /// Implicit/explicit cast expression.
     Closure,  /// An enclosed closure
     Branch,   /// If, elif and else block
     Vector,   /// Vector [x,y,z,w]

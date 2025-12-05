@@ -117,6 +117,29 @@ private:
     ValueVariant mValue;
 };
 
+/// Cast expression represents an explicit or implicit conversion to a target ElementaryType
+class CastExpression : public Expression {
+public:
+    inline CastExpression(const Location& loc, ElementaryType toType, const Ptr<Expression>& inner, bool explicitCast = true)
+        : Expression(loc, ExpressionType::Cast)
+        , mToType(toType)
+        , mInner(inner)
+        , mExplicit(explicitCast)
+    {
+        PEXPR_ASSERT(inner != nullptr, "Expected valid inner expression for cast");
+        setReturnType(mToType);
+    }
+
+    [[nodiscard]] inline ElementaryType toType() const { return mToType; }
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
+    [[nodiscard]] inline bool isExplicit() const { return mExplicit; }
+
+private:
+    ElementaryType mToType;
+    Ptr<Expression> mInner;
+    bool mExplicit;
+};
+
 /// Call to an unary operation, like +a, -a, !a, etc.
 class UnaryExpression : public Expression {
 public:
@@ -186,6 +209,13 @@ public:
     [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The parameters of the given function.
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
+
+    /// Replace a parameter expression (used by the typechecker to inject implicit casts).
+    inline void replaceParameter(size_t idx, const Ptr<Expression>& expr)
+    {
+        PEXPR_ASSERT(idx < mParameters.size(), "Parameter index out of range");
+        mParameters[idx] = expr;
+    }
 
     /// The typechecker-provided mangled name.
     [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
@@ -280,6 +310,14 @@ public:
     }
 
     [[nodiscard]] inline const std::vector<Ptr<Expression>> entries() const { return mEntries; }
+
+    /// Replace a vector entry expression (used by the TypeChecker to inject implicit casts).
+    inline void replaceEntry(size_t idx, const Ptr<Expression>& expr)
+    {
+        PEXPR_ASSERT(idx < mEntries.size(), "Entry index out of range");
+        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
+        mEntries[idx] = expr;
+    }
 
 private:
     std::vector<Ptr<Expression>> mEntries;

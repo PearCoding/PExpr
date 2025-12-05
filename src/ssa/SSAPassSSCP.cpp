@@ -210,10 +210,19 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
             return SSAValue::Constant(Vec4{ values[0], values[1], values[2], values[3] });
     }
 
-    // Cast int -> num
+    // Cast
     if (asg->Operator == SSAInstrAssign::OpKind::Cast) {
-        if (Integer i; getInteger(asg->Operands.front(), i))
-            return SSAValue::Constant(static_cast<Number>(i));
+        if (asg->Target.Type == ElementaryType::Number) {
+            // int -> num (implicit or explicit)
+            if (Integer i; getInteger(asg->Operands.front(), i))
+                return SSAValue::Constant(static_cast<Number>(i));
+        }
+
+        if (asg->Target.Type == ElementaryType::Integer) {
+            // num -> int (explicit)
+            if (Number v; getNumber(asg->Operands.front(), v))
+                return SSAValue::Constant(static_cast<Integer>(v));
+        }
     }
 
     // Unary fold
@@ -447,7 +456,7 @@ void SSAPassSSCP::run(SSAProgram& program)
                     // if assignment target is Named and not a parameter => non-local write
                     if (asg->Target.Kind == SSAValue::Kind::Named) {
                         std::string base = asg->Target.baseName();
-                        bool isParam = funcParams[f.Name].contains(base);
+                        bool isParam     = funcParams[f.Name].contains(base);
                         if (!isParam) {
                             mSideEffectFunctions.insert(f.Name);
                             progress = true;

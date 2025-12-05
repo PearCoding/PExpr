@@ -37,6 +37,14 @@ public:
         mExpression = expr;
     }
 
+    /// Replace the existing expression inside the closure. This is used by the
+    /// TypeChecker to inject CastExpression wrappers for implicit conversions.
+    inline void replaceExpression(const Ptr<Expression>& expr)
+    {
+        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
+        mExpression = expr;
+    }
+
     // Internal usage
     [[nodiscard]] inline internal::SymbolTable& symbols() { return mSymbols; }
 

@@ -4,7 +4,7 @@
 #include "SymbolTable.h"
 
 namespace PExpr::internal {
-/// @brief Checks types and resolves symbol lookups
+/// Checks types, resolves unspecified typing and resolves symbol lookups
 class TypeChecker {
 public:
     explicit TypeChecker(const SymbolTable& defs);
@@ -24,6 +24,7 @@ private:
     [[nodiscard]] ElementaryType handleNode(const Ptr<BinaryExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<CallExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<AccessExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<CastExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<VectorExpression>& expr);
 
     SymbolTable mDynamicDefinitions;

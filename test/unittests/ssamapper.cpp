@@ -37,7 +37,7 @@ TEST_CASE("SSAMapper: function declaration and call", "[ssamapper]")
 
     // Expect a function named '_Z1f*' (mangled) and a call to f in main body
     REQUIRE(dumped.find("fn _Z1f") != std::string::npos);
-    REQUIRE(dumped.find("call _Z1f") != std::string::npos);
+    REQUIRE(dumped.find("call[_Z1f") != std::string::npos);
 }
 
 TEST_CASE("SSAMapper: branch produces phi", "[ssamapper]")

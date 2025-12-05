@@ -17,6 +17,14 @@ public:
     [[nodiscard]] inline const std::string& name() const { return mName; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
 
+    /// Replace the expression owned by this statement. Used by the TypeChecker to
+    /// inject implicit CastExpression nodes for assignments and other contexts.
+    inline void replaceExpression(const Ptr<Expression>& expr)
+    {
+        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
+        mExpression = expr;
+    }
+
     [[nodiscard]] inline StatementType type() const { return mType; }
 
 protected:
@@ -31,22 +39,26 @@ protected:
 private:
     const Location mLocation;
     const std::string mName;
-    const Ptr<Expression> mExpression;
+    Ptr<Expression> mExpression;
     const StatementType mType;
 };
 
 class VariableDeclarationStatement : public Statement {
 public:
-    VariableDeclarationStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expression)
+    // declaredType may be ElementaryType::Unspecified when no explicit type is given.
+    VariableDeclarationStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expression, ElementaryType declaredType = ElementaryType::Unspecified)
         : Statement(loc, name, expression, StatementType::VariableDeclaration)
         , mIsMutable(mutable_)
+        , mDeclaredType(declaredType)
     {
     }
 
     [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
+    [[nodiscard]] inline ElementaryType declaredType() const { return mDeclaredType; }
 
 private:
     const bool mIsMutable;
+    const ElementaryType mDeclaredType;
 };
 
 class VariableAssignmentStatement : public Statement {

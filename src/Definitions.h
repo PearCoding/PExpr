@@ -43,7 +43,9 @@ public:
         , mParameters(params)
         , mIsExtern(isExtern)
     {
-        PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        // Allow unspecified return type for non-extern functions (to support recursion).
+        if (isExtern)
+            PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
     /// Construct a function definition with a given name, return type and parameter types.
@@ -54,7 +56,9 @@ public:
         , mParameters(std::move(params))
         , mIsExtern(isExtern)
     {
-        PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        // Allow unspecified return type for non-extern functions (to support recursion).
+        if (isExtern)
+            PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
     /// The identifier the function is named with.
