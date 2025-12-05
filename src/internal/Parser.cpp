@@ -154,7 +154,7 @@ private:
 
         // TODO: The location of the warning is incorrect and slightly off (a single token wide)
         if (P.accept(TokenType::Semicolon))
-            P.mReporter.warningf(P.cur().Location, "Trailing '%s' at the end of an expression", Token::toString(TokenType::Semicolon).data());
+            P.mReporter.warningf(RT_WARNING_TRAILING_SEMICOLON, P.cur().Location, "Trailing '%s' at the end of an expression", Token::toString(TokenType::Semicolon).data());
 
         mCurrentClosure = mCurrentClosure->parent();
 

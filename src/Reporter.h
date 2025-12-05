@@ -10,10 +10,21 @@
 
 namespace PExpr {
 
+enum ReportType {
+    RT_ERROR = 0x1, ///< All type of errors. These can not be disabled individually.
+
+    RT_WARNING_TRAILING_SEMICOLON = 0x100, ///< Warn about a trailing semicolon in expressions.
+    RT_WARNING_IMPLICIT_CAST      = 0x101, ///< Warn about all implicit casts
+
+    RT_WARNING_DEFAULT = RT_WARNING_TRAILING_SEMICOLON,
+    RT_WARNING_ALL     = RT_WARNING_TRAILING_SEMICOLON | RT_WARNING_IMPLICIT_CAST,
+};
+
 struct ReporterEntry {
     LogLevel Level;
     Location Loc;
     std::string Message;
+    ReportType Type;
 };
 
 /// Reporter collects diagnostics (errors, warnings)
@@ -26,21 +37,21 @@ public:
     Reporter& operator=(const Reporter&) = delete;
 
     // Configuration
-    void setWarningsEnabled(bool enabled);
-    bool warningsEnabled() const;
+    void setOutputMask(uint32_t mask) { mOutputMask = mask; }
+    [[nodiscard]] inline uint32_t outputMask() const { return mOutputMask; }
 
     inline void setQuiet(bool b) { mQuiet = b; }
     [[nodiscard]] inline bool isQuiet() const { return mQuiet; }
 
-    // Core API: store and forward a diagnostic (string)
-    void report(LogLevel level, const Location& loc, const std::string& message);
+    // Core API: store and forward a diagnostic
+    void report(LogLevel level, ReportType type, const Location& loc, const std::string& message);
     void error(const Location& loc, const std::string& message);
-    void warning(const Location& loc, const std::string& message);
+    void warning(ReportType type, const Location& loc, const std::string& message);
 
-    // printf-style APIs (safer for many call-sites)
-    void reportf(LogLevel level, const Location& loc, const char* fmt, ...);
+    // printf-style APIs
+    void reportf(LogLevel level, ReportType type, const Location& loc, const char* fmt, ...);
     void errorf(const Location& loc, const char* fmt, ...);
-    void warningf(const Location& loc, const char* fmt, ...);
+    void warningf(ReportType type, const Location& loc, const char* fmt, ...);
 
     // Query
     size_t errorCount() const;
@@ -54,7 +65,7 @@ private:
 
     mutable std::mutex mMutex;
     std::vector<ReporterEntry> mEntries;
-    bool mWarningsEnabled;
+    uint32_t mOutputMask;
     bool mQuiet;
     size_t mErrorCount;
     size_t mWarningCount;

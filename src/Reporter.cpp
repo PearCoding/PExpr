@@ -4,25 +4,13 @@
 namespace PExpr {
 
 Reporter::Reporter()
-    : mWarningsEnabled(true)
+    : mOutputMask(RT_WARNING_DEFAULT | RT_ERROR)
     , mErrorCount(0)
     , mWarningCount(0)
 {
 }
 
 Reporter::~Reporter() = default;
-
-void Reporter::setWarningsEnabled(bool enabled)
-{
-    std::lock_guard<std::mutex> l(mMutex);
-    mWarningsEnabled = enabled;
-}
-
-bool Reporter::warningsEnabled() const
-{
-    std::lock_guard<std::mutex> l(mMutex);
-    return mWarningsEnabled;
-}
 
 std::string Reporter::vformat(const char* fmt, va_list args) const
 {
@@ -43,14 +31,14 @@ std::string Reporter::vformat(const char* fmt, va_list args) const
     return buf;
 }
 
-void Reporter::report(LogLevel level, const Location& loc, const std::string& message)
+void Reporter::report(LogLevel level, ReportType type, const Location& loc, const std::string& message)
 {
     {
         std::lock_guard<std::mutex> l(mMutex);
-        mEntries.push_back(ReporterEntry{ level, loc, message });
+        mEntries.push_back(ReporterEntry{ level, loc, message, type });
         if (level == LogLevel::Error)
             ++mErrorCount;
-        else if (level == LogLevel::Warning)
+        else if (level == LogLevel::Warning && (mOutputMask & type) == type)
             ++mWarningCount;
     }
 
@@ -63,7 +51,7 @@ void Reporter::report(LogLevel level, const Location& loc, const std::string& me
         PEXPR_LOG(LogLevel::Error) << loc << ": " << message << std::endl;
         break;
     case LogLevel::Warning:
-        if (warningsEnabled())
+        if ((mOutputMask & type) == type)
             PEXPR_LOG(LogLevel::Warning) << loc << ": " << message << std::endl;
         break;
     case LogLevel::Info:
@@ -78,7 +66,7 @@ void Reporter::report(LogLevel level, const Location& loc, const std::string& me
     }
 }
 
-void Reporter::reportf(LogLevel level, const Location& loc, const char* fmt, ...)
+void Reporter::reportf(LogLevel level, ReportType type, const Location& loc, const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -90,7 +78,7 @@ void Reporter::reportf(LogLevel level, const Location& loc, const char* fmt, ...
         throw;
     }
     va_end(args);
-    report(level, loc, msg);
+    report(level, type, loc, msg);
 }
 
 void Reporter::errorf(const Location& loc, const char* fmt, ...)
@@ -105,10 +93,10 @@ void Reporter::errorf(const Location& loc, const char* fmt, ...)
         throw;
     }
     va_end(args);
-    report(LogLevel::Error, loc, msg);
+    report(LogLevel::Error, RT_ERROR, loc, msg);
 }
 
-void Reporter::warningf(const Location& loc, const char* fmt, ...)
+void Reporter::warningf(ReportType type, const Location& loc, const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -120,17 +108,17 @@ void Reporter::warningf(const Location& loc, const char* fmt, ...)
         throw;
     }
     va_end(args);
-    report(LogLevel::Warning, loc, msg);
+    report(LogLevel::Warning, type, loc, msg);
 }
 
 void Reporter::error(const Location& loc, const std::string& message)
 {
-    report(LogLevel::Error, loc, message);
+    report(LogLevel::Error, RT_ERROR, loc, message);
 }
 
-void Reporter::warning(const Location& loc, const std::string& message)
+void Reporter::warning(ReportType type, const Location& loc, const std::string& message)
 {
-    report(LogLevel::Warning, loc, message);
+    report(LogLevel::Warning, type, loc, message);
 }
 
 size_t Reporter::errorCount() const
