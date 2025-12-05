@@ -53,3 +53,41 @@ TEST_CASE("SSAMapper: branch produces phi", "[ssamapper]")
     // Expect a phi node for merged branch results
     REQUIRE(dumped.find("phi(") != std::string::npos);
 }
+
+TEST_CASE("SSAMapper: closure captures const parent", "[ssamapper]") {
+    std::stringstream stream("let k = 1; let c = { k + 2 }; c");
+    Environment env;
+    auto ast = env.parse(stream);
+
+    SSAMapper mapper;
+    auto prog = mapper.map(ast);
+
+    bool found = false;
+    for (const auto& f : prog.Functions) {
+        if (f.Name.rfind("closure", 0) == 0) {
+            found = true;
+            REQUIRE(std::find(f.AccessedConstParents.begin(), f.AccessedConstParents.end(), "k") != f.AccessedConstParents.end());
+            REQUIRE(f.AccessedMutableParents.empty());
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("SSAMapper: closure captures mutable parent", "[ssamapper]") {
+    std::stringstream stream("let mut k = 1; let c = { k + 2 }; c");
+    Environment env;
+    auto ast = env.parse(stream);
+
+    SSAMapper mapper;
+    auto prog = mapper.map(ast);
+
+    bool found = false;
+    for (const auto& f : prog.Functions) {
+        if (f.Name.rfind("closure", 0) == 0) {
+            found = true;
+            REQUIRE(std::find(f.AccessedMutableParents.begin(), f.AccessedMutableParents.end(), "k") != f.AccessedMutableParents.end());
+            REQUIRE(f.AccessedConstParents.empty());
+        }
+    }
+    REQUIRE(found);
+}

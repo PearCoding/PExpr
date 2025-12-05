@@ -194,6 +194,7 @@ SSAProgram SSAMapper::map(const Ptr<Closure>& closure)
     mProgram = SSAProgram{};
     mCounters.clear();
     mExprValues.clear();
+    mLocalMutability.clear();
     mapClosure(closure);
 
     return mProgram;
@@ -220,6 +221,49 @@ SSAValue SSAMapper::handleCast(ElementaryType to, const SSAValue& from)
     cast.Operands = { from };
     mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
     return tgt;
+}
+
+void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr>>& body, SSAFunction& func)
+{
+    std::unordered_set<std::string> captured;
+
+    auto collectNamed = [&](const SSAValue& v) {
+        if (v.Kind == SSAValue::Kind::Named) {
+            const auto& n = v.Name;
+            // only consider plain names (no SSA version suffix like "x.1")
+            if (!n.empty() && n.find('.') == std::string::npos) {
+                captured.insert(n);
+            }
+        }
+    };
+
+    for (const auto& instr : body) {
+        if (auto a = dynamic_cast<SSAInstrAssign*>(instr.get())) {
+            collectNamed(a->Target);
+            for (const auto& op : a->Operands)
+                collectNamed(op);
+        } else if (auto ccall = dynamic_cast<SSAInstrCall*>(instr.get())) {
+            collectNamed(ccall->Target);
+            for (const auto& arg : ccall->Arguments)
+                collectNamed(arg);
+        } else if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
+            collectNamed(ret->Value);
+        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instr.get())) {
+            collectNamed(phi->Target);
+            for (const auto& s : phi->Sources)
+                collectNamed(s);
+        }
+    }
+
+    for (const auto& name : captured) {
+        auto it = mLocalMutability.find(name);
+        if (it != mLocalMutability.end()) {
+            if (it->second)
+                func.AccessedMutableParents.insert(name);
+            else
+                func.AccessedConstParents.insert(name);
+        }
+    }
 }
 
 void SSAMapper::mapClosure(const Ptr<Closure>& closure)
@@ -258,6 +302,9 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         // remember mapping for this statement's expression pointer, so subsequent uses can reuse name
         mExprValues[stmt.get()] = tgt;
+
+        // record mutability for local declarations in this mapper's scope
+        mLocalMutability[var->name()] = var->isMutable();
     } break;
     case StatementType::VariableAssignment: {
         auto var     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
@@ -290,6 +337,9 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
             // move innerProg.mainBody into func.body
             for (auto& instr : innerProg.Body)
                 func.Body.push_back(instr);
+
+            // detect captured parent-level variables referenced by the inner function
+            detectCapturedParents(innerProg.Body, func);
         } else {
             // if body is not a closure, map expression into a single return instr inside function
             if (f->expression()) {
@@ -459,6 +509,10 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         for (auto& instr : prog.Body)
             func.Body.push_back(instr);
         func.InnerFunctions = std::move(prog.Functions);
+
+        // detect captured parent-level variables referenced by the closure
+        detectCapturedParents(prog.Body, func);
+
         mProgram.Functions.push_back(std::move(func));
 
         // directly call the closure

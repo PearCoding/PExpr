@@ -3,6 +3,8 @@
 #include "Closure.h"
 #include "Enums.h"
 
+#include <unordered_set>
+
 namespace PExpr::ssa {
 
 /// Object-based SSA IR representation and mapper.
@@ -137,6 +139,13 @@ struct SSAFunction {
     // External functions are considered to have side-effects.
     bool External = false;
 
+    // Track accessed parent-level variables for later side-effect analysis.
+    // These are populated by the parent SSAMapper when nested closures/functions
+    // are mapped. Names are the plain variable names (without SSA version suffix).
+    // Use unordered_set for faster lookup and to avoid duplicates.
+    std::unordered_set<std::string> AccessedConstParents;
+    std::unordered_set<std::string> AccessedMutableParents;
+
     [[nodiscard]] std::string dump() const;
 };
 
@@ -163,12 +172,23 @@ private:
     [[nodiscard]] SSAValue mapExpression(const Ptr<Expression>& expr);
     [[nodiscard]] SSAValue handleCast(ElementaryType to, const SSAValue& from);
 
+    // Detect captured parent-level variables referenced inside a nested function/closure.
+    // Scans the provided SSA instruction list, classifies plain (non-versioned) named
+    // references and appends them to the provided SSAFunction's AccessedConstParents /
+    // AccessedMutableParents vectors based on this mapper's recorded local mutability.
+    void detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr>>& body, SSAFunction& func);
+
     // Program under construction
     SSAProgram mProgram;
 
     // Internal helpers
     std::unordered_map<std::string, int> mCounters;
     std::unordered_map<const void*, SSAValue> mExprValues;
+
+    // Track mutability of local variable declarations in this mapper's scope.
+    // Used by the parent mapper to determine whether a captured parent variable
+    // is mutable or constant.
+    std::unordered_map<std::string, bool> mLocalMutability;
 };
 
 } // namespace PExpr::ssa
