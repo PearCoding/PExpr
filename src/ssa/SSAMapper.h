@@ -27,7 +27,7 @@ public:
         , Type(type)
     {
     }
-    SSAValue(Kind k, std::string n, ElementaryType type, const ValueVariant& v)
+    SSAValue(Kind k, std::string n, ElementaryType type, const ExtendedValueVariant& v)
         : Kind(k)
         , Name(std::move(n))
         , Type(type)
@@ -38,7 +38,7 @@ public:
     Kind Kind = Kind::Named;
     std::string Name;
     ElementaryType Type = ElementaryType::Unspecified;
-    ValueVariant Value;
+    ExtendedValueVariant Value;
 
     [[nodiscard]] std::string toString(bool suffixType = true) const;
 
@@ -61,6 +61,21 @@ public:
     {
         return SSAValue(Kind::Constant, "\"" + str + "\"", ElementaryType::String, str);
     }
+
+    [[nodiscard]] inline static SSAValue Constant(const Vec2& v)
+    {
+        return SSAValue(Kind::Constant, "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "]", ElementaryType::Vec2, v);
+    }
+
+    [[nodiscard]] inline static SSAValue Constant(const Vec3& v)
+    {
+        return SSAValue(Kind::Constant, "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "]", ElementaryType::Vec2, v);
+    }
+
+    [[nodiscard]] inline static SSAValue Constant(const Vec4& v)
+    {
+        return SSAValue(Kind::Constant, "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "," + std::to_string(v[3]) + "]", ElementaryType::Vec2, v);
+    }
 };
 
 struct SSAInstr {
@@ -74,6 +89,7 @@ struct SSAInstrAssign : public SSAInstr {
                         Binary,
                         CallOp,
                         Access,
+                        Vector,
                         Nop,
                         Phi };
 
@@ -140,6 +156,8 @@ public:
 
 private:
     [[nodiscard]] std::string fresh(const std::string& base);
+    [[nodiscard]] SSAValue uplift(const std::string& base, const SSAValue& old);
+    [[nodiscard]] Ptr<SSAInstr> uplift(const std::string& base, Ptr<SSAInstr>& old);
 
     void mapClosure(const Ptr<Closure>& closure);
     void mapStatement(const Ptr<Statement>& stmt);

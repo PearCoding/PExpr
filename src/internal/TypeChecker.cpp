@@ -39,8 +39,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
 void TypeChecker::handleNode(const Ptr<Statement>& statement)
 {
     switch (statement->type()) {
-    case StatementType::Variable: {
-        auto varStmt = std::reinterpret_pointer_cast<VariableStatement>(statement);
+    case StatementType::VariableDeclaration: {
+        auto varStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
         auto type    = handleNode(varStmt->expression());
         if (type == ElementaryType::Unspecified)
             return; // Error was caught somewhere else
@@ -49,12 +49,29 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         // and expressions can resolve it.
         const bool is_ok = mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), type, varStmt->isMutable()));
         if (!is_ok) {
+            PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to declare a new variable '" << varStmt->name() << "'" << std::endl;
+            return;
+        }
+    } break;
+    case StatementType::VariableAssignment: {
+        auto varStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
+        auto type    = handleNode(varStmt->expression());
+        if (type == ElementaryType::Unspecified)
+            return; // Error was caught somewhere else
+
+        // Check if the variable exists and can be updated
+        const auto var = mDynamicDefinitions.lookupVariable(varStmt->location(), varStmt->name());
+        if (!var.has_value()) {
+            PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to assign a value to unknown variable '" << varStmt->name() << "'" << std::endl;
+            return;
+        }
+        if (!var->isMutable()) {
             PEXPR_LOG(LogLevel::Error) << varStmt->location() << ": Trying to reassign a value to constant variable '" << varStmt->name() << "'" << std::endl;
             return;
         }
     } break;
-    case StatementType::Function: {
-        auto funcStmt = std::reinterpret_pointer_cast<FunctionStatement>(statement);
+    case StatementType::FunctionDeclaration: {
+        auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
         // Collect parameter types (may include ElementaryType::Unspecified)
         std::vector<ElementaryType> paramTypes;
@@ -110,6 +127,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<Expression>& expr)
         return handleNode(std::reinterpret_pointer_cast<CallExpression>(expr));
     case ExpressionType::Access:
         return handleNode(std::reinterpret_pointer_cast<AccessExpression>(expr));
+    case ExpressionType::Vector:
+        return handleNode(std::reinterpret_pointer_cast<VectorExpression>(expr));
     case ExpressionType::Closure:
         return handleNode(std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
@@ -369,6 +388,26 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
         PEXPR_LOG(LogLevel::Error) << expr->location() << ": Access operator is only defined for vector types" << std::endl;
     }
 
+    return expr->returnType();
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
+{
+    ElementaryType type;
+    switch (expr->entries().size()) {
+    case 2:
+        type = ElementaryType::Vec2;
+        break;
+    case 3:
+        type = ElementaryType::Vec3;
+        break;
+    case 4:
+        type = ElementaryType::Vec4;
+        break;
+    default:
+        return ElementaryType::Unspecified; // Should be caught somewhere else
+    }
+    expr->setReturnType(type);
     return expr->returnType();
 }
 } // namespace PExpr::internal

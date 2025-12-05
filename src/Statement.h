@@ -35,10 +35,10 @@ private:
     const StatementType mType;
 };
 
-class VariableStatement : public Statement {
+class VariableDeclarationStatement : public Statement {
 public:
-    VariableStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expression)
-        : Statement(loc, name, expression, StatementType::Variable)
+    VariableDeclarationStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expression)
+        : Statement(loc, name, expression, StatementType::VariableDeclaration)
         , mIsMutable(mutable_)
     {
     }
@@ -49,7 +49,15 @@ private:
     const bool mIsMutable;
 };
 
-class FunctionStatement : public Statement {
+class VariableAssignmentStatement : public Statement {
+public:
+    VariableAssignmentStatement(const Location& loc, const std::string& name, const Ptr<Expression>& expression)
+        : Statement(loc, name, expression, StatementType::VariableAssignment)
+    {
+    }
+};
+
+class FunctionDeclarationStatement : public Statement {
 public:
     struct Parameter {
         std::string Name;
@@ -58,8 +66,8 @@ public:
 
     using ParameterList = std::vector<Parameter>;
 
-    FunctionStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression, ElementaryType returnType, const std::string& mangledName)
-        : Statement(loc, name, expression, StatementType::Function)
+    FunctionDeclarationStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression, ElementaryType returnType, const std::string& mangledName)
+        : Statement(loc, name, expression, StatementType::FunctionDeclaration)
         , mParameters(parameters)
         , mReturnType(returnType)
         , mMangledName(mangledName)

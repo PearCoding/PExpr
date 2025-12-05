@@ -58,8 +58,8 @@ private:
     void handleNode(const Ptr<Statement>& statement, Payload& /*payload*/)
     {
         switch (statement->type()) {
-        case StatementType::Variable: {
-            auto varStmt = std::reinterpret_pointer_cast<VariableStatement>(statement);
+        case StatementType::VariableDeclaration: {
+            auto varStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
 
             // Transpile initializer expression to obtain payload for the variable
             Payload initPayload = handle(varStmt->expression());
@@ -69,8 +69,18 @@ private:
             const ElementaryType varType = varStmt->expression()->returnType();
             mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), varType, varStmt->isMutable()));
         } break;
-        case StatementType::Function: {
-            auto funcStmt = std::reinterpret_pointer_cast<FunctionStatement>(statement);
+        case StatementType::VariableAssignment: {
+            auto varStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
+
+            // Transpile initializer expression to obtain payload for the variable
+            Payload initPayload = handle(varStmt->expression());
+
+            // Lookup variable
+            const auto var = mDynamicDefinitions.lookupVariable(varStmt->location(), varStmt->name());
+            // TODO
+        } break;
+        case StatementType::FunctionDeclaration: {
+            auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
             // Collect parameter types (may be Unspecified)
             std::vector<ElementaryType> paramTypes;

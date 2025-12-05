@@ -14,10 +14,12 @@ public:
     static std::string visit(const Ptr<Statement>& statement)
     {
         switch (statement->type()) {
-        case StatementType::Variable:
-            return dump(std::reinterpret_pointer_cast<VariableStatement>(statement));
-        case StatementType::Function:
-            return dump(std::reinterpret_pointer_cast<FunctionStatement>(statement));
+        case StatementType::VariableDeclaration:
+            return dump(std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement));
+        case StatementType::VariableAssignment:
+            return dump(std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement));
+        case StatementType::FunctionDeclaration:
+            return dump(std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement));
         default:
             return "ERROR";
         }
@@ -60,9 +62,10 @@ private:
         return stream.str();
     }
 
-    static std::string dump(const Ptr<VariableStatement>& statement)
+    static std::string dump(const Ptr<VariableDeclarationStatement>& statement)
     {
         std::stringstream stream;
+        stream << "let ";
         if (statement->isMutable())
             stream << "mut ";
         stream << statement->name();
@@ -73,7 +76,14 @@ private:
         return stream.str();
     }
 
-    static std::string dump(const Ptr<FunctionStatement>& statement)
+    static std::string dump(const Ptr<VariableAssignmentStatement>& statement)
+    {
+        std::stringstream stream;
+        stream << statement->name() << " = " << visit(statement->expression()) << ";";
+        return stream.str();
+    }
+
+    static std::string dump(const Ptr<FunctionDeclarationStatement>& statement)
     {
         std::stringstream stream;
         if (statement->isExtern())

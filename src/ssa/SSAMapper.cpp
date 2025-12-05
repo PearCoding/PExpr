@@ -93,6 +93,9 @@ std::string SSAInstrAssign::dump() const
     case OpKind::Access:
         ss << "access[" << Swizzle << "]";
         break;
+    case OpKind::Vector:
+        ss << "vec[" << Operands.size() << "]";
+        break;
     case OpKind::Nop:
         ss << "nop";
         break;
@@ -202,6 +205,40 @@ std::string SSAMapper::fresh(const std::string& base)
     return ss.str();
 }
 
+SSAValue SSAMapper::uplift(const std::string& base, const SSAValue& old)
+{
+    SSAValue copy = old;
+    if (old.Kind == SSAValue::Kind::Named || old.Kind == SSAValue::Kind::Temp) {
+        std::stringstream ss;
+        ss << base << "." << old.Name;
+        copy.Name = ss.str();
+    }
+    return copy;
+}
+
+Ptr<SSAInstr> SSAMapper::uplift(const std::string& base, Ptr<SSAInstr>& old)
+{
+    if (!old)
+        return nullptr;
+
+    if (auto a = dynamic_cast<SSAInstrAssign*>(old.get())) {
+        a->Target = uplift(base, a->Target);
+        for (auto& o : a->Operands)
+            o = uplift(base, o);
+    }
+    if (auto a = dynamic_cast<SSAInstrCall*>(old.get()))
+        a->Target = uplift(base, a->Target);
+    if (auto a = dynamic_cast<SSAInstrReturn*>(old.get()))
+        a->Value = uplift(base, a->Value);
+    if (auto a = dynamic_cast<SSAInstrPhi*>(old.get())) {
+        a->Target = uplift(base, a->Target);
+        for (auto& o : a->Sources)
+            o = uplift(base, o);
+    }
+
+    return old;
+}
+
 void SSAMapper::mapClosure(const Ptr<Closure>& closure)
 {
     if (!closure)
@@ -226,11 +263,12 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         return;
 
     switch (stmt->type()) {
-    case StatementType::Variable: {
-        auto var     = std::reinterpret_pointer_cast<VariableStatement>(stmt);
+    case StatementType::VariableDeclaration: {
+        auto var     = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
         SSAValue rhs = mapExpression(var->expression());
         SSAInstrAssign asg;
         SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), var->expression()->returnType());
+        // TODO: Implicit cast
         // propagate type from RHS if available
         tgt.Type     = rhs.Type;
         asg.Target   = tgt;
@@ -240,8 +278,23 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         // remember mapping for this statement's expression pointer, so subsequent uses can reuse name
         mExprValues[stmt.get()] = tgt;
     } break;
-    case StatementType::Function: {
-        auto f = std::reinterpret_pointer_cast<FunctionStatement>(stmt);
+    case StatementType::VariableAssignment: {
+        auto var     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
+        SSAValue rhs = mapExpression(var->expression());
+        SSAInstrAssign asg;
+        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), var->expression()->returnType());
+        // TODO: Implicit cast
+        // propagate type from RHS if available
+        tgt.Type     = rhs.Type;
+        asg.Target   = tgt;
+        asg.Operator = SSAInstrAssign::OpKind::Assign;
+        asg.Operands = { rhs };
+        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        // remember mapping for this statement's expression pointer, so subsequent uses can reuse name
+        mExprValues[stmt.get()] = tgt;
+    } break;
+    case StatementType::FunctionDeclaration: {
+        auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
         SSAFunction func;
         func.Name = f->mangledName();
         func.Parameters.reserve(f->parameters().size());
@@ -256,8 +309,8 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
             SSAMapper inner;
             auto innerProg = inner.map(closureExpr->closure());
             // move innerProg.mainBody into func.body
-            for (const auto& instr : innerProg.Body)
-                func.Body.push_back(instr);
+            for (auto& instr : innerProg.Body)
+                func.Body.push_back(uplift(func.Name, instr));
         } else {
             // if body is not a closure, map expression into a single return instr inside function
             if (f->expression()) {
@@ -265,8 +318,8 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
                 Ptr<Closure> tmp = std::make_shared<Closure>(f->expression()->location(), nullptr);
                 tmp->setExpression(f->expression());
                 auto innerProg = inner.map(tmp);
-                for (const auto& instr : innerProg.Body)
-                    func.Body.push_back(instr);
+                for (auto& instr : innerProg.Body)
+                    func.Body.push_back(uplift(func.Name, instr));
             }
         }
 
@@ -307,27 +360,27 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         case ElementaryType::Boolean:
             sval    = lit->getBool() ? "true" : "false";
             v.Name  = sval;
-            v.Value = ValueVariant(lit->getBool());
+            v.Value = ExtendedValueVariant(lit->getBool());
             break;
         case ElementaryType::Integer:
             sval    = std::to_string(lit->getInteger());
             v.Name  = sval;
-            v.Value = ValueVariant(static_cast<Integer>(lit->getInteger()));
+            v.Value = ExtendedValueVariant(static_cast<Integer>(lit->getInteger()));
             break;
         case ElementaryType::Number:
             sval    = std::to_string(lit->getNumber());
             v.Name  = sval;
-            v.Value = ValueVariant(static_cast<Number>(lit->getNumber()));
+            v.Value = ExtendedValueVariant(static_cast<Number>(lit->getNumber()));
             break;
         case ElementaryType::String:
             sval    = std::string("\"") + lit->getString() + "\"";
             v.Name  = sval;
-            v.Value = ValueVariant(lit->getString());
+            v.Value = ExtendedValueVariant(lit->getString());
             break;
         default:
             sval    = "unknown";
             v.Name  = sval;
-            v.Value = ValueVariant(std::string());
+            v.Value = ExtendedValueVariant(std::string());
         }
         result = v;
     } break;
@@ -342,6 +395,21 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         } else {
             result = SSAValue(SSAValue::Kind::Named, v->name(), v->returnType());
         }
+    } break;
+    case ExpressionType::Vector: {
+        auto v = std::reinterpret_pointer_cast<VectorExpression>(expr);
+        std::vector<SSAValue> inners;
+        inners.reserve(v->entries().size());
+        for (const auto& e : v->entries())
+            inners.push_back(mapExpression(e));
+
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), v->returnType());
+        SSAInstrAssign asg;
+        asg.Target   = tgt;
+        asg.Operator = SSAInstrAssign::OpKind::Vector;
+        asg.Operands = std::move(inners);
+        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        result = tgt;
     } break;
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
@@ -409,8 +477,8 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         func.ReturnType = c->returnType();
         func.External   = false;
         // move inner instructions into function body
-        for (const auto& instr : prog.Body)
-            func.Body.push_back(instr);
+        for (auto& instr : prog.Body)
+            func.Body.push_back(uplift(func.Name, instr));
         func.InnerFunctions = std::move(prog.Functions);
         mProgram.Functions.push_back(std::move(func));
 

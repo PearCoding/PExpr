@@ -1,9 +1,9 @@
 extern fn make_vec3(x:num, y:num, z:num) -> vec3;
 fn test() = {
-    r = 1234;
-    rr = 12345;
+    let r = 1234;
+    let rr = 12345;
     r * rr
 };
-mut k = 2;
+let mut k = 2;
 k = k*3;
 test() * {make_vec3(2, 1, 2) * 22}.xz * k

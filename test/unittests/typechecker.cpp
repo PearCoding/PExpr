@@ -49,7 +49,7 @@ TEST_CASE("TypeChecker: mixed int and number yields number", "[typechecker]") {
 }
 
 TEST_CASE("TypeChecker: variable declaration registers variable and used in expression", "[typechecker]") {
-    std::stringstream stream("mut x = 1; x = x+4; x+2");
+    std::stringstream stream("let mut x = 1; x = x+4; x+2");
     Lexer lexer(stream);
     Parser parser(lexer);
     SymbolTable globals;

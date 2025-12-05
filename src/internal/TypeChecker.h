@@ -24,6 +24,7 @@ private:
     [[nodiscard]] ElementaryType handleNode(const Ptr<BinaryExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<CallExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<AccessExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<VectorExpression>& expr);
 
     SymbolTable mDynamicDefinitions;
     const SymbolTable& mDefinitions;

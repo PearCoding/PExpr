@@ -41,7 +41,7 @@ TEST_CASE("Parser: complex expression parsing", "[parser]")
 
 TEST_CASE("Parser: closure with variable and expression", "[parser]")
 {
-    const std::string input = "mut x = 1; x+2";
+    const std::string input = "let mut x = 1; x+2";
     std::stringstream stream(input);
     Lexer lexer(stream);
     Parser parser(lexer);

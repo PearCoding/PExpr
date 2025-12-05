@@ -1,7 +1,7 @@
 // A variable can be easily defined by assignment
-a = 42;
+let a = 42;
 // A variable can not be changed if not defined mutable first
-mut b = 1234;
+let mut b = 1234;
 // A variable can only be reassigned with the same type
 b = 56;
 //- b = vec2(1, 1) // Error!

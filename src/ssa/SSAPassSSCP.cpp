@@ -97,6 +97,27 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         }
         return false;
     };
+    auto getVec2 = [](const SSAValue& vv, Vec2& out) -> bool {
+        if (const Vec2* n = std::get_if<Vec2>(&vv.Value)) {
+            out = static_cast<Vec2>(*n);
+            return true;
+        }
+        return false;
+    };
+    auto getVec3 = [](const SSAValue& vv, Vec3& out) -> bool {
+        if (const Vec3* n = std::get_if<Vec3>(&vv.Value)) {
+            out = static_cast<Vec3>(*n);
+            return true;
+        }
+        return false;
+    };
+    auto getVec4 = [](const SSAValue& vv, Vec4& out) -> bool {
+        if (const Vec4* n = std::get_if<Vec4>(&vv.Value)) {
+            out = static_cast<Vec4>(*n);
+            return true;
+        }
+        return false;
+    };
 
     // Collect resolved operand constants
     std::vector<SSAValue> ops;
@@ -122,17 +143,88 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
     if (asg->Operator == SSAInstrAssign::OpKind::Assign && ops.size() == 1)
         return ops.front();
 
+    // Access xyzw
+    if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 1) {
+        std::vector<Number> values;
+        values.reserve(asg->Swizzle.size());
+
+        if (Vec2 v; getVec2(ops.front(), v)) {
+            for (const char c : asg->Swizzle) {
+                if (c == 'x' || c == 'r')
+                    values.push_back(v[0]);
+                if (c == 'y' || c == 'g')
+                    values.push_back(v[1]);
+            }
+        }
+
+        if (Vec3 v; getVec3(ops.front(), v)) {
+            for (const char c : asg->Swizzle) {
+                if (c == 'x' || c == 'r')
+                    values.push_back(v[0]);
+                if (c == 'y' || c == 'g')
+                    values.push_back(v[1]);
+                if (c == 'z' || c == 'b')
+                    values.push_back(v[2]);
+            }
+        }
+
+        if (Vec4 v; getVec4(ops.front(), v)) {
+            for (const char c : asg->Swizzle) {
+                if (c == 'x' || c == 'r')
+                    values.push_back(v[0]);
+                if (c == 'y' || c == 'g')
+                    values.push_back(v[1]);
+                if (c == 'z' || c == 'b')
+                    values.push_back(v[2]);
+                if (c == 'w' || c == 'a')
+                    values.push_back(v[3]);
+            }
+        }
+
+        if (values.size() == 1)
+            return SSAValue::Constant(values[0]);
+        if (values.size() == 2)
+            return SSAValue::Constant(Vec2{ values[0], values[1] });
+        if (values.size() == 3)
+            return SSAValue::Constant(Vec3{ values[0], values[1], values[2] });
+        if (values.size() == 4)
+            return SSAValue::Constant(Vec4{ values[0], values[1], values[2], values[3] });
+    }
+
+    // Vector [x,y,z,w]
+    if (asg->Operator == SSAInstrAssign::OpKind::Vector) {
+        std::vector<Number> values;
+        values.reserve(ops.size());
+        for (const auto& vv : ops) {
+            Number v;
+            if (!getNumber(vv, v))
+                return std::nullopt;
+            values.push_back(v);
+        }
+
+        if (values.size() == 2)
+            return SSAValue::Constant(Vec2{ values[0], values[1] });
+        if (values.size() == 3)
+            return SSAValue::Constant(Vec3{ values[0], values[1], values[2] });
+        if (values.size() == 4)
+            return SSAValue::Constant(Vec4{ values[0], values[1], values[2], values[3] });
+    }
+
     // Unary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1) {
         const auto& o = ops[0];
         switch (asg->UnaryOp) {
         case UnaryOperation::Neg: {
-            Integer iv;
-            Number dv;
-            if (getInteger(o, iv))
+            if (Integer iv; getInteger(o, iv))
                 return SSAValue::Constant(static_cast<Integer>(-iv));
-            else if (getNumber(o, dv))
+            else if (Number dv; getNumber(o, dv))
                 return SSAValue::Constant(static_cast<Number>(-dv));
+            else if (Vec2 v; getVec2(o, v))
+                return SSAValue::Constant(Vec2{ -v[0], -v[1] });
+            else if (Vec3 v; getVec3(o, v))
+                return SSAValue::Constant(Vec3{ -v[0], -v[1], -v[2] });
+            else if (Vec4 v; getVec4(o, v))
+                return SSAValue::Constant(Vec4{ -v[0], -v[1], -v[2], -v[3] });
             break;
         }
         case UnaryOperation::Pos:
@@ -240,6 +332,8 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
                     }
                 }
             }
+
+            // TODO: Vector version
             break;
         }
         case BinaryOperation::Equal:

@@ -1,5 +1,5 @@
-Pi = 3.141592;
+let Pi = 3.141592;
 fn test() = 23+123*Pi;
-mut k = 2;
+let mut k = 2;
 k = k*3;
 test() * 22 * k

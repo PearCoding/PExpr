@@ -121,8 +121,8 @@ private:
             mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
 
         while (true) {
-            if (P.accept(TokenType::Mutable)) {
-                // Variable
+            if (P.accept(TokenType::Let)) {
+                // Variable declaration
                 closure->addStatement(p_variable_statement(true));
             } else if (P.accept(TokenType::Extern)) {
                 // Function (extern)
@@ -162,11 +162,15 @@ private:
     }
 
     // Statements
-    inline Ptr<Statement> p_variable_statement(bool is_mutable)
+    inline Ptr<Statement> p_variable_statement(bool is_declaration)
     {
-        const auto loc            = P.cur().Location;
-        const std::string varName = std::get<std::string>(P.cur().Value);
+        const auto loc = P.cur().Location;
 
+        bool is_mutable = false;
+        if (is_declaration)
+            is_mutable = P.accept(TokenType::Mutable);
+
+        const std::string varName = std::get<std::string>(P.cur().Value);
         P.expect(TokenType::Identifier);
         P.expect(TokenType::Assign);
 
@@ -174,12 +178,15 @@ private:
 
         P.expect(TokenType::Semicolon);
 
-        return std::make_shared<VariableStatement>(is_mutable, loc, varName, expr);
+        if (is_declaration)
+            return std::make_shared<VariableDeclarationStatement>(is_mutable, loc, varName, expr);
+        else
+            return std::make_shared<VariableAssignmentStatement>(loc, varName, expr);
     }
 
-    inline FunctionStatement::ParameterList p_parameter_def_list()
+    inline FunctionDeclarationStatement::ParameterList p_parameter_def_list()
     {
-        FunctionStatement::ParameterList list;
+        FunctionDeclarationStatement::ParameterList list;
 
         if (P.cur().Type == TokenType::ClosedParentheses)
             return list; // Empty parameter list
@@ -190,7 +197,7 @@ private:
             // if (P.cur().Type == TokenType::Colon) {
             P.expect(TokenType::Colon);
             const ElementaryType type = p_elementary_type();
-            list.push_back(FunctionStatement::Parameter{ paramName, type });
+            list.push_back(FunctionDeclarationStatement::Parameter{ paramName, type });
             // } else {
             //     list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
             // }
@@ -239,7 +246,7 @@ private:
             paramTypes.push_back(p.Type);
 
         std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
-        return std::make_shared<FunctionStatement>(loc, funcName, parameters, expr, returnType, mangled);
+        return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, expr, returnType, mangled);
     }
 
     // Expressions

@@ -2,9 +2,7 @@
 #include <sstream>
 #include <string>
 
-#include "internal/Lexer.h"
-#include "internal/Parser.h"
-#include "internal/SymbolTable.h"
+#include "Environment.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSAPassSSCP.h"
 
@@ -14,12 +12,9 @@ using namespace PExpr::internal;
 
 TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
 {
-    std::stringstream stream("mut a = 2; mut b = 3; mut c = a + b; c");
-    Lexer lexer(stream);
-    Parser parser(lexer);
-    SymbolTable globals;
-
-    auto ast = parser.parse(&globals);
+    std::stringstream stream("let mut a = 2; let mut b = 3; let mut c = a + b; c");
+    Environment env;
+    auto ast = env.parse(stream);
 
     SSAMapper mapper;
     auto prog = mapper.map(ast);
@@ -36,12 +31,9 @@ TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
 
 TEST_CASE("SSAPassSSCP: dead code elimination removes unused assigns", "[sscp]")
 {
-    std::stringstream stream("x = 1; y = 2; x");
-    Lexer lexer(stream);
-    Parser parser(lexer);
-    SymbolTable globals;
-
-    auto ast = parser.parse(&globals);
+    std::stringstream stream("let x = 1; let y = 2; x");
+    Environment env;
+    auto ast = env.parse(stream);
 
     SSAMapper mapper;
     auto prog = mapper.map(ast);

@@ -96,9 +96,10 @@ enum class ExpressionType {
 };
 
 enum class StatementType {
-    Error,    /// Internally used statement type.
-    Variable, /// New or redefinition of a variable
-    Function, /// New definition of a function
+    Error,               /// Internally used statement type.
+    VariableDeclaration, /// New declaration of a variable
+    VariableAssignment,  /// Update of a variable
+    FunctionDeclaration, /// New declaration of a function
 };
 
 /// Returns printable representation of the given type.

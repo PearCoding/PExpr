@@ -270,13 +270,13 @@ public:
         : Expression(loc, ExpressionType::Vector)
         , mEntries(entries)
     {
-        PEXPR_ASSERT(mEntries.size() >= 2 && mEntries.size() < 4, "Expected valid sized entries for vector expression");
+        PEXPR_ASSERT(mEntries.size() >= 2 && mEntries.size() <= 4, "Expected valid sized entries for vector expression");
     }
     inline VectorExpression(const Location& loc, std::vector<Ptr<Expression>>&& entries)
         : Expression(loc, ExpressionType::Vector)
         , mEntries(std::move(entries))
     {
-        PEXPR_ASSERT(mEntries.size() >= 2 && mEntries.size() < 4, "Expected valid sized entries for vector expression");
+        PEXPR_ASSERT(mEntries.size() >= 2 && mEntries.size() <= 4, "Expected valid sized entries for vector expression");
     }
 
     [[nodiscard]] inline const std::vector<Ptr<Expression>> entries() const { return mEntries; }

@@ -125,6 +125,8 @@ Token Lexer::next()
                 return Token(prevLoc, TokenType::Elif);
             if (mTemp == "else")
                 return Token(prevLoc, TokenType::Else);
+            if (mTemp == "let")
+                return Token(prevLoc, TokenType::Let);
             if (mTemp == "mut")
                 return Token(prevLoc, TokenType::Mutable);
             if (mTemp == "fn")

@@ -15,10 +15,8 @@ public:
 
     inline bool addVariable(const VariableDef& var)
     {
-        if (const auto it = mVariables.find(var.name()); it != mVariables.end()) {
-            if (!it->second.isMutable() || it->second.type() != var.type())
-                return false;
-        }
+        if (const auto it = mVariables.find(var.name()); it != mVariables.end())
+            return false;
 
         mVariables.emplace(var.name(), var);
         return true;
@@ -26,10 +24,8 @@ public:
 
     inline bool addVariable(VariableDef&& var)
     {
-        if (const auto it = mVariables.find(var.name()); it != mVariables.end()) {
-            if (!it->second.isMutable() || it->second.type() != var.type())
-                return false;
-        }
+        if (const auto it = mVariables.find(var.name()); it != mVariables.end())
+            return false;
 
         const std::string name = var.name();
         mVariables.emplace(name, std::move(var));
