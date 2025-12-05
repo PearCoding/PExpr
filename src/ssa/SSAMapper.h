@@ -157,8 +157,6 @@ public:
 
 private:
     [[nodiscard]] std::string fresh(const std::string& base);
-    [[nodiscard]] SSAValue uplift(const std::string& base, const SSAValue& old);
-    [[nodiscard]] Ptr<SSAInstr> uplift(const std::string& base, Ptr<SSAInstr>& old);
 
     void mapClosure(const Ptr<Closure>& closure);
     void mapStatement(const Ptr<Statement>& stmt);

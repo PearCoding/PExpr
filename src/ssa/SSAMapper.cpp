@@ -208,40 +208,6 @@ std::string SSAMapper::fresh(const std::string& base)
     return ss.str();
 }
 
-SSAValue SSAMapper::uplift(const std::string& base, const SSAValue& old)
-{
-    SSAValue copy = old;
-    if (old.Kind == SSAValue::Kind::Named || old.Kind == SSAValue::Kind::Temp) {
-        std::stringstream ss;
-        ss << base << "." << old.Name;
-        copy.Name = ss.str();
-    }
-    return copy;
-}
-
-Ptr<SSAInstr> SSAMapper::uplift(const std::string& base, Ptr<SSAInstr>& old)
-{
-    if (!old)
-        return nullptr;
-
-    if (auto a = dynamic_cast<SSAInstrAssign*>(old.get())) {
-        a->Target = uplift(base, a->Target);
-        for (auto& o : a->Operands)
-            o = uplift(base, o);
-    }
-    if (auto a = dynamic_cast<SSAInstrCall*>(old.get()))
-        a->Target = uplift(base, a->Target);
-    if (auto a = dynamic_cast<SSAInstrReturn*>(old.get()))
-        a->Value = uplift(base, a->Value);
-    if (auto a = dynamic_cast<SSAInstrPhi*>(old.get())) {
-        a->Target = uplift(base, a->Target);
-        for (auto& o : a->Sources)
-            o = uplift(base, o);
-    }
-
-    return old;
-}
-
 SSAValue SSAMapper::handleCast(ElementaryType to, const SSAValue& from)
 {
     if (to == from.Type || !isConvertible(from.Type, to))
@@ -323,7 +289,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
             auto innerProg = inner.map(closureExpr->closure());
             // move innerProg.mainBody into func.body
             for (auto& instr : innerProg.Body)
-                func.Body.push_back(uplift(func.Name, instr));
+                func.Body.push_back(instr);
         } else {
             // if body is not a closure, map expression into a single return instr inside function
             if (f->expression()) {
@@ -332,7 +298,7 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
                 tmp->setExpression(f->expression());
                 auto innerProg = inner.map(tmp);
                 for (auto& instr : innerProg.Body)
-                    func.Body.push_back(uplift(func.Name, instr));
+                    func.Body.push_back(instr);
             }
         }
 
@@ -491,7 +457,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         func.External   = false;
         // move inner instructions into function body
         for (auto& instr : prog.Body)
-            func.Body.push_back(uplift(func.Name, instr));
+            func.Body.push_back(instr);
         func.InnerFunctions = std::move(prog.Functions);
         mProgram.Functions.push_back(std::move(func));
 
