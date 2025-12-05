@@ -1,5 +1,3 @@
 let v = [4,   1, 3,   4];
-let u = -v;
-//let u = [1, v.y, 5, v.w];
-//u.y * v.x
-u.x
+let u = [1, v.y, 5, v.w];
+u.y * v.x
