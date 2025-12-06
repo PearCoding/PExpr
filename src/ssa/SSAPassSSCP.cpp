@@ -211,7 +211,11 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
     }
 
     // Cast
-    if (asg->Operator == SSAInstrAssign::OpKind::Cast) {
+    if (asg->Operator == SSAInstrAssign::OpKind::Cast && ops.size() == 1) {
+        // Is it even useful?
+        if (asg->Target.Type == asg->Operands.front().Type)
+            return asg->Operands.front();
+
         if (asg->Target.Type == ElementaryType::Number) {
             // int -> num (implicit or explicit)
             if (Integer i; getInteger(asg->Operands.front(), i))
@@ -245,12 +249,10 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         case UnaryOperation::Pos:
             // +x -> x
             return o;
-        case UnaryOperation::Not: {
-            bool bv;
-            if (getBool(o, bv))
+        case UnaryOperation::Not:
+            if (bool bv; getBool(o, bv))
                 return SSAValue::Constant(!bv);
             break;
-        }
         default:
             break;
         }
@@ -263,8 +265,7 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         switch (asg->BinaryOp) {
         case BinaryOperation::And:
         case BinaryOperation::Or: {
-            bool lv, rv;
-            if (getBool(L, lv) && getBool(R, rv)) {
+            if (bool lv, rv; getBool(L, lv) && getBool(R, rv)) {
                 bool res = (asg->BinaryOp == BinaryOperation::And) ? (lv && rv) : (lv || rv);
                 return SSAValue::Constant(res);
             }
@@ -357,8 +358,7 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         case BinaryOperation::Greater:
         case BinaryOperation::LessEqual:
         case BinaryOperation::GreaterEqual: {
-            Number lv, rv;
-            if (getNumber(L, lv) && getNumber(R, rv)) {
+            if (Number lv, rv; getNumber(L, lv) && getNumber(R, rv)) {
                 bool res = false;
                 switch (asg->BinaryOp) {
                 case BinaryOperation::Equal:
@@ -385,25 +385,25 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
 
                 return SSAValue::Constant(res);
             }
-            // try boolean
-            bool lb, rb;
-            if (getBool(L, lb) && getBool(R, rb)) {
-                if (asg->BinaryOp == BinaryOperation::Equal || asg->BinaryOp == BinaryOperation::NotEqual) {
+
+            if (asg->BinaryOp == BinaryOperation::Equal || asg->BinaryOp == BinaryOperation::NotEqual) {
+                // try boolean
+                if (bool lb, rb; getBool(L, lb) && getBool(R, rb)) {
                     bool res = (lb == rb);
                     if (asg->BinaryOp == BinaryOperation::NotEqual)
                         res = !res;
                     return SSAValue::Constant(res);
                 }
-                // other comparisons don't apply to booleans here
-            }
-            // try string equality for Equal/NotEqual
-            std::string ls, rs;
-            if ((asg->BinaryOp == BinaryOperation::Equal || asg->BinaryOp == BinaryOperation::NotEqual) && getString(L, ls) && getString(R, rs)) {
-                bool res = (ls == rs);
-                if (asg->BinaryOp == BinaryOperation::Equal)
-                    return SSAValue::Constant(res);
-                if (asg->BinaryOp == BinaryOperation::NotEqual)
-                    return SSAValue::Constant(!res);
+
+                // try string equality
+                if (std::string ls, rs; getString(L, ls) && getString(R, rs)) {
+                    bool res = (ls == rs);
+                    if (asg->BinaryOp == BinaryOperation::Equal)
+                        return SSAValue::Constant(res);
+                    if (asg->BinaryOp == BinaryOperation::NotEqual)
+                        return SSAValue::Constant(!res);
+                }
+                // other comparisons don't apply to booleans or strings here
             }
             break;
         }
