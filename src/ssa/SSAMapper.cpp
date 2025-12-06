@@ -185,6 +185,23 @@ std::string SSAInstrReturn::dump() const
     return ss.str();
 }
 
+std::string SSAInstrLabel::dump() const
+{
+    return std::string(Name + ":");
+}
+
+std::string SSAInstrBranch::dump() const
+{
+    std::stringstream ss;
+    ss << "br " << Condition.toString(false) << " -> " << TargetLabel;
+    return ss.str();
+}
+
+std::string SSAInstrGoto::dump() const
+{
+    return std::string("goto " + TargetLabel);
+}
+
 std::string SSAInstrPhi::dump() const
 {
     std::stringstream ss;
@@ -299,6 +316,32 @@ void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr
                 func.AccessedConstParents.insert(name);
         }
     }
+}
+
+// Inline a mapped closure body into the current program by replacing any
+// SSAInstrReturn instructions with assignments to a fresh temporary variable.
+// Returns the SSAValue representing the last returned value (or a nil constant).
+SSAValue SSAMapper::inlineClosureBody(const std::vector<std::shared_ptr<SSAInstr>>& body)
+{
+    SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
+
+    for (const auto& instr : body) {
+        if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
+            // create assignment to capture returned value
+            SSAInstrAssign asg;
+            SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), ret->Value.Type);
+            asg.Target   = tgt;
+            asg.Operator = SSAInstrAssign::OpKind::Assign;
+            asg.Operands = { ret->Value };
+            mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+            lastVal = tgt;
+        } else {
+            // non-return instructions are appended as-is
+            mProgram.Body.push_back(instr);
+        }
+    }
+
+    return lastVal;
 }
 
 void SSAMapper::mapClosure(const Ptr<Closure>& closure)
@@ -589,35 +632,61 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
     } break;
     case ExpressionType::Branch: {
         auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        // Map each branch and collect their return values (if any)
+
+        // Prepare labels for each branch, else and join
+        std::vector<std::string> branchLabels;
+        branchLabels.reserve(br->branches().size());
+        for (size_t i = 0; i < br->branches().size(); ++i)
+            branchLabels.push_back(fresh("lbl"));
+        std::string elseLabel = fresh("lbl");
+        std::string joinLabel = fresh("lbl");
+
+        // Emit conditional branches for each branch condition that jump to their label
+        for (size_t i = 0; i < br->branches().size(); ++i) {
+            const auto& single = br->branches()[i];
+            // map condition expression
+            SSAValue cond = mapExpression(single.Condition);
+            // emit branch instruction
+            SSAInstrBranch bInstr;
+            bInstr.Condition   = cond;
+            bInstr.TargetLabel = branchLabels[i];
+            mProgram.Body.push_back(std::make_shared<SSAInstrBranch>(bInstr));
+        }
+
+        // If none matched, fall through to else label; emit else label and inline else body
+        SSAInstrLabel elbl;
+        elbl.Name = elseLabel;
+        mProgram.Body.push_back(std::make_shared<SSAInstrLabel>(elbl));
+        SSAMapper elseMapper;
+        auto elseProg    = elseMapper.map(br->elseClosure());
+        SSAValue elseVal = inlineClosureBody(elseProg.Body);
+        // after else body jump to join
+        SSAInstrGoto gToJoin;
+        gToJoin.TargetLabel = joinLabel;
+        mProgram.Body.push_back(std::make_shared<SSAInstrGoto>(gToJoin));
+
+        // Now emit each branch body under its label and jump to join after
         std::vector<SSAValue> branchVals;
-        for (const auto& b : br->branches()) {
+        branchVals.reserve(branchLabels.size());
+        for (size_t i = 0; i < br->branches().size(); ++i) {
+            SSAInstrLabel lbl;
+            lbl.Name = branchLabels[i];
+            mProgram.Body.push_back(std::make_shared<SSAInstrLabel>(lbl));
+
             SSAMapper inner;
-            auto prog = inner.map(b.Body);
-            // append branch instructions as inline (for now)
-            for (const auto& instr : prog.Body)
-                mProgram.Body.push_back(instr);
-            // try to extract last return value if present
-            SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
-            if (!prog.Body.empty()) {
-                // inspect last instr; if SSAInstrReturn, use its value
-                auto last = prog.Body.back();
-                if (auto ret = dynamic_cast<SSAInstrReturn*>(last.get()))
-                    lastVal = ret->Value;
-            }
+            auto prog        = inner.map(br->branches()[i].Body);
+            SSAValue lastVal = inlineClosureBody(prog.Body);
             branchVals.push_back(lastVal);
+
+            SSAInstrGoto toJoin;
+            toJoin.TargetLabel = joinLabel;
+            mProgram.Body.push_back(std::make_shared<SSAInstrGoto>(toJoin));
         }
-        // else closure
-        SSAMapper inner;
-        auto elseProg = inner.map(br->elseClosure());
-        for (const auto& instr : elseProg.Body)
-            mProgram.Body.push_back(instr);
-        SSAValue elseVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
-        if (!elseProg.Body.empty()) {
-            auto last = elseProg.Body.back();
-            if (auto ret = dynamic_cast<SSAInstrReturn*>(last.get()))
-                elseVal = ret->Value;
-        }
+
+        // Emit join label
+        SSAInstrLabel jlbl;
+        jlbl.Name = joinLabel;
+        mProgram.Body.push_back(std::make_shared<SSAInstrLabel>(jlbl));
 
         // Use the BranchExpression's declared return type as the phi node type.
         ElementaryType phiType = expr->returnType();
@@ -627,8 +696,8 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         auto phi    = std::make_shared<SSAInstrPhi>();
         phi->Target = tgt;
 
-        // Add sources as-is; casts should have been injected by the TypeChecker if needed.
-        phi->Sources = branchVals;
+        // Add sources: branch results in order then else result
+        phi->Sources = std::move(branchVals);
         phi->Sources.push_back(elseVal);
 
         mProgram.Body.push_back(phi);

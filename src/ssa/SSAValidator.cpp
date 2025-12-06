@@ -40,6 +40,13 @@ bool SSAValidator::checkIfTyped(const SSAInstr* instr)
             if (!checkIfTyped(instr))
                 return false;
         }
+    } else if (const auto ptr = dynamic_cast<const SSAInstrBranch*>(instr)) {
+        if (!checkIfTyped(ptr->Condition))
+            return false;
+    } else if (dynamic_cast<const SSAInstrGoto*>(instr)) {
+        /* Ignore */
+    } else if (dynamic_cast<const SSAInstrLabel*>(instr)) {
+        /* Ignore */
     } else if (const auto ptr = dynamic_cast<const SSAInstrReturn*>(instr)) {
         if (!checkIfTyped(ptr->Value))
             return false;

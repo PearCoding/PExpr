@@ -102,6 +102,27 @@ struct SSAInstrReturn : public SSAInstr {
     [[nodiscard]] std::string dump() const override;
 };
 
+// Label instruction to mark basic blocks in the SSA body. Labels are useful
+// for representing control-flow boundaries (e.g., branch entry points) and
+// are emitted when inlining branch/closure bodies.
+struct SSAInstrLabel : public SSAInstr {
+    std::string Name;
+    [[nodiscard]] std::string dump() const override;
+};
+
+// Conditional branch instruction: if Condition is true jump to TargetLabel.
+struct SSAInstrBranch : public SSAInstr {
+    SSAValue Condition;
+    std::string TargetLabel;
+    [[nodiscard]] std::string dump() const override;
+};
+
+// Unconditional jump to a label.
+struct SSAInstrGoto : public SSAInstr {
+    std::string TargetLabel;
+    [[nodiscard]] std::string dump() const override;
+};
+
 struct SSAInstrPhi : public SSAInstr {
     SSAValue Target;
     std::vector<SSAValue> Sources;
@@ -156,6 +177,11 @@ private:
     // references and appends them to the provided SSAFunction's AccessedConstParents /
     // AccessedMutableParents vectors based on this mapper's recorded local mutability.
     void detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr>>& body, SSAFunction& func);
+
+    // Inline a mapped closure body into the current program by replacing any
+    // SSAInstrReturn instructions with assignments to a fresh temporary variable.
+    // Returns the SSAValue representing the last returned value (or a nil constant).
+    SSAValue inlineClosureBody(const std::vector<std::shared_ptr<SSAInstr>>& body);
 
     // Program under construction
     SSAProgram mProgram;
