@@ -84,12 +84,12 @@ std::string SSAValue::toString(bool showType) const
             break;
         }
         case ElementaryType::Vec3: {
-            const auto v = std::get<Vec2>(Value);
+            const auto v = std::get<Vec3>(Value);
             prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "]";
             break;
         }
         case ElementaryType::Vec4: {
-            const auto v = std::get<Vec2>(Value);
+            const auto v = std::get<Vec4>(Value);
             prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "," + std::to_string(v[3]) + "]";
             break;
         }
