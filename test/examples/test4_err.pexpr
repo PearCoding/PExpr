@@ -1,0 +1,7 @@
+let mut k = 2;
+k = k*3;
+fn foo() = {
+    k = 0; // Updating a mutable variable from a different scope is not allowed!
+    k
+};
+foo() * k // k = 0 not 6 at this point (in the SSA) -> Solving this requires a lot more brain-power, so we just prevent side-effects in pure functions

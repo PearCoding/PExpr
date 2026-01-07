@@ -1,7 +1,0 @@
-let mut k = 2;
-k = k*3;
-fn foo() = {
-    k = 0;
-    k
-};
-foo() * k // k = 0 not 6 at this point (in the SSA)
