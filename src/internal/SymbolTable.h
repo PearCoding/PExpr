@@ -32,12 +32,15 @@ public:
         return true;
     }
 
-    inline std::optional<VariableDef> lookupVariable(const Location& loc, const std::string& name) const
+    inline std::optional<VariableDef> lookupVariable(const Location& loc, const std::string& name, const SymbolTable** tbl = nullptr) const
     {
-        if (const auto it = mVariables.find(name); it != mVariables.end())
+        if (const auto it = mVariables.find(name); it != mVariables.end()) {
+            if (tbl)
+                *tbl = this;
             return it->second;
+        }
 
-        return mParent ? mParent->lookupVariable(loc, name) : std::nullopt;
+        return mParent ? mParent->lookupVariable(loc, name, tbl) : std::nullopt;
     }
 
     inline bool addFunction(const FunctionDef& func)
@@ -55,7 +58,7 @@ public:
         // Check if a function with the same name and parameters exists
         if (checkFunctionExists(func.name(), func.parameters(), true) != mFunctions.end())
             return false;
- 
+
         const std::string name = func.name();
         mFunctions.emplace(name, std::move(func));
         return true;

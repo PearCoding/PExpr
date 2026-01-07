@@ -4,6 +4,8 @@
 #include "Reporter.h"
 #include "SymbolTable.h"
 
+#include <unordered_set>
+
 namespace PExpr::internal {
 /// Checks types, resolves unspecified typing and resolves symbol lookups
 class TypeChecker {
@@ -28,6 +30,7 @@ private:
     [[nodiscard]] ElementaryType handleNode(const Ptr<CastExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<VectorExpression>& expr);
 
+    std::unordered_set<VariableDef> mCapturedVariables;
     SymbolTable mDynamicDefinitions;
     const SymbolTable& mDefinitions;
     Reporter& mReporter;

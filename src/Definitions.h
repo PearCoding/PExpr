@@ -26,6 +26,8 @@ public:
 
     [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
 
+    [[nodiscard]] auto operator<=>(const VariableDef&) const = default;
+
 private:
     std::string mName;
     ElementaryType mType;
@@ -49,7 +51,7 @@ public:
     }
 
     /// Construct a function definition with a given name, return type and parameter types.
-    inline FunctionDef(const std::string& name, const std::string& mangledName,std::vector<ElementaryType>&& params, ElementaryType retType, bool isExtern)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, std::vector<ElementaryType>&& params, ElementaryType retType, bool isExtern)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
@@ -82,3 +84,18 @@ private:
 };
 
 } // namespace PExpr
+
+namespace std {
+template <>
+class hash<PExpr::VariableDef> {
+public:
+    std::size_t operator()(const PExpr::VariableDef& def) const
+    {
+        const auto h1 = std::hash<std::string>{}(def.name());
+        const auto h2 = std::hash<uint32_t>{}((uint32_t)def.type());
+        const auto h3 = std::hash<bool>{}(def.isMutable());
+
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
+    }
+};
+} // namespace std

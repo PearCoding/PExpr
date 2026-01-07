@@ -84,9 +84,14 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             return; // Error was caught somewhere else
 
         // Check if the variable exists and can be updated
-        const auto var = mDynamicDefinitions.lookupVariable(varStmt->location(), varStmt->name());
+        const SymbolTable* capturedTbl;
+        const auto var = mDynamicDefinitions.lookupVariable(varStmt->location(), varStmt->name(), &capturedTbl);
         if (!var.has_value()) {
             mReporter.errorf(varStmt->location(), "Trying to assign a value to unknown variable '%s'", varStmt->name().c_str());
+            return;
+        }
+        if (capturedTbl != &mDynamicDefinitions) {
+            mReporter.errorf(varStmt->location(), "Trying to reassign a value to variable '%s' defined in a different scope", varStmt->name().c_str());
             return;
         }
         if (!var->isMutable()) {
@@ -178,10 +183,18 @@ ElementaryType TypeChecker::handleNode(const Ptr<Expression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<ClosureExpression>& expr)
 {
+    // Link closure information
+    auto cpt            = mCapturedVariables;
     auto def            = mDynamicDefinitions;
+    mCapturedVariables  = {};
+    mDynamicDefinitions = SymbolTable(&def);
+
     ElementaryType type = handleNode(expr->closure());
     expr->setReturnType(type);
+
+    // Reset closure information
     mDynamicDefinitions = std::move(def);
+    mCapturedVariables  = std::move(cpt);
     return type;
 }
 
@@ -230,7 +243,11 @@ ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
 
 ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
 {
-    if (const auto def = mDynamicDefinitions.lookupVariable(expr->location(), expr->name()); def.has_value()) {
+    const SymbolTable* capturedTbl;
+    if (const auto def = mDynamicDefinitions.lookupVariable(expr->location(), expr->name(), &capturedTbl); def.has_value()) {
+        // The variable was used outside the current closure. Capture it!
+        if (capturedTbl != &mDynamicDefinitions)
+            mCapturedVariables.insert(def.value());
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
