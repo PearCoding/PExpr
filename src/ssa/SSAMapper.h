@@ -167,9 +167,9 @@ public:
 private:
     [[nodiscard]] std::string fresh(const std::string& base);
 
-    void mapClosure(const Ptr<Closure>& closure);
-    void mapStatement(const Ptr<Statement>& stmt);
-    [[nodiscard]] SSAValue mapExpression(const Ptr<Expression>& expr);
+    [[nodiscard]] SSAProgram mapClosure(const Ptr<Closure>& closure);
+    void mapStatement(SSAProgram& program, const Ptr<Statement>& stmt);
+    [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<Expression>& expr);
 
     // Detect captured parent-level variables referenced inside a nested function/closure.
     // Scans the provided SSA instruction list, classifies plain (non-versioned) named
@@ -180,10 +180,7 @@ private:
     // Inline a mapped closure body into the current program by replacing any
     // SSAInstrReturn instructions with assignments to a fresh temporary variable.
     // Returns the SSAValue representing the last returned value (or a nil constant).
-    SSAValue inlineClosureBody(const std::vector<std::shared_ptr<SSAInstr>>& body);
-
-    // Program under construction
-    SSAProgram mProgram;
+    SSAValue inlineClosureBody(SSAProgram& program, const std::vector<std::shared_ptr<SSAInstr>>& body);
 
     // Internal helpers
     std::unordered_map<std::string, int> mCounters;

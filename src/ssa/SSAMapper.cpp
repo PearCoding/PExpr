@@ -257,13 +257,10 @@ SSAMapper::SSAMapper() = default;
 
 SSAProgram SSAMapper::map(const Ptr<Closure>& closure)
 {
-    mProgram = SSAProgram{};
     mCounters.clear();
     mExprValues.clear();
     mLocalMutability.clear();
-    mapClosure(closure);
-
-    return mProgram;
+    return mapClosure(closure);
 }
 
 std::string SSAMapper::fresh(const std::string& base)
@@ -321,7 +318,7 @@ void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr
 // Inline a mapped closure body into the current program by replacing any
 // SSAInstrReturn instructions with assignments to a fresh temporary variable.
 // Returns the SSAValue representing the last returned value (or a nil constant).
-SSAValue SSAMapper::inlineClosureBody(const std::vector<std::shared_ptr<SSAInstr>>& body)
+SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std::shared_ptr<SSAInstr>>& body)
 {
     SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
 
@@ -333,36 +330,40 @@ SSAValue SSAMapper::inlineClosureBody(const std::vector<std::shared_ptr<SSAInstr
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { ret->Value };
-            mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
             lastVal = tgt;
         } else {
             // non-return instructions are appended as-is
-            mProgram.Body.push_back(instr);
+            program.Body.push_back(instr);
         }
     }
 
     return lastVal;
 }
 
-void SSAMapper::mapClosure(const Ptr<Closure>& closure)
+SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
 {
     if (!closure)
-        return;
+        return SSAProgram{};
+
+    auto program = SSAProgram{};
 
     // map statements
     for (const auto& stmt : closure->statements())
-        mapStatement(stmt);
+        mapStatement(program, stmt);
 
     // map final expression as return
     if (closure->expression()) {
-        SSAValue v = mapExpression(closure->expression());
+        SSAValue v = mapExpression(program, closure->expression());
         auto ret   = std::make_shared<SSAInstrReturn>();
         ret->Value = v;
-        mProgram.Body.push_back(ret);
+        program.Body.push_back(ret);
     }
+
+    return program;
 }
 
-void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
+void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
 {
     if (!stmt)
         return;
@@ -370,14 +371,14 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
     switch (stmt->type()) {
     case StatementType::VariableDeclaration: {
         auto var     = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
-        SSAValue rhs = mapExpression(var->expression());
+        SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
         SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
-        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         // remember mapping for this statement's expression pointer, so subsequent uses can reuse name
         mExprValues[stmt.get()] = tgt;
 
@@ -386,14 +387,14 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
     } break;
     case StatementType::VariableAssignment: {
         auto var     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
-        SSAValue rhs = mapExpression(var->expression());
+        SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
         SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
-        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         // remember mapping for this statement's expression pointer, so subsequent uses can reuse name
         mExprValues[stmt.get()] = tgt;
     } break;
@@ -411,14 +412,14 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         func.External   = f->isExtern();
 
         // Insert placeholder function into program so it's visible during mapping.
-        mProgram.Functions.push_back(func);
-        SSAFunction& dst = mProgram.Functions.back();
+        program.Functions.push_back(func);
+        SSAFunction& dst = program.Functions.back();
 
         // map function body using a nested mapper so temporaries are local
         if (f->expression() && f->expression()->type() == ExpressionType::Closure) {
             auto closureExpr = std::reinterpret_pointer_cast<ClosureExpression>(f->expression());
-            SSAMapper inner;
-            auto innerProg = inner.map(closureExpr->closure());
+            // SSAMapper inner;
+            auto innerProg = mapClosure(closureExpr->closure());
             // move innerProg.mainBody into dst.body
             for (auto& instr : innerProg.Body)
                 dst.Body.push_back(instr);
@@ -431,10 +432,10 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
         } else {
             // if body is not a closure, map expression into a single return instr inside function
             if (f->expression()) {
-                SSAMapper inner;
+                // SSAMapper inner;
                 Ptr<Closure> tmp = std::make_shared<Closure>(f->expression()->location(), nullptr);
                 tmp->setExpression(f->expression());
-                auto innerProg = inner.map(tmp);
+                auto innerProg = mapClosure(tmp);
                 for (auto& instr : innerProg.Body)
                     dst.Body.push_back(instr);
                 dst.InnerFunctions = std::move(innerProg.Functions);
@@ -448,13 +449,13 @@ void SSAMapper::mapStatement(const Ptr<Statement>& stmt)
             SSAInstrAssign asg;
             asg.Target   = SSAValue(SSAValue::Kind::Temp, fresh("tmp"), ElementaryType::Unspecified);
             asg.Operator = SSAInstrAssign::OpKind::Nop;
-            mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         }
         break;
     }
 }
 
-SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
+SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
 {
     if (!expr)
         return SSAValue{ SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified };
@@ -518,39 +519,39 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         std::vector<SSAValue> inners;
         inners.reserve(v->entries().size());
         for (const auto& e : v->entries())
-            inners.push_back(mapExpression(e));
+            inners.push_back(mapExpression(program, e));
 
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), v->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Vector;
         asg.Operands = std::move(inners);
-        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        SSAValue inner = mapExpression(u->inner());
+        SSAValue inner = mapExpression(program, u->inner());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Unary;
         asg.UnaryOp  = u->op();
         asg.Operands = { inner };
-        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
     case ExpressionType::Binary: {
         auto b     = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        SSAValue L = mapExpression(b->left());
-        SSAValue R = mapExpression(b->right());
+        SSAValue L = mapExpression(program, b->left());
+        SSAValue R = mapExpression(program, b->right());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Binary;
         asg.BinaryOp = b->op();
         asg.Operands = { L, R };
-        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
     case ExpressionType::Call: {
@@ -558,7 +559,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         std::vector<SSAValue> args;
         args.reserve(c->parameters().size());
         for (const auto& p : c->parameters())
-            args.push_back(mapExpression(p)); // TODO: Implicit casts
+            args.push_back(mapExpression(program, p)); // TODO: Implicit casts
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
         SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());
@@ -567,25 +568,25 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         call->FunctionName       = c->mangledName();
         call->PublicFunctionName = c->name();
         call->Arguments          = args;
-        mProgram.Body.push_back(call);
+        program.Body.push_back(call);
         result = tgt;
     } break;
     case ExpressionType::Access: {
         auto a      = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        SSAValue in = mapExpression(a->inner());
+        SSAValue in = mapExpression(program, a->inner());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Access;
         asg.Swizzle  = a->swizzle();
         asg.Operands = { in };
-        mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;
     case ExpressionType::Cast: {
         auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
         // Map inner expression and emit an SSA cast instruction
-        SSAValue inner = mapExpression(c->inner());
+        SSAValue inner = mapExpression(program, c->inner());
         // If both types match do nothing else typechecker should ensure correctness
         if (inner.Type == c->toType()) {
             result = inner;
@@ -595,15 +596,15 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
             cast.Target   = tgt;
             cast.Operator = SSAInstrAssign::OpKind::Cast;
             cast.Operands = { inner };
-            mProgram.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
             result = tgt;
         }
     } break;
     case ExpressionType::Closure: {
         auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
         // Map nested closure as a function-like entity and return a temp referencing it.
-        SSAMapper inner;
-        auto prog = inner.map(c->closure());
+        // SSAMapper inner;
+        auto prog = mapClosure(c->closure());
         // create a synthetic function name and register it as a function in program
         const std::string funcName = fresh("closure");
         SSAFunction func;
@@ -618,7 +619,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         // detect captured parent-level variables referenced by the closure
         detectCapturedParents(prog.Body, func);
 
-        mProgram.Functions.push_back(std::move(func));
+        program.Functions.push_back(std::move(func));
 
         // directly call the closure
         SSAValue tgt(SSAValue::Kind::Temp, fresh(funcName), c->returnType());
@@ -627,7 +628,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         call->PublicFunctionName = funcName;
         call->FunctionName       = funcName;
         call->Arguments          = {}; // empty
-        mProgram.Body.push_back(call);
+        program.Body.push_back(call);
         result = tgt;
     } break;
     case ExpressionType::Branch: {
@@ -645,25 +646,25 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         for (size_t i = 0; i < br->branches().size(); ++i) {
             const auto& single = br->branches()[i];
             // map condition expression
-            SSAValue cond = mapExpression(single.Condition);
+            SSAValue cond = mapExpression(program, single.Condition);
             // emit branch instruction
             SSAInstrBranch bInstr;
             bInstr.Condition   = cond;
             bInstr.TargetLabel = branchLabels[i];
-            mProgram.Body.push_back(std::make_shared<SSAInstrBranch>(bInstr));
+            program.Body.push_back(std::make_shared<SSAInstrBranch>(bInstr));
         }
 
         // If none matched, fall through to else label; emit else label and inline else body
         SSAInstrLabel elbl;
         elbl.Name = elseLabel;
-        mProgram.Body.push_back(std::make_shared<SSAInstrLabel>(elbl));
-        SSAMapper elseMapper;
-        auto elseProg    = elseMapper.map(br->elseClosure());
-        SSAValue elseVal = inlineClosureBody(elseProg.Body);
+        program.Body.push_back(std::make_shared<SSAInstrLabel>(elbl));
+        // SSAMapper elseMapper;
+        auto elseProg    = mapClosure(br->elseClosure());
+        SSAValue elseVal = inlineClosureBody(program, elseProg.Body);
         // after else body jump to join
         SSAInstrGoto gToJoin;
         gToJoin.TargetLabel = joinLabel;
-        mProgram.Body.push_back(std::make_shared<SSAInstrGoto>(gToJoin));
+        program.Body.push_back(std::make_shared<SSAInstrGoto>(gToJoin));
 
         // Now emit each branch body under its label and jump to join after
         std::vector<SSAValue> branchVals;
@@ -671,22 +672,22 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         for (size_t i = 0; i < br->branches().size(); ++i) {
             SSAInstrLabel lbl;
             lbl.Name = branchLabels[i];
-            mProgram.Body.push_back(std::make_shared<SSAInstrLabel>(lbl));
+            program.Body.push_back(std::make_shared<SSAInstrLabel>(lbl));
 
-            SSAMapper inner;
-            auto prog        = inner.map(br->branches()[i].Body);
-            SSAValue lastVal = inlineClosureBody(prog.Body);
+            // SSAMapper inner;
+            auto prog        = mapClosure(br->branches()[i].Body);
+            SSAValue lastVal = inlineClosureBody(program, prog.Body);
             branchVals.push_back(lastVal);
 
             SSAInstrGoto toJoin;
             toJoin.TargetLabel = joinLabel;
-            mProgram.Body.push_back(std::make_shared<SSAInstrGoto>(toJoin));
+            program.Body.push_back(std::make_shared<SSAInstrGoto>(toJoin));
         }
 
         // Emit join label
         SSAInstrLabel jlbl;
         jlbl.Name = joinLabel;
-        mProgram.Body.push_back(std::make_shared<SSAInstrLabel>(jlbl));
+        program.Body.push_back(std::make_shared<SSAInstrLabel>(jlbl));
 
         // Use the BranchExpression's declared return type as the phi node type.
         ElementaryType phiType = expr->returnType();
@@ -700,7 +701,7 @@ SSAValue SSAMapper::mapExpression(const Ptr<Expression>& expr)
         phi->Sources = std::move(branchVals);
         phi->Sources.push_back(elseVal);
 
-        mProgram.Body.push_back(phi);
+        program.Body.push_back(phi);
         result = tgt;
     } break;
     default:
