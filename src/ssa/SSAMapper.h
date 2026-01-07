@@ -143,7 +143,6 @@ struct SSAFunction {
     // Track accessed parent-level variables for later side-effect analysis.
     // These are populated by the parent SSAMapper when nested closures/functions
     // are mapped. Names are the plain variable names (without SSA version suffix).
-    // Use unordered_set for faster lookup and to avoid duplicates.
     std::unordered_set<std::string> AccessedConstParents;
     std::unordered_set<std::string> AccessedMutableParents;
 

@@ -5,7 +5,7 @@ fn a(r: num) = {
 };
 
 // A closure contains multiple statements accessible only to the closure and child closures
-closure1 = {
+let closure1 = {
     fn a() = 42;
     let mut k = 1111;
     a(22) * k * a()
