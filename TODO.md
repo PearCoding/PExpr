@@ -5,3 +5,5 @@
 - [x] Global value numbering
 - [ ] Partial-redundancy elimination
 - [ ] Parameter/Constant/Function unused warning
+- [ ] Make functions in PExpr side-effect free
+- [ ] Do not reorder side-effected functions!
