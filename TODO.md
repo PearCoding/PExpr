@@ -2,5 +2,6 @@
 - [ ] Register allocation
 - [x] Constant folding
 - [x] Dead-code elimination
-- [ ] Global value numbering
+- [x] Global value numbering
 - [ ] Partial-redundancy elimination
+- [ ] Parameter/Constant/Function unused warning
