@@ -6,11 +6,13 @@
 namespace PExpr {
 namespace internal {
 class TypeChecker;
+class UpliftPass;
 }
 
 /// Abstract expression. Can not be created directly.
 class Expression {
     friend internal::TypeChecker;
+    friend class internal::UpliftPass;
     friend class Environment;
 
 public:
@@ -215,6 +217,13 @@ public:
     {
         PEXPR_ASSERT(idx < mParameters.size(), "Parameter index out of range");
         mParameters[idx] = expr;
+    }
+
+    /// Append a parameter expression (used by transformation passes like UpliftPass).
+    inline void appendParameter(const Ptr<Expression>& expr)
+    {
+        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
+        mParameters.push_back(expr);
     }
 
     /// The typechecker-provided mangled name.

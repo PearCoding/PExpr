@@ -46,7 +46,7 @@ public:
     inline bool addFunction(const FunctionDef& func)
     {
         // Check if a function with the same name and parameters exists
-        if (checkFunctionExists(func.name(), func.parameters(), true) != mFunctions.end())
+        if (checkFunctionExists(func.name(), func.parameterTypes(), true) != mFunctions.end())
             return false;
 
         mFunctions.emplace(func.name(), func);
@@ -56,7 +56,7 @@ public:
     inline bool addFunction(FunctionDef&& func)
     {
         // Check if a function with the same name and parameters exists
-        if (checkFunctionExists(func.name(), func.parameters(), true) != mFunctions.end())
+        if (checkFunctionExists(func.name(), func.parameterTypes(), true) != mFunctions.end())
             return false;
 
         const std::string name = func.name();
@@ -69,8 +69,8 @@ public:
     {
         const auto range = mFunctions.equal_range(func.name());
         for (auto it = range.first; it != range.second; ++it) {
-            const auto& params = it->second.parameters();
-            if (params.size() == func.parameters().size() && std::equal(params.begin(), params.end(), func.parameters().begin())) {
+            const auto& params = it->second.parameterTypes();
+            if (params.size() == func.parameterTypes().size() && std::equal(params.begin(), params.end(), func.parameterTypes().begin())) {
                 // replace this overload
                 mFunctions.erase(it);
                 mFunctions.emplace(func.name(), func);
@@ -86,8 +86,8 @@ public:
     {
         const auto range = mFunctions.equal_range(func.name());
         for (auto it = range.first; it != range.second; ++it) {
-            const auto& params = it->second.parameters();
-            if (params.size() == func.parameters().size() && std::equal(params.begin(), params.end(), func.parameters().begin())) {
+            const auto& params = it->second.parameterTypes();
+            if (params.size() == func.parameterTypes().size() && std::equal(params.begin(), params.end(), func.parameterTypes().begin())) {
                 mFunctions.erase(it);
                 mFunctions.emplace(func.name(), std::move(func));
                 return true;
@@ -129,7 +129,7 @@ private:
         const auto range = mFunctions.equal_range(name);
         if (strict) {
             for (auto it = range.first; it != range.second; ++it) {
-                const auto& params = it->second.parameters();
+                const auto& params = it->second.parameterTypes();
                 if (parameterTypes.size() == params.size()) {
                     if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), params.begin()))
                         return it;
@@ -137,7 +137,7 @@ private:
             }
         } else {
             for (auto it = range.first; it != range.second; ++it) {
-                const auto& params = it->second.parameters();
+                const auto& params = it->second.parameterTypes();
                 if (parameterTypes.size() == params.size()) {
                     if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), params.begin(), isConvertible))
                         return it;

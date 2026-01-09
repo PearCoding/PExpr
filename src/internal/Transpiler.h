@@ -84,9 +84,13 @@ private:
 
             // Collect parameter types (may be Unspecified)
             std::vector<ElementaryType> paramTypes;
+            std::vector<std::string> paramNames;
             paramTypes.reserve(funcStmt->parameters().size());
-            for (const auto& p : funcStmt->parameters())
+            paramNames.reserve(funcStmt->parameters().size());
+            for (const auto& p : funcStmt->parameters()) {
                 paramTypes.push_back(p.Type);
+                paramNames.push_back(p.Name);
+            }
 
             if (!funcStmt->isExtern()) {
                 // Temporarily expose parameters as variables while transpiling the body
@@ -108,7 +112,7 @@ private:
 
             // Register the function in the dynamic symbol table so calls can be resolved.
             const ElementaryType returnType = funcStmt->expression() ? funcStmt->expression()->returnType() : ElementaryType::Unspecified;
-            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), returnType, funcStmt->isExtern()));
+            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), std::move(paramNames), returnType, funcStmt->isExtern()));
         } break;
         default:
             break;
@@ -308,12 +312,12 @@ private:
         // Handle implicit casts
         for (size_t i = 0; i < args.size(); ++i) {
             ElementaryType fromType = types[i];
-            ElementaryType toType   = def.value().parameters().at(i);
+            ElementaryType toType   = def.value().parameterTypes().at(i);
 
             args[i] = handleCast(args[i], fromType, toType);
         }
 
-        return mVisitor->onFunctionCall(funcName, def.value().returnType(), def.value().parameters(), args);
+        return mVisitor->onFunctionCall(funcName, def.value().returnType(), def.value().parameterTypes(), args);
     }
 
     Payload handleNode(const Ptr<AccessExpression>& expr)

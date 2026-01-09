@@ -3,6 +3,7 @@
 #include "internal/Parser.h"
 #include "internal/SymbolTable.h"
 #include "internal/TypeChecker.h"
+#include "internal/UpliftPass.h"
 
 namespace PExpr {
 Environment::Environment()
@@ -22,11 +23,16 @@ void Environment::registerVariable(const std::string& name, ElementaryType type)
 
 void Environment::registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType)
 {
+    std::vector<std::string> parameterNames;
+    parameterNames.reserve(parameterTypes.size());
+    for (size_t i = 0; i < parameterTypes.size(); ++i)
+        parameterNames.push_back("p" + std::to_string(i));
+
     const std::string mangledName = internal::makeMangledNameFromTypes(name, parameterTypes, nullptr);
-    mGlobals.addFunction(FunctionDef(name, mangledName, parameterTypes, returnType, true));
+    mGlobals.addFunction(FunctionDef(name, mangledName, parameterTypes, parameterNames, returnType, true));
 }
 
-Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking)
+Ptr<Closure> Environment::parse(std::istream& stream)
 {
     internal::Lexer lexer(stream, mReporter);
     internal::Parser parser(lexer, mReporter);
@@ -36,18 +42,20 @@ Ptr<Closure> Environment::parse(std::istream& stream, bool skipTypeChecking)
     if (!expr || parser.hasError())
         return nullptr;
 
-    if (!skipTypeChecking) {
-        if (!doTypeChecking(expr))
-            return nullptr;
-    }
+    if (!doTypeChecking(expr))
+        return nullptr;
+
+    // run uplift pass to transform captured variables into parameters
+    internal::UpliftPass uplift(mGlobals, mReporter);
+    uplift.handle(expr);
 
     return expr;
 }
 
-Ptr<Closure> Environment::parse(const std::string& str, bool skipTypeChecking)
+Ptr<Closure> Environment::parse(std::string_view str)
 {
-    std::stringstream stream(str);
-    return parse(stream, skipTypeChecking);
+    std::istringstream stream(str.data());
+    return parse(stream);
 }
 
 bool Environment::doTypeChecking(const Ptr<Closure>& closure)

@@ -38,26 +38,30 @@ private:
 class FunctionDef {
 public:
     /// Construct a function definition with a given name, return type and parameter types.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, const std::vector<ElementaryType>& params, ElementaryType retType, bool isExtern)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, const std::vector<ElementaryType>& params, const std::vector<std::string>& paramNames, ElementaryType retType, bool isExtern)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
-        , mParameters(params)
+        , mParameterTypes(params)
+        , mParameterNames(paramNames)
         , mIsExtern(isExtern)
     {
+        PEXPR_ASSERT(params.size() == paramNames.size(), "Expected parameter types and parameter names to be of same size");
         // Allow unspecified return type for non-extern functions (to support recursion).
         if (isExtern)
             PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
     /// Construct a function definition with a given name, return type and parameter types.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, std::vector<ElementaryType>&& params, ElementaryType retType, bool isExtern)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, std::vector<ElementaryType>&& params, std::vector<std::string>&& paramNames, ElementaryType retType, bool isExtern)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
-        , mParameters(std::move(params))
+        , mParameterTypes(std::move(params))
+        , mParameterNames(std::move(paramNames))
         , mIsExtern(isExtern)
     {
+        PEXPR_ASSERT(params.size() == paramNames.size(), "Expected parameter types and parameter names to be of same size");
         // Allow unspecified return type for non-extern functions (to support recursion).
         if (isExtern)
             PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
@@ -71,7 +75,10 @@ public:
     /// The type of the return value.
     [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
     /// The all parameter types the function has to be called with.
-    [[nodiscard]] inline const std::vector<ElementaryType>& parameters() const { return mParameters; }
+    [[nodiscard]] inline const std::vector<ElementaryType>& parameterTypes() const { return mParameterTypes; }
+
+    /// Parameter names (if available). May be empty for externally-registered functions.
+    [[nodiscard]] inline const std::vector<std::string>& parameterNames() const { return mParameterNames; }
 
     [[nodiscard]] inline bool isExtern() const { return mIsExtern; }
 
@@ -79,7 +86,8 @@ private:
     std::string mName;
     std::string mMangledName;
     ElementaryType mReturnType;
-    std::vector<ElementaryType> mParameters;
+    std::vector<ElementaryType> mParameterTypes;
+    std::vector<std::string> mParameterNames;
     bool mIsExtern;
 };
 

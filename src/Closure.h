@@ -45,6 +45,29 @@ public:
         mExpression = expr;
     }
 
+    inline void replaceStatement(const Ptr<Statement>& oldStmt, const Ptr<Statement>& newStmt)
+    {
+        PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
+        PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
+        for (auto& st : mStatement) {
+            if (st == oldStmt) {
+                st = newStmt;
+                break;
+            }
+        }
+    }
+
+    inline void replaceStatement(const Ptr<Statement>& oldStmt, Ptr<Statement>&& newStmt)
+    {
+        PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
+        PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
+        for (auto& st : mStatement) {
+            if (st == oldStmt) {
+                st = std::move(newStmt);
+            }
+        }
+    }
+
     // Internal usage
     [[nodiscard]] inline internal::SymbolTable& symbols() { return mSymbols; }
 

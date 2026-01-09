@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     }
 
     Environment env;
-    auto ast = env.parse(input, true);
+    auto ast = env.parse(input);
 
     if (ast == nullptr)
         return EXIT_FAILURE;

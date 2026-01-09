@@ -39,6 +39,8 @@ set(SRC
     internal/Token.h
     internal/TypeChecker.cpp
     internal/TypeChecker.h
+    internal/UpliftPass.cpp
+    internal/UpliftPass.h
 )
 
 add_library(pexpr ${SRC})
