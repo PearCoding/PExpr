@@ -435,7 +435,6 @@ void SSAPassSSCP::run(SSAProgram& program)
     // Propagate side-effects:
     // - Any function that calls an unknown function (not in knownFunctions) is side-effecting.
     // - Any function that calls a side-effecting function is side-effecting.
-    // - Any function that writes to a non-local Named target is side-effecting.
     bool progress = true;
     while (progress) {
         progress = false;
@@ -451,17 +450,6 @@ void SSAPassSSCP::run(SSAProgram& program)
                         mSideEffectFunctions.insert(f.Name);
                         progress = true;
                         break;
-                    }
-                } else if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
-                    // if assignment target is Named and not a parameter => non-local write
-                    if (asg->Target.Kind == SSAValue::Kind::Named) {
-                        std::string base = asg->Target.baseName();
-                        bool isParam     = funcParams[f.Name].contains(base);
-                        if (!isParam) {
-                            mSideEffectFunctions.insert(f.Name);
-                            progress = true;
-                            break;
-                        }
                     }
                 }
             }
