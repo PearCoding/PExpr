@@ -102,25 +102,15 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
     case StatementType::FunctionDeclaration: {
         auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
-        // Collect parameter types (may include ElementaryType::Unspecified)
-        std::vector<ElementaryType> paramTypes;
-        std::vector<std::string> paramNames;
-        paramTypes.reserve(funcStmt->parameters().size());
-        paramNames.reserve(funcStmt->parameters().size());
-        for (const auto& p : funcStmt->parameters()) {
-            paramTypes.push_back(p.Type);
-            paramNames.push_back(p.Name);
-        }
-
         // Pre-register a provisional function definition so the function name is visible
         // inside its own body (allows recursion). For extern functions we register the
         // final signature immediately.
         if (funcStmt->isExtern()) {
             // extern must provide a concrete return type
-            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), paramTypes, paramNames, funcStmt->returnType(), funcStmt->isExtern()));
+            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern()));
         } else {
             // register with unspecified return type to allow recursive calls
-            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), paramTypes, paramNames, ElementaryType::Unspecified, funcStmt->isExtern()));
+            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), ElementaryType::Unspecified, funcStmt->isExtern()));
         }
 
         // Temporarily expose parameters as variables (only when they have a specified type)
@@ -148,7 +138,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         }
 
         // Replace provisional registration with the final signature (or add if missing)
-        if (!mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), std::move(paramNames), returnType, funcStmt->isExtern()))) {
+        if (!mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()))) {
             mReporter.errorf(funcStmt->location(), "Given function '%s' is already defined", funcStmt->name().c_str());
         }
     } break;
@@ -405,9 +395,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
         // For any parameter where the actual type differs from the parameter type
         // and an implicit conversion exists, inject an implicit CastExpression
         // (explicit=false) so downstream passes see an explicit cast node.
-        const auto& paramTypes = def->parameterTypes();
-        for (size_t i = 0; i < expr->parameters().size() && i < paramTypes.size(); ++i) {
-            const ElementaryType desired = paramTypes[i];
+        const auto& pList = def.value().parameters();
+        for (size_t i = 0; i < expr->parameters().size() && i < pList.size(); ++i) {
+            const ElementaryType desired = pList[i].Type;
             const ElementaryType actual  = fromArgs[i];
             if (actual != desired) {
                 if (isConvertible(actual, desired)) {

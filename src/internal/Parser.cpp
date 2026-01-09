@@ -1,6 +1,7 @@
 #include "Parser.h"
 #include "Logger.h"
 #include "Mangler.h"
+#include "Parameter.h"
 
 namespace PExpr::internal {
 Parser::Parser(Lexer& lexer, Reporter& reporter)
@@ -190,9 +191,9 @@ private:
             return std::make_shared<VariableAssignmentStatement>(loc, varName, expr);
     }
 
-    inline FunctionDeclarationStatement::ParameterList p_parameter_def_list()
+    inline ParameterList p_parameter_def_list()
     {
-        FunctionDeclarationStatement::ParameterList list;
+        ParameterList list;
 
         if (P.cur().Type == TokenType::ClosedParentheses)
             return list; // Empty parameter list
@@ -203,7 +204,7 @@ private:
             // if (P.cur().Type == TokenType::Colon) {
             P.expect(TokenType::Colon);
             const ElementaryType type = p_elementary_type();
-            list.push_back(FunctionDeclarationStatement::Parameter{ paramName, type });
+            list.push_back(Parameter{ paramName, type });
             // } else {
             //     list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
             // }

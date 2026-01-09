@@ -39,15 +39,8 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
         } break;
         case StatementType::FunctionDeclaration: {
             auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            // pre-register function with its declared parameter names and types
-            std::vector<ElementaryType> paramTypes;
-            std::vector<std::string> paramNames;
-            paramTypes.reserve(f->parameters().size());
-            for (const auto& p : f->parameters()) {
-                paramTypes.push_back(p.Type);
-                paramNames.push_back(p.Name);
-            }
-            local.addFunction(FunctionDef(f->name(), f->mangledName(), paramTypes, paramNames, f->returnType(), f->isExtern()));
+            // pre-register function with its declared parameter list
+            local.addFunction(FunctionDef(f->name(), f->mangledName(), f->parameters(), f->returnType(), f->isExtern()));
         } break;
         default:
             break;
@@ -77,11 +70,10 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
             // For each captured variable, add a new parameter at the end of the function's parameter list
             if (!captured.empty()) {
                 // We need to create a new parameter list combining existing parameters + captured
-                FunctionDeclarationStatement::ParameterList newParams = f->parameters();
+                ParameterList newParams = f->parameters();
                 for (const auto& kv : captured) {
                     const auto& v = kv.second;
-                    FunctionDeclarationStatement::Parameter p{ v.name(), v.type() };
-                    newParams.push_back(std::move(p));
+                    newParams.push_back(Parameter{ v.name(), v.type() });
                 }
 
                 // Build new mangled name with new parameter types
@@ -103,7 +95,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
                 cexpr->closure()->parent()->replaceStatement(stmt, newFunc);
 
                 // Update local symbol table: replace function entry
-                local.replaceFunction(FunctionDef(newFunc->name(), newFunc->mangledName(), newParamTypes, newParamNames, newFunc->returnType(), newFunc->isExtern()));
+                local.replaceFunction(FunctionDef(newFunc->name(), newFunc->mangledName(), newParams, newFunc->returnType(), newFunc->isExtern()));
 
                 // Now update all calls in this closure's scope to pass the captured variables
                 // We'll append arguments corresponding to the captured variables in the same order they were added.
@@ -138,13 +130,7 @@ void UpliftPass::collectCapturesFromClosureBody(const Ptr<Closure>& closure, con
             dyn.addVariable(VariableDef(v->name(), v->expression()->returnType(), v->isMutable()));
         } else if (stmt->type() == StatementType::FunctionDeclaration) {
             auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            std::vector<ElementaryType> ptypes;
-            std::vector<std::string> pnames;
-            for (const auto& p : f->parameters()) {
-                ptypes.push_back(p.Type);
-                pnames.push_back(p.Name);
-            }
-            dyn.addFunction(FunctionDef(f->name(), f->mangledName(), ptypes, pnames, f->returnType(), f->isExtern()));
+            dyn.addFunction(FunctionDef(f->name(), f->mangledName(), f->parameters(), f->returnType(), f->isExtern()));
         }
     }
 
@@ -256,15 +242,15 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Symb
 
         if (auto def = currentDefs.lookupFunction(c->location(), c->name(), argTypes, false); def.has_value()) {
             // If the function def has more parameters than provided, it means uplift added parameters
-            if (def->parameterTypes().size() > c->parameters().size()) {
+            const auto& fparams = def->parameters();
+            if (fparams.size() > c->parameters().size()) {
                 // For each additional parameter, create a VariableExpression pointing to the captured variable name
-                size_t existing        = c->parameters().size();
-                const auto& paramNames = def->parameterNames();
-                for (size_t i = existing; i < def->parameterTypes().size(); ++i) {
-                    const std::string capName = (i < paramNames.size()) ? paramNames[i] : std::string();
+                size_t existing = c->parameters().size();
+                for (size_t i = existing; i < fparams.size(); ++i) {
+                    const std::string capName = fparams[i].Name;
                     auto vexpr                = std::make_shared<VariableExpression>(c->location(), capName);
                     // Set the expression return type to the declared parameter type so downstream passes (SSA) see correct types
-                    vexpr->setReturnType(def->parameterTypes()[i]);
+                    vexpr->setReturnType(fparams[i].Type);
                     // Append the parameter via public API
                     c->appendParameter(vexpr);
                 }

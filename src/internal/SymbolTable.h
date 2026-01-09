@@ -2,6 +2,7 @@
 
 #include "Logger.h"
 #include "Lookup.h"
+#include "Parameter.h"
 
 #include <span>
 
@@ -46,7 +47,7 @@ public:
     inline bool addFunction(const FunctionDef& func)
     {
         // Check if a function with the same name and parameters exists
-        if (checkFunctionExists(func.name(), func.parameterTypes(), true) != mFunctions.end())
+        if (checkFunctionExists(func.name(), func.parameters(), true) != mFunctions.end())
             return false;
 
         mFunctions.emplace(func.name(), func);
@@ -56,7 +57,7 @@ public:
     inline bool addFunction(FunctionDef&& func)
     {
         // Check if a function with the same name and parameters exists
-        if (checkFunctionExists(func.name(), func.parameterTypes(), true) != mFunctions.end())
+        if (checkFunctionExists(func.name(), func.parameters(), true) != mFunctions.end())
             return false;
 
         const std::string name = func.name();
@@ -69,8 +70,9 @@ public:
     {
         const auto range = mFunctions.equal_range(func.name());
         for (auto it = range.first; it != range.second; ++it) {
-            const auto& params = it->second.parameterTypes();
-            if (params.size() == func.parameterTypes().size() && std::equal(params.begin(), params.end(), func.parameterTypes().begin())) {
+            if (func.parameters().size() == it->second.parameters().size()
+                && std::equal(func.parameters().begin(), func.parameters().end(), it->second.parameters().begin(),
+                              [](const Parameter& a, const Parameter& b) { return a.Type == b.Type; })) {
                 // replace this overload
                 mFunctions.erase(it);
                 mFunctions.emplace(func.name(), func);
@@ -86,8 +88,9 @@ public:
     {
         const auto range = mFunctions.equal_range(func.name());
         for (auto it = range.first; it != range.second; ++it) {
-            const auto& params = it->second.parameterTypes();
-            if (params.size() == func.parameterTypes().size() && std::equal(params.begin(), params.end(), func.parameterTypes().begin())) {
+            if (func.parameters().size() == it->second.parameters().size()
+                && std::equal(func.parameters().begin(), func.parameters().end(), it->second.parameters().begin(),
+                              [](const Parameter& a, const Parameter& b) { return a.Type == b.Type; })) {
                 mFunctions.erase(it);
                 mFunctions.emplace(func.name(), std::move(func));
                 return true;
@@ -124,22 +127,41 @@ public:
     inline void setParent(const SymbolTable* tbl) { mParent = tbl; }
 
 private:
-    [[nodiscard]] inline std::unordered_multimap<std::string, FunctionDef>::const_iterator checkFunctionExists(const std::string& name, const std::span<const ElementaryType>& parameterTypes, bool strict) const
+    [[nodiscard]] inline std::unordered_multimap<std::string, FunctionDef>::const_iterator checkFunctionExists(const std::string& name, std::span<const ElementaryType> parameterTypes, bool strict) const
     {
         const auto range = mFunctions.equal_range(name);
         if (strict) {
             for (auto it = range.first; it != range.second; ++it) {
-                const auto& params = it->second.parameterTypes();
-                if (parameterTypes.size() == params.size()) {
-                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), params.begin()))
+                if (parameterTypes.size() == it->second.parameters().size()) {
+                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](ElementaryType aType, const Parameter& b) { return aType == b.Type; }))
                         return it;
                 }
             }
         } else {
             for (auto it = range.first; it != range.second; ++it) {
-                const auto& params = it->second.parameterTypes();
-                if (parameterTypes.size() == params.size()) {
-                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), params.begin(), isConvertible))
+                if (parameterTypes.size() == it->second.parameters().size()) {
+                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](ElementaryType aType, const Parameter& b) { return isConvertible(aType, b.Type); }))
+                        return it;
+                }
+            }
+        }
+        return mFunctions.end();
+    }
+
+    [[nodiscard]] inline std::unordered_multimap<std::string, FunctionDef>::const_iterator checkFunctionExists(const std::string& name, std::span<const Parameter> parameters, bool strict) const
+    {
+        const auto range = mFunctions.equal_range(name);
+        if (strict) {
+            for (auto it = range.first; it != range.second; ++it) {
+                if (parameters.size() == it->second.parameters().size()) {
+                    if (parameters.size() == 0 || std::equal(parameters.begin(), parameters.end(), it->second.parameters().begin(), [](const Parameter& a, const Parameter& b) { return a.Type == b.Type; }))
+                        return it;
+                }
+            }
+        } else {
+            for (auto it = range.first; it != range.second; ++it) {
+                if (parameters.size() == it->second.parameters().size()) {
+                    if (parameters.size() == 0 || std::equal(parameters.begin(), parameters.end(), it->second.parameters().begin(), [](const Parameter& a, const Parameter& b) { return isConvertible(a.Type, b.Type); }))
                         return it;
                 }
             }

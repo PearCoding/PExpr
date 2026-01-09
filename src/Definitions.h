@@ -2,6 +2,7 @@
 
 #include "Enums.h"
 #include "Location.h"
+#include "Parameter.h"
 
 #include <vector>
 
@@ -37,32 +38,26 @@ private:
 /// A general purpose function definition with a fixed signature.
 class FunctionDef {
 public:
-    /// Construct a function definition with a given name, return type and parameter types.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, const std::vector<ElementaryType>& params, const std::vector<std::string>& paramNames, ElementaryType retType, bool isExtern)
+    /// Construct a function definition with a given name and a ParameterList.
+    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, ElementaryType retType, bool isExtern)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
-        , mParameterTypes(params)
-        , mParameterNames(paramNames)
+        , mParameters(params)
         , mIsExtern(isExtern)
     {
-        PEXPR_ASSERT(params.size() == paramNames.size(), "Expected parameter types and parameter names to be of same size");
-        // Allow unspecified return type for non-extern functions (to support recursion).
         if (isExtern)
             PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
 
-    /// Construct a function definition with a given name, return type and parameter types.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, std::vector<ElementaryType>&& params, std::vector<std::string>&& paramNames, ElementaryType retType, bool isExtern)
+    /// Construct a function definition with a given name and a ParameterList (rvalue)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, ElementaryType retType, bool isExtern)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
-        , mParameterTypes(std::move(params))
-        , mParameterNames(std::move(paramNames))
+        , mParameters(std::move(params))
         , mIsExtern(isExtern)
     {
-        PEXPR_ASSERT(params.size() == paramNames.size(), "Expected parameter types and parameter names to be of same size");
-        // Allow unspecified return type for non-extern functions (to support recursion).
         if (isExtern)
             PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
     }
@@ -74,11 +69,9 @@ public:
 
     /// The type of the return value.
     [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
-    /// The all parameter types the function has to be called with.
-    [[nodiscard]] inline const std::vector<ElementaryType>& parameterTypes() const { return mParameterTypes; }
 
-    /// Parameter names (if available). May be empty for externally-registered functions.
-    [[nodiscard]] inline const std::vector<std::string>& parameterNames() const { return mParameterNames; }
+    /// List of parameters
+    [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
 
     [[nodiscard]] inline bool isExtern() const { return mIsExtern; }
 
@@ -86,8 +79,7 @@ private:
     std::string mName;
     std::string mMangledName;
     ElementaryType mReturnType;
-    std::vector<ElementaryType> mParameterTypes;
-    std::vector<std::string> mParameterNames;
+    ParameterList mParameters;
     bool mIsExtern;
 };
 

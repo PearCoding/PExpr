@@ -1,4 +1,5 @@
 #include "Environment.h"
+#include "Parameter.h"
 #include "internal/Mangler.h"
 #include "internal/Parser.h"
 #include "internal/SymbolTable.h"
@@ -23,13 +24,14 @@ void Environment::registerVariable(const std::string& name, ElementaryType type)
 
 void Environment::registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType)
 {
-    std::vector<std::string> parameterNames;
-    parameterNames.reserve(parameterTypes.size());
+    // Build a ParameterList using default parameter names p0, p1, ...
+    ParameterList params;
+    params.reserve(parameterTypes.size());
     for (size_t i = 0; i < parameterTypes.size(); ++i)
-        parameterNames.push_back("p" + std::to_string(i));
+        params.push_back(Parameter{ "p" + std::to_string(i), parameterTypes[i] });
 
     const std::string mangledName = internal::makeMangledNameFromTypes(name, parameterTypes, nullptr);
-    mGlobals.addFunction(FunctionDef(name, mangledName, parameterTypes, parameterNames, returnType, true));
+    mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true));
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream)

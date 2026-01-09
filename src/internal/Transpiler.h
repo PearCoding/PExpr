@@ -82,16 +82,6 @@ private:
         case StatementType::FunctionDeclaration: {
             auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
-            // Collect parameter types (may be Unspecified)
-            std::vector<ElementaryType> paramTypes;
-            std::vector<std::string> paramNames;
-            paramTypes.reserve(funcStmt->parameters().size());
-            paramNames.reserve(funcStmt->parameters().size());
-            for (const auto& p : funcStmt->parameters()) {
-                paramTypes.push_back(p.Type);
-                paramNames.push_back(p.Name);
-            }
-
             if (!funcStmt->isExtern()) {
                 // Temporarily expose parameters as variables while transpiling the body
                 auto savedDefs = mDynamicDefinitions;
@@ -112,7 +102,7 @@ private:
 
             // Register the function in the dynamic symbol table so calls can be resolved.
             const ElementaryType returnType = funcStmt->expression() ? funcStmt->expression()->returnType() : ElementaryType::Unspecified;
-            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), std::move(paramTypes), std::move(paramNames), returnType, funcStmt->isExtern()));
+            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()));
         } break;
         default:
             break;
@@ -312,12 +302,21 @@ private:
         // Handle implicit casts
         for (size_t i = 0; i < args.size(); ++i) {
             ElementaryType fromType = types[i];
-            ElementaryType toType   = def.value().parameterTypes().at(i);
+            // build parameter types from FunctionDef::parameters()
+            const auto& pList     = def.value().parameters();
+            ElementaryType toType = (i < pList.size()) ? pList[i].Type : ElementaryType::Unspecified;
 
             args[i] = handleCast(args[i], fromType, toType);
         }
 
-        return mVisitor->onFunctionCall(funcName, def.value().returnType(), def.value().parameterTypes(), args);
+        // Build a vector<ElementaryType> from FunctionDef::parameters() for visitor
+        std::vector<ElementaryType> argTypes;
+        const auto& pList = def.value().parameters();
+        argTypes.reserve(pList.size());
+        for (const auto& p : pList)
+            argTypes.push_back(p.Type);
+
+        return mVisitor->onFunctionCall(funcName, def.value().returnType(), argTypes, args);
     }
 
     Payload handleNode(const Ptr<AccessExpression>& expr)

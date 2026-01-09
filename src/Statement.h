@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Expression.h"
+#include "Parameter.h"
 
 namespace PExpr {
 
@@ -71,13 +72,6 @@ public:
 
 class FunctionDeclarationStatement : public Statement {
 public:
-    struct Parameter {
-        std::string Name;
-        ElementaryType Type;
-    };
-
-    using ParameterList = std::vector<Parameter>;
-
     FunctionDeclarationStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Expression>& expression, ElementaryType returnType, const std::string& mangledName)
         : Statement(loc, name, expression, StatementType::FunctionDeclaration)
         , mParameters(parameters)

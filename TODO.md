@@ -5,5 +5,6 @@
 - [x] Global value numbering
 - [ ] Partial-redundancy elimination
 - [ ] Parameter/Constant/Function unused warning
-- [ ] Make functions in PExpr side-effect free
+- [x] Make functions in PExpr side-effect free
+- [x] Uplift nested functions
 - [ ] Do not reorder side-effected functions!
