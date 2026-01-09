@@ -8,12 +8,11 @@ using namespace PExpr;
 TEST_CASE("UpliftPass: simple capture and call update", "[uplift]")
 {
     Environment env;
-    const std::string input = "let x = 1; fn f() = { x + 1 }; f()";
-
-    auto ast = env.parse(input);
+    auto ast = env.parse("let x = 1; fn f() = { x + 1 }; f()");
     REQUIRE(ast != nullptr);
 
     const std::string out = StringVisitor::visit(ast);
+    std::cout << out << std::endl;
 
     // The captured variable 'x' should be uplifted into function parameter
     REQUIRE(out.find("fn f(x:int") != std::string::npos);
@@ -25,9 +24,7 @@ TEST_CASE("UpliftPass: nested function capture and call update", "[uplift]")
 {
     Environment env;
     // inner captures x from outer scope; inner's declaration should gain a parameter and the call updated
-    const std::string input = "let x = 2; fn outer() = { fn inner() = { x + 1 }; inner() }; outer()";
-
-    auto ast = env.parse(input);
+    auto ast = env.parse("let x = 2; fn outer() = { fn inner() = { x + 1 }; inner() }; outer()");
     REQUIRE(ast != nullptr);
 
     const std::string out = StringVisitor::visit(ast);

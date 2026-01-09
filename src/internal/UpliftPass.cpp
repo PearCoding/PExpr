@@ -62,10 +62,13 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
         // collect captures from function body
         std::map<std::string, VariableDef> captured;
 
-        if (f->expression() && f->expression()->type() == ExpressionType::Closure) {
-            // Extract closure ptr
-            auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(f->expression());
-            collectCapturesFromClosureBody(cexpr->closure(), local, captured);
+        if (f->expression()) {
+            if (f->expression()->type() == ExpressionType::Closure) {
+                // Extract closure ptr
+                collectCapturesFromClosureBody(std::reinterpret_pointer_cast<ClosureExpression>(f->expression())->closure(), local, captured);
+            } else {
+                collectCapturesFromExpression(f->expression(), local, captured);
+            }
 
             // For each captured variable, add a new parameter at the end of the function's parameter list
             if (!captured.empty()) {
@@ -78,13 +81,9 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
 
                 // Build new mangled name with new parameter types
                 std::vector<ElementaryType> newParamTypes;
-                std::vector<std::string> newParamNames;
                 newParamTypes.reserve(newParams.size());
-                newParamNames.reserve(newParams.size());
-                for (const auto& p : newParams) {
+                for (const auto& p : newParams)
                     newParamTypes.push_back(p.Type);
-                    newParamNames.push_back(p.Name);
-                }
 
                 const std::string newMangled = makeMangledNameFromTypes(f->name(), newParamTypes, nullptr);
 
@@ -92,7 +91,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
                 auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, f->expression(), f->returnType(), newMangled);
 
                 // Replace in closure statements:
-                cexpr->closure()->parent()->replaceStatement(stmt, newFunc);
+                closure->replaceStatement(stmt, newFunc);
 
                 // Update local symbol table: replace function entry
                 local.replaceFunction(FunctionDef(newFunc->name(), newFunc->mangledName(), newParams, newFunc->returnType(), newFunc->isExtern()));
@@ -104,8 +103,10 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
                 updateCallsInClosure(closure, local);
             }
 
-            // Recurse into nested closure body
-            processClosure(cexpr->closure(), local);
+            if (f->expression()->type() == ExpressionType::Closure) {
+                // Recurse into nested closure body
+                processClosure(std::reinterpret_pointer_cast<ClosureExpression>(f->expression())->closure(), local);
+            }
         }
     }
 
