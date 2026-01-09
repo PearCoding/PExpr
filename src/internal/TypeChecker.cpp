@@ -48,14 +48,13 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             return; // Error was caught somewhere else
 
         // If an explicit declared type is provided, validate / coerce the initializer.
-        const auto declared = varStmt->declaredType();
+        auto declared = varStmt->declaredType();
         if (declared != ElementaryType::Unspecified && type != declared) {
             if (isConvertible(type, declared)) {
                 // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
                 auto orig     = varStmt->expression();
                 auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
                 varStmt->replaceExpression(castExpr);
-                type = declared;
 
                 // Special case: `int` literal for a `num` variable
                 if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
@@ -96,6 +95,24 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         }
         if (!var->isMutable()) {
             mReporter.errorf(varStmt->location(), "Trying to reassign a value to constant variable '%s'", varStmt->name().c_str());
+            return;
+        }
+
+        const auto declared = var->type();
+        if (isConvertible(type, declared)) {
+            // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
+            auto orig     = varStmt->expression();
+            auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
+            varStmt->replaceExpression(castExpr);
+
+            // Special case: `int` literal for a `num` variable
+            if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
+                // Ignore warning
+            } else {
+                mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
+            }
+        } else {
+            mReporter.errorf(varStmt->location(), "Cannot implicitly convert from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
             return;
         }
     } break;

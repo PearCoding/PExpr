@@ -11,9 +11,8 @@ using namespace PExpr::internal;
 
 TEST_CASE("Casts: implicit int->num in call injects SSA cast", "[casts]")
 {
-    std::stringstream stream("fn f(a:num) = a; f(1)");
     Environment env;
-    auto ast = env.parse(stream);
+    auto ast = env.parse("fn f(a:num) = a; f(1)");
     REQUIRE(ast != nullptr); // parsing & typechecking must succeed
 
     SSAMapper mapper;
@@ -26,9 +25,8 @@ TEST_CASE("Casts: implicit int->num in call injects SSA cast", "[casts]")
 
 TEST_CASE("Casts: explicit num->int allowed with 'as' and lowers to SSA cast", "[casts]")
 {
-    std::stringstream stream("let x = 1.0 as int; x");
     Environment env;
-    auto ast = env.parse(stream);
+    auto ast = env.parse("let x = 1.0 as int; x");
     REQUIRE(ast != nullptr); // explicit cast must be accepted by typechecker
 
     SSAMapper mapper;
@@ -41,19 +39,20 @@ TEST_CASE("Casts: explicit num->int allowed with 'as' and lowers to SSA cast", "
 
 TEST_CASE("Casts: implicit num->int in call is rejected (requires explicit cast)", "[casts]")
 {
-    std::stringstream stream("fn f(a:int) = a; f(1.0)");
     Environment env;
+    env.reporter().setQuiet(true);
+
     // parse should fail because implicit num->int is not allowed
-    auto ast = env.parse(stream);
+    auto ast = env.parse("fn f(a:int) = a; f(1.0)");
     REQUIRE(ast == nullptr);
 }
 
 TEST_CASE("Casts: implicit int->num assignment injects SSA cast", "[casts]")
 {
     // declare mutable variable of type num with a matching literal, then assign int
-    std::stringstream stream("let mut a:num = 0.0; a = 1; a");
     Environment env;
-    auto ast = env.parse(stream);
+    env.reporter().setQuiet(true);
+    auto ast = env.parse("let mut a:num = 0.0; a = 1; a");
     REQUIRE(ast != nullptr); // typechecking should succeed and inject implicit cast on assignment
 
     SSAMapper mapper;
@@ -67,8 +66,9 @@ TEST_CASE("Casts: implicit int->num assignment injects SSA cast", "[casts]")
 TEST_CASE("Casts: implicit num->int assignment is rejected (requires explicit cast)", "[casts]")
 {
     // assigning a num to a variable declared as int should require explicit cast
-    std::stringstream stream("let mut a:int = 0; a = 1.0; a");
     Environment env;
-    auto ast = env.parse(stream);
+    env.reporter().setQuiet(true);
+
+    auto ast = env.parse("let mut a:int = 0; a = 1.0; a");
     REQUIRE(ast == nullptr); // typechecker should reject implicit num->int assignment
 }

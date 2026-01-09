@@ -47,6 +47,9 @@ Ptr<Closure> Environment::parse(std::istream& stream)
     if (!doTypeChecking(expr))
         return nullptr;
 
+    if (mReporter.errorCount() > 0)
+        return nullptr;
+
     // run uplift pass to transform captured variables into parameters
     internal::UpliftPass uplift(mGlobals, mReporter);
     uplift.handle(expr);

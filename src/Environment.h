@@ -41,6 +41,9 @@ public:
         return transpiler.handle(closure);
     }
 
+    [[nodiscard]] inline const Reporter& reporter() const { return mReporter; }
+    [[nodiscard]] inline Reporter& reporter() { return mReporter; }
+
 private:
     /// If no error was found, true will be returned, false otherwise.
     bool doTypeChecking(const Ptr<Closure>& closure);
