@@ -9,34 +9,30 @@
 using namespace PExpr;
 using namespace PExpr::internal;
 
-TEST_CASE("Parser: simple arithmetic", "[parser]")
+inline static auto parseOnly(std::string_view str)
 {
     Reporter reporter;
     reporter.setQuiet(true);
-    std::stringstream stream("a+1");
-    Lexer lexer(stream, reporter);
-    Parser parser(lexer, reporter);
-    SymbolTable globals;
-
+    auto stream = std::istringstream(str.data());
+    internal::Lexer lexer(stream, reporter);
+    internal::Parser parser(lexer, reporter);
+    internal::SymbolTable globals;
     auto ast = parser.parse(&globals);
 
     REQUIRE(!parser.hasError());
+    return ast;
+}
+
+TEST_CASE("Parser: simple arithmetic", "[parser]")
+{
+    auto ast = parseOnly("a+1");
     REQUIRE(StringVisitor::visit(ast) == "(a)+(1)");
 }
 
 TEST_CASE("Parser: complex expression parsing", "[parser]")
 {
-    Reporter reporter;
-    reporter.setQuiet(true);
-    const std::string input = "abc(231*22.231*2.42e-3).xyz*Pi-123*(K.x+sin(22^4, 1-2%2, --1))";
-    std::stringstream stream(input);
-    Lexer lexer(stream, reporter);
-    Parser parser(lexer, reporter);
-    SymbolTable globals;
+    auto ast = parseOnly("abc(231*22.231*2.42e-3).xyz*Pi-123*(K.x+sin(22^4, 1-2%2, --1))");
 
-    auto ast = parser.parse(&globals);
-
-    REQUIRE(!parser.hasError());
     const std::string out = StringVisitor::visit(ast);
     REQUIRE(out.find("sin(") != std::string::npos);
     REQUIRE(out.find("Pi") != std::string::npos);
@@ -45,17 +41,8 @@ TEST_CASE("Parser: complex expression parsing", "[parser]")
 
 TEST_CASE("Parser: closure with variable and expression", "[parser]")
 {
-    Reporter reporter;
-    reporter.setQuiet(true);
-    const std::string input = "let mut x = 1; x+2";
-    std::stringstream stream(input);
-    Lexer lexer(stream, reporter);
-    Parser parser(lexer, reporter);
-    SymbolTable globals;
+    auto ast = parseOnly("let mut x = 1; x+2");
 
-    auto ast = parser.parse(&globals);
-
-    REQUIRE(!parser.hasError());
     const std::string out = StringVisitor::visit(ast);
     REQUIRE(out.find("mut x:int = 1;") != std::string::npos);
     REQUIRE(out.find("(x)+(2)") != std::string::npos);
@@ -63,17 +50,8 @@ TEST_CASE("Parser: closure with variable and expression", "[parser]")
 
 TEST_CASE("Parser: function declaration and call", "[parser]")
 {
-    Reporter reporter;
-    reporter.setQuiet(true);
-    const std::string input = "fn f(a:int) = a; f(1)";
-    std::stringstream stream(input);
-    Lexer lexer(stream, reporter);
-    Parser parser(lexer, reporter);
-    SymbolTable globals;
+    auto ast = parseOnly("fn f(a:int) = a; f(1)");
 
-    auto ast = parser.parse(&globals);
-
-    REQUIRE(!parser.hasError());
     const std::string out = StringVisitor::visit(ast);
     REQUIRE(out.find("fn f(") != std::string::npos);
     REQUIRE(out.find("f(") != std::string::npos);
@@ -81,17 +59,8 @@ TEST_CASE("Parser: function declaration and call", "[parser]")
 
 TEST_CASE("Parser: branch expression (if/else)", "[parser]")
 {
-    Reporter reporter;
-    reporter.setQuiet(true);
-    const std::string input = "if true { 1 } else { 2 }";
-    std::stringstream stream(input);
-    Lexer lexer(stream, reporter);
-    Parser parser(lexer, reporter);
-    SymbolTable globals;
+    auto ast = parseOnly("if true { 1 } else { 2 }");
 
-    auto ast = parser.parse(&globals);
-
-    REQUIRE(!parser.hasError());
     const std::string out = StringVisitor::visit(ast);
     REQUIRE(out.find("if ") != std::string::npos);
     REQUIRE(out.find("else") != std::string::npos);
