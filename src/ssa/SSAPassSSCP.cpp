@@ -52,7 +52,11 @@ static void countUsesInInstr(const SSAInstr* instr, std::unordered_map<std::stri
         if (r->Value.Kind != SSAValue::Kind::Constant)
             ++counts[r->Value.Name];
     } else if (auto p = dynamic_cast<const SSAInstrPhi*>(instr)) {
-        for (const auto& s : p->Sources) {
+        for (const auto& s : p->Conditions) {
+            if (s.Kind != SSAValue::Kind::Constant)
+                ++counts[s.Name];
+        }
+        for (const auto& s : p->Branches) {
             if (s.Kind != SSAValue::Kind::Constant)
                 ++counts[s.Name];
         }
@@ -479,7 +483,8 @@ void SSAPassSSCP::run(SSAProgram& program)
                     }
                 }
             } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
-                replaceOperandIfConst(phi->Sources, mConstants);
+                replaceOperandIfConst(phi->Conditions, mConstants);
+                replaceOperandIfConst(phi->Branches, mConstants);
             }
         }
         for (auto& func : program.Functions) {
@@ -499,7 +504,8 @@ void SSAPassSSCP::run(SSAProgram& program)
                         }
                     }
                 } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
-                    replaceOperandIfConst(phi->Sources, mConstants);
+                    replaceOperandIfConst(phi->Conditions, mConstants);
+                    replaceOperandIfConst(phi->Branches, mConstants);
                 }
             }
         }

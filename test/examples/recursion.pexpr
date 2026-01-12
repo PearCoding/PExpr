@@ -1,2 +1,2 @@
-fn fact(n:int) = if n < 2 { 1 } else { n * fact(n - 1) };
+fn fact(n:int) -> int = {if n < 2 { 1 } else { n * fact(n - 1) }};
 fact(5)

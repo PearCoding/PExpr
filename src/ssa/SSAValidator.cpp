@@ -53,7 +53,11 @@ bool SSAValidator::checkIfTyped(const SSAInstr* instr)
     } else if (const auto ptr = dynamic_cast<const SSAInstrPhi*>(instr)) {
         if (!checkIfTyped(ptr->Target))
             return false;
-        for (const auto& instr : ptr->Sources) {
+        for (const auto& instr : ptr->Conditions) {
+            if (!checkIfTyped(instr))
+                return false;
+        }
+        for (const auto& instr : ptr->Branches) {
             if (!checkIfTyped(instr))
                 return false;
         }

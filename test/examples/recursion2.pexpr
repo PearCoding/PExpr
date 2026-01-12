@@ -1,0 +1,10 @@
+fn fact(n:int) -> int = {
+    if n < 2 {
+        1
+    } else { 
+        let f = fact(n - 1);
+        n * f
+    }
+};
+
+fact(5)

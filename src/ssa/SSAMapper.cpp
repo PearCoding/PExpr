@@ -205,11 +205,17 @@ std::string SSAInstrGoto::dump() const
 std::string SSAInstrPhi::dump() const
 {
     std::stringstream ss;
-    ss << Target.toString(true) << " = phi(";
-    for (size_t i = 0; i < Sources.size(); ++i) {
+    ss << Target.toString(true) << " = phi[";
+    for (size_t i = 0; i < Conditions.size(); ++i) {
         if (i)
             ss << ", ";
-        ss << Sources[i].toString(false);
+        ss << Conditions[i].toString(false);
+    }
+    ss << "](";
+    for (size_t i = 0; i < Branches.size(); ++i) {
+        if (i)
+            ss << ", ";
+        ss << Branches[i].toString(false);
     }
     ss << ")";
     return ss.str();
@@ -299,7 +305,9 @@ void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr
             collectNamed(ret->Value);
         } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instr.get())) {
             collectNamed(phi->Target);
-            for (const auto& s : phi->Sources)
+            for (const auto& s : phi->Conditions)
+                collectNamed(s);
+            for (const auto& s : phi->Branches)
                 collectNamed(s);
         }
     }
@@ -627,10 +635,14 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         std::string joinLabel = fresh("lbl");
 
         // Emit conditional branches for each branch condition that jump to their label
+        std::vector<SSAValue> conditionVals;
+        conditionVals.reserve(branchLabels.size());
         for (size_t i = 0; i < br->branches().size(); ++i) {
             const auto& single = br->branches()[i];
             // map condition expression
             SSAValue cond = mapExpression(program, single.Condition);
+            conditionVals.push_back(cond);
+
             // emit branch instruction
             SSAInstrBranch bInstr;
             bInstr.Condition   = cond;
@@ -681,9 +693,10 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto phi    = std::make_shared<SSAInstrPhi>();
         phi->Target = tgt;
 
-        // Add sources: branch results in order then else result
-        phi->Sources = std::move(branchVals);
-        phi->Sources.push_back(elseVal);
+        // Insert into phi block
+        phi->Conditions = std::move(conditionVals);
+        phi->Branches   = std::move(branchVals);
+        phi->Branches.push_back(elseVal);
 
         program.Body.push_back(phi);
         result = tgt;

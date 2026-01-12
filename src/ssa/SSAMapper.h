@@ -125,7 +125,8 @@ struct SSAInstrGoto : public SSAInstr {
 
 struct SSAInstrPhi : public SSAInstr {
     SSAValue Target;
-    std::vector<SSAValue> Sources;
+    std::vector<SSAValue> Conditions;
+    std::vector<SSAValue> Branches; // One more than Conditions due to 'else' case
     [[nodiscard]] std::string dump() const override;
 };
 
