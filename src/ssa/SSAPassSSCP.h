@@ -9,20 +9,10 @@
 namespace PExpr::ssa {
 
 /// Sparse Conditional Constant Propagation (SSCP) pass for the SSA IR.
-///
-/// This pass performs:
-///  - Constant propagation: replace uses of values known to be constants
-///    with SSAValue::Kind::Constant values.
-///  - Constant folding (basic): fold simple unary/binary operations when
-///    operands are constant.
-///  - Dead code elimination: remove instructions whose results are unused
-///    and have no side-effects
-///
-/// The pass is intentionally conservative: it only folds simple literal
-/// operations. It does not attempt advanced algebraic simplifications or
-/// cross-function interprocedural propagation.
 class SSAPassSSCP {
 public:
+    using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
+
     SSAPassSSCP() = default;
 
     /// Run the pass on a program. Modifies the program in-place.
@@ -31,16 +21,24 @@ public:
 private:
     // Helpers
     std::optional<SSAValue> foldAssign(const SSAInstrAssign* asg);
+    std::optional<SSAValue> foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp);
+    std::optional<SSAValue> foldBinaryOp(const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp);
+    std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const std::string& swizzle);
+    std::optional<SSAValue> foldVectorOp(const std::vector<SSAValue>& operands);
+    std::optional<SSAValue> foldCastOp(const SSAValue& operand, ElementaryType targetType);
+
     bool instrHasSideEffects(const SSAInstr* instr) const;
+    void countUsesInInstr(const SSAInstr* instr, std::unordered_map<std::string, int>& counts);
 
-    bool removeEmptyBranches(std::vector<std::shared_ptr<SSAInstr>>& instructions);
-
-    bool removeObsoleteLabels(std::vector<std::shared_ptr<SSAInstr>>& instructions);
-
+    bool removeEmptyBranches(InstructionList& instructions);
+    bool removeObsoleteLabels(InstructionList& instructions);
     bool replaceOperandIfConst(std::vector<SSAValue>& ops);
-    bool replaceOperandIfConst(std::vector<std::shared_ptr<SSAInstr>>& instructions);
+    bool replaceOperandIfConst(InstructionList& instructions);
+    bool collapsePhiNodes(InstructionList& instructions);
 
-    bool collapsePhiNodes(std::vector<std::shared_ptr<SSAInstr>>& instructions);
+    void propagateSideEffects(const SSAProgram& program);
+    bool processFunction(SSAFunction& func);
+    bool processBody(InstructionList& body);
 
     // map from SSA value name -> constant value (string representation + type)
     std::unordered_map<std::string, SSAValue> mConstants;
