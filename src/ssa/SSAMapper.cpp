@@ -328,7 +328,7 @@ void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr
 // Returns the SSAValue representing the last returned value (or a nil constant).
 SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std::shared_ptr<SSAInstr>>& body)
 {
-    SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified);
+    SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Error);
 
     for (const auto& instr : body) {
         if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
@@ -450,7 +450,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
 SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
 {
     if (!expr)
-        return SSAValue{ SSAValue::Kind::Constant, "nil", ElementaryType::Unspecified };
+        return SSAValue{ SSAValue::Kind::Constant, "nil", ElementaryType::Error };
 
     // reuse cached value if present
     auto it = mExprValues.find(expr.get());

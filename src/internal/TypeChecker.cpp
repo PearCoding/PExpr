@@ -29,7 +29,7 @@ ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
 
 ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
-    for (auto statement : closure->statements())
+    for (const auto& statement : closure->statements())
         handleNode(closure, statement);
     return handleNode(closure, closure->expression());
 }
@@ -55,8 +55,8 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         if (declared != ElementaryType::Unspecified && type != declared) {
             if (isConvertible(type, declared)) {
                 // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
-                auto orig     = varStmt->expression();
-                auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
+                const auto orig     = varStmt->expression();
+                const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
 
                 // Special case: `int` literal for a `num` variable
                 if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
@@ -72,13 +72,9 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
             }
         }
 
-        // Register the variable in the dynamic symbol table so following statements
-        // and expressions can resolve it. Use the declared type if present, otherwise the inferred type.
-        const bool is_ok = closure->symbols().addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable()));
-        if (!is_ok) {
-            mReporter.errorf(varStmt->location(), "Trying to declare a new variable '%s' which already exists in the current scope", varStmt->name().c_str());
-            return;
-        }
+        // Register the variable
+        if (!closure->symbols().addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable())))
+            mReporter.errorf(varStmt->location(), "New variable '%s' already exists in the current scope", varStmt->name().c_str());
     } break;
     case StatementType::VariableAssignment: {
         const auto varStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);

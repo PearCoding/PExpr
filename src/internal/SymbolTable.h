@@ -111,6 +111,14 @@ public:
     inline const SymbolTable* parent() const { return mParent; }
     inline void setParent(const SymbolTable* tbl) { mParent = tbl; }
 
+#if 0
+    inline void printVariables()
+    {
+        for (const auto& v : mVariables)
+            std::cout << v.first << std::endl;
+    }
+#endif
+
 private:
     [[nodiscard]] inline std::unordered_multimap<std::string, FunctionDef>::const_iterator checkFunctionExists(const std::string& name, std::span<const ElementaryType> parameterTypes, bool strict) const
     {

@@ -24,14 +24,14 @@ private:
     void processClosure(const Ptr<Closure>& closure);
 
     // Collect captured variable names used inside 'expr' relative to the given
-    // "local" symbol table (funcDefs). Any variable resolved to a different
-    // symbol table is considered captured and inserted into outCaptured map.
-    void collectCapturesFromExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr, std::map<std::string, VariableDef>& outCaptured);
-    void collectCapturesFromClosureBody(const Ptr<Closure>& closure, std::map<std::string, VariableDef>& outCaptured);
+    // "function" closure. Any variable resolved to a symbol table above this is
+    // considered captured and inserted into outCaptured map.
+    void collectCapturesFromExpression(const Ptr<Closure>& funcClosure, const Ptr<Closure>& closure, const Ptr<Expression>& expr, std::map<std::string, VariableDef>& outCaptured);
+    void collectCapturesFromClosureBody(const Ptr<Closure>& funcClosure, const Ptr<Closure>& closure, std::map<std::string, VariableDef>& outCaptured);
 
     // Traverse and update call expressions to append additional arguments when
     // the target function signature expects more parameters (e.g. uplifted captures).
-    void updateCallsInExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr, const FunctionDef& oldDef, const FunctionDef& newDef);
+    void updateCallsInExpression(const Ptr<Expression>& expr, const FunctionDef& oldDef, const FunctionDef& newDef);
     void updateCallsInClosure(const Ptr<Closure>& closure, const FunctionDef& oldDef, const FunctionDef& newDef);
 };
 
