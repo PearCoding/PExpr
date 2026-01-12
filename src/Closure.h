@@ -1,16 +1,17 @@
 #pragma once
 
-#include "Statement.h"
 #include "internal/SymbolTable.h"
 
 namespace PExpr {
+class Expression;
+class Statement;
 class Closure {
 public:
     using StatementList = std::vector<Ptr<Statement>>;
 
     explicit Closure(const Location& loc, Closure* parent = nullptr)
         : mParent(parent)
-        , mSymbols(parent ? &parent->mSymbols : nullptr)
+        , mSymbols(internal::SymbolTable::Connect(parent ? &parent->mSymbols : nullptr))
         , mLocation(loc)
     {
     }

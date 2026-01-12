@@ -7,7 +7,7 @@ namespace PExpr {
 namespace internal {
 class TypeChecker;
 class UpliftPass;
-}
+} // namespace internal
 
 /// Abstract expression. Can not be created directly.
 class Expression {

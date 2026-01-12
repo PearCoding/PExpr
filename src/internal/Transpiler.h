@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../Definitions.h"
+#include "../Expression.h"
+#include "../Statement.h"
 #include "../TranspileVisitor.h"
 #include "SymbolTable.h"
 
@@ -21,7 +23,7 @@ public:
     Payload handle(const Ptr<Closure>& closure)
     {
         // Initialize a fresh dynamic symbol table for this translation unit
-        mDynamicDefinitions = SymbolTable(&mDefinitions);
+        mDynamicDefinitions = SymbolTable::Connect(&mDefinitions);
 
         // Process top-level statements (e.g., variable/function declarations)
         for (const auto& stmt : closure->statements()) {
@@ -93,15 +95,15 @@ private:
 
                 // Transpile function body to compute payload (if needed by visitor implementations)
                 Payload bodyPayload{}; //< TODO: What do we do with this?
-                if (funcStmt->expression())
-                    bodyPayload = handle(funcStmt->expression());
+                if (funcStmt->closure())
+                    bodyPayload = handle(funcStmt->closure());
 
                 // Restore dynamic definitions
                 mDynamicDefinitions = std::move(savedDefs);
             }
 
             // Register the function in the dynamic symbol table so calls can be resolved.
-            const ElementaryType returnType = funcStmt->expression() ? funcStmt->expression()->returnType() : ElementaryType::Unspecified;
+            const ElementaryType returnType = funcStmt->closure() ? funcStmt->closure()->expression()->returnType() : ElementaryType::Unspecified;
             mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()));
         } break;
         default:

@@ -1,4 +1,5 @@
 #include "Environment.h"
+#include "Expression.h"
 #include "Parameter.h"
 #include "internal/Mangler.h"
 #include "internal/Parser.h"
@@ -51,7 +52,7 @@ Ptr<Closure> Environment::parse(std::istream& stream)
         return nullptr;
 
     // run uplift pass to transform captured variables into parameters
-    internal::UpliftPass uplift(mGlobals, mReporter);
+    internal::UpliftPass uplift(mReporter);
     uplift.handle(expr);
 
     return expr;
@@ -65,7 +66,7 @@ Ptr<Closure> Environment::parse(std::string_view str)
 
 bool Environment::doTypeChecking(const Ptr<Closure>& closure)
 {
-    internal::TypeChecker checker(mGlobals, mReporter);
+    internal::TypeChecker checker(mReporter);
     auto retType = checker.handle(closure);
     if (retType == ElementaryType::Unspecified)
         return false;

@@ -1,7 +1,9 @@
 #include "Parser.h"
+#include "Expression.h"
 #include "Logger.h"
 #include "Mangler.h"
 #include "Parameter.h"
+#include "Statement.h"
 
 namespace PExpr::internal {
 Parser::Parser(Lexer& lexer, Reporter& reporter)
@@ -181,14 +183,14 @@ private:
 
         P.expect(TokenType::Assign);
 
-        const auto expr = p_expression();
+        auto expr = p_expression();
 
         P.expect(TokenType::Semicolon);
 
         if (is_declaration)
-            return std::make_shared<VariableDeclarationStatement>(is_mutable, loc, varName, expr, declaredType);
+            return std::make_shared<VariableDeclarationStatement>(is_mutable, loc, varName, std::move(expr), declaredType);
         else
-            return std::make_shared<VariableAssignmentStatement>(loc, varName, expr);
+            return std::make_shared<VariableAssignmentStatement>(loc, varName, std::move(expr));
     }
 
     inline ParameterList p_parameter_def_list()
@@ -252,7 +254,20 @@ private:
             paramTypes.push_back(p.Type);
 
         std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
-        return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, expr, returnType, mangled);
+
+        if (!expr)
+            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, nullptr, returnType, mangled);
+
+        std::shared_ptr<Closure> closure;
+        if (expr->type() == ExpressionType::Closure) {
+            auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(closure->expression());
+            closure    = cexpr->closure();
+        } else {
+            closure = std::make_shared<Closure>(loc, mCurrentClosure);
+            closure->setExpression(std::move(expr));
+        }
+
+        return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled);
     }
 
     // Expressions

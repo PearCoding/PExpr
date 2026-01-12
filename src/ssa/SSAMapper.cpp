@@ -416,32 +416,16 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAFunction& dst = program.Functions.back();
 
         // map function body using a nested mapper so temporaries are local
-        if (f->expression() && f->expression()->type() == ExpressionType::Closure) {
-            auto closureExpr = std::reinterpret_pointer_cast<ClosureExpression>(f->expression());
-            // SSAMapper inner;
-            auto innerProg = mapClosure(closureExpr->closure());
-            // move innerProg.mainBody into dst.body
-            for (auto& instr : innerProg.Body)
-                dst.Body.push_back(instr);
+        auto innerProg = mapClosure(f->closure());
+        // move innerProg.mainBody into dst.body
+        for (auto& instr : innerProg.Body)
+            dst.Body.push_back(instr);
 
-            // detect captured parent-level variables referenced by the inner function
-            detectCapturedParents(innerProg.Body, dst);
+        // detect captured parent-level variables referenced by the inner function
+        detectCapturedParents(innerProg.Body, dst);
 
-            // move any inner functions discovered by the inner mapper
-            dst.InnerFunctions = std::move(innerProg.Functions);
-        } else {
-            // if body is not a closure, map expression into a single return instr inside function
-            if (f->expression()) {
-                // SSAMapper inner;
-                Ptr<Closure> tmp = std::make_shared<Closure>(f->expression()->location(), nullptr);
-                tmp->setExpression(f->expression());
-                auto innerProg = mapClosure(tmp);
-                for (auto& instr : innerProg.Body)
-                    dst.Body.push_back(instr);
-                dst.InnerFunctions = std::move(innerProg.Functions);
-            }
-        }
-
+        // move any inner functions discovered by the inner mapper
+        dst.InnerFunctions = std::move(innerProg.Functions);
     } break;
     default:
         // unsupported - emit comment as an assign to a dummy temp

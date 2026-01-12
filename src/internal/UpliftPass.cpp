@@ -9,44 +9,18 @@
 
 namespace PExpr::internal {
 
-UpliftPass::UpliftPass(const SymbolTable& globals, Reporter& reporter)
-    : mGlobals(globals)
-    , mReporter(reporter)
+UpliftPass::UpliftPass(Reporter& reporter)
+    : mReporter(reporter)
 {
 }
 
 void UpliftPass::handle(const Ptr<Closure>& closure)
 {
-    // Start with top-level dynamic symbol table initialized from globals
-    SymbolTable dyn(mGlobals);
-    processClosure(closure, dyn);
+    processClosure(closure);
 }
 
-void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& dynDefs)
+void UpliftPass::processClosure(const Ptr<Closure>& closure)
 {
-    // Iterate statements and process functions and nested closures.
-    // Build a mutable copy of dynDefs so we can register variables/functions as we go.
-    SymbolTable local = dynDefs;
-
-    // First pass: register top-level variables and function signatures (like TypeChecker does)
-    for (const auto& stmt : closure->statements()) {
-        switch (stmt->type()) {
-        case StatementType::VariableDeclaration: {
-            auto var = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
-            // register variable with its type (typechecker ran already)
-            const ElementaryType t = var->expression()->returnType();
-            local.addVariable(VariableDef(var->name(), t, var->isMutable()));
-        } break;
-        case StatementType::FunctionDeclaration: {
-            auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            // pre-register function with its declared parameter list
-            local.addFunction(FunctionDef(f->name(), f->mangledName(), f->parameters(), f->returnType(), f->isExtern()));
-        } break;
-        default:
-            break;
-        }
-    }
-
     // Second pass: for each function declaration, determine captured variables and
     // uplift them to parameters; also recursively process nested closures.
     for (const auto& stmt : closure->statements()) {
@@ -62,13 +36,8 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
         // collect captures from function body
         std::map<std::string, VariableDef> captured;
 
-        if (f->expression()) {
-            if (f->expression()->type() == ExpressionType::Closure) {
-                // Extract closure ptr
-                collectCapturesFromClosureBody(std::reinterpret_pointer_cast<ClosureExpression>(f->expression())->closure(), local, captured);
-            } else {
-                collectCapturesFromExpression(f->expression(), local, captured);
-            }
+        if (f->closure()) {
+            collectCapturesFromClosureBody(f->closure(), captured);
 
             // For each captured variable, add a new parameter at the end of the function's parameter list
             if (!captured.empty()) {
@@ -85,86 +54,63 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure, const SymbolTable& 
                 for (const auto& p : newParams)
                     newParamTypes.push_back(p.Type);
 
-                const std::string newMangled = makeMangledNameFromTypes(f->name(), newParamTypes, nullptr);
+                const std::string oldMangled = f->mangledName();
+                const std::string newMangled = makeMangledNameFromTypes(f->name(), newParamTypes, closure.get());
+
+                // Update local symbol table: replace function entry
+                closure->symbols().removeFunction(FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern()));
+                closure->symbols().replaceFunction(FunctionDef(f->name(), newMangled, newParams, f->returnType(), f->isExtern()));
 
                 // Replace the function declaration by constructing a new one and replacing in the closure
-                auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, f->expression(), f->returnType(), newMangled);
+                auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, f->closure(), f->returnType(), newMangled);
+
+                PEXPR_ASSERT(newFunc->name() == f->name(), "Name of function should stay the same after uplift");
+                PEXPR_ASSERT(newFunc->returnType() == f->returnType(), "Return type of function should stay the same after uplift");
 
                 // Replace in closure statements:
                 closure->replaceStatement(stmt, newFunc);
-
-                // Update local symbol table: replace function entry
-                local.replaceFunction(FunctionDef(newFunc->name(), newFunc->mangledName(), newParams, newFunc->returnType(), newFunc->isExtern()));
 
                 // Now update all calls in this closure's scope to pass the captured variables
                 // We'll append arguments corresponding to the captured variables in the same order they were added.
                 // We need to determine the expressions to pass: these are variable expressions referencing the captured names
                 // We'll traverse the closure (top-level closure) and update calls.
-                updateCallsInClosure(closure, local);
+                updateCallsInClosure(closure);
             }
 
-            if (f->expression()->type() == ExpressionType::Closure) {
-                // Recurse into nested closure body
-                processClosure(std::reinterpret_pointer_cast<ClosureExpression>(f->expression())->closure(), local);
-            }
+            // Recurse into nested closure body
+            processClosure(f->closure());
         }
     }
 
     // Finally, process nested closures that are not function declarations (i.e., closure expressions inside top-level expr)
     if (closure->expression() && closure->expression()->type() == ExpressionType::Closure) {
         auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(closure->expression());
-        processClosure(cexpr->closure(), local);
+        processClosure(cexpr->closure());
     }
 }
 
-void UpliftPass::collectCapturesFromClosureBody(const Ptr<Closure>& closure, const SymbolTable& funcDefs, std::map<std::string, VariableDef>& outCaptured)
+void UpliftPass::collectCapturesFromClosureBody(const Ptr<Closure>& closure, std::map<std::string, VariableDef>& outCaptured)
 {
-    // Walk statements and expressions in closure and collect variable usages that resolve
-    // to a different symbol table than funcDefs
-    // First, set up a dynamic symbol table similar to TypeChecker
-    SymbolTable dyn = funcDefs;
-
-    // Register local variables and functions visible in this closure (top-level of closure)
-    for (const auto& stmt : closure->statements()) {
-        if (stmt->type() == StatementType::VariableDeclaration) {
-            auto v = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
-            dyn.addVariable(VariableDef(v->name(), v->expression()->returnType(), v->isMutable()));
-        } else if (stmt->type() == StatementType::FunctionDeclaration) {
-            auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            dyn.addFunction(FunctionDef(f->name(), f->mangledName(), f->parameters(), f->returnType(), f->isExtern()));
-        }
-    }
-
     // Now traverse statements expressions
     for (const auto& stmt : closure->statements()) {
         // For variable decl/assign and function decl bodies, inspect expressions
-        if (stmt->type() == StatementType::VariableDeclaration || stmt->type() == StatementType::VariableAssignment) {
-            collectCapturesFromExpression(stmt->expression(), dyn, outCaptured);
+        if (stmt->type() == StatementType::VariableDeclaration) {
+            collectCapturesFromExpression(closure, std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt)->expression(), outCaptured);
+        } else if (stmt->type() == StatementType::VariableAssignment) {
+            collectCapturesFromExpression(closure, std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt)->expression(), outCaptured);
         } else if (stmt->type() == StatementType::FunctionDeclaration) {
             auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            if (!f->isExtern() && f->expression()) {
-                if (f->expression()->type() == ExpressionType::Closure) {
-                    auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(f->expression());
-                    collectCapturesFromClosureBody(cexpr->closure(), dyn, outCaptured);
-                } else {
-                    collectCapturesFromExpression(f->expression(), dyn, outCaptured);
-                }
-            }
+            if (!f->isExtern())
+                collectCapturesFromClosureBody(f->closure(), outCaptured);
         }
     }
 
     // Finally check the final expression
-    if (closure->expression()) {
-        if (closure->expression()->type() == ExpressionType::Closure) {
-            auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(closure->expression());
-            collectCapturesFromClosureBody(cexpr->closure(), dyn, outCaptured);
-        } else {
-            collectCapturesFromExpression(closure->expression(), dyn, outCaptured);
-        }
-    }
+    if (closure->expression())
+        collectCapturesFromExpression(closure, closure->expression(), outCaptured);
 }
 
-void UpliftPass::collectCapturesFromExpression(const Ptr<Expression>& expr, const SymbolTable& funcDefs, std::map<std::string, VariableDef>& outCaptured)
+void UpliftPass::collectCapturesFromExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr, std::map<std::string, VariableDef>& outCaptured)
 {
     if (!expr)
         return;
@@ -173,8 +119,8 @@ void UpliftPass::collectCapturesFromExpression(const Ptr<Expression>& expr, cons
     case ExpressionType::Variable: {
         auto v                 = std::reinterpret_pointer_cast<VariableExpression>(expr);
         const SymbolTable* tbl = nullptr;
-        if (auto def = funcDefs.lookupVariable(v->location(), v->name(), &tbl); def.has_value()) {
-            if (tbl != &funcDefs) {
+        if (auto def = closure->symbols().lookupVariable(v->location(), v->name(), &tbl); def.has_value()) {
+            if (tbl != &closure->symbols()) {
                 // captured
                 outCaptured.emplace(def->name(), def.value());
             }
@@ -186,41 +132,41 @@ void UpliftPass::collectCapturesFromExpression(const Ptr<Expression>& expr, cons
         break;
     case ExpressionType::Unary: {
         auto u = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        collectCapturesFromExpression(u->inner(), funcDefs, outCaptured);
+        collectCapturesFromExpression(closure, u->inner(), outCaptured);
     } break;
     case ExpressionType::Binary: {
         auto b = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        collectCapturesFromExpression(b->left(), funcDefs, outCaptured);
-        collectCapturesFromExpression(b->right(), funcDefs, outCaptured);
+        collectCapturesFromExpression(closure, b->left(), outCaptured);
+        collectCapturesFromExpression(closure, b->right(), outCaptured);
     } break;
     case ExpressionType::Call: {
         auto c = std::reinterpret_pointer_cast<CallExpression>(expr);
         for (const auto& p : c->parameters())
-            collectCapturesFromExpression(p, funcDefs, outCaptured);
+            collectCapturesFromExpression(closure, p, outCaptured);
     } break;
     case ExpressionType::Access: {
         auto a = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        collectCapturesFromExpression(a->inner(), funcDefs, outCaptured);
+        collectCapturesFromExpression(closure, a->inner(), outCaptured);
     } break;
     case ExpressionType::Cast: {
         auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
-        collectCapturesFromExpression(c->inner(), funcDefs, outCaptured);
+        collectCapturesFromExpression(closure, c->inner(), outCaptured);
     } break;
     case ExpressionType::Vector: {
         auto v = std::reinterpret_pointer_cast<VectorExpression>(expr);
         for (const auto& e : v->entries())
-            collectCapturesFromExpression(e, funcDefs, outCaptured);
+            collectCapturesFromExpression(closure, e, outCaptured);
     } break;
     case ExpressionType::Closure: {
         auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        collectCapturesFromClosureBody(c->closure(), funcDefs, outCaptured);
+        collectCapturesFromClosureBody(c->closure(), outCaptured);
     } break;
     case ExpressionType::Branch: {
         auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        collectCapturesFromExpression(br->elseClosure()->expression(), funcDefs, outCaptured);
+        collectCapturesFromExpression(closure, br->elseClosure()->expression(), outCaptured);
         for (const auto& b : br->branches()) {
-            collectCapturesFromExpression(b.Condition, funcDefs, outCaptured);
-            collectCapturesFromClosureBody(b.Body, funcDefs, outCaptured);
+            collectCapturesFromExpression(closure, b.Condition, outCaptured);
+            collectCapturesFromClosureBody(b.Body, outCaptured);
         }
     } break;
     default:
@@ -228,7 +174,7 @@ void UpliftPass::collectCapturesFromExpression(const Ptr<Expression>& expr, cons
     }
 }
 
-void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const SymbolTable& currentDefs)
+void UpliftPass::updateCallsInExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr)
 {
     if (!expr)
         return;
@@ -241,7 +187,7 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Symb
         for (const auto& p : c->parameters())
             argTypes.push_back(p->returnType());
 
-        if (auto def = currentDefs.lookupFunction(c->location(), c->name(), argTypes, false); def.has_value()) {
+        if (auto def = closure->symbols().lookupFunction(c->location(), c->name(), argTypes, false); def.has_value()) {
             // If the function def has more parameters than provided, it means uplift added parameters
             const auto& fparams = def->parameters();
             if (fparams.size() > c->parameters().size()) {
@@ -252,7 +198,6 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Symb
                     auto vexpr                = std::make_shared<VariableExpression>(c->location(), capName);
                     // Set the expression return type to the declared parameter type so downstream passes (SSA) see correct types
                     vexpr->setReturnType(fparams[i].Type);
-                    // Append the parameter via public API
                     c->appendParameter(vexpr);
                 }
                 // update mangled name to the new one (function may have been replaced)
@@ -262,41 +207,41 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Symb
 
         // Recurse into parameters
         for (const auto& p : c->parameters())
-            updateCallsInExpression(p, currentDefs);
+            updateCallsInExpression(closure, p);
 
     } break;
     case ExpressionType::Unary: {
         auto u = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        updateCallsInExpression(u->inner(), currentDefs);
+        updateCallsInExpression(closure, u->inner());
     } break;
     case ExpressionType::Binary: {
         auto b = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        updateCallsInExpression(b->left(), currentDefs);
-        updateCallsInExpression(b->right(), currentDefs);
+        updateCallsInExpression(closure, b->left());
+        updateCallsInExpression(closure, b->right());
     } break;
     case ExpressionType::Access: {
         auto a = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        updateCallsInExpression(a->inner(), currentDefs);
+        updateCallsInExpression(closure, a->inner());
     } break;
     case ExpressionType::Cast: {
         auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
-        updateCallsInExpression(c->inner(), currentDefs);
+        updateCallsInExpression(closure, c->inner());
     } break;
     case ExpressionType::Vector: {
         auto v = std::reinterpret_pointer_cast<VectorExpression>(expr);
         for (const auto& e : v->entries())
-            updateCallsInExpression(e, currentDefs);
+            updateCallsInExpression(closure, e);
     } break;
     case ExpressionType::Closure: {
         auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        updateCallsInClosure(c->closure(), currentDefs);
+        updateCallsInClosure(c->closure());
     } break;
     case ExpressionType::Branch: {
         auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        updateCallsInExpression(br->elseClosure()->expression(), currentDefs);
+        updateCallsInClosure(br->elseClosure());
         for (const auto& b : br->branches()) {
-            updateCallsInExpression(b.Condition, currentDefs);
-            updateCallsInClosure(b.Body, currentDefs);
+            updateCallsInExpression(closure, b.Condition);
+            updateCallsInClosure(b.Body);
         }
     } break;
     default:
@@ -304,33 +249,28 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Symb
     }
 }
 
-void UpliftPass::updateCallsInClosure(const Ptr<Closure>& closure, const SymbolTable& currentDefs)
+void UpliftPass::updateCallsInClosure(const Ptr<Closure>& closure)
 {
     // Update calls inside statements
     for (const auto& stmt : closure->statements()) {
-        if (stmt->type() == StatementType::VariableDeclaration || stmt->type() == StatementType::VariableAssignment) {
-            updateCallsInExpression(stmt->expression(), currentDefs);
+        // For variable decl/assign and function decl bodies, inspect expressions
+        if (stmt->type() == StatementType::VariableDeclaration) {
+            updateCallsInExpression(closure, std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt)->expression());
+        } else if (stmt->type() == StatementType::VariableAssignment) {
+            updateCallsInExpression(closure, std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt)->expression());
         } else if (stmt->type() == StatementType::FunctionDeclaration) {
             auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            if (!f->isExtern() && f->expression()) {
-                if (f->expression()->type() == ExpressionType::Closure) {
-                    auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(f->expression());
-                    updateCallsInClosure(cexpr->closure(), currentDefs);
-                } else {
-                    updateCallsInExpression(f->expression(), currentDefs);
-                }
-            }
+            if (!f->isExtern())
+                updateCallsInClosure(f->closure());
         }
     }
 
     // Update final expression
     if (closure->expression()) {
-        if (closure->expression()->type() == ExpressionType::Closure) {
-            auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(closure->expression());
-            updateCallsInClosure(cexpr->closure(), currentDefs);
-        } else {
-            updateCallsInExpression(closure->expression(), currentDefs);
-        }
+        if (closure->expression()->type() == ExpressionType::Closure)
+            updateCallsInClosure(std::reinterpret_pointer_cast<ClosureExpression>(closure->expression())->closure());
+        else
+            updateCallsInExpression(closure, closure->expression());
     }
 }
 

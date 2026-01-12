@@ -17,33 +17,31 @@ inline void typeError(Reporter& rep, const Ptr<BinaryExpression>& expr, Elementa
     rep.errorf(expr->location(), "Can not use operator '%s' with types '%s' and '%s'", toString(expr->op()).data(), toString(left).data(), toString(right).data());
 }
 
-TypeChecker::TypeChecker(const SymbolTable& defs, Reporter& reporter)
-    : mDefinitions(defs)
-    , mReporter(reporter)
+TypeChecker::TypeChecker(Reporter& reporter)
+    : mReporter(reporter)
 {
 }
 
 ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
 {
-    mDynamicDefinitions = SymbolTable(&mDefinitions);
     return handleNode(closure);
 }
 
 ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
     for (auto statement : closure->statements())
-        handleNode(statement);
-    return handleNode(closure->expression());
+        handleNode(closure, statement);
+    return handleNode(closure, closure->expression());
 }
 
-void TypeChecker::handleNode(const Ptr<Statement>& statement)
+void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& statement)
 {
     switch (statement->type()) {
     case StatementType::VariableDeclaration: {
         auto varStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
 
         // Type-check the initializer expression first.
-        auto type = handleNode(varStmt->expression());
+        auto type = handleNode(closure, varStmt->expression());
         if (type == ElementaryType::Unspecified)
             return; // Error was caught somewhere else
 
@@ -54,7 +52,6 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
                 // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
                 auto orig     = varStmt->expression();
                 auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
-                varStmt->replaceExpression(castExpr);
 
                 // Special case: `int` literal for a `num` variable
                 if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
@@ -62,6 +59,8 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
                 } else {
                     mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
                 }
+
+                varStmt->replaceExpression(castExpr);
             } else {
                 mReporter.errorf(varStmt->location(), "Cannot implicitly convert initializer from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
                 return;
@@ -70,7 +69,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
 
         // Register the variable in the dynamic symbol table so following statements
         // and expressions can resolve it. Use the declared type if present, otherwise the inferred type.
-        const bool is_ok = mDynamicDefinitions.addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable()));
+        const bool is_ok = closure->symbols().addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable()));
         if (!is_ok) {
             mReporter.errorf(varStmt->location(), "Trying to declare a new variable '%s'", varStmt->name().c_str());
             return;
@@ -78,18 +77,18 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
     } break;
     case StatementType::VariableAssignment: {
         auto varStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
-        auto type    = handleNode(varStmt->expression());
+        auto type    = handleNode(closure, varStmt->expression());
         if (type == ElementaryType::Unspecified)
             return; // Error was caught somewhere else
 
         // Check if the variable exists and can be updated
         const SymbolTable* capturedTbl;
-        const auto var = mDynamicDefinitions.lookupVariable(varStmt->location(), varStmt->name(), &capturedTbl);
+        const auto var = closure->symbols().lookupVariable(varStmt->location(), varStmt->name(), &capturedTbl);
         if (!var.has_value()) {
             mReporter.errorf(varStmt->location(), "Trying to assign a value to unknown variable '%s'", varStmt->name().c_str());
             return;
         }
-        if (capturedTbl != &mDynamicDefinitions) {
+        if (capturedTbl != &closure->symbols()) {
             mReporter.errorf(varStmt->location(), "Trying to reassign a value to variable '%s' defined in a different scope", varStmt->name().c_str());
             return;
         }
@@ -103,7 +102,6 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
             auto orig     = varStmt->expression();
             auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
-            varStmt->replaceExpression(castExpr);
 
             // Special case: `int` literal for a `num` variable
             if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
@@ -111,6 +109,8 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
             } else {
                 mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
             }
+
+            varStmt->replaceExpression(castExpr);
         } else {
             mReporter.errorf(varStmt->location(), "Cannot implicitly convert from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
             return;
@@ -124,25 +124,20 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         // final signature immediately.
         if (funcStmt->isExtern()) {
             // extern must provide a concrete return type
-            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern()));
+            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern()));
         } else {
             // register with unspecified return type to allow recursive calls
-            mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), ElementaryType::Unspecified, funcStmt->isExtern()));
+            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), ElementaryType::Unspecified, funcStmt->isExtern()));
         }
 
-        // Temporarily expose parameters as variables (only when they have a specified type)
-        auto savedDefs = mDynamicDefinitions;
-        for (const auto& p : funcStmt->parameters()) {
-            if (p.Type == ElementaryType::Unspecified)
-                continue; // cannot register a parameter without a type
-            mDynamicDefinitions.addVariable(VariableDef(p.Name, p.Type, false));
+        // Add parameters to the symbol table
+        if (funcStmt->closure()) {
+            for (const auto& p : funcStmt->parameters())
+                funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.Type, false));//< TODO: Really non-mutable?
         }
 
         // Type-check the function body to determine the return type
-        const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->expression());
-
-        // Restore dynamic definitions (provisional function remains in savedDefs)
-        mDynamicDefinitions = std::move(savedDefs);
+        const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->closure());
 
         if (returnType == ElementaryType::Unspecified) {
             mReporter.errorf(funcStmt->location(), "Could not determine return type for function '%s'", funcStmt->name().c_str());
@@ -155,7 +150,7 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
         }
 
         // Replace provisional registration with the final signature (or add if missing)
-        if (!mDynamicDefinitions.replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()))) {
+        if (!closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()))) {
             mReporter.errorf(funcStmt->location(), "Given function '%s' is already defined", funcStmt->name().c_str());
         }
     } break;
@@ -164,57 +159,49 @@ void TypeChecker::handleNode(const Ptr<Statement>& statement)
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Expression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>& expr)
 {
     switch (expr->type()) {
     case ExpressionType::Variable:
-        return handleNode(std::reinterpret_pointer_cast<VariableExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<VariableExpression>(expr));
     case ExpressionType::Literal:
-        return handleNode(std::reinterpret_pointer_cast<LiteralExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<LiteralExpression>(expr));
     case ExpressionType::Unary:
-        return handleNode(std::reinterpret_pointer_cast<UnaryExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<UnaryExpression>(expr));
     case ExpressionType::Binary:
-        return handleNode(std::reinterpret_pointer_cast<BinaryExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<BinaryExpression>(expr));
     case ExpressionType::Call:
-        return handleNode(std::reinterpret_pointer_cast<CallExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<CallExpression>(expr));
     case ExpressionType::Access:
-        return handleNode(std::reinterpret_pointer_cast<AccessExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<AccessExpression>(expr));
     case ExpressionType::Vector:
-        return handleNode(std::reinterpret_pointer_cast<VectorExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<VectorExpression>(expr));
     case ExpressionType::Cast:
-        return handleNode(std::reinterpret_pointer_cast<CastExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<CastExpression>(expr));
     case ExpressionType::Closure:
-        return handleNode(std::reinterpret_pointer_cast<ClosureExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
-        return handleNode(std::reinterpret_pointer_cast<BranchExpression>(expr));
+        return handleNode(closure, std::reinterpret_pointer_cast<BranchExpression>(expr));
     default:
         return ElementaryType::Unspecified;
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<ClosureExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<ClosureExpression>& expr)
 {
-    // Link closure information
-    auto cpt            = mCapturedVariables;
-    auto def            = mDynamicDefinitions;
-    mCapturedVariables  = {};
-    mDynamicDefinitions = SymbolTable(&def);
+    PEXPR_UNUSED(closure);
 
     ElementaryType type = handleNode(expr->closure());
     expr->setReturnType(type);
-
-    // Reset closure information
-    mDynamicDefinitions = std::move(def);
-    mCapturedVariables  = std::move(cpt);
     return type;
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpression>& expr)
 {
     ElementaryType returnType = handleNode(expr->elseClosure());
 
     for (const auto& branch : expr->branches()) {
-        const ElementaryType conditionType = handleNode(branch.Condition);
+        const ElementaryType conditionType = handleNode(closure, branch.Condition);
         if (isConvertible(conditionType, ElementaryType::Boolean)) {
             branch.Condition->setReturnType(ElementaryType::Boolean);
         } else {
@@ -252,13 +239,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<BranchExpression>& expr)
     return returnType;
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VariableExpression>& expr)
 {
-    const SymbolTable* capturedTbl;
-    if (const auto def = mDynamicDefinitions.lookupVariable(expr->location(), expr->name(), &capturedTbl); def.has_value()) {
-        // The variable was used outside the current closure. Capture it!
-        if (capturedTbl != &mDynamicDefinitions)
-            mCapturedVariables.insert(def.value());
+    if (const auto def = closure->symbols().lookupVariable(expr->location(), expr->name()); def.has_value()) {
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
@@ -267,14 +250,15 @@ ElementaryType TypeChecker::handleNode(const Ptr<VariableExpression>& expr)
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<LiteralExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<LiteralExpression>& expr)
 {
+    PEXPR_UNUSED(closure);
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpression>& expr)
 {
-    auto innerType = handleNode(expr->inner());
+    auto innerType = handleNode(closure, expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
 
@@ -300,10 +284,10 @@ ElementaryType TypeChecker::handleNode(const Ptr<UnaryExpression>& expr)
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<BinaryExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpression>& expr)
 {
-    auto leftType  = handleNode(expr->left());
-    auto rightType = handleNode(expr->right());
+    auto leftType  = handleNode(closure, expr->left());
+    auto rightType = handleNode(closure, expr->right());
     if (leftType == ElementaryType::Unspecified || rightType == ElementaryType::Unspecified)
         return rightType; // Error was caught somewhere else
 
@@ -392,14 +376,14 @@ inline std::string printArgs(const std::vector<ElementaryType>& args)
     return stream.str();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpression>& expr)
 {
     std::vector<ElementaryType> fromArgs;
     fromArgs.reserve(expr->parameters().size());
 
     // First, type-check arguments to obtain their types.
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
-        auto type = handleNode(expr->parameters().at(i));
+        auto type = handleNode(closure, expr->parameters().at(i));
         if (type == ElementaryType::Unspecified)
             return ElementaryType::Unspecified; // Error was caught somewhere else
         fromArgs.push_back(type);
@@ -408,7 +392,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     expr->setReturnType(ElementaryType::Unspecified);
 
     // Lookup the function (this allows matching with implicit convertible args)
-    if (const auto def = mDynamicDefinitions.lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value()) {
+    if (const auto def = closure->symbols().lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value()) {
         // For any parameter where the actual type differs from the parameter type
         // and an implicit conversion exists, inject an implicit CastExpression
         // (explicit=false) so downstream passes see an explicit cast node.
@@ -445,9 +429,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<CallExpression>& expr)
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr)
 {
-    auto innerType = handleNode(expr->inner());
+    auto innerType = handleNode(closure, expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was caught somewhere else
 
@@ -503,13 +487,13 @@ ElementaryType TypeChecker::handleNode(const Ptr<AccessExpression>& expr)
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr)
 {
     // Ensure each entry is type-checked and, if necessary, inject an implicit
     // CastExpression to Number so downstream passes (SSA) see explicit casts.
     for (size_t i = 0; i < expr->entries().size(); ++i) {
         auto orig        = expr->entries().at(i);
-        const auto pType = handleNode(orig);
+        const auto pType = handleNode(closure, orig);
         if (pType == ElementaryType::Unspecified)
             return ElementaryType::Unspecified; // Error handled somewhere else
 
@@ -553,10 +537,10 @@ ElementaryType TypeChecker::handleNode(const Ptr<VectorExpression>& expr)
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<CastExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CastExpression>& expr)
 {
     // Type-check inner expression first
-    const ElementaryType innerType = handleNode(expr->inner());
+    const ElementaryType innerType = handleNode(closure, expr->inner());
     if (innerType == ElementaryType::Unspecified)
         return innerType; // Error was reported deeper
 

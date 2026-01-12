@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Closure.h"
+#include "Expression.h"
+#include "Statement.h"
 
 namespace PExpr {
 /// Simple visitor which will construct a parsable representation of the given AST.
@@ -105,7 +107,7 @@ private:
             stream << " -> " << toString(statement->returnType());
 
         if (!statement->isExtern())
-            stream << " = " << visit(statement->expression());
+            stream << " = " << visit(statement->closure());
         stream << ";";
         return stream.str();
     }

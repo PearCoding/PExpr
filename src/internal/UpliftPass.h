@@ -1,8 +1,8 @@
 #pragma once
 
-#include "SymbolTable.h"
 #include "Closure.h"
 #include "Reporter.h"
+#include "SymbolTable.h"
 #include <map>
 
 namespace PExpr::internal {
@@ -13,27 +13,26 @@ namespace PExpr::internal {
 /// argument lists accordingly.
 class UpliftPass {
 public:
-    explicit UpliftPass(const SymbolTable& globals, Reporter& reporter);
+    explicit UpliftPass(Reporter& reporter);
 
     /// Run the uplift pass on the given closure (in-place modification).
     void handle(const Ptr<Closure>& closure);
 
 private:
-    const SymbolTable& mGlobals;
     Reporter& mReporter;
 
-    void processClosure(const Ptr<Closure>& closure, const SymbolTable& dynDefs);
+    void processClosure(const Ptr<Closure>& closure);
 
     // Collect captured variable names used inside 'expr' relative to the given
     // "local" symbol table (funcDefs). Any variable resolved to a different
     // symbol table is considered captured and inserted into outCaptured map.
-    void collectCapturesFromExpression(const Ptr<Expression>& expr, const SymbolTable& funcDefs, std::map<std::string, VariableDef>& outCaptured);
-    void collectCapturesFromClosureBody(const Ptr<Closure>& closure, const SymbolTable& funcDefs, std::map<std::string, VariableDef>& outCaptured);
+    void collectCapturesFromExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr, std::map<std::string, VariableDef>& outCaptured);
+    void collectCapturesFromClosureBody(const Ptr<Closure>& closure, std::map<std::string, VariableDef>& outCaptured);
 
     // Traverse and update call expressions to append additional arguments when
     // the target function signature expects more parameters (e.g. uplifted captures).
-    void updateCallsInExpression(const Ptr<Expression>& expr, const SymbolTable& currentDefs);
-    void updateCallsInClosure(const Ptr<Closure>& closure, const SymbolTable& currentDefs);
+    void updateCallsInExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr);
+    void updateCallsInClosure(const Ptr<Closure>& closure);
 };
 
 } // namespace PExpr::internal
