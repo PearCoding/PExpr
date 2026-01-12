@@ -39,6 +39,11 @@ private:
     void propagateSideEffects(const SSAProgram& program);
     bool processBody(InstructionList& body);
 
+    void analyzeCallGraph(const SSAProgram& program);
+    bool inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    bool inlineCallsToFunction(SSAProgram& program, SSAFunction& func);
+    void removeUnusedFunctions(SSAProgram& program);
+
     // map from SSA value name -> constant value (string representation + type)
     std::unordered_map<std::string, SSAValue> mConstants;
 
@@ -47,6 +52,9 @@ private:
 
     // set of function names that are considered to have side-effects (externals and those calling externals)
     std::unordered_set<std::string> mSideEffectFunctions;
+
+    // call counts for functions
+    std::unordered_map<std::string, int> mCallCounts;
 };
 
 } // namespace PExpr::ssa

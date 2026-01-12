@@ -1,0 +1,21 @@
+// Test for SSAPassSSCP function inlining and removal
+
+// Function called once - should be inlined
+fn add_one(x: int) = x + 1;
+
+// Function called multiple times - should not be inlined -> TODO: In the future a constant folded one should be inlined (needs cache etc)
+fn double(x: int) = x * 2;
+
+// Function never called - should be removed
+fn unused_func(x: int) = x * 100;
+
+// Function called once from another function
+fn helper(y: int) = y + 5;
+fn use_helper(z: int) = helper(z) * 2;
+
+let result1 = add_one(10);
+let result2 = double(20);
+let result3 = double(30);
+let result4 = use_helper(40);
+
+result1 + result2 + result3 + result4

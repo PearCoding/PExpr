@@ -582,6 +582,26 @@ void SSAPassSSCP::run(SSAProgram& program)
             if (processBody(func.Body))
                 changed = true;
         }
+
+        analyzeCallGraph(program);
+
+        // Attempt to inline functions called once
+        for (auto& func : program.Functions) {
+            if (func.External)
+                continue;
+
+            // Check if function should be inlined (called exactly once)
+            if (auto callCountIt = mCallCounts.find(func.Name);
+                callCountIt != mCallCounts.end() && callCountIt->second == 1) {
+                // Find and inline all calls to this function
+                bool inlined = inlineCallsToFunction(program, func);
+                if (inlined)
+                    changed = true;
+            }
+        }
+
+        // Remove unused functions after inlining
+        removeUnusedFunctions(program);
     }
 }
 
@@ -730,7 +750,7 @@ bool SSAPassSSCP::removeObsoleteLabels(InstructionList& instructions)
         if (!instrPtr)
             continue;
         if (auto l = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
-            if (!counter.contains(l->Name))
+            if (counter.find(l->Name) == counter.end())
                 counter[l->Name] = 0;
         } else if (auto g = dynamic_cast<const SSAInstrGoto*>(instrPtr.get())) {
             if (auto it = counter.find(g->TargetLabel); it != counter.end())
@@ -819,5 +839,196 @@ bool SSAPassSSCP::collapsePhiNodes(InstructionList& instructions)
     }
 
     return changed;
+}
+
+void SSAPassSSCP::analyzeCallGraph(const SSAProgram& program)
+{
+    mCallCounts.clear();
+
+    // Count all calls to functions
+    auto countCallsInBody = [&](const InstructionList& body) {
+        for (const auto& instrPtr : body) {
+            if (!instrPtr)
+                continue;
+            if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+                ++mCallCounts[call->FunctionName];
+            }
+        }
+    };
+
+    // Count in main body
+    countCallsInBody(program.Body);
+
+    // Count in function bodies
+    for (const auto& func : program.Functions)
+        countCallsInBody(func.Body);
+}
+
+bool SSAPassSSCP::inlineCallsToFunction(SSAProgram& program, SSAFunction& func)
+{
+    bool inlinedAny = false;
+
+    // Helper to inline calls in a body
+    auto inlineInBody = [&](InstructionList& body) -> bool {
+        bool changed = false;
+        for (size_t i = 0; i < body.size(); ++i) {
+            if (!body[i])
+                continue;
+            if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
+                if (call->FunctionName == func.Name) {
+                    if (inlineFunctionCall(call, func, body, i)) {
+                        changed = true;
+                        // After inlining, we need to reprocess from start
+                        // Break and return true to trigger re-evaluation
+                        break;
+                    }
+                }
+            }
+        }
+        return changed;
+    };
+
+    // Inline in main body
+    if (inlineInBody(program.Body))
+        inlinedAny = true;
+
+    // Inline in other functions
+    for (auto& otherFunc : program.Functions) {
+        if (&otherFunc == &func)
+            continue;
+        if (inlineInBody(otherFunc.Body))
+            inlinedAny = true;
+    }
+
+    return inlinedAny;
+}
+
+bool SSAPassSSCP::inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+{
+    PEXPR_ASSERT(func.Parameters.size() == call->Arguments.size(), "Call parameters must match function parameters at this point");
+
+    // Create a mapping from parameter names to argument values
+    std::unordered_map<std::string, SSAValue> paramMap;
+    for (size_t i = 0; i < func.Parameters.size(); ++i)
+        paramMap[func.Parameters[i]] = call->Arguments[i];
+
+    // Create instructions for the inlined body
+    InstructionList inlinedInstructions;
+    inlinedInstructions.reserve(func.Body.size());
+
+    SSAValue returnValue;
+
+    for (const auto& instrPtr : func.Body) {
+        if (!instrPtr)
+            continue;
+
+        // Clone the instruction
+        std::shared_ptr<SSAInstr> cloned;
+
+        if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
+            auto newAsg = std::make_shared<SSAInstrAssign>(*asg);
+
+            // Map operand names (parameters to arguments)
+            for (auto& op : newAsg->Operands) {
+                if (op.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(op.Name); paramIt != paramMap.end())
+                        op = paramIt->second;
+                }
+            }
+
+            cloned = newAsg;
+        } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
+            returnValue = ret->Value;
+
+            // Map the return value if needed
+            if (returnValue.Kind != SSAValue::Kind::Constant) {
+                if (auto paramIt = paramMap.find(returnValue.Name); paramIt != paramMap.end())
+                    returnValue = paramIt->second;
+            }
+
+            // Don't add the return instruction to the inlined body
+            continue;
+        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
+            auto newBr = std::make_shared<SSAInstrBranch>(*br);
+
+            // Map condition
+            if (newBr->Condition.Kind != SSAValue::Kind::Constant) {
+                if (auto paramIt = paramMap.find(newBr->Condition.Name); paramIt != paramMap.end())
+                    newBr->Condition = paramIt->second;
+            }
+
+            cloned = newBr;
+        } else if (auto callInstr = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+            auto newCall = std::make_shared<SSAInstrCall>(*callInstr);
+
+            // Map arguments
+            for (auto& arg : newCall->Arguments) {
+                if (arg.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(arg.Name); paramIt != paramMap.end())
+                        arg = paramIt->second;
+                }
+            }
+
+            cloned = newCall;
+        } else if (auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
+            auto newPhi = std::make_shared<SSAInstrPhi>(*phi);
+
+            // Map conditions and branches
+            for (auto& cond : newPhi->Conditions) {
+                if (cond.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(cond.Name); paramIt != paramMap.end())
+                        cond = paramIt->second;
+                }
+            }
+
+            for (auto& branch : newPhi->Branches) {
+                if (branch.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(branch.Name); paramIt != paramMap.end())
+                        branch = paramIt->second;
+                }
+            }
+
+            cloned = newPhi;
+        } else {
+            cloned = instrPtr;
+        }
+
+        if (cloned)
+            inlinedInstructions.push_back(cloned);
+    }
+
+    // Replace the call with the inlined instructions
+    // Create an assignment from the return value to the call's target
+
+    auto assign      = std::make_shared<SSAInstrAssign>();
+    assign->Target   = call->Target;
+    assign->Operator = SSAInstrAssign::OpKind::Assign;
+    assign->Operands = { returnValue };
+    inlinedInstructions.push_back(assign);
+
+    // Replace the call with inlined instructions
+    instructions.erase(instructions.begin() + callIndex);
+    instructions.insert(instructions.begin() + callIndex,
+                        inlinedInstructions.begin(), inlinedInstructions.end());
+
+    return true;
+}
+
+void SSAPassSSCP::removeUnusedFunctions(SSAProgram& program)
+{
+    // Remove functions that are never called and are not external
+    auto it = program.Functions.begin();
+    while (it != program.Functions.end()) {
+        if (it->External) {
+            ++it;
+            continue;
+        }
+
+        auto callCountIt = mCallCounts.find(it->Name);
+        if (callCountIt == mCallCounts.end() || callCountIt->second == 0)
+            it = program.Functions.erase(it);
+        else
+            ++it;
+    }
 }
 } // namespace PExpr::ssa
