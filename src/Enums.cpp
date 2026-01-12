@@ -8,6 +8,8 @@ std::string_view toString(ElementaryType type)
     default:
         PEXPR_ASSERT(false, "Invalid elementary type");
         return "invalid";
+    case ElementaryType::Error:
+        return "error";
     case ElementaryType::Unspecified:
         return "unspecified";
     case ElementaryType::Boolean:

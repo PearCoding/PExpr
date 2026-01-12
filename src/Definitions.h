@@ -17,7 +17,7 @@ public:
         , mType(type)
         , mIsMutable(isMutable)
     {
-        PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a valid type for a variable definition");
     }
 
     /// The identifier the variable is named with.

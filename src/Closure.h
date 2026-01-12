@@ -11,7 +11,7 @@ public:
 
     explicit Closure(const Location& loc, Closure* parent = nullptr)
         : mParent(parent)
-        , mSymbols(internal::SymbolTable::Connect(parent ? &parent->mSymbols : nullptr))
+        , mSymbols(internal::SymbolTable::Connect(parent ? &parent->symbols() : nullptr))
         , mLocation(loc)
     {
     }

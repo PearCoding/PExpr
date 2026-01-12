@@ -31,8 +31,8 @@ private:
 
     // Traverse and update call expressions to append additional arguments when
     // the target function signature expects more parameters (e.g. uplifted captures).
-    void updateCallsInExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr);
-    void updateCallsInClosure(const Ptr<Closure>& closure);
+    void updateCallsInExpression(const Ptr<Closure>& closure, const Ptr<Expression>& expr, const FunctionDef& oldDef, const FunctionDef& newDef);
+    void updateCallsInClosure(const Ptr<Closure>& closure, const FunctionDef& oldDef, const FunctionDef& newDef);
 };
 
 } // namespace PExpr::internal

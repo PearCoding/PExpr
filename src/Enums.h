@@ -6,6 +6,7 @@
 namespace PExpr {
 /// Supported types.
 enum class ElementaryType {
+    Error,       /// Issue during type checking
     Unspecified, /// Will be used internally.
     Boolean,     /// 'bool' Represented as 'bool' internally.
     Integer,     /// 'int' Represented as 'int64' internally.
@@ -20,6 +21,9 @@ enum class ElementaryType {
 /// Currently only 'int' -> 'num' is defined (implicit conversion).
 inline bool isConvertible(ElementaryType from, ElementaryType to)
 {
+    if (from == ElementaryType::Error || to == ElementaryType::Error)
+        return false;
+
     if (from == ElementaryType::Unspecified || to == ElementaryType::Unspecified)
         return false;
 

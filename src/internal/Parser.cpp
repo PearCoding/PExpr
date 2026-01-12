@@ -260,8 +260,7 @@ private:
 
         std::shared_ptr<Closure> closure;
         if (expr->type() == ExpressionType::Closure) {
-            auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(closure->expression());
-            closure    = cexpr->closure();
+            closure = std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure();
         } else {
             closure = std::make_shared<Closure>(loc, mCurrentClosure);
             closure->setExpression(std::move(expr));

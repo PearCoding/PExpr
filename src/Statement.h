@@ -86,19 +86,13 @@ public:
     [[nodiscard]] inline bool isExtern() const { return this->closure() == nullptr; }
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
 
-    /// Return the actual return type if unspecified or the specified version
-    /// The return type must be specified if the function is declared extern
-    [[nodiscard]] inline ElementaryType returnType() const
-    {
-        if (mReturnType == ElementaryType::Unspecified && !isExtern())
-            return this->closure()->expression()->returnType();
-        else
-            return mReturnType;
-    }
+    [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
+    inline void setReturnType(ElementaryType type) { mReturnType = type; }
+    [[nodiscard]] inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
 
 private:
     const ParameterList mParameters;
-    const ElementaryType mReturnType;
+    ElementaryType mReturnType;
     const std::string mMangledName;
     const Ptr<Closure> mClosure;
 };
