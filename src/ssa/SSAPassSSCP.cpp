@@ -23,17 +23,6 @@ bool SSAPassSSCP::instrHasSideEffects(const SSAInstr* instr) const
     return false;
 }
 
-static void replaceOperandIfConst(std::vector<SSAValue>& ops, const std::unordered_map<std::string, SSAValue>& consts)
-{
-    for (auto& o : ops) {
-        if (o.Kind == SSAValue::Kind::Constant)
-            continue;
-        auto it = consts.find(o.Name);
-        if (it != consts.end())
-            o = it->second;
-    }
-}
-
 static void countUsesInInstr(const SSAInstr* instr, std::unordered_map<std::string, int>& counts)
 {
     if (!instr)
@@ -51,6 +40,9 @@ static void countUsesInInstr(const SSAInstr* instr, std::unordered_map<std::stri
     } else if (auto r = dynamic_cast<const SSAInstrReturn*>(instr)) {
         if (r->Value.Kind != SSAValue::Kind::Constant)
             ++counts[r->Value.Name];
+    } else if (auto b = dynamic_cast<const SSAInstrBranch*>(instr)) {
+        if (b->Condition.Kind != SSAValue::Kind::Constant)
+            ++counts[b->Condition.Name];
     } else if (auto p = dynamic_cast<const SSAInstrPhi*>(instr)) {
         for (const auto& s : p->Conditions) {
             if (s.Kind != SSAValue::Kind::Constant)
@@ -122,6 +114,11 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         }
         return false;
     };
+
+    // FIXME: Understand why we could not just do this??
+    // Assignment
+    // if (asg->Operator == SSAInstrAssign::OpKind::Assign && asg->Operands.size() == 1)
+    //     return asg->Operands.front();
 
     // Collect resolved operand constants
     std::vector<SSAValue> ops;
@@ -467,47 +464,11 @@ void SSAPassSSCP::run(SSAProgram& program)
         changed = false;
 
         // 1) Replace operands with known constants where possible
-        for (auto& instrPtr : program.Body) {
-            if (!instrPtr)
-                continue;
-            if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-                replaceOperandIfConst(asg->Operands, mConstants);
-            } else if (auto call = dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
-                replaceOperandIfConst(call->Arguments, mConstants);
-            } else if (auto ret = dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
-                if (ret->Value.Kind != SSAValue::Kind::Constant) {
-                    auto it = mConstants.find(ret->Value.Name);
-                    if (it != mConstants.end()) {
-                        ret->Value = it->second;
-                        changed    = true;
-                    }
-                }
-            } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
-                replaceOperandIfConst(phi->Conditions, mConstants);
-                replaceOperandIfConst(phi->Branches, mConstants);
-            }
-        }
+        if (replaceOperandIfConst(program.Body))
+            changed = true;
         for (auto& func : program.Functions) {
-            for (auto& instrPtr : func.Body) {
-                if (!instrPtr)
-                    continue;
-                if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-                    replaceOperandIfConst(asg->Operands, mConstants);
-                } else if (auto call = dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
-                    replaceOperandIfConst(call->Arguments, mConstants);
-                } else if (auto ret = dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
-                    if (ret->Value.Kind != SSAValue::Kind::Constant) {
-                        auto it = mConstants.find(ret->Value.Name);
-                        if (it != mConstants.end()) {
-                            ret->Value = it->second;
-                            changed    = true;
-                        }
-                    }
-                } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
-                    replaceOperandIfConst(phi->Conditions, mConstants);
-                    replaceOperandIfConst(phi->Branches, mConstants);
-                }
-            }
+            if (replaceOperandIfConst(func.Body))
+                changed = true;
         }
 
         // 2) Try to fold assignments into constants
@@ -602,7 +563,229 @@ void SSAPassSSCP::run(SSAProgram& program)
             }
             func.Body.swap(newF);
         }
+
+        // 4) Remove empty branches
+        if (removeEmptyBranches(program.Body))
+            changed = true;
+        for (auto& func : program.Functions) {
+            if (removeEmptyBranches(func))
+                changed = true;
+        }
+
+        // 5) Handle unused labels
+        if (removeObsoleteLabels(program.Body))
+            changed = true;
+        for (auto& func : program.Functions) {
+            if (removeObsoleteLabels(func))
+                changed = true;
+        }
     }
 }
 
+bool SSAPassSSCP::replaceOperandIfConst(std::vector<SSAValue>& ops)
+{
+    bool changed = false;
+    for (auto& o : ops) {
+        if (o.Kind == SSAValue::Kind::Constant)
+            continue;
+        auto it = mConstants.find(o.Name);
+        if (it != mConstants.end()) {
+            o       = it->second;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+bool SSAPassSSCP::replaceOperandIfConst(std::vector<std::shared_ptr<SSAInstr>>& instructions)
+{
+    bool changed = false;
+    for (auto& instrPtr : instructions) {
+        if (!instrPtr)
+            continue;
+        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
+            if (replaceOperandIfConst(asg->Operands))
+                changed = true;
+        } else if (auto call = dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
+            if (replaceOperandIfConst(call->Arguments))
+                changed = true;
+        } else if (auto ret = dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
+            if (ret->Value.Kind != SSAValue::Kind::Constant) {
+                auto it = mConstants.find(ret->Value.Name);
+                if (it != mConstants.end()) {
+                    ret->Value = it->second;
+                    changed    = true;
+                }
+            }
+        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
+            if (replaceOperandIfConst(phi->Conditions))
+                changed = true;
+            if (replaceOperandIfConst(phi->Branches))
+                changed = true;
+        } else if (auto br = dynamic_cast<SSAInstrBranch*>(instrPtr.get())) {
+            if (br->Condition.Kind != SSAValue::Kind::Constant) {
+                auto it = mConstants.find(br->Condition.Name);
+                if (it != mConstants.end()) {
+                    br->Condition = it->second;
+                    changed       = true;
+                }
+            }
+        }
+    }
+    return changed;
+}
+
+bool SSAPassSSCP::removeEmptyBranches(SSAFunction& func)
+{
+    bool changed = false;
+    for (auto& f : func.InnerFunctions) {
+        if (removeEmptyBranches(f.Body))
+            changed = true;
+    }
+
+    if (removeEmptyBranches(func.Body))
+        changed = true;
+
+    return changed;
+}
+
+bool SSAPassSSCP::removeEmptyBranches(std::vector<std::shared_ptr<SSAInstr>>& instructions)
+{
+    for (size_t i = 0; i < instructions.size() - 1; ++i) {
+        // Check for the following:
+        //   lbl.1:
+        //   goto lbl.2
+        // and
+        //   lbl.1:
+        //   lbl.2:
+        if (auto l = dynamic_cast<const SSAInstrLabel*>(instructions[i].get())) {
+            // Is the following instruction a basic jump?
+            if (auto g = dynamic_cast<const SSAInstrGoto*>(instructions[i + 1].get())) {
+                // Replace all necessary stuff in this program
+                for (size_t j = 0; j < instructions.size(); ++j) {
+                    if (i == j)
+                        continue;
+                    // Check branches/gotos
+                    if (auto br = dynamic_cast<SSAInstrBranch*>(instructions[j].get())) {
+                        if (br->TargetLabel == l->Name)
+                            br->TargetLabel = g->TargetLabel;
+                    } else if (auto gt = dynamic_cast<SSAInstrGoto*>(instructions[j].get())) {
+                        if (gt->TargetLabel == l->Name)
+                            br->TargetLabel = g->TargetLabel;
+                    }
+                }
+
+                // Remove the label and the goto
+                instructions.erase(instructions.begin() + i, instructions.begin() + i + 2);
+                return true;
+            } else if (auto l2 = dynamic_cast<const SSAInstrLabel*>(instructions[i + 1].get())) {
+                // Replace all necessary stuff in this program
+                for (size_t j = 0; j < instructions.size(); ++j) {
+                    if (i == j)
+                        continue;
+                    // Check branches/gotos
+                    if (auto br = dynamic_cast<SSAInstrBranch*>(instructions[j].get())) {
+                        if (br->TargetLabel == l->Name)
+                            br->TargetLabel = l2->Name;
+                    } else if (auto gt = dynamic_cast<SSAInstrGoto*>(instructions[j].get())) {
+                        if (gt->TargetLabel == l->Name)
+                            br->TargetLabel = l2->Name;
+                    }
+                }
+
+                // Remove the first label
+                instructions.erase(instructions.begin() + i);
+                return true;
+            }
+        }
+
+        // Check for the following:
+        //   goto lbl.1
+        //   lbl.1:
+        if (auto g = dynamic_cast<const SSAInstrGoto*>(instructions[i].get())) {
+            // Is the following instruction a label?
+            if (auto l = dynamic_cast<const SSAInstrLabel*>(instructions[i + 1].get())) {
+                // The goto follows strict the label
+                if (g->TargetLabel == l->Name) {
+                    // Delete the goto
+                    instructions.erase(instructions.begin() + i);
+                    return true;
+                }
+            }
+        }
+
+        // Check for the following:
+        //   br x -> lbl.1
+        //   lbl.1:
+        if (auto br = dynamic_cast<const SSAInstrBranch*>(instructions[i].get())) {
+            // Is the following instruction a label?
+            if (auto l = dynamic_cast<const SSAInstrLabel*>(instructions[i + 1].get())) {
+                // The goto follows strict the label
+                if (br->TargetLabel == l->Name) {
+                    // Delete the branching
+                    instructions.erase(instructions.begin() + i);
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+bool SSAPassSSCP::removeObsoleteLabels(SSAFunction& func)
+{
+    bool changed = false;
+    for (auto& f : func.InnerFunctions) {
+        if (removeObsoleteLabels(f.Body))
+            changed = true;
+    }
+
+    if (removeObsoleteLabels(func.Body))
+        changed = true;
+
+    return changed;
+}
+
+bool SSAPassSSCP::removeObsoleteLabels(std::vector<std::shared_ptr<SSAInstr>>& instructions)
+{
+    // Count the usage of the labels
+    std::unordered_map<std::string, size_t> counter;
+    for (auto& instrPtr : instructions) {
+        if (!instrPtr)
+            continue;
+        if (auto l = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
+            if (!counter.contains(l->Name))
+                counter[l->Name] = 0;
+        } else if (auto g = dynamic_cast<const SSAInstrGoto*>(instrPtr.get())) {
+            if (auto it = counter.find(g->TargetLabel); it != counter.end())
+                it->second += 1;
+            else
+                counter[g->TargetLabel] = 1;
+        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
+            if (auto it = counter.find(br->TargetLabel); it != counter.end())
+                it->second += 1;
+            else
+                counter[br->TargetLabel] = 1;
+        }
+    }
+
+    bool changed = false;
+    // Remove labels without usage
+    for (auto it = instructions.begin(); it != instructions.end(); ++it) {
+        if (!*it)
+            continue;
+
+        if (auto l = dynamic_cast<const SSAInstrLabel*>(it->get())) {
+            if (counter.at(l->Name) == 0) {
+                it      = instructions.erase(it);
+                changed = true;
+                if (it != instructions.begin())
+                    --it;
+            }
+        }
+    }
+
+    return changed;
+}
 } // namespace PExpr::ssa

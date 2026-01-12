@@ -33,6 +33,15 @@ private:
     std::optional<SSAValue> foldAssign(const SSAInstrAssign* asg);
     bool instrHasSideEffects(const SSAInstr* instr) const;
 
+    bool removeEmptyBranches(SSAFunction& func);
+    bool removeEmptyBranches(std::vector<std::shared_ptr<SSAInstr>>& instructions);
+
+    bool removeObsoleteLabels(SSAFunction& func);
+    bool removeObsoleteLabels(std::vector<std::shared_ptr<SSAInstr>>& instructions);
+
+    bool replaceOperandIfConst(std::vector<SSAValue>& ops);
+    bool replaceOperandIfConst(std::vector<std::shared_ptr<SSAInstr>>& instructions);
+
     // map from SSA value name -> constant value (string representation + type)
     std::unordered_map<std::string, SSAValue> mConstants;
 

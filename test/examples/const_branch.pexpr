@@ -1,0 +1,6 @@
+let k = true;
+if k {
+    42
+} else {
+    7
+}
