@@ -37,7 +37,6 @@ private:
     bool collapsePhiNodes(InstructionList& instructions);
 
     void propagateSideEffects(const SSAProgram& program);
-    bool processFunction(SSAFunction& func);
     bool processBody(InstructionList& body);
 
     // map from SSA value name -> constant value (string representation + type)

@@ -238,8 +238,6 @@ std::string SSAFunction::dump() const
     ss << std::endl;
 
     if (!Body.empty()) {
-        for (const auto& f : InnerFunctions)
-            ss << f.dump() << std::endl;
         for (const auto& instr : Body)
             ss << "  " << instr->dump() << std::endl;
         ss << "endfn" << std::endl;
@@ -374,18 +372,13 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         func.ReturnType = f->returnType();
         func.External   = f->isExtern();
 
-        // Insert placeholder function into program so it's visible during mapping.
-        program.Functions.push_back(func);
-        SSAFunction& dst = program.Functions.back();
-
-        // map function body using a nested mapper so temporaries are local
+        // Acquire inner closure
         auto innerProg = mapClosure(f->closure());
-        // move innerProg.mainBody into dst.body
-        for (auto& instr : innerProg.Body)
-            dst.Body.push_back(instr);
+        func.Body      = std::move(innerProg.Body);
 
-        // move any inner functions discovered by the inner mapper
-        dst.InnerFunctions = std::move(innerProg.Functions);
+        // Given the uplifting all functions are global
+        program.Functions.insert(program.Functions.end(), innerProg.Functions.begin(), innerProg.Functions.end());
+        program.Functions.push_back(std::move(func));
     } break;
     default:
         // unsupported - emit comment as an assign to a dummy temp
@@ -545,32 +538,11 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         }
     } break;
     case ExpressionType::Closure: {
-        auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        // Map nested closure as a function-like entity and return a temp referencing it.
-        // SSAMapper inner;
+        auto c    = std::reinterpret_pointer_cast<ClosureExpression>(expr);
         auto prog = mapClosure(c->closure());
-        // create a synthetic function name and register it as a function in program
-        const std::string funcName = fresh("closure");
-        SSAFunction func;
-        func.Name       = funcName;
-        func.ReturnType = c->returnType();
-        func.External   = false;
-        // move inner instructions into function body
-        for (auto& instr : prog.Body)
-            func.Body.push_back(instr);
-        func.InnerFunctions = std::move(prog.Functions);
-
-        program.Functions.push_back(std::move(func));
-
-        // directly call the closure
-        SSAValue tgt(SSAValue::Kind::Temp, fresh(funcName), c->returnType());
-        auto call                = std::make_shared<SSAInstrCall>();
-        call->Target             = tgt;
-        call->PublicFunctionName = funcName;
-        call->FunctionName       = funcName;
-        call->Arguments          = {}; // empty
-        program.Body.push_back(call);
-        result = tgt;
+        result    = inlineClosureBody(program, prog.Body);
+        // Given the uplifting all functions are global
+        program.Functions.insert(program.Functions.end(), prog.Functions.begin(), prog.Functions.end());
     } break;
     case ExpressionType::Branch: {
         auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);

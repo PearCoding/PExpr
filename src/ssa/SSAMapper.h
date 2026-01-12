@@ -134,7 +134,6 @@ struct SSAFunction {
     std::string Name;
     std::vector<std::string> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
-    std::vector<SSAFunction> InnerFunctions;
     ElementaryType ReturnType = ElementaryType::Unspecified;
 
     // Mark whether this function is external (declared but not defined).

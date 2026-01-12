@@ -453,21 +453,6 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
     return std::nullopt;
 }
 
-template <typename Func>
-[[nodiscard]] inline bool handleCallbackWithChange(SSAFunction& func, Func clb)
-{
-    bool changed = false;
-    for (auto& f : func.InnerFunctions) {
-        if (clb(f.Body))
-            changed = true;
-    }
-
-    if (clb(func.Body))
-        changed = true;
-
-    return changed;
-}
-
 void SSAPassSSCP::propagateSideEffects(const SSAProgram& program)
 {
     // Build helper maps: known functions and their parameter sets.
@@ -594,22 +579,10 @@ void SSAPassSSCP::run(SSAProgram& program)
 
         // Process all functions
         for (auto& func : program.Functions) {
-            if (processFunction(func))
+            if (processBody(func.Body))
                 changed = true;
         }
     }
-}
-
-bool SSAPassSSCP::processFunction(SSAFunction& func)
-{
-    bool changed = false;
-    if (handleCallbackWithChange(func, [this](auto& a) { return this->processBody(a); }))
-        changed = true;
-    for (auto& innerFunc : func.InnerFunctions) {
-        if (processFunction(innerFunc))
-            changed = true;
-    }
-    return changed;
 }
 
 bool SSAPassSSCP::replaceOperandIfConst(std::vector<SSAValue>& ops)
