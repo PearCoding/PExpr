@@ -416,6 +416,21 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
     return std::nullopt;
 }
 
+template <typename Func>
+[[nodiscard]] inline bool handleCallbackWithChange(SSAFunction& func, Func clb)
+{
+    bool changed = false;
+    for (auto& f : func.InnerFunctions) {
+        if (clb(f.Body))
+            changed = true;
+    }
+
+    if (clb(func.Body))
+        changed = true;
+
+    return changed;
+}
+
 void SSAPassSSCP::run(SSAProgram& program)
 {
     // Build helper maps: known functions and their parameter sets.
@@ -568,7 +583,7 @@ void SSAPassSSCP::run(SSAProgram& program)
         if (removeEmptyBranches(program.Body))
             changed = true;
         for (auto& func : program.Functions) {
-            if (removeEmptyBranches(func))
+            if (handleCallbackWithChange(func, [this](auto& a) { return this->removeEmptyBranches(a); }))
                 changed = true;
         }
 
@@ -576,7 +591,15 @@ void SSAPassSSCP::run(SSAProgram& program)
         if (removeObsoleteLabels(program.Body))
             changed = true;
         for (auto& func : program.Functions) {
-            if (removeObsoleteLabels(func))
+            if (handleCallbackWithChange(func, [this](auto& a) { return this->removeObsoleteLabels(a); }))
+                changed = true;
+        }
+
+        // 6) Collapse phi nodes
+        if (collapsePhiNodes(program.Body))
+            changed = true;
+        for (auto& func : program.Functions) {
+            if (handleCallbackWithChange(func, [this](auto& a) { return this->collapsePhiNodes(a); }))
                 changed = true;
         }
     }
@@ -632,20 +655,6 @@ bool SSAPassSSCP::replaceOperandIfConst(std::vector<std::shared_ptr<SSAInstr>>& 
             }
         }
     }
-    return changed;
-}
-
-bool SSAPassSSCP::removeEmptyBranches(SSAFunction& func)
-{
-    bool changed = false;
-    for (auto& f : func.InnerFunctions) {
-        if (removeEmptyBranches(f.Body))
-            changed = true;
-    }
-
-    if (removeEmptyBranches(func.Body))
-        changed = true;
-
     return changed;
 }
 
@@ -733,20 +742,6 @@ bool SSAPassSSCP::removeEmptyBranches(std::vector<std::shared_ptr<SSAInstr>>& in
     return false;
 }
 
-bool SSAPassSSCP::removeObsoleteLabels(SSAFunction& func)
-{
-    bool changed = false;
-    for (auto& f : func.InnerFunctions) {
-        if (removeObsoleteLabels(f.Body))
-            changed = true;
-    }
-
-    if (removeObsoleteLabels(func.Body))
-        changed = true;
-
-    return changed;
-}
-
 bool SSAPassSSCP::removeObsoleteLabels(std::vector<std::shared_ptr<SSAInstr>>& instructions)
 {
     // Count the usage of the labels
@@ -782,6 +777,63 @@ bool SSAPassSSCP::removeObsoleteLabels(std::vector<std::shared_ptr<SSAInstr>>& i
                 changed = true;
                 if (it != instructions.begin())
                     --it;
+            }
+        }
+    }
+
+    return changed;
+}
+
+bool SSAPassSSCP::collapsePhiNodes(std::vector<std::shared_ptr<SSAInstr>>& instructions)
+{
+    bool changed = false;
+    for (auto& instrPtr : instructions) {
+        if (!instrPtr)
+            continue;
+
+        if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
+            // Check if there are some obsolete branches?
+            std::vector<size_t> removableBranches;
+            for (size_t i = 0; i < phi->Conditions.size(); ++i) {
+                const auto& cond = phi->Conditions[i];
+                if (cond.Kind == SSAValue::Kind::Constant && cond.Type == ElementaryType::Boolean) {
+                    const bool condVal = std::get<bool>(cond.Value);
+                    if (!condVal)
+                        removableBranches.push_back(i);
+                }
+            }
+
+            if (!removableBranches.empty())
+                changed = true;
+
+            // Remove the obsolete ones from back to front (for the iterator to work)
+            for (auto it = removableBranches.rbegin(); it != removableBranches.rend(); ++it) {
+                phi->Branches.erase(phi->Branches.begin() + *it);
+                phi->Conditions.erase(phi->Conditions.begin() + *it);
+            }
+
+            // Only the 'else' statement survived
+            if (phi->Conditions.empty()) {
+                SSAInstrAssign asg;
+                asg.Target   = phi->Target;
+                asg.Operator = SSAInstrAssign::OpKind::Assign;
+                asg.Operands = { phi->Branches.at(0) };
+                instrPtr     = std::make_shared<SSAInstrAssign>(std::move(asg));
+                changed      = true;
+                continue;
+            }
+
+            // Check if the first entry is truely 'true' -> remove phi and use that one
+            const auto& firstCond = phi->Conditions.at(0);
+            if (firstCond.Kind == SSAValue::Kind::Constant && firstCond.Type == ElementaryType::Boolean) {
+                const bool condVal = std::get<bool>(firstCond.Value);
+                PEXPR_ASSERT(condVal, "Expected a 'true' phi condition as all 'false' ones should be erased");
+                SSAInstrAssign asg;
+                asg.Target   = phi->Target;
+                asg.Operator = SSAInstrAssign::OpKind::Assign;
+                asg.Operands = { phi->Branches.at(0) };
+                instrPtr     = std::make_shared<SSAInstrAssign>(std::move(asg));
+                changed      = true;
             }
         }
     }
