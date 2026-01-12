@@ -278,51 +278,6 @@ std::string SSAMapper::fresh(const std::string& base)
     return ss.str();
 }
 
-void SSAMapper::detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr>>& body, SSAFunction& func)
-{
-    std::unordered_set<std::string> captured;
-
-    auto collectNamed = [&](const SSAValue& v) {
-        if (v.Kind == SSAValue::Kind::Named) {
-            auto b = v.baseName();
-            // only consider plain (non-versioned) names; baseName == Name implies no suffix
-            if (!b.empty() && b == v.Name) {
-                captured.insert(b);
-            }
-        }
-    };
-
-    for (const auto& instr : body) {
-        if (auto a = dynamic_cast<SSAInstrAssign*>(instr.get())) {
-            collectNamed(a->Target);
-            for (const auto& op : a->Operands)
-                collectNamed(op);
-        } else if (auto ccall = dynamic_cast<SSAInstrCall*>(instr.get())) {
-            collectNamed(ccall->Target);
-            for (const auto& arg : ccall->Arguments)
-                collectNamed(arg);
-        } else if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
-            collectNamed(ret->Value);
-        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instr.get())) {
-            collectNamed(phi->Target);
-            for (const auto& s : phi->Conditions)
-                collectNamed(s);
-            for (const auto& s : phi->Branches)
-                collectNamed(s);
-        }
-    }
-
-    for (const auto& name : captured) {
-        auto it = mLocalMutability.find(name);
-        if (it != mLocalMutability.end()) {
-            if (it->second)
-                func.AccessedMutableParents.insert(name);
-            else
-                func.AccessedConstParents.insert(name);
-        }
-    }
-}
-
 // Inline a mapped closure body into the current program by replacing any
 // SSAInstrReturn instructions with assignments to a fresh temporary variable.
 // Returns the SSAValue representing the last returned value (or a nil constant).
@@ -428,9 +383,6 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         // move innerProg.mainBody into dst.body
         for (auto& instr : innerProg.Body)
             dst.Body.push_back(instr);
-
-        // detect captured parent-level variables referenced by the inner function
-        detectCapturedParents(innerProg.Body, dst);
 
         // move any inner functions discovered by the inner mapper
         dst.InnerFunctions = std::move(innerProg.Functions);
@@ -607,9 +559,6 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         for (auto& instr : prog.Body)
             func.Body.push_back(instr);
         func.InnerFunctions = std::move(prog.Functions);
-
-        // detect captured parent-level variables referenced by the closure
-        detectCapturedParents(prog.Body, func);
 
         program.Functions.push_back(std::move(func));
 

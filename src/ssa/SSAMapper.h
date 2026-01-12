@@ -141,12 +141,6 @@ struct SSAFunction {
     // External functions are considered to have side-effects.
     bool External = false;
 
-    // Track accessed parent-level variables for later side-effect analysis.
-    // These are populated by the parent SSAMapper when nested closures/functions
-    // are mapped. Names are the plain variable names (without SSA version suffix).
-    std::unordered_set<std::string> AccessedConstParents;
-    std::unordered_set<std::string> AccessedMutableParents;
-
     [[nodiscard]] std::string dump() const;
 };
 
@@ -172,11 +166,6 @@ private:
     void mapStatement(SSAProgram& program, const Ptr<Statement>& stmt);
     [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<Expression>& expr);
 
-    // Detect captured parent-level variables referenced inside a nested function/closure.
-    // Scans the provided SSA instruction list, classifies plain (non-versioned) named
-    // references and appends them to the provided SSAFunction's AccessedConstParents /
-    // AccessedMutableParents vectors based on this mapper's recorded local mutability.
-    void detectCapturedParents(const std::vector<std::shared_ptr<SSAInstr>>& body, SSAFunction& func);
 
     // Inline a mapped closure body into the current program by replacing any
     // SSAInstrReturn instructions with assignments to a fresh temporary variable.
