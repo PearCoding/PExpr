@@ -3,7 +3,7 @@
     "displayName": "PExpr Language Support",
     "description": "Syntax highlighting for PExpr language",
     "version": "0.0.1",
-    "publisher": "PExpr",
+    "publisher": "Ömercan Yazici",
     "engines": {
         "vscode": "^1.85.0"
     },
