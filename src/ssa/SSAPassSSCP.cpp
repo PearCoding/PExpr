@@ -240,7 +240,146 @@ std::optional<SSAValue> SSAPassSSCP::foldBinaryOp(const SSAValue& L, const SSAVa
                 }
             }
         }
-        // TODO: Vector version
+
+        // Vector arithmetic folding
+        if (L.Type == R.Type && ::PExpr::isArray(L.Type)) {
+            // Helper lambda to perform component-wise operation on arrays
+            auto applyToArrays = [&](auto&& opFunc) -> std::optional<SSAValue> {
+                if (Vec2 lv; extractVec2(L, lv)) {
+                    if (Vec2 rv; extractVec2(R, rv)) {
+                        Vec2 result;
+                        for (size_t i = 0; i < 2; ++i)
+                            result[i] = opFunc(lv[i], rv[i]);
+                        return SSAValue::Constant(result);
+                    }
+                } else if (Vec3 lv; extractVec3(L, lv)) {
+                    if (Vec3 rv; extractVec3(R, rv)) {
+                        Vec3 result;
+                        for (size_t i = 0; i < 3; ++i)
+                            result[i] = opFunc(lv[i], rv[i]);
+                        return SSAValue::Constant(result);
+                    }
+                } else if (Vec4 lv; extractVec4(L, lv)) {
+                    if (Vec4 rv; extractVec4(R, rv)) {
+                        Vec4 result;
+                        for (size_t i = 0; i < 4; ++i)
+                            result[i] = opFunc(lv[i], rv[i]);
+                        return SSAValue::Constant(result);
+                    }
+                }
+                return std::nullopt;
+            };
+
+            // Helper lambda to check if all components are non-zero for division/mod operations
+            auto allComponentsNonZero = [](const auto& arr) {
+                for (const auto& val : arr)
+                    if (val == Number(0.0))
+                        return false;
+                return true;
+            };
+
+            switch (binaryOp) {
+            case BinaryOperation::Add:
+                return applyToArrays([](Number a, Number b) { return a + b; });
+            case BinaryOperation::Sub:
+                return applyToArrays([](Number a, Number b) { return a - b; });
+            case BinaryOperation::Mul:
+                return applyToArrays([](Number a, Number b) { return a * b; });
+            case BinaryOperation::Div:
+                if (Vec2 rv; extractVec2(R, rv)) {
+                    if (allComponentsNonZero(rv))
+                        return applyToArrays([](Number a, Number b) { return a / b; });
+                } else if (Vec3 rv; extractVec3(R, rv)) {
+                    if (allComponentsNonZero(rv))
+                        return applyToArrays([](Number a, Number b) { return a / b; });
+                } else if (Vec4 rv; extractVec4(R, rv)) {
+                    if (allComponentsNonZero(rv))
+                        return applyToArrays([](Number a, Number b) { return a / b; });
+                }
+                break;
+            case BinaryOperation::Mod:
+                if (Vec2 rv; extractVec2(R, rv)) {
+                    if (allComponentsNonZero(rv))
+                        return applyToArrays([](Number a, Number b) { return std::fmod(a, b); });
+                } else if (Vec3 rv; extractVec3(R, rv)) {
+                    if (allComponentsNonZero(rv))
+                        return applyToArrays([](Number a, Number b) { return std::fmod(a, b); });
+                } else if (Vec4 rv; extractVec4(R, rv)) {
+                    if (allComponentsNonZero(rv))
+                        return applyToArrays([](Number a, Number b) { return std::fmod(a, b); });
+                }
+                break;
+            case BinaryOperation::Pow:
+                return applyToArrays([](Number a, Number b) { return std::pow(a, b); });
+            default:
+                break;
+            }
+        }
+
+        // Vector-scalar arithmetic folding (vector * scalar, vector / scalar, vector % scalar, vector ^ scalar)
+        // Note: Add and Sub are not allowed between vectors and scalars
+        if (::PExpr::isArithmetic(L.Type) && ::PExpr::isArithmetic(R.Type)) {
+            const bool LIsArray = ::PExpr::isArray(L.Type);
+            const bool RIsArray = ::PExpr::isArray(R.Type);
+
+            if (LIsArray != RIsArray) { // One is vector, one is scalar
+                const SSAValue& vecOp    = LIsArray ? L : R;
+                const SSAValue& scalarOp = LIsArray ? R : L;
+
+                // Extract scalar value
+                Number scalarVal;
+                if (extractNumber(scalarOp, scalarVal)) {
+                    // Helper lambda to apply scalar operation to vector
+                    auto applyScalarToVector = [&](auto&& opFunc) -> std::optional<SSAValue> {
+                        if (Vec2 vec; extractVec2(vecOp, vec)) {
+                            Vec2 result;
+                            for (size_t i = 0; i < 2; ++i)
+                                result[i] = opFunc(vec[i], scalarVal);
+                            return SSAValue::Constant(result);
+                        } else if (Vec3 vec; extractVec3(vecOp, vec)) {
+                            Vec3 result;
+                            for (size_t i = 0; i < 3; ++i)
+                                result[i] = opFunc(vec[i], scalarVal);
+                            return SSAValue::Constant(result);
+                        } else if (Vec4 vec; extractVec4(vecOp, vec)) {
+                            Vec4 result;
+                            for (size_t i = 0; i < 4; ++i)
+                                result[i] = opFunc(vec[i], scalarVal);
+                            return SSAValue::Constant(result);
+                        }
+                        return std::nullopt;
+                    };
+
+                    switch (binaryOp) {
+                    case BinaryOperation::Mul:
+                        // Both vector * scalar and scalar * vector are commutative
+                        return applyScalarToVector([](Number a, Number b) { return a * b; });
+                    case BinaryOperation::Div:
+                        // Only vector / scalar is allowed, not scalar / vector
+                        if (LIsArray) { // vector / scalar
+                            if (scalarVal != Number(0.0)) {
+                                return applyScalarToVector([](Number a, Number b) { return a / b; });
+                            }
+                        }
+                        break;
+                    case BinaryOperation::Mod:
+                        // Only vector % scalar is allowed, not scalar % vector
+                        if (LIsArray) { // vector % scalar
+                            if (scalarVal != Number(0.0)) {
+                                return applyScalarToVector([](Number a, Number b) { return std::fmod(a, b); });
+                            }
+                        }
+                        break;
+                    case BinaryOperation::Pow:
+                        // Both vector ^ scalar and scalar ^ vector are allowed
+                        return applyScalarToVector([](Number a, Number b) { return std::pow(a, b); });
+                    default:
+                        // Add and Sub are not allowed between vectors and scalars
+                        break;
+                    }
+                }
+            }
+        }
         break;
     }
     case BinaryOperation::Equal:
