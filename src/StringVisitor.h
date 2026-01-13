@@ -42,13 +42,16 @@ public:
             return dump(std::reinterpret_pointer_cast<CallExpression>(expr));
         case ExpressionType::Access:
             return dump(std::reinterpret_pointer_cast<AccessExpression>(expr));
+        case ExpressionType::Vector:
+            return dump(std::reinterpret_pointer_cast<VectorExpression>(expr));
+        case ExpressionType::Cast:
+            return dump(std::reinterpret_pointer_cast<CastExpression>(expr));
         case ExpressionType::Closure:
             return dump(std::reinterpret_pointer_cast<ClosureExpression>(expr));
         case ExpressionType::Branch:
             return dump(std::reinterpret_pointer_cast<BranchExpression>(expr));
-        case ExpressionType::Vector:
-            return dump(std::reinterpret_pointer_cast<VectorExpression>(expr));
         default:
+            PEXPR_ASSERT(false, "Unhandled expression type");
             return "ERROR";
         }
     };
@@ -107,7 +110,7 @@ private:
             stream << " -> " << toString(statement->returnType());
 
         if (!statement->isExtern())
-            stream << " = " << visit(statement->closure());
+            stream << " = { " << visit(statement->closure()) << " }";
         stream << ";";
         return stream.str();
     }
@@ -158,6 +161,13 @@ private:
         return "(" + visit(expr->inner()) + ")." + expr->swizzle();
     }
 
+    static std::string dump(const Ptr<CastExpression>& expr)
+    {
+        std::stringstream stream;
+        stream << "(" << visit(expr->inner()) << " as " << toString(expr->toType()) << ")";
+        return stream.str();
+    }
+
     static std::string dump(const Ptr<ClosureExpression>& expr)
     {
         return "{\n" + visit(expr->closure()) + "\n}";
@@ -170,10 +180,10 @@ private:
         stream << "if " << visit(expr->branches().front().Condition) << " { " << visit(expr->branches().front().Body) << " }";
 
         for (size_t i = 1; i < expr->branches().size(); ++i) {
-            stream << "if " << visit(expr->branches().at(i).Condition) << " { " << visit(expr->branches().at(i).Body) << " }";
+            stream << " elif " << visit(expr->branches().at(i).Condition) << " { " << visit(expr->branches().at(i).Body) << " }";
         }
 
-        stream << "else { " << visit(expr->elseClosure()) << "}";
+        stream << " else { " << visit(expr->elseClosure()) << " }";
         return stream.str();
     }
 

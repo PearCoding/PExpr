@@ -173,7 +173,7 @@ private:
         if (is_declaration)
             is_mutable = P.accept(TokenType::Mutable);
 
-        const std::string varName = std::get<std::string>(P.cur().Value);
+        const std::string varName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
         P.expect(TokenType::Identifier);
 
         // Optional explicit type annotation for declarations: ': TYPE'
@@ -556,7 +556,7 @@ private:
             P.error(std::array<TokenType, 7>{ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType,
                                               TokenType::Vec2Type, TokenType::Vec3Type, TokenType::Vec4Type,
                                               TokenType::StringType });
-            return ElementaryType::Unspecified;
+            return ElementaryType::Error;
         }
     }
 };

@@ -799,7 +799,13 @@ bool SSAPassSSCP::replaceOperandIfConst(InstructionList& instructions)
 
 bool SSAPassSSCP::removeEmptyBranches(InstructionList& instructions)
 {
+    if (instructions.empty())
+        return false;
+
     for (size_t i = 0; i < instructions.size() - 1; ++i) {
+        if (!instructions[i])
+            continue;
+
         // Check for the following:
         //   lbl.1:
         //   goto lbl.2

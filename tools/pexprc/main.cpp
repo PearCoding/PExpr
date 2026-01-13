@@ -100,6 +100,8 @@ int main(int argc, char** argv)
     env.reporter().setOutputMask(warningFlags);
 
     auto ast = env.parse(sourceFiles);
+    std::cout.flush();
+    std::cerr.flush();
 
     if (ast == nullptr)
         return env.reporter().errorCount();
@@ -117,6 +119,8 @@ int main(int argc, char** argv)
     // Map to IR
     ssa::SSAMapper mapper;
     auto program = mapper.map(ast);
+    std::cout.flush();
+    std::cerr.flush();
 
     if (warningAsError && env.reporter().warningCount() > 0) {
         std::cerr << "Terminating as a warning was generated" << std::endl;
@@ -136,6 +140,8 @@ int main(int argc, char** argv)
     // Optimize
     ssa::SSAPassSSCP sscp;
     sscp.run(program);
+    std::cout.flush();
+    std::cerr.flush();
 
     if (warningAsError && env.reporter().warningCount() > 0) {
         std::cerr << "Terminating as a warning was generated" << std::endl;

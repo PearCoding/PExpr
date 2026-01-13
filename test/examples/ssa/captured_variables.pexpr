@@ -5,4 +5,4 @@ let closure_with_capture = {
     use_cap()
 };
 
-closure_capture
+closure_with_capture

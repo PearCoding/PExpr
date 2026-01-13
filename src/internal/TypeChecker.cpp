@@ -129,9 +129,9 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         if (funcStmt->closure()) {
             for (const auto& p : funcStmt->parameters())
                 funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.Type, false)); //< TODO: Really non-mutable?
-        }
 
-        PEXPR_ASSERT(funcStmt->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
+            PEXPR_ASSERT(funcStmt->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
+        }
 
         // Type-check the function body to determine the return type
         const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->closure());
@@ -192,7 +192,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ex
     case ExpressionType::Branch:
         return handleNode(closure, std::reinterpret_pointer_cast<BranchExpression>(expr));
     default:
-        return ElementaryType::Unspecified;
+        PEXPR_ASSERT(false, "Unhandled expression type");
+        return ElementaryType::Error;
     }
 }
 
