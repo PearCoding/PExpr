@@ -1,0 +1,11 @@
+// Capture in branch condition
+let x = 77;
+fn capture_in_branch() = {
+    if x > 0 {
+        1
+    } else {
+        2
+    }
+};
+
+capture_in_branch()

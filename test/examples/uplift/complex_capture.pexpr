@@ -1,0 +1,13 @@
+// Complex nested captures with multiple levels
+let level1 = 1;
+fn level1_func() = {
+    let level2 = 2;
+    fn level2_func() = {
+        let level3 = 3;
+        fn level3_func() = level1 + level2 + level3;
+        level3_func()
+    };
+    level2_func()
+};
+
+level1_func()

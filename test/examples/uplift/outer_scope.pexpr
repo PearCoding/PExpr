@@ -1,0 +1,6 @@
+// Multiple captures from outer scope
+let x = 1;
+let y = 2;
+fn multi_capture() = x + y;
+
+multi_capture()

@@ -1,0 +1,7 @@
+// Constant folding of binary operations
+let const_fold1 = 1 + 2 * 3;           // should fold to 7
+let const_fold2 = (1 + 2) * (3 - 4);   // should fold to -3
+let const_fold3 = true && false;       // should fold to false
+let const_fold4 = 10.5 + 2.3;          // should fold to 12.8
+
+const_fold1 + const_fold2 + (if const_fold3 { 0 } else { 1 })

@@ -1,0 +1,10 @@
+// Recursive function with constant argument
+fn recursive_const(n: int) -> int = if n <= 0 {
+    0
+} else {
+    n + recursive_const(n - 1)
+};
+let rec_result = recursive_const(3); // should fold to 6
+rec_result
+
+// TODO

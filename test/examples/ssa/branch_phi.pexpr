@@ -1,0 +1,8 @@
+// Branch with phi node
+let branch_phi = if true {
+    10
+} else {
+    20
+};
+
+branch_phi

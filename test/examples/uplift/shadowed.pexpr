@@ -1,0 +1,8 @@
+// Shadowed variable capture
+let shadow = 42;
+fn shadow_test() = {
+    let shadow = 99; // shadows outer
+    fn inner_shadow() = shadow + 1; // captures inner shadow
+    inner_shadow()
+};
+shadow_test() // -> Should return 100

@@ -1,0 +1,8 @@
+// Complex closure with multiple statements
+let complex_closure = {
+    let a = 1;
+    let b = 2;
+    fn inner(x: int) = x * a + b;
+    inner(10) + inner(20)
+};
+complex_closure

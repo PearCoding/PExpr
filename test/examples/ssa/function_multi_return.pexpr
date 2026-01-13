@@ -1,0 +1,8 @@
+// Function with multiple returns via branches
+fn multi_return(x: int) = if x > 0 {
+    x + 1
+} else {
+    x - 1
+};
+
+multi_return(2)

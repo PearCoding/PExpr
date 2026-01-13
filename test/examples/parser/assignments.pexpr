@@ -1,0 +1,7 @@
+// Multiple assignments in sequence
+let mut m = 0;
+m = m + 1;
+m = m * 2;
+m = m - 1;
+
+m

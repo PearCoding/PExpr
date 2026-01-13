@@ -1,0 +1,7 @@
+// Mutable variable with multiple assignments
+let mut m = 1;
+m = m + 1;
+m = m * 2;
+m = m - 1;
+
+m

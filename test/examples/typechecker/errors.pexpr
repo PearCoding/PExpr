@@ -1,0 +1,52 @@
+// Type checker error cases
+// These should produce type errors
+
+// 1. Type mismatch in binary operation
+let type_mismatch1 = 1 + "hello"; // int + string
+
+// 2. Function call with wrong argument type
+fn expect_int(x: int) = x * 2;
+let wrong_arg = expect_int(3.14); // num instead of int
+
+// 3. Variable reassignment with wrong type
+let mut m = 5;
+m = "string"; // int -> string
+
+// 4. Return type mismatch in function
+fn bad_return() -> int {
+    3.14 // returns num instead of int
+}
+
+// 5. Access non-existent field
+let vec = [1, 2, 3];
+let bad_access = vec.w; // vector has only x,y,z
+
+// 6. Calling non-function
+let not_a_func = 42;
+let bad_call = not_a_func(1, 2);
+
+// 7. Undefined variable
+let uses_undefined = undefined_var + 1;
+
+// 8. Branch with different types in branches
+let branch_type_mismatch = if true {
+    1
+} else {
+    "string"
+};
+
+// 9. Vector element type mismatch
+let mixed_vec = [1, 2.5, 3]; // int and num mixed
+
+// 10. Closure with inconsistent return types
+let inconsistent_closure = {
+    let a = 1;
+    if a > 0 {
+        42
+    } else {
+        "error"
+    }
+};
+
+// Note: This file should not compile successfully
+// Each case should produce a type error

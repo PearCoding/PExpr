@@ -1,0 +1,5 @@
+// Mutual recursion
+fn mutual_a(n: int) -> int = if n <= 0 { 0 } else { mutual_b(n - 1) };
+fn mutual_b(n: int) -> int = if n <= 0 { 0 } else { mutual_a(n - 1) };
+
+mutual_a(5)

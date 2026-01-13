@@ -1,0 +1,4 @@
+// Function with constant parameters
+fn const_params(x: int, y: int) = x * y;
+let const_result = const_params(3, 4); // should fold to 12
+const_result

@@ -1,0 +1,6 @@
+// Mutability and constant propagation
+let mut mutable_const = 5;
+mutable_const = mutable_const + 1; // should propagate 6
+let use_mut = mutable_const * 2;   // should fold to 12
+
+use_mut

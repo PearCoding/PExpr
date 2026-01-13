@@ -1,0 +1,7 @@
+// Nested constant propagation
+let a = 1;
+let b = 2;
+let c = a + b; // should fold to 3
+let d = c * 2; // should fold to 6
+
+d

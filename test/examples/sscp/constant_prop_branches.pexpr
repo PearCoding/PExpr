@@ -1,0 +1,8 @@
+// Constant propagation through branches
+let const_cond = true;
+let branch_elim = if const_cond { // should eliminate else branch
+    100
+} else {
+    200                           // dead code
+};
+branch_elim

@@ -1,0 +1,8 @@
+// Mutability in different scopes
+let outer_mut = {
+    let mut inner = 5;
+    inner = inner + 1;
+    inner
+};
+
+outer_mut

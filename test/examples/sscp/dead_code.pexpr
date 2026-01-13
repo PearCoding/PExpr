@@ -1,0 +1,11 @@
+// Unused variables should be eliminated
+let unused_var = 42;                    // should be eliminated
+let used_var = 10;
+let dead_branch = if false {           // branch should be eliminated
+    let never_used = 99;               // should be eliminated
+    1
+} else {
+    2
+};
+
+dead_branch + used_var

@@ -1,0 +1,3 @@
+// Type annotations
+let typed: int = 42;
+typed

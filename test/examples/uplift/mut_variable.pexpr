@@ -1,0 +1,4 @@
+// Capturing mutable variable (should be captured by value)
+let mut mutable_cap = 5;
+fn capture_mutable() = mutable_cap + 1;
+capture_mutable()

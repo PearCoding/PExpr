@@ -1,0 +1,4 @@
+// Function that captures and also has parameters
+let x = 32;
+fn with_params_and_capture(a: int) = a + x; // captures x from top level
+with_params_and_capture(22)

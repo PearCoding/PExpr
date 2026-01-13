@@ -1,0 +1,5 @@
+// Functions with side effects should not be eliminated
+extern fn print(x: int) -> void; // Has side effect (by default)
+let side_effect = print(42);     // should not be eliminated
+
+side_effect

@@ -1,0 +1,7 @@
+// Nested branches with phi nodes
+let nested_branch = if true {
+    if false { 1 } else { 2 }
+} else {
+    3
+};
+nested_branch

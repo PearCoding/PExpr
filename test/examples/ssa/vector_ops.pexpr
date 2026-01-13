@@ -1,0 +1,7 @@
+// Vector operations
+let vec1 = [1, 2, 3];
+let vec2 = [4, 5, 6];
+let vec_op = vec1 + vec2;
+let vec_swizzle = vec_op.yx;
+
+vec_swizzle

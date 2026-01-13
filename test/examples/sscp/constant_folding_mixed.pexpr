@@ -1,0 +1,3 @@
+// Complex constant expression with mixed types
+let mixed_const = (1 as num) + 2.5; // should fold to 3.5
+mixed_const

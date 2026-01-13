@@ -1,0 +1,4 @@
+// Multiple uses of same variable
+let a = 5;
+let multiple_uses = a + a * a - a / a;
+multiple_uses

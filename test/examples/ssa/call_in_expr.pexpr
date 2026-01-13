@@ -1,0 +1,4 @@
+// Function call within expression
+fn add_one(x: int) = x + 1;
+let call_in_expr = add_one(5) * add_one(6);
+call_in_expr

@@ -1,0 +1,12 @@
+// Function inlining
+
+// Function called once - should be inlined
+fn single_call(x: int) = x * 2;
+let inlined = single_call(5); // should be replaced with 10
+
+// Function called multiple times - currently NOT be inlined (TODO)
+fn multi_call(x: int) = x + 1;
+let multi1 = multi_call(1);
+let multi2 = multi_call(2);
+
+inlined + multi1 + multi2

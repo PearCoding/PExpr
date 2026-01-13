@@ -1,0 +1,3 @@
+// Test nested function calls
+let nested_calls = max(min(1, 2), min(3, 4));
+nested_calls

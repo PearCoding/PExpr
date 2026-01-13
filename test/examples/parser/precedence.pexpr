@@ -1,0 +1,5 @@
+// Test operator precedence
+let precedence1 = 1 + 2 * 3;   // Should be 7, not 9
+let precedence2 = (1 + 2) * 3; // Should be 9
+
+precedence1 + precedence2

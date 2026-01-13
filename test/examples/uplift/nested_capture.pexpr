@@ -1,0 +1,8 @@
+// Nested captures (function inside function)
+fn outer() = {
+    let inner_var = 10;
+    fn inner() = inner_var * 2;
+    inner()
+};
+
+outer()

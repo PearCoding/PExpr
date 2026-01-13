@@ -1,0 +1,8 @@
+// Capture from grandparent scope
+let global = 100;
+fn parent() = {
+    fn child() = global + 1;
+    child()
+};
+
+parent()

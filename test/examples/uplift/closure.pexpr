@@ -1,0 +1,7 @@
+// Capturing from closure expression
+let closure_capture = {
+    let z = 77;
+    fn use_z() = z * 2;
+    use_z()
+};
+closure_capture
