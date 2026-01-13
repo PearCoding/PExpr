@@ -1,0 +1,26 @@
+{
+    "name": "pexpr-language-support",
+    "displayName": "PExpr Language Support",
+    "description": "Syntax highlighting for PExpr language",
+    "version": "0.0.1",
+    "publisher": "PExpr",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "pexpr",
+            "aliases": ["PExpr", "pexpr"],
+            "extensions": [".pexpr"],
+            "configuration": "./pexpr-language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "pexpr",
+            "scopeName": "source.pexpr",
+            "path": "./pexpr.tmLanguage.json"
+        }]
+    }
+}
