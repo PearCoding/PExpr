@@ -236,37 +236,40 @@ private:
         if (P.accept(TokenType::ArrowRight))
             returnType = p_elementary_type();
 
-        Ptr<Expression> expr;
-        if (!is_extern) {
-            P.expect(TokenType::Assign);
-            expr = p_expression();
-        } else if (returnType == ElementaryType::Unspecified) {
-            P.signalError();
-            P.mReporter.errorf(P.cur().Location, "Expected an explicit return type for the given function");
-        }
-
-        P.expect(TokenType::Semicolon);
-
         // Build mangled name from declared parameter types (do NOT include return type).
         std::vector<ElementaryType> paramTypes;
         paramTypes.reserve(parameters.size());
         for (const auto& p : parameters)
             paramTypes.push_back(p.Type);
 
-        std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
+        const std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
 
-        if (!expr)
-            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, nullptr, returnType, mangled);
+        if (!is_extern) {
+            auto closure    = std::make_shared<Closure>(loc, mCurrentClosure);
+            mCurrentClosure = closure.get();
 
-        std::shared_ptr<Closure> closure;
-        if (expr->type() == ExpressionType::Closure) {
-            closure = std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure();
+            P.expect(TokenType::Assign);
+            Ptr<Expression> expr = p_expression();
+            closure->setExpression(expr);
+            P.expect(TokenType::Semicolon);
+
+            mCurrentClosure = closure->parent();
+
+            if (expr->type() == ExpressionType::Closure) {
+                // Remove the previous closure to directly use this one.
+                closure = std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure();
+                closure->setParent(mCurrentClosure);
+            }
+
+            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled);
         } else {
-            closure = std::make_shared<Closure>(loc, mCurrentClosure);
-            closure->setExpression(std::move(expr));
+            if (returnType == ElementaryType::Unspecified) {
+                P.signalError();
+                P.mReporter.errorf(P.cur().Location, "Expected an explicit return type for the given function");
+            }
+            P.expect(TokenType::Semicolon);
+            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, nullptr, returnType, mangled);
         }
-
-        return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled);
     }
 
     // Expressions

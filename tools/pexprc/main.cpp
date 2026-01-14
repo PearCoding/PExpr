@@ -38,7 +38,7 @@ int main(int argc, char** argv)
     app.add_option("-o,--output", outputFile, "Output file.");
 
     bool useStdOutput = false;
-    app.add_flag("--output-std", useStdOutput, "Dump the result into the standard output");
+    app.add_flag("--std-output", useStdOutput, "Dump the result into the standard output");
 
     bool emitAST = false;
     app.add_flag("--emit-ast", emitAST, "Emit AST instead of the IR");
@@ -107,7 +107,7 @@ int main(int argc, char** argv)
             std::cout << result;
         } else {
             std::ofstream f(outputFile);
-            f << outputFile;
+            f << result;
         }
     };
 

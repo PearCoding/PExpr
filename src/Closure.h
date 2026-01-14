@@ -21,6 +21,11 @@ public:
 
     [[nodiscard]] inline bool isTranslationUnit() const { return mParent == nullptr; }
     [[nodiscard]] inline Closure* parent() const { return mParent; }
+    inline void setParent(Closure* p)
+    {
+        mParent = p;
+        mSymbols.setParent(p ? &p->symbols() : nullptr);
+    }
 
     [[nodiscard]] inline const StatementList& statements() const { return mStatement; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }

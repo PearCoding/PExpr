@@ -29,6 +29,18 @@ ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
 
 ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
+    // Preregister functions in this closure
+    for (const auto& statement : closure->statements()) {
+        if (statement->type() != StatementType::FunctionDeclaration)
+            continue;
+
+        const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
+
+        // Pre-register a provisional function definition
+        if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern())))
+            mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+    }
+
     for (const auto& statement : closure->statements())
         handleNode(closure, statement);
     return handleNode(closure, closure->expression());
@@ -119,16 +131,12 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
     case StatementType::FunctionDeclaration: {
         const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
-        // Pre-register a provisional function definition
-        if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern()))) {
-            mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
-            return;
-        }
-
         // Add parameters to the symbol table
         if (funcStmt->closure()) {
-            for (const auto& p : funcStmt->parameters())
-                funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.Type, false)); //< TODO: Really non-mutable?
+            for (const auto& p : funcStmt->parameters()) {
+                if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.Type, false))) //< TODO: Really non-mutable?
+                    mReporter.errorf(funcStmt->location(), "Parameter '%s' already exists in the current scope", p.Name.c_str());
+            }
 
             PEXPR_ASSERT(funcStmt->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
         }
@@ -200,6 +208,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ex
 ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<ClosureExpression>& expr)
 {
     PEXPR_UNUSED(closure);
+    PEXPR_ASSERT(expr->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
 
     ElementaryType type = handleNode(expr->closure());
     expr->setReturnType(type);

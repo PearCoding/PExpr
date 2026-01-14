@@ -82,8 +82,8 @@ public:
 
     [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
 
-    inline const ParameterList& parameters() const { return mParameters; }
-    [[nodiscard]] inline bool isExtern() const { return this->closure() == nullptr; }
+    [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
+    [[nodiscard]] inline bool isExtern() const { return mClosure == nullptr; }
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
 
     [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }

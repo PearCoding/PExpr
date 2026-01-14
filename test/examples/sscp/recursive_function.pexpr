@@ -4,7 +4,5 @@ fn recursive_const(n: int) -> int = if n <= 0 {
 } else {
     n + recursive_const(n - 1)
 };
-let rec_result = recursive_const(3); // should fold to 6
+let rec_result = recursive_const(3); // should fold to 6 (TODO: Our inlining is not powerful enough for that)
 rec_result
-
-// TODO
