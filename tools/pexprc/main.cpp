@@ -31,8 +31,14 @@ int main(int argc, char** argv)
     app.set_version_flag("--version", "0.1");
     app.set_help_flag("-h,--help", "Shows help message and exit");
 
-    std::vector<std::filesystem::path> files;
-    app.add_option("files", files, "Files to compile.")->required(true)->check(CLI::ExistingFile);
+    std::filesystem::path inputFile;
+    app.add_option("file", inputFile, "File to compile.")->required(true)->check(CLI::ExistingFile);
+
+    std::filesystem::path outputFile;
+    app.add_option("-o,--output", outputFile, "Output file.");
+
+    bool useStdOutput = false;
+    app.add_flag("--output-std", useStdOutput, "Dump the result into the standard output");
 
     bool emitAST = false;
     app.add_flag("--emit-ast", emitAST, "Emit AST instead of the IR");
@@ -83,25 +89,40 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    if (files.empty()) {
-        std::cout << "No files given" << std::endl;
+    if (inputFile.empty()) {
+        std::cout << "No file given" << std::endl;
         return EXIT_SUCCESS;
     }
 
+    if (outputFile.empty()) {
+        outputFile = inputFile;
+        if (emitAST)
+            outputFile.replace_filename(inputFile.stem().generic_string() + std::string("-ast.pexpr"));
+        else
+            outputFile.replace_extension(".pexprir");
+    }
+
+    const auto dumpOutput = [&](const std::string& result) {
+        if (useStdOutput) {
+            std::cout << result;
+        } else {
+            std::ofstream f(outputFile);
+            f << outputFile;
+        }
+    };
+
     // Handle source files
-    std::stringstream sourceFiles;
-    for (const auto& path : files) {
-        std::ifstream f(path);
-        sourceFiles << f.rdbuf();
+    std::stringstream sourceFile;
+    {
+        std::ifstream f(inputFile);
+        sourceFile << f.rdbuf();
     }
 
     // Parse
     Environment env;
     env.reporter().setOutputMask(warningFlags);
 
-    auto ast = env.parse(sourceFiles);
-    std::cout.flush();
-    std::cerr.flush();
+    auto ast = env.parse(sourceFile);
 
     if (ast == nullptr)
         return env.reporter().errorCount();
@@ -112,15 +133,13 @@ int main(int argc, char** argv)
     }
 
     if (emitAST) {
-        std::cout << StringVisitor::visit(ast) << std::endl;
+        dumpOutput(StringVisitor::visit(ast) + "\n");
         return env.reporter().errorCount();
     }
 
     // Map to IR
     ssa::SSAMapper mapper;
     auto program = mapper.map(ast);
-    std::cout.flush();
-    std::cerr.flush();
 
     if (warningAsError && env.reporter().warningCount() > 0) {
         std::cerr << "Terminating as a warning was generated" << std::endl;
@@ -133,22 +152,20 @@ int main(int argc, char** argv)
     }
 
     if (optLevel == 0) {
-        std::cout << program.dump();
+        dumpOutput(program.dump());
         return env.reporter().errorCount();
     }
 
     // Optimize
     ssa::SSAPassSSCP sscp;
     sscp.run(program);
-    std::cout.flush();
-    std::cerr.flush();
 
     if (warningAsError && env.reporter().warningCount() > 0) {
         std::cerr << "Terminating as a warning was generated" << std::endl;
         return env.reporter().warningCount();
     }
 
-    std::cout << program.dump();
+    dumpOutput(program.dump());
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
         std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;

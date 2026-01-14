@@ -43,6 +43,7 @@ void ConsoleLogListener::startEntry(LogLevel level)
     }
 
     std::cout << "] ";
+    std::cout.flush();
 }
 
 void ConsoleLogListener::writeEntry(char c)
