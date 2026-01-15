@@ -42,6 +42,7 @@ TEST_CASE("DeclaredTypes: implicit num->int declaration is rejected (requires ex
 {
     std::stringstream stream("let a:int = 1.0; a");
     Environment env;
+    env.reporter().setQuiet(true); // Keep it silent as an error will be triggered
     auto ast = env.parse(stream);
     REQUIRE(ast == nullptr); // typechecker should reject implicit narrowing
 }

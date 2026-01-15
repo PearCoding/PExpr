@@ -48,13 +48,13 @@ TEST_CASE("SSAMapper: branch produces phi", "[ssamapper]")
     auto dumped = prog.dump();
 
     // Expect a phi node for merged branch results
-    REQUIRE(dumped.find("phi(") != std::string::npos);
+    REQUIRE(dumped.find("phi[") != std::string::npos);
 }
 
 TEST_CASE("SSAMapper: recursion function mapping", "[ssamapper]")
 {
     Environment env;
-    auto ast = env.parse("fn fact(n:int) = if n < 2 { 1 } else { n * fact(n - 1) }; fact(5)");
+    auto ast = env.parse("fn fact(n:int) -> int = if n < 2 { 1 } else { n * fact(n - 1) }; fact(5)");
 
     SSAMapper mapper;
     auto prog = mapper.map(ast);

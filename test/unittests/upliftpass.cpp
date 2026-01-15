@@ -12,7 +12,6 @@ TEST_CASE("UpliftPass: simple capture and call update", "[uplift]")
     REQUIRE(ast != nullptr);
 
     const std::string out = StringVisitor::visit(ast);
-    std::cout << out << std::endl;
 
     // The captured variable 'x' should be uplifted into function parameter
     REQUIRE(out.find("fn f(x:int") != std::string::npos);
