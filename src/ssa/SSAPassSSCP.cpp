@@ -548,11 +548,9 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         if (op.Kind == SSAValue::Kind::Constant) {
             resolved = op;
         } else {
-            auto it = mConstants.find(op.Name);
-            if (it == mConstants.end()) {
-                // not a constant
+            const auto it = mConstants.find(op.Name);
+            if (it == mConstants.end()) // not a constant
                 return std::nullopt;
-            }
             resolved = it->second;
         }
         ops.push_back(resolved);
@@ -565,29 +563,24 @@ std::optional<SSAValue> SSAPassSSCP::foldAssign(const SSAInstrAssign* asg)
         return ops.front();
 
     // Access xyzw
-    if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 1) {
+    if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 1)
         return foldAccessOp(ops.front(), asg->Swizzle);
-    }
 
     // Vector [x,y,z,w]
-    if (asg->Operator == SSAInstrAssign::OpKind::Vector) {
+    if (asg->Operator == SSAInstrAssign::OpKind::Vector)
         return foldVectorOp(ops);
-    }
 
     // Cast
-    if (asg->Operator == SSAInstrAssign::OpKind::Cast && ops.size() == 1) {
+    if (asg->Operator == SSAInstrAssign::OpKind::Cast && ops.size() == 1)
         return foldCastOp(ops.front(), asg->Target.Type);
-    }
 
     // Unary fold
-    if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1) {
+    if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1)
         return foldUnaryOp(ops[0], asg->UnaryOp);
-    }
 
     // Binary fold
-    if (asg->Operator == SSAInstrAssign::OpKind::Binary && ops.size() == 2) {
+    if (asg->Operator == SSAInstrAssign::OpKind::Binary && ops.size() == 2)
         return foldBinaryOp(ops[0], ops[1], asg->BinaryOp);
-    }
 
     return std::nullopt;
 }
@@ -668,6 +661,7 @@ bool SSAPassSSCP::processBody(InstructionList& body)
     for (const auto& instrPtr : body)
         countUsesInInstr(instrPtr.get(), localUseCount);
 
+    // TODO: This can be done more efficiently
     InstructionList newBody;
     newBody.reserve(body.size());
     for (const auto& instrPtr : body) {
@@ -706,6 +700,9 @@ void SSAPassSSCP::run(SSAProgram& program)
 {
     propagateSideEffects(program);
 
+    // Reset inlining state for this run
+    mInlineAttempts.clear();
+
     // Now proceed with the usual SSCP iterations (replace operands, fold, DCE), but
     // consider calls side-effecting only if the callee is marked side-effecting.
     bool changed = true;
@@ -724,7 +721,7 @@ void SSAPassSSCP::run(SSAProgram& program)
 
         analyzeCallGraph(program);
 
-        // Attempt to inline functions called once
+        // Attempt to inline functions called once (basic inlining)
         for (auto& func : program.Functions) {
             if (func.External)
                 continue;
@@ -920,6 +917,8 @@ bool SSAPassSSCP::removeObsoleteLabels(InstructionList& instructions)
             if (counter.at(l->Name) == 0) {
                 it      = instructions.erase(it);
                 changed = true;
+                if (it == instructions.end())
+                    break;
                 if (it != instructions.begin())
                     --it;
             }
@@ -995,9 +994,8 @@ void SSAPassSSCP::analyzeCallGraph(const SSAProgram& program)
         for (const auto& instrPtr : body) {
             if (!instrPtr)
                 continue;
-            if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+            if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
                 ++mCallCounts[call->FunctionName];
-            }
         }
     };
 
@@ -1021,11 +1019,18 @@ bool SSAPassSSCP::inlineCallsToFunction(SSAProgram& program, SSAFunction& func)
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    if (inlineFunctionCall(call, func, body, i)) {
-                        changed = true;
-                        // After inlining, we need to reprocess from start
-                        // Break and return true to trigger re-evaluation
-                        break;
+                    if (shouldInlineFunctionCall(call, func)) {
+                        // Try advanced inlining first (for constant parameters)
+                        if (attemptAdvancedInlining(call, func, body, i)) {
+                            changed = true;
+                            break;
+                        }
+                    } else if (mCallCounts[func.Name] == 1) {
+                        // Fall back to basic inlining for single-call functions
+                        if (inlineFunctionCall(call, func, body, i)) {
+                            changed = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -1153,8 +1158,7 @@ bool SSAPassSSCP::inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, Inst
 
     // Replace the call with inlined instructions
     instructions.erase(instructions.begin() + callIndex);
-    instructions.insert(instructions.begin() + callIndex,
-                        inlinedInstructions.begin(), inlinedInstructions.end());
+    instructions.insert(instructions.begin() + callIndex, inlinedInstructions.begin(), inlinedInstructions.end());
 
     return true;
 }
@@ -1175,5 +1179,175 @@ void SSAPassSSCP::removeUnusedFunctions(SSAProgram& program)
         else
             ++it;
     }
+}
+
+bool SSAPassSSCP::shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func)
+{
+    if (func.External)
+        return false;
+
+    // Check if we've already attempted inlining this function too many times
+    auto& attemptInfo = mInlineAttempts[func.Name];
+    if (attemptInfo.attempts >= MAX_INLINE_ATTEMPTS) {
+        attemptInfo.failed = true;
+        return false;
+    }
+
+    // Check if all arguments are constants
+    for (const auto& arg : call->Arguments) {
+        if (arg.Kind != SSAValue::Kind::Constant)
+            return false;
+    }
+
+    return true;
+}
+
+bool SSAPassSSCP::isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody)
+{
+    // TODO: Due to SSA value name clashes we can not simply inline larger blocks of code
+    PEXPR_UNUSED(originalBody);
+    return inlinedBody.size() == 1;
+    // Count effective instructions (excluding labels, gotos that will be optimized)
+    // size_t originalEffective = 0;
+    // size_t inlinedEffective = 0;
+
+    // for (const auto& instr : originalBody) {
+    //     if (!instr) continue;
+    //     if (dynamic_cast<const SSAInstrLabel*>(instr.get())) continue;
+    //     if (dynamic_cast<const SSAInstrGoto*>(instr.get())) continue;
+    //     ++originalEffective;
+    // }
+
+    // for (const auto& instr : inlinedBody) {
+    //     if (!instr) continue;
+    //     if (dynamic_cast<const SSAInstrLabel*>(instr.get())) continue;
+    //     if (dynamic_cast<const SSAInstrGoto*>(instr.get())) continue;
+    //     ++inlinedEffective;
+    // }
+
+    // // Significant size reduction
+    // return inlinedEffective == 1 || inlinedEffective < originalEffective / 2;
+}
+
+bool SSAPassSSCP::attemptAdvancedInlining(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+{
+    auto& attemptInfo = mInlineAttempts[func.Name];
+    attemptInfo.attempts++;
+
+    // Create a mapping from parameter names to argument values
+    std::unordered_map<std::string, SSAValue> paramMap;
+    for (size_t i = 0; i < func.Parameters.size(); ++i)
+        paramMap[func.Parameters[i]] = call->Arguments[i];
+
+    // Create instructions for the inlined body
+    InstructionList inlinedInstructions;
+    inlinedInstructions.reserve(func.Body.size());
+
+    SSAValue returnValue;
+
+    for (const auto& instrPtr : func.Body) {
+        if (!instrPtr)
+            continue;
+
+        // Clone the instruction
+        std::shared_ptr<SSAInstr> cloned;
+
+        if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
+            auto newAsg = std::make_shared<SSAInstrAssign>(*asg);
+
+            // Map operand names (parameters to arguments)
+            for (auto& op : newAsg->Operands) {
+                if (op.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(op.Name); paramIt != paramMap.end())
+                        op = paramIt->second;
+                }
+            }
+
+            cloned = newAsg;
+        } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
+            returnValue = ret->Value;
+
+            // Map the return value if needed
+            if (returnValue.Kind != SSAValue::Kind::Constant) {
+                if (auto paramIt = paramMap.find(returnValue.Name); paramIt != paramMap.end())
+                    returnValue = paramIt->second;
+            }
+
+            // Don't add the return instruction to the inlined body
+            continue;
+        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
+            auto newBr = std::make_shared<SSAInstrBranch>(*br);
+
+            // Map condition
+            if (newBr->Condition.Kind != SSAValue::Kind::Constant) {
+                if (auto paramIt = paramMap.find(newBr->Condition.Name); paramIt != paramMap.end())
+                    newBr->Condition = paramIt->second;
+            }
+
+            cloned = newBr;
+        } else if (auto callInstr = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+            auto newCall = std::make_shared<SSAInstrCall>(*callInstr);
+
+            // Map arguments
+            for (auto& arg : newCall->Arguments) {
+                if (arg.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(arg.Name); paramIt != paramMap.end())
+                        arg = paramIt->second;
+                }
+            }
+
+            cloned = newCall;
+        } else if (auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
+            auto newPhi = std::make_shared<SSAInstrPhi>(*phi);
+
+            // Map conditions and branches
+            for (auto& cond : newPhi->Conditions) {
+                if (cond.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(cond.Name); paramIt != paramMap.end())
+                        cond = paramIt->second;
+                }
+            }
+
+            for (auto& branch : newPhi->Branches) {
+                if (branch.Kind != SSAValue::Kind::Constant) {
+                    if (auto paramIt = paramMap.find(branch.Name); paramIt != paramMap.end())
+                        branch = paramIt->second;
+                }
+            }
+
+            cloned = newPhi;
+        } else {
+            cloned = instrPtr;
+        }
+
+        if (cloned)
+            inlinedInstructions.push_back(cloned);
+    }
+
+    // Create an assignment from the return value to the call's target
+    auto assign      = std::make_shared<SSAInstrAssign>();
+    assign->Target   = call->Target;
+    assign->Operator = SSAInstrAssign::OpKind::Assign;
+    assign->Operands = { returnValue };
+    inlinedInstructions.push_back(assign);
+
+    // Try to optimize the inlined body
+    InstructionList optimizedBody = inlinedInstructions;
+    processBody(optimizedBody);
+
+    // Check if optimization resulted in something simpler
+    if (!isSimplerAfterOptimization(inlinedInstructions, optimizedBody)) {
+        // Inlining didn't help, reject it
+        attemptInfo.failed = true;
+        return false;
+    }
+
+    // Replace the call with the optimized inlined instructions
+    instructions.erase(instructions.begin() + callIndex);
+    instructions.insert(instructions.begin() + callIndex,
+                        optimizedBody.begin(), optimizedBody.end());
+
+    attemptInfo.succeeded = true;
+    return true;
 }
 } // namespace PExpr::ssa

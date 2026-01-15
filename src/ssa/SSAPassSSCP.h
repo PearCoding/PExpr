@@ -44,6 +44,11 @@ private:
     bool inlineCallsToFunction(SSAProgram& program, SSAFunction& func);
     void removeUnusedFunctions(SSAProgram& program);
 
+    // Advanced inlining helpers
+    bool shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func);
+    bool attemptAdvancedInlining(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
+    
     // map from SSA value name -> constant value (string representation + type)
     std::unordered_map<std::string, SSAValue> mConstants;
 
@@ -55,6 +60,15 @@ private:
 
     // call counts for functions
     std::unordered_map<std::string, int> mCallCounts;
+
+    // Advanced inlining state
+    struct InlineAttemptInfo {
+        int attempts = 0;
+        bool succeeded = false;
+        bool failed = false;
+    };
+    std::unordered_map<std::string, InlineAttemptInfo> mInlineAttempts;
+    static constexpr int MAX_INLINE_ATTEMPTS = 16;
 };
 
 } // namespace PExpr::ssa
