@@ -3,7 +3,7 @@
 // Function called once - should be inlined
 fn add_one(x: int) = x + 1;
 
-// Function called multiple times - should not be inlined -> TODO: In the future a constant folded one should be inlined (needs cache etc)
+// Function called multiple times - should be inlined as it collapses to a single function
 fn double(x: int) = x * 2;
 
 // Function never called - should be removed
