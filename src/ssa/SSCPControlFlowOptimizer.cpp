@@ -167,20 +167,20 @@ bool SSCPControlFlowOptimizer::removeObsoleteLabels(InstructionList& instruction
 
     bool changed = false;
     // Remove labels without usage
-    for (auto it = instructions.begin(); it != instructions.end(); ++it) {
-        if (!*it)
+    for (auto it = instructions.begin(); it != instructions.end();) {
+        if (!*it) {
+            ++it;
             continue;
+        }
 
         if (auto l = dynamic_cast<const SSAInstrLabel*>(it->get())) {
             if (counter.at(l->Name) == 0) {
                 it      = instructions.erase(it);
                 changed = true;
-                if (it == instructions.end())
-                    break;
-                if (it != instructions.begin())
-                    --it;
+                continue;
             }
         }
+        ++it;
     }
 
     return changed;

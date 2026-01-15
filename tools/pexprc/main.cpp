@@ -69,8 +69,37 @@ int main(int argc, char** argv)
     app.add_option_function<std::string>("-W,--warning", handleWarningCmd, "Set warnings");
     app.add_flag_callback("--no-warnings", [&]() { warningFlags = 0; }, "Disable all warnings");
 
-    uint32_t optLevel = 0;
-    app.add_option_function<int>("-O", [&](int opt) { optLevel = (uint32_t)std::min(2, std::max(0, opt)); }, "Set optimization level");
+    ssa::SSAOptions optimizationOptions;
+    app.add_option_function<int>("-O", [&](int opt) { 
+        if (opt == 0)
+            optimizationOptions = ssa::SSAOptions{
+                .EnableConstantFolding = false,
+                .EnableConstantFoldingNumber = false,
+                .RemoveDeadCode = false,
+                .InlineFunctions = false,
+            };
+        else if (opt == 1)
+            optimizationOptions = ssa::SSAOptions{
+                .EnableConstantFolding = true,
+                .EnableConstantFoldingNumber = false,
+                .RemoveDeadCode = true,
+                .InlineFunctions = false,
+            };
+       else 
+            optimizationOptions = ssa::SSAOptions{
+                .EnableConstantFolding = true,
+                .EnableConstantFoldingNumber = true,
+                .RemoveDeadCode = true,
+                .InlineFunctions = true,
+            }; }, "Set optimization level");
+
+    app.add_flag("--opt-constant-folding,!--no-opt-constant-folding", optimizationOptions.EnableConstantFolding, "Enable constant folding");
+    app.add_flag("--opt-math-folding,!--no-opt-math-folding", optimizationOptions.EnableConstantFoldingNumber, "Enable constant folding on numbers");
+    app.add_flag("--opt-dead-code,!--no-opt-dead-code", optimizationOptions.RemoveDeadCode, "Enable removal of dead code");
+    app.add_flag("--opt-inline-functions,!--no-opt-inline-functions", optimizationOptions.InlineFunctions, "Attemp to inline functions");
+
+    bool skipOptimizationPass = false;
+    app.add_flag("--skip-optimization,!--no-skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
 
     // Add some hidden commandline parameters
     bool listCLI = false;
@@ -151,13 +180,13 @@ int main(int argc, char** argv)
         return env.reporter().errorCount();
     }
 
-    if (optLevel == 0) {
+    if (skipOptimizationPass) {
         dumpOutput(program.dump());
         return env.reporter().errorCount();
     }
 
     // Optimize
-    ssa::SSAPassSSCP::Run(program);
+    ssa::SSAPassSSCP::Run(optimizationOptions, program);
 
     if (warningAsError && env.reporter().warningCount() > 0) {
         std::cerr << "Terminating as a warning was generated" << std::endl;

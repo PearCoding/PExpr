@@ -13,14 +13,14 @@ public:
     using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
 
     bool replaceOperandIfConst(InstructionList& instructions);
-    bool foldToConstants(InstructionList& instructions);
+    bool foldToConstants(bool foldNumber, InstructionList& instructions);
 
 private:
     bool replaceOperandIfConst(std::vector<SSAValue>& ops);
 
-    std::optional<SSAValue> foldAssign(const SSAInstrAssign* asg);
-    std::optional<SSAValue> foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp);
-    std::optional<SSAValue> foldBinaryOp(const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp);
+    std::optional<SSAValue> foldAssign(bool foldNumber, const SSAInstrAssign* asg);
+    std::optional<SSAValue> foldUnaryOp(bool foldNumber, const SSAValue& operand, UnaryOperation unaryOp);
+    std::optional<SSAValue> foldBinaryOp(bool foldNumber, const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp);
     std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const std::string& swizzle);
     std::optional<SSAValue> foldVectorOp(const std::vector<SSAValue>& operands);
     std::optional<SSAValue> foldCastOp(const SSAValue& operand, ElementaryType targetType);

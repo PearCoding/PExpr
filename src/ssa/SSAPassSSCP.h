@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SSAOptions.h"
 #include "SSCPConstantFolder.h"
 #include "SSCPControlFlowOptimizer.h"
 #include "SSCPFunctionInliner.h"
@@ -15,17 +16,19 @@ public:
     using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
 
     /// Run the pass on a program. Modifies the program in-place.
-    static void Run(SSAProgram& program);
+    static void Run(const SSAOptions& opts, SSAProgram& program);
 
 private:
-    SSAPassSSCP();
+    SSAPassSSCP(const SSAOptions& opts);
     ~SSAPassSSCP();
 
     /// Run the pass on a program. Modifies the program in-place.
     void runProgram(SSAProgram& program);
     bool processBody(InstructionList& body);
 
-    // Refactored components
+    const SSAOptions mOptions;
+
+    // Components
     std::unique_ptr<SSCPConstantFolder> mConstantFolder;
     std::unique_ptr<SSCPControlFlowOptimizer> mControlFlowOptimizer;
     std::unique_ptr<SSCPFunctionInliner> mFunctionInliner;

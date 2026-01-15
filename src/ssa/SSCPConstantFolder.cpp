@@ -75,10 +75,13 @@ bool SSCPConstantFolder::extractVec4(const SSAValue& vv, Vec4& out)
     return false;
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp)
+std::optional<SSAValue> SSCPConstantFolder::foldUnaryOp(bool foldNumber, const SSAValue& operand, UnaryOperation unaryOp)
 {
     switch (unaryOp) {
     case UnaryOperation::Neg: {
+        if (!foldNumber)
+            return std::nullopt;
+
         if (Integer iv; extractInteger(operand, iv))
             return SSAValue::Constant(static_cast<Integer>(-iv));
         else if (Number dv; extractNumber(operand, dv))
@@ -104,7 +107,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldUnaryOp(const SSAValue& operand,
     return std::nullopt;
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp)
+std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp)
 {
     switch (binaryOp) {
     case BinaryOperation::And:
@@ -121,6 +124,9 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(const SSAValue& L, cons
     case BinaryOperation::Div:
     case BinaryOperation::Mod:
     case BinaryOperation::Pow: {
+        if (!foldNumber)
+            return std::nullopt;
+
         Integer li, ri;
         Number ld, rd;
         bool Lint = extractInteger(L, li);
@@ -340,32 +346,34 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(const SSAValue& L, cons
     case BinaryOperation::Greater:
     case BinaryOperation::LessEqual:
     case BinaryOperation::GreaterEqual: {
-        if (Number lv, rv; extractNumber(L, lv) && extractNumber(R, rv)) {
-            bool res = false;
-            switch (binaryOp) {
-            case BinaryOperation::Equal:
-                res = (lv == rv);
-                break;
-            case BinaryOperation::NotEqual:
-                res = (lv != rv);
-                break;
-            case BinaryOperation::Less:
-                res = (lv < rv);
-                break;
-            case BinaryOperation::Greater:
-                res = (lv > rv);
-                break;
-            case BinaryOperation::LessEqual:
-                res = (lv <= rv);
-                break;
-            case BinaryOperation::GreaterEqual:
-                res = (lv >= rv);
-                break;
-            default:
-                break;
-            }
+        if (foldNumber) {
+            if (Number lv, rv; extractNumber(L, lv) && extractNumber(R, rv)) {
+                bool res = false;
+                switch (binaryOp) {
+                case BinaryOperation::Equal:
+                    res = (lv == rv);
+                    break;
+                case BinaryOperation::NotEqual:
+                    res = (lv != rv);
+                    break;
+                case BinaryOperation::Less:
+                    res = (lv < rv);
+                    break;
+                case BinaryOperation::Greater:
+                    res = (lv > rv);
+                    break;
+                case BinaryOperation::LessEqual:
+                    res = (lv <= rv);
+                    break;
+                case BinaryOperation::GreaterEqual:
+                    res = (lv >= rv);
+                    break;
+                default:
+                    break;
+                }
 
-            return SSAValue::Constant(res);
+                return SSAValue::Constant(res);
+            }
         }
 
         if (binaryOp == BinaryOperation::Equal || binaryOp == BinaryOperation::NotEqual) {
@@ -487,7 +495,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, 
     return std::nullopt;
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldAssign(const SSAInstrAssign* asg)
+std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SSAInstrAssign* asg)
 {
     if (!asg)
         return std::nullopt;
@@ -528,11 +536,11 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(const SSAInstrAssign* asg
 
     // Unary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1)
-        return foldUnaryOp(ops[0], asg->UnaryOp);
+        return foldUnaryOp(foldNumber, ops[0], asg->UnaryOp);
 
     // Binary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Binary && ops.size() == 2)
-        return foldBinaryOp(ops[0], ops[1], asg->BinaryOp);
+        return foldBinaryOp(foldNumber, ops[0], ops[1], asg->BinaryOp);
 
     return std::nullopt;
 }
@@ -590,14 +598,14 @@ bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
     return changed;
 }
 
-bool SSCPConstantFolder::foldToConstants(InstructionList& body)
+bool SSCPConstantFolder::foldToConstants(bool foldNumber, InstructionList& body)
 {
     bool changed = false;
     for (auto& instrPtr : body) {
         if (!instrPtr)
             continue;
         if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            auto folded = foldAssign(asg);
+            auto folded = foldAssign(foldNumber, asg);
             if (folded) {
                 if (!asg->Target.Name.empty()) {
                     mConstants[asg->Target.Name] = *folded;

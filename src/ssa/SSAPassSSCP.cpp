@@ -6,8 +6,9 @@
 
 namespace PExpr::ssa {
 
-SSAPassSSCP::SSAPassSSCP()
-    : mConstantFolder(std::make_unique<SSCPConstantFolder>())
+SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
+    : mOptions(opts)
+    , mConstantFolder(std::make_unique<SSCPConstantFolder>())
     , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>())
     , mFunctionInliner(std::make_unique<SSCPFunctionInliner>())
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
@@ -16,9 +17,9 @@ SSAPassSSCP::SSAPassSSCP()
 
 SSAPassSSCP::~SSAPassSSCP() = default;
 
-void SSAPassSSCP::Run(SSAProgram& program)
+void SSAPassSSCP::Run(const SSAOptions& opts, SSAProgram& program)
 {
-    SSAPassSSCP sscp;
+    SSAPassSSCP sscp(opts);
     sscp.runProgram(program);
 }
 
@@ -43,17 +44,21 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
 
         mFunctionInliner->analyzeCallGraph(program);
 
-        // Check if we can inline some functions
-        for (auto& func : program.Functions) {
-            if (func.External)
-                continue;
+        if (mOptions.InlineFunctions) {
+            // Check if we can inline some functions
+            for (auto& func : program.Functions) {
+                if (func.External)
+                    continue;
 
-            if (mFunctionInliner->attempFunctionInlining(program, func))
-                changed = true;
+                if (mFunctionInliner->attempFunctionInlining(program, func))
+                    changed = true;
+            }
         }
 
-        // Remove unused functions after inlining
-        mFunctionInliner->removeUnusedFunctions(program);
+        if (mOptions.RemoveDeadCode) {
+            // Remove unused functions after inlining
+            mFunctionInliner->removeUnusedFunctions(program);
+        }
     }
 }
 
@@ -66,15 +71,19 @@ bool SSAPassSSCP::processBody(InstructionList& body)
         changed = true;
 
     // 2) Try to fold assignments into constants
-    if (mConstantFolder->foldToConstants(body))
-        changed = true;
+    if (mOptions.EnableConstantFolding) {
+        if (mConstantFolder->foldToConstants(mOptions.EnableConstantFoldingNumber, body))
+            changed = true;
+    }
 
     // 3) Count uses
     mControlFlowOptimizer->resetAndCountUses(body);
 
-    // 4) Remove dead assigns without side effects
-    if (mControlFlowOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
-        changed = true;
+    if (mOptions.RemoveDeadCode) {
+        // 4) Remove dead assigns without side effects
+        if (mControlFlowOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
+            changed = true;
+    }
 
     // 5) Remove empty branches
     if (mControlFlowOptimizer->removeEmptyBranches(body))
@@ -84,9 +93,11 @@ bool SSAPassSSCP::processBody(InstructionList& body)
     if (mControlFlowOptimizer->removeObsoleteLabels(body))
         changed = true;
 
-    // 7) Collapse phi nodes
-    if (mControlFlowOptimizer->collapsePhiNodes(body))
-        changed = true;
+    if (mOptions.RemoveDeadCode) {
+        // 7) Collapse phi nodes
+        if (mControlFlowOptimizer->collapsePhiNodes(body))
+            changed = true;
+    }
 
     return changed;
 }

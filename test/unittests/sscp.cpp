@@ -20,7 +20,7 @@ TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAPassSSCP::Run(prog);
+    SSAPassSSCP::Run(SSAOptions(), prog);
 
     auto dumped = prog.dump();
 
@@ -41,7 +41,7 @@ TEST_CASE("SSAPassSSCP: dead code elimination removes unused assigns", "[sscp]")
     auto before = prog.dump();
     REQUIRE((before.find("y.") != std::string::npos || before.find("y:") != std::string::npos));
 
-    SSAPassSSCP::Run(prog);
+    SSAPassSSCP::Run(SSAOptions(), prog);
 
     auto after = prog.dump();
 
@@ -61,7 +61,7 @@ TEST_CASE("SSAPassSSCP: constant folding for vectors", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAPassSSCP::Run(prog);
+    SSAPassSSCP::Run(SSAOptions(), prog);
 
     auto dumped = prog.dump();
 
@@ -79,7 +79,7 @@ TEST_CASE("SSAPassSSCP: vector arithmetic operations", "[sscp]")
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    SSAPassSSCP::Run(prog);
+    SSAPassSSCP::Run(SSAOptions(), prog);
 
     auto dumped = prog.dump();
 
