@@ -17,6 +17,11 @@ set(PUBLIC
     
     ssa/SSAMapper.h
     ssa/SSAValidator.h
+    ssa/SSCPConstantFolder.h
+    ssa/SSCPControlFlowOptimizer.h
+    ssa/SSCPFunctionInliner.h
+    ssa/SSCPSideEffectAnalyzer.h
+    ssa/SSAPassSSCP.h
 )
 
 set(SRC
@@ -29,6 +34,10 @@ set(SRC
     ssa/SSAMapper.cpp
     ssa/SSAValidator.cpp
     ssa/SSAPassSSCP.cpp
+    ssa/SSCPConstantFolder.cpp
+    ssa/SSCPControlFlowOptimizer.cpp
+    ssa/SSCPFunctionInliner.cpp
+    ssa/SSCPSideEffectAnalyzer.cpp
 
     internal/ConsoleLogListener.cpp
     internal/Lexer.h

@@ -71,6 +71,6 @@ bool SSAValidator::checkIfTyped(const SSAInstr* instr)
 
 bool SSAValidator::checkIfTyped(const SSAValue& value)
 {
-    return value.Type != ElementaryType::Unspecified;
+    return value.Type != ElementaryType::Unspecified && value.Type != ElementaryType::Error;
 }
 } // namespace PExpr::ssa

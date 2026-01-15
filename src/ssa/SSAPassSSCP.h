@@ -1,10 +1,11 @@
 #pragma once
 
-#include "SSAMapper.h"
+#include "SSCPConstantFolder.h"
+#include "SSCPControlFlowOptimizer.h"
+#include "SSCPFunctionInliner.h"
+#include "SSCPSideEffectAnalyzer.h"
 
-#include <optional>
-#include <unordered_map>
-#include <unordered_set>
+#include <memory>
 
 namespace PExpr::ssa {
 
@@ -13,41 +14,15 @@ class SSAPassSSCP {
 public:
     using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
 
-    SSAPassSSCP() = default;
+    SSAPassSSCP();
+    ~SSAPassSSCP();
 
     /// Run the pass on a program. Modifies the program in-place.
     void run(SSAProgram& program);
 
 private:
-    // Helpers
-    std::optional<SSAValue> foldAssign(const SSAInstrAssign* asg);
-    std::optional<SSAValue> foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp);
-    std::optional<SSAValue> foldBinaryOp(const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp);
-    std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const std::string& swizzle);
-    std::optional<SSAValue> foldVectorOp(const std::vector<SSAValue>& operands);
-    std::optional<SSAValue> foldCastOp(const SSAValue& operand, ElementaryType targetType);
-
-    bool instrHasSideEffects(const SSAInstr* instr) const;
-    void countUsesInInstr(const SSAInstr* instr, std::unordered_map<std::string, int>& counts);
-
-    bool removeEmptyBranches(InstructionList& instructions);
-    bool removeObsoleteLabels(InstructionList& instructions);
-    bool replaceOperandIfConst(std::vector<SSAValue>& ops);
-    bool replaceOperandIfConst(InstructionList& instructions);
-    bool collapsePhiNodes(InstructionList& instructions);
-
-    void propagateSideEffects(const SSAProgram& program);
     bool processBody(InstructionList& body);
-
-    void analyzeCallGraph(const SSAProgram& program);
-    bool inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    bool inlineCallsToFunction(SSAProgram& program, SSAFunction& func);
-    void removeUnusedFunctions(SSAProgram& program);
-
-    // Advanced inlining helpers
-    bool shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func);
-    bool attemptAdvancedInlining(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
+    void resetState();
     
     // map from SSA value name -> constant value (string representation + type)
     std::unordered_map<std::string, SSAValue> mConstants;
@@ -55,20 +30,11 @@ private:
     // usage counts for SSA named/temp values
     std::unordered_map<std::string, int> mUseCount;
 
-    // set of function names that are considered to have side-effects (externals and those calling externals)
-    std::unordered_set<std::string> mSideEffectFunctions;
-
-    // call counts for functions
-    std::unordered_map<std::string, int> mCallCounts;
-
-    // Advanced inlining state
-    struct InlineAttemptInfo {
-        int attempts = 0;
-        bool succeeded = false;
-        bool failed = false;
-    };
-    std::unordered_map<std::string, InlineAttemptInfo> mInlineAttempts;
-    static constexpr int MAX_INLINE_ATTEMPTS = 16;
+    // Refactored components
+    std::unique_ptr<SSCPConstantFolder> mConstantFolder;
+    std::unique_ptr<SSCPControlFlowOptimizer> mControlFlowOptimizer;
+    std::unique_ptr<SSCPFunctionInliner> mFunctionInliner;
+    std::unique_ptr<SSCPSideEffectAnalyzer> mSideEffectAnalyzer;
 };
 
 } // namespace PExpr::ssa
