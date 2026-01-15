@@ -14,21 +14,16 @@ class SSAPassSSCP {
 public:
     using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
 
+    /// Run the pass on a program. Modifies the program in-place.
+    static void Run(SSAProgram& program);
+
+private:
     SSAPassSSCP();
     ~SSAPassSSCP();
 
     /// Run the pass on a program. Modifies the program in-place.
-    void run(SSAProgram& program);
-
-private:
+    void runProgram(SSAProgram& program);
     bool processBody(InstructionList& body);
-    void resetState();
-    
-    // map from SSA value name -> constant value (string representation + type)
-    std::unordered_map<std::string, SSAValue> mConstants;
-
-    // usage counts for SSA named/temp values
-    std::unordered_map<std::string, int> mUseCount;
 
     // Refactored components
     std::unique_ptr<SSCPConstantFolder> mConstantFolder;

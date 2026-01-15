@@ -8,11 +8,6 @@
 
 namespace PExpr::ssa {
 
-SSCPConstantFolder::SSCPConstantFolder(std::unordered_map<std::string, SSAValue>& constants)
-    : mConstants(constants)
-{
-}
-
 bool SSCPConstantFolder::extractBool(const SSAValue& vv, bool& out)
 {
     if (const bool* b = std::get_if<bool>(&vv.Value)) {
@@ -588,6 +583,31 @@ bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
                 if (it != mConstants.end()) {
                     br->Condition = it->second;
                     changed       = true;
+                }
+            }
+        }
+    }
+    return changed;
+}
+
+bool SSCPConstantFolder::foldToConstants(InstructionList& body)
+{
+    bool changed = false;
+    for (auto& instrPtr : body) {
+        if (!instrPtr)
+            continue;
+        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
+            auto folded = foldAssign(asg);
+            if (folded) {
+                if (!asg->Target.Name.empty()) {
+                    mConstants[asg->Target.Name] = *folded;
+                    // mutate instruction to literal form
+                    SSAInstrAssign lit;
+                    lit.Target   = asg->Target;
+                    lit.Operator = SSAInstrAssign::OpKind::Assign;
+                    lit.Operands = { *folded };
+                    *asg         = std::move(lit);
+                    changed      = true;
                 }
             }
         }

@@ -157,8 +157,7 @@ int main(int argc, char** argv)
     }
 
     // Optimize
-    ssa::SSAPassSSCP sscp;
-    sscp.run(program);
+    ssa::SSAPassSSCP::Run(program);
 
     if (warningAsError && env.reporter().warningCount() > 0) {
         std::cerr << "Terminating as a warning was generated" << std::endl;

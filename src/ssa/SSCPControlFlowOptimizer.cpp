@@ -3,9 +3,53 @@
 
 namespace PExpr::ssa {
 
-SSCPControlFlowOptimizer::SSCPControlFlowOptimizer(std::unordered_map<std::string, int>& useCount)
-    : mUseCount(useCount)
+void SSCPControlFlowOptimizer::resetAndCountUses(InstructionList& instructions)
 {
+    mUseCount.clear();
+    for (const auto& instrPtr : instructions) {
+        if (!instrPtr)
+            continue;
+
+        countUsesInInstr(instrPtr.get());
+    }
+}
+
+// TODO: Not really a control flow optimization... but uses the same mUseCount
+bool SSCPControlFlowOptimizer::removeDeadAssigns(InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions)
+{
+    bool changed = false;
+
+    for (auto it = instructions.begin(); it != instructions.end();) {
+        if (!*it) {
+            ++it;
+            continue;
+        }
+
+        SSAValue target;
+        if (auto asg = dynamic_cast<SSAInstrAssign*>(it->get())) {
+            target = asg->Target;
+        } else if (auto c = dynamic_cast<SSAInstrCall*>(it->get())) {
+            target = c->Target;
+        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(it->get())) {
+            target = phi->Target;
+        } else {
+            ++it;
+            continue;
+        }
+
+        int uses = 0;
+        if (auto uit = mUseCount.find(target.Name); uit != mUseCount.end())
+            uses = uit->second;
+
+        if (uses == 0 && !instrHasSideEffects(it->get(), sideEffectedFunctions)) {
+            changed = true;
+            it      = instructions.erase(it);
+            continue;
+        }
+        ++it;
+    }
+
+    return changed;
 }
 
 bool SSCPControlFlowOptimizer::removeEmptyBranches(InstructionList& instructions)
@@ -235,6 +279,7 @@ bool SSCPControlFlowOptimizer::instrHasSideEffects(const SSAInstr* instr, const 
 {
     if (!instr)
         return false;
+
     // Calls have side-effects only if the callee is known to be side-effecting.
     if (auto c = dynamic_cast<const SSAInstrCall*>(instr)) {
         if (sideEffectFunctions.find(c->FunctionName) != sideEffectFunctions.end())
@@ -243,6 +288,7 @@ bool SSCPControlFlowOptimizer::instrHasSideEffects(const SSAInstr* instr, const 
     }
     if (dynamic_cast<const SSAInstrReturn*>(instr))
         return true; // returns must be preserved
+
     // other instructions are assumed side-effect free
     return false;
 }

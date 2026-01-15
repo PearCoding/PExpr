@@ -7,8 +7,8 @@
 namespace PExpr::ssa {
 
 SSAPassSSCP::SSAPassSSCP()
-    : mConstantFolder(std::make_unique<SSCPConstantFolder>(mConstants))
-    , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>(mUseCount))
+    : mConstantFolder(std::make_unique<SSCPConstantFolder>())
+    , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>())
     , mFunctionInliner(std::make_unique<SSCPFunctionInliner>())
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
 {
@@ -16,15 +16,17 @@ SSAPassSSCP::SSAPassSSCP()
 
 SSAPassSSCP::~SSAPassSSCP() = default;
 
-void SSAPassSSCP::run(SSAProgram& program)
+void SSAPassSSCP::Run(SSAProgram& program)
+{
+    SSAPassSSCP sscp;
+    sscp.runProgram(program);
+}
+
+void SSAPassSSCP::runProgram(SSAProgram& program)
 {
     mSideEffectAnalyzer->propagateSideEffects(program);
 
-    // Reset inlining state for this run
-    // Note: mInlineAttempts is now managed by SSCPFunctionInliner
-
-    // Now proceed with the usual SSCP iterations (replace operands, fold, DCE), but
-    // consider calls side-effecting only if the callee is marked side-effecting.
+    // Keep optimizing until no changes are possible
     bool changed = true;
     while (changed) {
         changed = false;
@@ -64,71 +66,29 @@ bool SSAPassSSCP::processBody(InstructionList& body)
         changed = true;
 
     // 2) Try to fold assignments into constants
-    for (auto& instrPtr : body) {
-        if (!instrPtr)
-            continue;
-        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            auto folded = mConstantFolder->foldAssign(asg);
-            if (folded) {
-                if (!asg->Target.Name.empty()) {
-                    mConstants[asg->Target.Name] = *folded;
-                    // mutate instruction to literal form
-                    SSAInstrAssign lit;
-                    lit.Target   = asg->Target;
-                    lit.Operator = SSAInstrAssign::OpKind::Assign;
-                    lit.Operands = { *folded };
-                    *asg         = std::move(lit);
-                    changed      = true;
-                }
-            }
-        }
-    }
+    if (mConstantFolder->foldToConstants(body))
+        changed = true;
 
-    // 3) Dead code elimination: compute use counts and remove dead assigns without side effects
-    mUseCount.clear();
-    for (const auto& instrPtr : body)
-        mControlFlowOptimizer->countUsesInInstr(instrPtr.get());
+    // 3) Count uses
+    mControlFlowOptimizer->resetAndCountUses(body);
 
-    // TODO: This can be done more efficiently
-    InstructionList newBody;
-    newBody.reserve(body.size());
-    for (const auto& instrPtr : body) {
-        if (!instrPtr)
-            continue;
-        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            int uses = 0;
-            auto it  = mUseCount.find(asg->Target.Name);
-            if (it != mUseCount.end())
-                uses = it->second;
-            if (uses == 0 && !mControlFlowOptimizer->instrHasSideEffects(instrPtr.get(), mSideEffectAnalyzer->getSideEffectFunctions())) {
-                changed = true;
-                continue;
-            }
-        }
-        newBody.push_back(instrPtr);
-    }
-    body.swap(newBody);
+    // 4) Remove dead assigns without side effects
+    if (mControlFlowOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
+        changed = true;
 
-    // 4) Remove empty branches
+    // 5) Remove empty branches
     if (mControlFlowOptimizer->removeEmptyBranches(body))
         changed = true;
 
-    // 5) Handle unused labels
+    // 6) Handle unused labels
     if (mControlFlowOptimizer->removeObsoleteLabels(body))
         changed = true;
 
-    // 6) Collapse phi nodes
+    // 7) Collapse phi nodes
     if (mControlFlowOptimizer->collapsePhiNodes(body))
         changed = true;
 
     return changed;
-}
-
-void SSAPassSSCP::resetState()
-{
-    mConstants.clear();
-    mUseCount.clear();
-    mSideEffectAnalyzer.reset(new SSCPSideEffectAnalyzer());
 }
 
 } // namespace PExpr::ssa
