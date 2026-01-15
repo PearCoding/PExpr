@@ -4,9 +4,9 @@
 fn single_call(x: int) = x * 2;
 let inlined = single_call(5); // should be replaced with 10
 
-// Function called multiple times - currently NOT be inlined (TODO)
+// Function called multiple times
 fn multi_call(x: int) = x + 1;
-let multi1 = multi_call(1);
-let multi2 = multi_call(2);
+let multi1 = multi_call(1); // should be 2
+let multi2 = multi_call(2); // should be 3
 
-inlined + multi1 + multi2
+inlined + multi1 + multi2 // should be 15

@@ -1,18 +1,8 @@
 #include "SSCPFunctionInliner.h"
 #include "SSAMapper.h"
+#include "SSAPassSSCP.h"
 
 namespace PExpr::ssa {
-
-bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunction& func)
-{
-    // Check if function should be inlined
-    if (const auto callCountIt = mCallCounts.find(func.Name);
-        callCountIt != mCallCounts.end() && callCountIt->second == 1) {
-        // Find and inline all calls to this function
-        return inlineCallsToFunction(program, func);
-    }
-    return false;
-}
 
 void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
 {
@@ -36,7 +26,7 @@ void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
         countCallsInBody(func.Body);
 }
 
-bool SSCPFunctionInliner::inlineCallsToFunction(SSAProgram& program, SSAFunction& func)
+bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunction& func)
 {
     bool inlinedAny = false;
 
@@ -272,8 +262,6 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunctio
     InstructionList inlinedInstructions;
     inlinedInstructions.reserve(func.Body.size());
 
-    SSAValue returnValue;
-
     for (const auto& instrPtr : func.Body) {
         if (!instrPtr)
             continue;
@@ -294,16 +282,15 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunctio
 
             cloned = newAsg;
         } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
-            returnValue = ret->Value;
+            auto newRet = std::make_shared<SSAInstrReturn>(*ret);
 
             // Map the return value if needed
-            if (returnValue.Kind != SSAValue::Kind::Constant) {
-                if (auto paramIt = paramMap.find(returnValue.Name); paramIt != paramMap.end())
-                    returnValue = paramIt->second;
+            if (newRet->Value.Kind != SSAValue::Kind::Constant) {
+                if (auto paramIt = paramMap.find(newRet->Value.Name); paramIt != paramMap.end())
+                    newRet->Value = paramIt->second;
             }
 
-            // Don't add the return instruction to the inlined body
-            continue;
+            cloned = newRet;
         } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
             auto newBr = std::make_shared<SSAInstrBranch>(*br);
 
@@ -353,28 +340,28 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunctio
             inlinedInstructions.push_back(cloned);
     }
 
-    // Create an assignment from the return value to the call's target
-    auto assign      = std::make_shared<SSAInstrAssign>();
-    assign->Target   = call->Target;
-    assign->Operator = SSAInstrAssign::OpKind::Assign;
-    assign->Operands = { returnValue };
-    inlinedInstructions.push_back(assign);
-
-    // Note: We need to process the body here, but we don't have access to the full context
-    // This will be handled by the main SSAPassSSCP::processBody call later
-    // For now, we'll just check size
+    // Apply all the optimization possible on instructions
+    SSAPassSSCP::Run(mOptions, inlinedInstructions);
 
     // Check if optimization resulted in something simpler
-    if (!isSimplerAfterOptimization(inlinedInstructions, inlinedInstructions)) {
+    if (inlinedInstructions.empty() || !isSimplerAfterOptimization(func.Body, inlinedInstructions)) {
         // Inlining didn't help, reject it
         attemptInfo.failed = true;
         return false;
     }
 
+    PEXPR_ASSERT(dynamic_cast<const SSAInstrReturn*>(inlinedInstructions.back().get()) != nullptr, "Expected the last entry to be a return statement");
+
+    // Replace the return statement and assign the return value of it to the target
+    auto assign                = std::make_shared<SSAInstrAssign>();
+    assign->Target             = call->Target;
+    assign->Operator           = SSAInstrAssign::OpKind::Assign;
+    assign->Operands           = { dynamic_cast<const SSAInstrReturn*>(inlinedInstructions.back().get())->Value };
+    inlinedInstructions.back() = std::move(assign);
+
     // Replace the call with the optimized inlined instructions
     instructions.erase(instructions.begin() + callIndex);
-    instructions.insert(instructions.begin() + callIndex,
-                        inlinedInstructions.begin(), inlinedInstructions.end());
+    instructions.insert(instructions.begin() + callIndex, inlinedInstructions.begin(), inlinedInstructions.end());
 
     attemptInfo.succeeded = true;
     return true;

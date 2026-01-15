@@ -10,7 +10,7 @@ SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     : mOptions(opts)
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
     , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>())
-    , mFunctionInliner(std::make_unique<SSCPFunctionInliner>())
+    , mFunctionInliner(std::make_unique<SSCPFunctionInliner>(opts))
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
 {
 }
@@ -21,6 +21,16 @@ void SSAPassSSCP::Run(const SSAOptions& opts, SSAProgram& program)
 {
     SSAPassSSCP sscp(opts);
     sscp.runProgram(program);
+}
+
+void SSAPassSSCP::Run(const SSAOptions& opts, InstructionList& body)
+{
+    SSAPassSSCP sscp(opts);
+
+    // Keep optimizing until no changes are possible
+    bool changed = true;
+    while (changed)
+        changed = sscp.processBody(body);
 }
 
 void SSAPassSSCP::runProgram(SSAProgram& program)

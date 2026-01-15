@@ -15,8 +15,11 @@ class SSAPassSSCP {
 public:
     using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
 
-    /// Run the pass on a program. Modifies the program in-place.
+    /// Run the passes on a program. Modifies the program in-place.
     static void Run(const SSAOptions& opts, SSAProgram& program);
+
+    /// Run the passes on a subset of instructions. Modifies the instructions in-place. This prevents function inlining
+    static void Run(const SSAOptions& opts, InstructionList& body);
 
 private:
     SSAPassSSCP(const SSAOptions& opts);
