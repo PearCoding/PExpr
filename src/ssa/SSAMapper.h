@@ -159,7 +159,12 @@ public:
     [[nodiscard]] SSAProgram map(const Ptr<Closure>& closure);
 
 private:
-    [[nodiscard]] std::string fresh(const std::string& base);
+    [[nodiscard]] std::string fresh(const std::string& base, bool updateScope = false);
+    void pushScope();
+    void popScope();
+    int getCurrentVersion(const std::string& base) const;
+    std::unordered_map<std::string, int>& currentScope();
+    const std::unordered_map<std::string, int>& currentScope() const;
 
     [[nodiscard]] SSAProgram mapClosure(const Ptr<Closure>& closure);
     void mapStatement(SSAProgram& program, const Ptr<Statement>& stmt);
@@ -173,12 +178,8 @@ private:
 
     // Internal helpers
     std::unordered_map<std::string, int> mCounters;
+    std::vector<std::unordered_map<std::string, int>> mScopeStack;
     std::unordered_map<const void*, SSAValue> mExprValues;
-
-    // Track mutability of local variable declarations in this mapper's scope.
-    // Used by the parent mapper to determine whether a captured parent variable
-    // is mutable or constant.
-    std::unordered_map<std::string, bool> mLocalMutability;
 };
 
 } // namespace PExpr::ssa

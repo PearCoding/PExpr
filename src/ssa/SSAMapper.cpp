@@ -263,17 +263,55 @@ SSAProgram SSAMapper::map(const Ptr<Closure>& closure)
 {
     mCounters.clear();
     mExprValues.clear();
-    mLocalMutability.clear();
+    mScopeStack.clear();
     return mapClosure(closure);
 }
 
-std::string SSAMapper::fresh(const std::string& base)
+std::string SSAMapper::fresh(const std::string& base, bool updateScope)
 {
     int& c = mCounters[base];
     ++c;
+    if (updateScope && !mScopeStack.empty())
+        currentScope()[base] = c;
     std::stringstream ss;
     ss << base << "." << c;
     return ss.str();
+}
+
+void SSAMapper::pushScope()
+{
+    if (mScopeStack.empty())
+        mScopeStack.emplace_back();
+    else
+        mScopeStack.push_back(currentScope()); // copy current scope
+}
+
+void SSAMapper::popScope()
+{
+    PEXPR_ASSERT(!mScopeStack.empty(), "Scope stack underflow");
+    mScopeStack.pop_back();
+}
+
+int SSAMapper::getCurrentVersion(const std::string& base) const
+{
+    if (mScopeStack.empty())
+        return 0;
+    const auto& scope = currentScope();
+    if (const auto it = scope.find(base); it != scope.end())
+        return it->second;
+    return 0;
+}
+
+std::unordered_map<std::string, int>& SSAMapper::currentScope()
+{
+    PEXPR_ASSERT(!mScopeStack.empty(), "No scope active");
+    return mScopeStack.back();
+}
+
+const std::unordered_map<std::string, int>& SSAMapper::currentScope() const
+{
+    PEXPR_ASSERT(!mScopeStack.empty(), "No scope active");
+    return mScopeStack.back();
 }
 
 // Inline a mapped closure body into the current program by replacing any
@@ -307,6 +345,7 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
     if (!closure)
         return SSAProgram{};
 
+    pushScope();
     auto program = SSAProgram{};
 
     // map statements
@@ -321,6 +360,7 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
         program.Body.push_back(ret);
     }
 
+    popScope();
     return program;
 }
 
@@ -335,23 +375,20 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), rhs.Type);
+        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name(), true), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
         program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         // remember mapping for this statement's expression pointer, so subsequent uses can reuse name
         mExprValues[stmt.get()] = tgt;
-
-        // record mutability for local declarations in this mapper's scope
-        mLocalMutability[var->name()] = var->isMutable();
     } break;
     case StatementType::VariableAssignment: {
         auto var     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
         SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name()), rhs.Type);
+        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name(), true), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -440,12 +477,11 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         result = v;
     } break;
     case ExpressionType::Variable: {
-        auto v = std::reinterpret_pointer_cast<VariableExpression>(expr);
-        // prefer last SSA version if present in counters, else plain name
-        auto cit = mCounters.find(v->name());
-        if (cit != mCounters.end()) {
+        auto v      = std::reinterpret_pointer_cast<VariableExpression>(expr);
+        int version = getCurrentVersion(v->name());
+        if (version > 0) {
             std::stringstream ss;
-            ss << v->name() << "." << cit->second;
+            ss << v->name() << "." << version;
             result = SSAValue(SSAValue::Kind::Named, ss.str(), v->returnType());
         } else {
             result = SSAValue(SSAValue::Kind::Named, v->name(), v->returnType());
@@ -496,7 +532,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         std::vector<SSAValue> args;
         args.reserve(c->parameters().size());
         for (const auto& p : c->parameters())
-            args.push_back(mapExpression(program, p)); // TODO: Implicit casts
+            args.push_back(mapExpression(program, p));
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
         SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());
