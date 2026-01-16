@@ -37,7 +37,7 @@ public:
     Reporter& operator=(const Reporter&) = delete;
 
     // Configuration
-    void setOutputMask(uint32_t mask) { mOutputMask = mask; }
+    void setOutputMask(uint32_t mask) { mOutputMask = mask | RT_ERROR; }
     [[nodiscard]] inline uint32_t outputMask() const { return mOutputMask; }
 
     inline void setQuiet(bool b) { mQuiet = b; }

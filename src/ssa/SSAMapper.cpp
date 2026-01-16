@@ -325,7 +325,7 @@ SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std
         if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
             // create assignment to capture returned value
             SSAInstrAssign asg;
-            SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), ret->Value.Type);
+            SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), ret->Value.Type);
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { ret->Value };
@@ -494,7 +494,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         for (const auto& e : v->entries())
             inners.push_back(mapExpression(program, e));
 
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), v->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), v->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Vector;
@@ -505,7 +505,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
         SSAValue inner = mapExpression(program, u->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), u->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Unary;
@@ -518,7 +518,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto b     = std::reinterpret_pointer_cast<BinaryExpression>(expr);
         SSAValue L = mapExpression(program, b->left());
         SSAValue R = mapExpression(program, b->right());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), b->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Binary;
@@ -547,7 +547,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Access: {
         auto a      = std::reinterpret_pointer_cast<AccessExpression>(expr);
         SSAValue in = mapExpression(program, a->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), a->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Access;
@@ -565,7 +565,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             result = inner;
         } else {
             SSAInstrAssign cast;
-            SSAValue tgt(SSAValue::Kind::Temp, fresh("t"), c->toType());
+            SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), c->toType());
             cast.Target   = tgt;
             cast.Operator = SSAInstrAssign::OpKind::Cast;
             cast.Operands = { inner };
