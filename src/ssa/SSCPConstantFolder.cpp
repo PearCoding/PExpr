@@ -57,12 +57,11 @@ bool SSCPConstantFolder::extractVecN(const SSAValue& vv, VecN& out)
     return false;
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldUnaryOp(bool foldNumber, const SSAValue& operand, UnaryOperation unaryOp)
+std::optional<SSAValue> SSCPConstantFolder::foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp)
 {
     switch (unaryOp) {
     case UnaryOperation::Neg: {
-        if (!foldNumber)
-            return std::nullopt;
+        // We can always safely negate without worrying about precision
 
         if (Integer iv; extractInteger(operand, iv))
             return SSAValue::Constant(static_cast<Integer>(-iv));
@@ -471,7 +470,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
 
     // Unary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1)
-        return foldUnaryOp(foldNumber, ops[0], asg->UnaryOp);
+        return foldUnaryOp(ops[0], asg->UnaryOp);
 
     // Binary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Binary && ops.size() == 2)
