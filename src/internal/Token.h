@@ -53,10 +53,8 @@ enum class TokenType {
     BooleanType, // bool
     IntegerType, // int
     NumberType,  // num
-    Vec2Type,    // vec2
-    Vec3Type,    // vec3
-    Vec4Type,    // vec4
     StringType,  // str
+    Vec1Type,    // vec1 -> vec4 = vec1 + 3
 };
 
 class Token {
@@ -107,6 +105,16 @@ public:
     TokenType Type;
     ValueVariant Value;
 
-    static std::string_view toString(TokenType type);
+    [[nodiscard]] inline static size_t arraySize(TokenType t)
+    {
+        if (t >= TokenType::Vec1Type)
+            return (size_t)t - (size_t)TokenType::Vec1Type + 1;
+        else
+            return 1;
+    }
+
+    [[nodiscard]] inline size_t arraySize() const { return Token::arraySize(Type); }
+
+    static std::string toString(TokenType type);
 };
 } // namespace PExpr::internal

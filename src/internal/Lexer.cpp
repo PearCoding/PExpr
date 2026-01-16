@@ -141,16 +141,18 @@ Token Lexer::next()
                 return Token(prevLoc, TokenType::IntegerType);
             if (mTemp == "num")
                 return Token(prevLoc, TokenType::NumberType);
-            if (mTemp == "vec2")
-                return Token(prevLoc, TokenType::Vec2Type);
-            if (mTemp == "vec3")
-                return Token(prevLoc, TokenType::Vec3Type);
-            if (mTemp == "vec4")
-                return Token(prevLoc, TokenType::Vec4Type);
             if (mTemp == "str")
                 return Token(prevLoc, TokenType::StringType);
             if (mTemp == "as")
                 return Token(prevLoc, TokenType::As);
+
+            if (mTemp.starts_with("vec") && mTemp.size() >= 4) {
+                const char* endPtr = mTemp.data() + mTemp.size();
+                size_t num;
+                const auto res = std::from_chars(mTemp.data() + 3, endPtr, num, 10);
+                if (res.ptr == endPtr && res.ec != std::errc::result_out_of_range && res.ec != std::errc::invalid_argument && num > 0)
+                    return Token(prevLoc, (TokenType)((size_t)TokenType::Vec1Type + num - 1));
+            }
 
             return Token(prevLoc, TokenType::Identifier).With(mTemp);
         }

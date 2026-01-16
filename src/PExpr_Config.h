@@ -206,10 +206,7 @@ using ValueVariant = std::variant<bool, Integer, Number, std::string>;
 template <typename T>
 using Ptr = std::shared_ptr<T>;
 
-/* Precise vector types */
-using Vec2 = std::array<Number, 2>;
-using Vec3 = std::array<Number, 3>;
-using Vec4 = std::array<Number, 4>;
+using VecN = std::vector<Number>;
 
-using ExtendedValueVariant = std::variant<bool, Integer, Number, std::string, Vec2, Vec3, Vec4>;
+using ExtendedValueVariant = std::variant<bool, Integer, Number, std::string, VecN>;
 } // namespace PExpr

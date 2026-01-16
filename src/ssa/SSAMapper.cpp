@@ -78,26 +78,25 @@ std::string SSAValue::toString(bool showType) const
         case ElementaryType::Number:
             prefix = std::to_string(std::get<Number>(Value));
             break;
-        case ElementaryType::Vec2: {
-            const auto v = std::get<Vec2>(Value);
-            prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "]";
-            break;
-        }
-        case ElementaryType::Vec3: {
-            const auto v = std::get<Vec3>(Value);
-            prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "]";
-            break;
-        }
-        case ElementaryType::Vec4: {
-            const auto v = std::get<Vec4>(Value);
-            prefix       = "[" + std::to_string(v[0]) + "," + std::to_string(v[1]) + "," + std::to_string(v[2]) + "," + std::to_string(v[3]) + "]";
-            break;
-        }
         case ElementaryType::String:
             prefix = "\"" + std::get<std::string>(Value) + "\"";
             break;
         default:
-            PEXPR_ASSERT(false, "Expected specified type for SSAValue constants");
+            if (this->Type >= ElementaryType::Vec1) {
+                const auto v = std::get<VecN>(Value);
+                PEXPR_ASSERT(v.size() == typeArraySize(this->Type), "Vector data and vector type missmatch");
+
+                if (v.empty()) {
+                    prefix = "[]";
+                } else {
+                    prefix = "[" + std::to_string(v[0]);
+                    for (size_t i = 1; i < v.size(); ++i)
+                        prefix += "," + std::to_string(v[i]);
+                    prefix += "]";
+                }
+            } else {
+                PEXPR_ASSERT(false, "Expected specified type for SSAValue constants");
+            }
         }
     } else {
         prefix = Name;

@@ -5,25 +5,22 @@
 
 namespace PExpr::internal {
 /// Encode elementary types into compact characters for mangling.
-inline char encodeElemType(ElementaryType t)
+inline std::string encodeElemType(ElementaryType t)
 {
     switch (t) {
     case ElementaryType::Boolean:
-        return 'b';
+        return "b";
     case ElementaryType::Integer:
-        return 'i';
+        return "i";
     case ElementaryType::Number:
-        return 'n';
-    case ElementaryType::Vec2:
-        return '2';
-    case ElementaryType::Vec3:
-        return '3';
-    case ElementaryType::Vec4:
-        return '4';
+        return "n";
     case ElementaryType::String:
-        return 's';
+        return "s";
     default:
-        return 'u'; // unspecified / unknown
+        if (isArray(t))
+            return std::string("v") + std::to_string(typeArraySize(t));
+        else
+            return "u"; // unspecified / unknown
     }
 }
 
@@ -36,7 +33,7 @@ inline std::string makeMangledNameFromTypes(const std::string& name, std::span<c
     // parameter encoding prefix
     mangled += "_P";
     for (auto t : params)
-        mangled.push_back(encodeElemType(t));
+        mangled += encodeElemType(t);
 
     // include closure chain locations (outermost first)
     if (currentClosure) {

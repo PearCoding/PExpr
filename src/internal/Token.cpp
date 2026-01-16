@@ -1,11 +1,16 @@
 #include "Token.h"
 
 namespace PExpr::internal {
-std::string_view Token::toString(TokenType type)
+std::string Token::toString(TokenType type)
 {
     switch (type) {
     default:
-        PEXPR_ASSERT(false, "Invalid token type enum");
+        if (type >= TokenType::Vec1Type)
+            return std::string("vec") + std::to_string(Token::arraySize(type));
+        else {
+            PEXPR_ASSERT(false, "Invalid token type enum");
+            return "ERROR";
+        }
     case TokenType::Error:
         return "Error";
     case TokenType::Eof:
@@ -96,12 +101,6 @@ std::string_view Token::toString(TokenType type)
         return "int";
     case TokenType::NumberType:
         return "num";
-    case TokenType::Vec2Type:
-        return "vec2";
-    case TokenType::Vec3Type:
-        return "vec3";
-    case TokenType::Vec4Type:
-        return "vec4";
     case TokenType::StringType:
         return "str";
     }

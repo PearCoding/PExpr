@@ -31,9 +31,7 @@ private:
     static bool extractInteger(const SSAValue& vv, Integer& out);
     static bool extractNumber(const SSAValue& vv, Number& out);
     static bool extractString(const SSAValue& vv, std::string& out);
-    static bool extractVec2(const SSAValue& vv, Vec2& out);
-    static bool extractVec3(const SSAValue& vv, Vec3& out);
-    static bool extractVec4(const SSAValue& vv, Vec4& out);
+    static bool extractVecN(const SSAValue& vv, VecN& out);
 };
 
 } // namespace PExpr::ssa

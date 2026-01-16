@@ -472,16 +472,17 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ac
     if (isArray(innerType)) {
         const auto& swizzle = expr->swizzle();
 
-        size_t vec_size = 2;
-        if (innerType == ElementaryType::Vec3)
-            vec_size = 3;
-        if (innerType == ElementaryType::Vec4)
-            vec_size = 4;
+        const size_t vec_size = typeArraySize(innerType);
+
+        if (vec_size == 0 || vec_size > 4) {
+            mReporter.errorf(expr->location(), "The access operator is only defined for vector types of 1-4, but got a vector of size %zu instead", vec_size);
+            return ElementaryType::Error;
+        }
 
         bool isValid = true;
         for (char c : swizzle) {
             isValid = (c == 'x' || c == 'r'
-                       || c == 'y' || c == 'g'
+                       || (vec_size > 1 && c == 'y') || (vec_size > 1 && c == 'g')
                        || (vec_size > 2 && c == 'z') || (vec_size > 2 && c == 'b')
                        || (vec_size > 3 && c == 'w') || (vec_size > 3 && c == 'a'));
 
@@ -499,13 +500,9 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ac
                 expr->setReturnType(ElementaryType::Number);
                 break;
             case 2:
-                expr->setReturnType(ElementaryType::Vec2);
-                break;
             case 3:
-                expr->setReturnType(ElementaryType::Vec3);
-                break;
             case 4:
-                expr->setReturnType(ElementaryType::Vec4);
+                expr->setReturnType((ElementaryType)((size_t)ElementaryType::Vec1 + swizzle.size() - 1));
                 break;
             default:
                 mReporter.errorf(expr->location(), "Expected a maximum of 4 components but got %zu", swizzle.size());
@@ -522,6 +519,11 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ac
 
 ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr)
 {
+    if (expr->entries().size() == 0) {
+        mReporter.errorf(expr->location(), "Can not create an empty vector");
+        return ElementaryType::Error;
+    }
+
     // Ensure each entry is type-checked and, if necessary, inject an implicit
     // CastExpression to Number so downstream passes (SSA) see explicit casts.
     for (size_t i = 0; i < expr->entries().size(); ++i) {
@@ -552,21 +554,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ve
         return ElementaryType::Error;
     }
 
-    ElementaryType type;
-    switch (expr->entries().size()) {
-    case 2:
-        type = ElementaryType::Vec2;
-        break;
-    case 3:
-        type = ElementaryType::Vec3;
-        break;
-    case 4:
-        type = ElementaryType::Vec4;
-        break;
-    default:
-        return ElementaryType::Error; // Should be caught somewhere else
-    }
-    expr->setReturnType(type);
+    expr->setReturnType((ElementaryType)((size_t)ElementaryType::Vec1 + expr->entries().size() - 1));
     return expr->returnType();
 }
 

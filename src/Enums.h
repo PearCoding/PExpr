@@ -11,10 +11,8 @@ enum class ElementaryType {
     Boolean,     /// 'bool' Represented as 'bool' internally.
     Integer,     /// 'int' Represented as 'int64' internally.
     Number,      /// 'num' Represented as 'double' internally.
-    Vec2,        /// 'vec2' Represented as two 'double's internally.
-    Vec3,        /// 'vec3' Represented as three 'double's internally.
-    Vec4,        /// 'vec4' Represented as four 'double's internally.
-    String       /// 'str' Represented as 'std::string' internally.
+    String,      /// 'str' Represented as 'std::string' internally.
+    Vec1,        /// The vectors are listed after this Vec4 = Vec1 + 3
 };
 
 /// Checks if a conversion from one type to another is possible.
@@ -50,31 +48,24 @@ inline bool isExplicitConvertible(ElementaryType from, ElementaryType to)
     return false;
 }
 
-/// Checks if given type is one of 'vec2', 'vec3' or 'vec4'.
+/// Checks if given type is a vector.
 inline bool isArray(ElementaryType type)
 {
-    return type == ElementaryType::Vec2 || type == ElementaryType::Vec3 || type == ElementaryType::Vec4;
+    return type >= ElementaryType::Vec1;
 }
 
-/// Checks if given type is one of 'int', 'num', 'vec2', 'vec3' or 'vec4'.
+/// Checks if given type is a 'int', 'num' or a vector.
 inline bool isArithmetic(ElementaryType type)
 {
     return type == ElementaryType::Integer || type == ElementaryType::Number || isArray(type);
 }
 
 /// Returns the number of components the type has.
-inline uint8 typeArraySize(ElementaryType type)
+inline size_t typeArraySize(ElementaryType type)
 {
-    switch (type) {
-    default:
-        return 1;
-    case ElementaryType::Vec2:
-        return 2;
-    case ElementaryType::Vec3:
-        return 3;
-    case ElementaryType::Vec4:
-        return 4;
-    }
+    if (isArray(type))
+        return (size_t)type - (size_t)ElementaryType::Vec1 + 1;
+    return 1;
 }
 
 /// Supported unary operations.
@@ -124,7 +115,7 @@ enum class StatementType {
 };
 
 /// Returns printable representation of the given type.
-std::string_view toString(ElementaryType type);
+std::string toString(ElementaryType type);
 /// Returns printable representation of the given operation.
 std::string_view toString(UnaryOperation op);
 /// Returns printable representation of the given operation.

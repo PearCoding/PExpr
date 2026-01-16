@@ -2,12 +2,16 @@
 
 namespace PExpr {
 
-std::string_view toString(ElementaryType type)
+std::string toString(ElementaryType type)
 {
     switch (type) {
     default:
-        PEXPR_ASSERT(false, "Invalid elementary type");
-        return "invalid";
+        if (isArray(type)) {
+            return std::string("vec") + std::to_string(typeArraySize(type));
+        } else {
+            PEXPR_ASSERT(false, "Invalid elementary type");
+            return "invalid";
+        }
     case ElementaryType::Error:
         return "error";
     case ElementaryType::Unspecified:
@@ -18,12 +22,6 @@ std::string_view toString(ElementaryType type)
         return "int";
     case ElementaryType::Number:
         return "num";
-    case ElementaryType::Vec2:
-        return "vec2";
-    case ElementaryType::Vec3:
-        return "vec3";
-    case ElementaryType::Vec4:
-        return "vec4";
     case ElementaryType::String:
         return "str";
     }

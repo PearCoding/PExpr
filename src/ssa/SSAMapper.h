@@ -53,11 +53,7 @@ public:
 
     [[nodiscard]] inline static SSAValue Constant(const std::string& str) { return SSAValue(Kind::Constant, {}, ElementaryType::String, str); }
 
-    [[nodiscard]] inline static SSAValue Constant(const Vec2& v) { return SSAValue(Kind::Constant, {}, ElementaryType::Vec2, v); }
-
-    [[nodiscard]] inline static SSAValue Constant(const Vec3& v) { return SSAValue(Kind::Constant, {}, ElementaryType::Vec3, v); }
-
-    [[nodiscard]] inline static SSAValue Constant(const Vec4& v) { return SSAValue(Kind::Constant, {}, ElementaryType::Vec4, v); }
+    [[nodiscard]] inline static SSAValue Constant(const VecN& v) { return SSAValue(Kind::Constant, {}, (ElementaryType)((size_t)ElementaryType::Vec1 + v.size() - 1), v); }
 };
 
 struct SSAInstr {
@@ -169,7 +165,6 @@ private:
     [[nodiscard]] SSAProgram mapClosure(const Ptr<Closure>& closure);
     void mapStatement(SSAProgram& program, const Ptr<Statement>& stmt);
     [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<Expression>& expr);
-
 
     // Inline a mapped closure body into the current program by replacing any
     // SSAInstrReturn instructions with assignments to a fresh temporary variable.

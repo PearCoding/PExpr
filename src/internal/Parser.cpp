@@ -543,23 +543,16 @@ private:
         case TokenType::NumberType:
             P.next();
             return ElementaryType::Number;
-        case TokenType::Vec2Type:
-            P.next();
-            return ElementaryType::Vec2;
-        case TokenType::Vec3Type:
-            P.next();
-            return ElementaryType::Vec3;
-        case TokenType::Vec4Type:
-            P.next();
-            return ElementaryType::Vec4;
         case TokenType::StringType:
             P.next();
             return ElementaryType::String;
         default:
-            P.error(std::array<TokenType, 7>{ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType,
-                                              TokenType::Vec2Type, TokenType::Vec3Type, TokenType::Vec4Type,
-                                              TokenType::StringType });
-            return ElementaryType::Error;
+            if (P.cur().Type >= TokenType::Vec1Type) {
+                return (ElementaryType)((size_t)ElementaryType::Vec1 + P.cur().arraySize() - 1);
+            } else {
+                P.error(std::to_array<TokenType>({ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType, TokenType::StringType }));
+                return ElementaryType::Error;
+            }
         }
     }
 };

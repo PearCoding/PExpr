@@ -48,28 +48,10 @@ bool SSCPConstantFolder::extractString(const SSAValue& vv, std::string& out)
     return false;
 }
 
-bool SSCPConstantFolder::extractVec2(const SSAValue& vv, Vec2& out)
+bool SSCPConstantFolder::extractVecN(const SSAValue& vv, VecN& out)
 {
-    if (const Vec2* n = std::get_if<Vec2>(&vv.Value)) {
-        out = static_cast<Vec2>(*n);
-        return true;
-    }
-    return false;
-}
-
-bool SSCPConstantFolder::extractVec3(const SSAValue& vv, Vec3& out)
-{
-    if (const Vec3* n = std::get_if<Vec3>(&vv.Value)) {
-        out = static_cast<Vec3>(*n);
-        return true;
-    }
-    return false;
-}
-
-bool SSCPConstantFolder::extractVec4(const SSAValue& vv, Vec4& out)
-{
-    if (const Vec4* n = std::get_if<Vec4>(&vv.Value)) {
-        out = static_cast<Vec4>(*n);
+    if (const VecN* n = std::get_if<VecN>(&vv.Value)) {
+        out = static_cast<VecN>(*n);
         return true;
     }
     return false;
@@ -86,12 +68,13 @@ std::optional<SSAValue> SSCPConstantFolder::foldUnaryOp(bool foldNumber, const S
             return SSAValue::Constant(static_cast<Integer>(-iv));
         else if (Number dv; extractNumber(operand, dv))
             return SSAValue::Constant(static_cast<Number>(-dv));
-        else if (Vec2 v; extractVec2(operand, v))
-            return SSAValue::Constant(Vec2{ -v[0], -v[1] });
-        else if (Vec3 v; extractVec3(operand, v))
-            return SSAValue::Constant(Vec3{ -v[0], -v[1], -v[2] });
-        else if (Vec4 v; extractVec4(operand, v))
-            return SSAValue::Constant(Vec4{ -v[0], -v[1], -v[2], -v[3] });
+        else if (VecN v; extractVecN(operand, v)) {
+            VecN t;
+            t.reserve(v.size());
+            for (auto e : v)
+                t.push_back(-e);
+            return SSAValue::Constant(t);
+        }
         break;
     }
     case UnaryOperation::Pos:
@@ -203,25 +186,14 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
         if (L.Type == R.Type && ::PExpr::isArray(L.Type)) {
             // Helper lambda to perform component-wise operation on arrays
             auto applyToArrays = [&](auto&& opFunc) -> std::optional<SSAValue> {
-                if (Vec2 lv; extractVec2(L, lv)) {
-                    if (Vec2 rv; extractVec2(R, rv)) {
-                        Vec2 result;
-                        for (size_t i = 0; i < 2; ++i)
-                            result[i] = opFunc(lv[i], rv[i]);
-                        return SSAValue::Constant(result);
-                    }
-                } else if (Vec3 lv; extractVec3(L, lv)) {
-                    if (Vec3 rv; extractVec3(R, rv)) {
-                        Vec3 result;
-                        for (size_t i = 0; i < 3; ++i)
-                            result[i] = opFunc(lv[i], rv[i]);
-                        return SSAValue::Constant(result);
-                    }
-                } else if (Vec4 lv; extractVec4(L, lv)) {
-                    if (Vec4 rv; extractVec4(R, rv)) {
-                        Vec4 result;
-                        for (size_t i = 0; i < 4; ++i)
-                            result[i] = opFunc(lv[i], rv[i]);
+                if (VecN lv; extractVecN(L, lv)) {
+                    if (VecN rv; extractVecN(R, rv)) {
+                        if (lv.size() != rv.size())
+                            return std::nullopt;
+                        VecN result;
+                        result.reserve(lv.size());
+                        for (size_t i = 0; i < lv.size(); ++i)
+                            result.push_back(opFunc(lv[i], rv[i]));
                         return SSAValue::Constant(result);
                     }
                 }
@@ -244,25 +216,13 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
             case BinaryOperation::Mul:
                 return applyToArrays([](Number a, Number b) { return a * b; });
             case BinaryOperation::Div:
-                if (Vec2 rv; extractVec2(R, rv)) {
-                    if (allComponentsNonZero(rv))
-                        return applyToArrays([](Number a, Number b) { return a / b; });
-                } else if (Vec3 rv; extractVec3(R, rv)) {
-                    if (allComponentsNonZero(rv))
-                        return applyToArrays([](Number a, Number b) { return a / b; });
-                } else if (Vec4 rv; extractVec4(R, rv)) {
+                if (VecN rv; extractVecN(R, rv)) {
                     if (allComponentsNonZero(rv))
                         return applyToArrays([](Number a, Number b) { return a / b; });
                 }
                 break;
             case BinaryOperation::Mod:
-                if (Vec2 rv; extractVec2(R, rv)) {
-                    if (allComponentsNonZero(rv))
-                        return applyToArrays([](Number a, Number b) { return std::fmod(a, b); });
-                } else if (Vec3 rv; extractVec3(R, rv)) {
-                    if (allComponentsNonZero(rv))
-                        return applyToArrays([](Number a, Number b) { return std::fmod(a, b); });
-                } else if (Vec4 rv; extractVec4(R, rv)) {
+                if (VecN rv; extractVecN(R, rv)) {
                     if (allComponentsNonZero(rv))
                         return applyToArrays([](Number a, Number b) { return std::fmod(a, b); });
                 }
@@ -289,19 +249,10 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
                 if (extractNumber(scalarOp, scalarVal)) {
                     // Helper lambda to apply scalar operation to vector
                     auto applyScalarToVector = [&](auto&& opFunc) -> std::optional<SSAValue> {
-                        if (Vec2 vec; extractVec2(vecOp, vec)) {
-                            Vec2 result;
-                            for (size_t i = 0; i < 2; ++i)
-                                result[i] = opFunc(vec[i], scalarVal);
-                            return SSAValue::Constant(result);
-                        } else if (Vec3 vec; extractVec3(vecOp, vec)) {
-                            Vec3 result;
-                            for (size_t i = 0; i < 3; ++i)
-                                result[i] = opFunc(vec[i], scalarVal);
-                            return SSAValue::Constant(result);
-                        } else if (Vec4 vec; extractVec4(vecOp, vec)) {
-                            Vec4 result;
-                            for (size_t i = 0; i < 4; ++i)
+                        if (VecN vec; extractVecN(vecOp, vec)) {
+                            VecN result;
+                            result.reserve(vec.size());
+                            for (size_t i = 0; i < vec.size(); ++i)
                                 result[i] = opFunc(vec[i], scalarVal);
                             return SSAValue::Constant(result);
                         }
@@ -405,57 +356,45 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
 
 std::optional<SSAValue> SSCPConstantFolder::foldAccessOp(const SSAValue& operand, const std::string& swizzle)
 {
-    std::vector<Number> values;
+    VecN ops;
+    if (!extractVecN(operand, ops) || ops.size() == 0)
+        return std::nullopt;
+
+    VecN values;
     values.reserve(swizzle.size());
 
-    if (Vec2 v; extractVec2(operand, v)) {
-        for (const char c : swizzle) {
-            if (c == 'x' || c == 'r')
-                values.push_back(v[0]);
-            if (c == 'y' || c == 'g')
-                values.push_back(v[1]);
+    for (const char c : swizzle) {
+        if (c == 'x' || c == 'r')
+            values.push_back(ops.at(0));
+
+        if (c == 'y' || c == 'g') {
+            if (ops.size() > 1)
+                values.push_back(ops.at(1));
+            else
+                return std::nullopt;
+        }
+
+        if (c == 'z' || c == 'b') {
+            if (ops.size() > 2)
+                values.push_back(ops.at(2));
+            else
+                return std::nullopt;
+        }
+
+        if (c == 'w' || c == 'a') {
+            if (ops.size() > 3)
+                values.push_back(ops.at(3));
+            else
+                return std::nullopt;
         }
     }
 
-    if (Vec3 v; extractVec3(operand, v)) {
-        for (const char c : swizzle) {
-            if (c == 'x' || c == 'r')
-                values.push_back(v[0]);
-            if (c == 'y' || c == 'g')
-                values.push_back(v[1]);
-            if (c == 'z' || c == 'b')
-                values.push_back(v[2]);
-        }
-    }
-
-    if (Vec4 v; extractVec4(operand, v)) {
-        for (const char c : swizzle) {
-            if (c == 'x' || c == 'r')
-                values.push_back(v[0]);
-            if (c == 'y' || c == 'g')
-                values.push_back(v[1]);
-            if (c == 'z' || c == 'b')
-                values.push_back(v[2]);
-            if (c == 'w' || c == 'a')
-                values.push_back(v[3]);
-        }
-    }
-
-    if (values.size() == 1)
-        return SSAValue::Constant(values[0]);
-    if (values.size() == 2)
-        return SSAValue::Constant(Vec2{ values[0], values[1] });
-    if (values.size() == 3)
-        return SSAValue::Constant(Vec3{ values[0], values[1], values[2] });
-    if (values.size() == 4)
-        return SSAValue::Constant(Vec4{ values[0], values[1], values[2], values[3] });
-
-    return std::nullopt;
+    return SSAValue::Constant(values);
 }
 
 std::optional<SSAValue> SSCPConstantFolder::foldVectorOp(const std::vector<SSAValue>& operands)
 {
-    std::vector<Number> values;
+    VecN values;
     values.reserve(operands.size());
     for (const auto& vv : operands) {
         Number v;
@@ -464,14 +403,10 @@ std::optional<SSAValue> SSCPConstantFolder::foldVectorOp(const std::vector<SSAVa
         values.push_back(v);
     }
 
-    if (values.size() == 2)
-        return SSAValue::Constant(Vec2{ values[0], values[1] });
-    if (values.size() == 3)
-        return SSAValue::Constant(Vec3{ values[0], values[1], values[2] });
-    if (values.size() == 4)
-        return SSAValue::Constant(Vec4{ values[0], values[1], values[2], values[3] });
-
-    return std::nullopt;
+    if (values.size() == 0)
+        return std::nullopt;
+    else
+        return SSAValue::Constant(values);
 }
 
 std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, ElementaryType targetType)
