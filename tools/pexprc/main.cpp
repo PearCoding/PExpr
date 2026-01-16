@@ -63,6 +63,10 @@ int main(int argc, char** argv)
             warningFlags |= RT_WARNING_IMPLICIT_CAST;
         else if (name == "no-implicit-cast")
             warningFlags &= ~RT_WARNING_IMPLICIT_CAST;
+        else if (name == "implicit-cast-int")
+            warningFlags |= RT_WARNING_IMPLICIT_CAST_INT;
+        else if (name == "no-implicit-cast-int")
+            warningFlags &= ~RT_WARNING_IMPLICIT_CAST_INT;
         else
             throw CLI::RuntimeError();
     };

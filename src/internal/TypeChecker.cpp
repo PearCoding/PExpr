@@ -73,13 +73,12 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
                 const auto orig     = varStmt->expression();
                 const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
 
+                ReportType rt = RT_WARNING_IMPLICIT_CAST;
                 // Special case: `int` literal for a `num` variable
-                if (declared == ElementaryType::Number && type == ElementaryType::Integer) {
-                    // Ignore warning
-                } else {
-                    mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
-                }
+                if (declared == ElementaryType::Number && type == ElementaryType::Integer)
+                    rt = RT_WARNING_IMPLICIT_CAST_INT;
 
+                mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
                 varStmt->replaceExpression(castExpr);
             } else {
                 mReporter.errorf(varStmt->location(), "Cannot implicitly convert initializer from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
@@ -119,13 +118,12 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
             const auto orig     = varStmt->expression();
             const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
 
+            ReportType rt = RT_WARNING_IMPLICIT_CAST;
             // Special case: `int` literal for a `num` variable
-            if (declared == ElementaryType::Number && type == ElementaryType::Integer) {
-                // Ignore warning
-            } else {
-                mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
-            }
+            if (declared == ElementaryType::Number && type == ElementaryType::Integer)
+                rt = RT_WARNING_IMPLICIT_CAST_INT;
 
+            mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
             varStmt->replaceExpression(castExpr);
         } else if (type != declared) {
             mReporter.errorf(varStmt->location(), "Cannot implicitly convert from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
@@ -249,12 +247,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Br
             auto castExpr = std::make_shared<CastExpression>(origExpr->location(), returnType, origExpr);
             branch.Body->replaceExpression(castExpr);
 
+            ReportType rt = RT_WARNING_IMPLICIT_CAST;
             // Special case: `int` literal for a `num` branch
-            if (returnType == ElementaryType::Number && bodyType == ElementaryType::Integer) {
-                // Ignore warning
-            } else {
-                mReporter.warningf(RT_WARNING_IMPLICIT_CAST, origExpr->location(), "Implicitly converting from '%s' to '%s' for conditional branch", toString(bodyType).data(), toString(returnType).data());
-            }
+            if (returnType == ElementaryType::Number && bodyType == ElementaryType::Integer)
+                rt = RT_WARNING_IMPLICIT_CAST_INT;
+
+            mReporter.warningf(rt, origExpr->location(), "Implicitly converting from '%s' to '%s' for conditional branch", toString(bodyType).data(), toString(returnType).data());
         } else if (bodyType == returnType) {
             // matching type — nothing to do
         } else {
@@ -439,12 +437,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ca
                     expr->replaceParameter(i, castExpr);
                     fromArgs[i] = desired;
 
+                    ReportType rt = RT_WARNING_IMPLICIT_CAST;
                     // Special case: `int` literal for a `num` parameter
-                    if (desired == ElementaryType::Number && actual == ElementaryType::Integer) {
-                        // Ignore warning
-                    } else {
-                        mReporter.warningf(RT_WARNING_IMPLICIT_CAST, original->location(), "Implicitly converting from '%s' to '%s' for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
-                    }
+                    if (desired == ElementaryType::Number && actual == ElementaryType::Integer)
+                        rt = RT_WARNING_IMPLICIT_CAST_INT;
+
+                    mReporter.warningf(rt, original->location(), "Implicitly converting from '%s' to '%s' for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
                 } else {
                     mReporter.errorf(expr->parameters().at(i)->location(), "Cannot implicitly convert from '%s' to '%s' for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
                     return ElementaryType::Error;
@@ -563,12 +561,12 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ve
 
         // Allow implicit conversion to Number (e.g. Integer -> Number) by injecting a cast.
         if (isConvertible(pType, ElementaryType::Number)) {
+            ReportType rt = RT_WARNING_IMPLICIT_CAST;
             // Special case: `int` literal for a `num` parameter
-            if (pType == ElementaryType::Integer) {
-                // Ignore warning
-            } else {
-                mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for vector parameter %zu", toString(pType).data(), toString(ElementaryType::Number).data(), i);
-            }
+            if (pType == ElementaryType::Integer)
+                rt = RT_WARNING_IMPLICIT_CAST_INT;
+
+            mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for vector parameter %zu", toString(pType).data(), toString(ElementaryType::Number).data(), i);
 
             auto castExpr = std::make_shared<CastExpression>(orig->location(), ElementaryType::Number, orig, false);
             expr->replaceEntry(i, castExpr);
