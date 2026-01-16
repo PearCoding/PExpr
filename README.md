@@ -1,20 +1,28 @@
 # PExpr [![Build](https://github.com/PearCoding/PExpr/actions/workflows/build.yml/badge.svg)](https://github.com/PearCoding/PExpr/actions/workflows/build.yml)
 
-A fairly simple inline expression optimized to be transpiled to other languages.
+A fairly simple inline programming language to be transpiled to other languages or directly interpreted.
 The intended field of application is computer graphics, hpc and other math frameworks.
 
 ## Why?
 
-In contrary to many other expressive languages, this one is solely intended to be transpiled to other languages (e.g., GLSL, HLSL, Artic) and allows easy definition of external functions, variables and constants. Therefore, the syntax is simple and limited to a single statement. To support complex programs you may use a node based system  (as in [Ignis](https://github.com/PearCoding/Ignis)) or your own statement based dsl on top of PExpr.
+In contrary to many other expressive languages, this one is solely intended to be transpiled to other languages (e.g., GLSL, HLSL, Artic) or run on a stack based virtual interpreter. It allows easy definition of external functions, variables and constants. Therefore, the syntax is simple and limited to a math style expression and functional style.
 
 ## Does it optimize?
 
-Optimization, except constant unfolding (to some degree), is not applied and kept as an exercise to the language the expression is transpiled to.
+Optionally, yes. The following optimizations are available:
 
+- Constant Folding
+- Constant Folding of math expressions
+- Dead-Code removal
+- Function inlining
+
+## What is the output?
+
+Depends, the output can be a AST in code or optimized SSA IR ready for interpretation.
 
 ## Dependencies
 
-PExpr has no other dependencies, except a modern C++17 compiler.
+PExpr has no other dependencies, except a modern C++20 compiler.
 
 ## Similar libraries
 
