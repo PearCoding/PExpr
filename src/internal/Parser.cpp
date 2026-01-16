@@ -360,7 +360,7 @@ private:
                 P.mReporter.errorf(loc, "Given access '%s' is invalid", std::string(swizzle).c_str());
             }
 
-            return std::make_shared<AccessExpression>(loc, expr, swizzle);
+            return std::make_shared<SwizzleExpression>(loc, expr, swizzle);
         }
 
         // explicit cast syntax: "<expr> as <type>"
@@ -369,6 +369,23 @@ private:
             const auto loc              = expr->location();
             const ElementaryType toType = p_elementary_type();
             return std::make_shared<CastExpression>(loc, toType, expr);
+        }
+
+        // [i]
+        if (P.accept(TokenType::OpenSquareBracket)) {
+            size_t index     = 0;
+            const auto token = P.cur();
+            P.accept(TokenType::IntegerLiteral);
+            const Integer i = std::get<Integer>(token.Value);
+            if (i < 0) {
+                P.signalError();
+                P.mReporter.errorf(token.Location, "Negative index given for vector lookup");
+            } else {
+                index = (size_t)i;
+            }
+            P.expect(TokenType::ClosedSquareBracket);
+
+            return std::make_shared<AccessExpression>(token.Location, expr, index);
         }
 
         return expr;

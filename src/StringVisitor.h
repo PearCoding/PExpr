@@ -40,6 +40,8 @@ public:
             return dump(std::reinterpret_pointer_cast<BinaryExpression>(expr));
         case ExpressionType::Call:
             return dump(std::reinterpret_pointer_cast<CallExpression>(expr));
+        case ExpressionType::Swizzle:
+            return dump(std::reinterpret_pointer_cast<SwizzleExpression>(expr));
         case ExpressionType::Access:
             return dump(std::reinterpret_pointer_cast<AccessExpression>(expr));
         case ExpressionType::Vector:
@@ -156,9 +158,14 @@ private:
         return str + ")";
     }
 
-    static std::string dump(const Ptr<AccessExpression>& expr)
+    static std::string dump(const Ptr<SwizzleExpression>& expr)
     {
         return "(" + visit(expr->inner()) + ")." + expr->swizzle();
+    }
+
+    static std::string dump(const Ptr<AccessExpression>& expr)
+    {
+        return "(" + visit(expr->inner()) + ")[" + std::to_string(expr->index()) + "]";
     }
 
     static std::string dump(const Ptr<CastExpression>& expr)

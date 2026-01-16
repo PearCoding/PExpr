@@ -74,7 +74,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
                 const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
 
                 // Special case: `int` literal for a `num` variable
-                if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
+                if (declared == ElementaryType::Number && type == ElementaryType::Integer) {
                     // Ignore warning
                 } else {
                     mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
@@ -120,7 +120,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
             const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
 
             // Special case: `int` literal for a `num` variable
-            if (varStmt->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && type == ElementaryType::Integer) {
+            if (declared == ElementaryType::Number && type == ElementaryType::Integer) {
                 // Ignore warning
             } else {
                 mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
@@ -192,6 +192,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ex
         return handleNode(closure, std::reinterpret_pointer_cast<BinaryExpression>(expr));
     case ExpressionType::Call:
         return handleNode(closure, std::reinterpret_pointer_cast<CallExpression>(expr));
+    case ExpressionType::Swizzle:
+        return handleNode(closure, std::reinterpret_pointer_cast<SwizzleExpression>(expr));
     case ExpressionType::Access:
         return handleNode(closure, std::reinterpret_pointer_cast<AccessExpression>(expr));
     case ExpressionType::Vector:
@@ -248,7 +250,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Br
             branch.Body->replaceExpression(castExpr);
 
             // Special case: `int` literal for a `num` branch
-            if (branch.Body->expression()->type() == ExpressionType::Literal && returnType == ElementaryType::Number && bodyType == ElementaryType::Integer) {
+            if (returnType == ElementaryType::Number && bodyType == ElementaryType::Integer) {
                 // Ignore warning
             } else {
                 mReporter.warningf(RT_WARNING_IMPLICIT_CAST, origExpr->location(), "Implicitly converting from '%s' to '%s' for conditional branch", toString(bodyType).data(), toString(returnType).data());
@@ -438,7 +440,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ca
                     fromArgs[i] = desired;
 
                     // Special case: `int` literal for a `num` parameter
-                    if (original->type() == ExpressionType::Literal && desired == ElementaryType::Number && actual == ElementaryType::Integer) {
+                    if (desired == ElementaryType::Number && actual == ElementaryType::Integer) {
                         // Ignore warning
                     } else {
                         mReporter.warningf(RT_WARNING_IMPLICIT_CAST, original->location(), "Implicitly converting from '%s' to '%s' for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
@@ -460,7 +462,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ca
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr)
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpression>& expr)
 {
     auto innerType = handleNode(closure, expr->inner());
     if (innerType == ElementaryType::Error)
@@ -492,7 +494,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ac
 
         PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
         if (!isValid) {
-            mReporter.errorf(expr->location(), "Invalid access components '%s' given", std::string(swizzle).c_str());
+            mReporter.errorf(expr->location(), "Invalid swizzle components '%s' given", std::string(swizzle).c_str());
             return ElementaryType::Error;
         } else {
             switch (swizzle.size()) {
@@ -510,10 +512,34 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ac
             }
         }
     } else {
+        mReporter.errorf(expr->location(), "Swizzle operator is only defined for vector types");
+        return ElementaryType::Error;
+    }
+
+    return expr->returnType();
+}
+
+ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr)
+{
+    auto innerType = handleNode(closure, expr->inner());
+    if (innerType == ElementaryType::Error)
+        return innerType; // Error was caught somewhere else
+
+    expr->setReturnType(ElementaryType::Unspecified);
+
+    if (isArray(innerType)) {
+        const size_t vec_size = typeArraySize(innerType);
+
+        if (vec_size < expr->index()) {
+            mReporter.errorf(expr->location(), "Out of bounds access with %zu on vector of size %zu", expr->index(), vec_size);
+            return ElementaryType::Error;
+        }
+    } else {
         mReporter.errorf(expr->location(), "Access operator is only defined for vector types");
         return ElementaryType::Error;
     }
 
+    expr->setReturnType(ElementaryType::Number);
     return expr->returnType();
 }
 
@@ -538,7 +564,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ve
         // Allow implicit conversion to Number (e.g. Integer -> Number) by injecting a cast.
         if (isConvertible(pType, ElementaryType::Number)) {
             // Special case: `int` literal for a `num` parameter
-            if (orig->type() == ExpressionType::Literal && pType == ElementaryType::Integer) {
+            if (pType == ElementaryType::Integer) {
                 // Ignore warning
             } else {
                 mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting from '%s' to '%s' for vector parameter %zu", toString(pType).data(), toString(ElementaryType::Number).data(), i);

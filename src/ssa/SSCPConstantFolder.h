@@ -21,7 +21,8 @@ private:
     std::optional<SSAValue> foldAssign(bool foldNumber, const SSAInstrAssign* asg);
     std::optional<SSAValue> foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp);
     std::optional<SSAValue> foldBinaryOp(bool foldNumber, const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp);
-    std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const std::string& swizzle);
+    std::optional<SSAValue> foldSwizzleOp(const SSAValue& operand, const std::string& swizzle);
+    std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const SSAValue& index);
     std::optional<SSAValue> foldVectorOp(const std::vector<SSAValue>& operands);
     std::optional<SSAValue> foldCastOp(const SSAValue& operand, ElementaryType targetType);
 

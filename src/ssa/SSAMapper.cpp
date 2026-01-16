@@ -138,8 +138,11 @@ std::string SSAInstrAssign::dump() const
     case OpKind::Binary:
         ss << toInstructionString(BinaryOp);
         break;
+    case OpKind::Swizzle:
+        ss << "swizzle[" << Swizzle << "]";
+        break;
     case OpKind::Access:
-        ss << "access[" << Swizzle << "]";
+        ss << "access";
         break;
     case OpKind::Vector:
         ss << "vec[" << Operands.size() << "]";
@@ -543,15 +546,27 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         program.Body.push_back(call);
         result = tgt;
     } break;
-    case ExpressionType::Access: {
-        auto a      = std::reinterpret_pointer_cast<AccessExpression>(expr);
+    case ExpressionType::Swizzle: {
+        auto a      = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
         SSAValue in = mapExpression(program, a->inner());
         SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
-        asg.Operator = SSAInstrAssign::OpKind::Access;
+        asg.Operator = SSAInstrAssign::OpKind::Swizzle;
         asg.Swizzle  = a->swizzle();
         asg.Operands = { in };
+        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        result = tgt;
+    } break;
+    case ExpressionType::Access: {
+        auto a       = std::reinterpret_pointer_cast<AccessExpression>(expr);
+        SSAValue in  = mapExpression(program, a->inner());
+        SSAValue cst = SSAValue::Constant((Integer)a->index());
+        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), a->returnType());
+        SSAInstrAssign asg;
+        asg.Target   = tgt;
+        asg.Operator = SSAInstrAssign::OpKind::Access;
+        asg.Operands = { in, cst };
         program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
     } break;

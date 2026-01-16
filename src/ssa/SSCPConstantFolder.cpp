@@ -353,7 +353,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
     return std::nullopt;
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldAccessOp(const SSAValue& operand, const std::string& swizzle)
+std::optional<SSAValue> SSCPConstantFolder::foldSwizzleOp(const SSAValue& operand, const std::string& swizzle)
 {
     VecN ops;
     if (!extractVecN(operand, ops) || ops.size() == 0)
@@ -388,7 +388,26 @@ std::optional<SSAValue> SSCPConstantFolder::foldAccessOp(const SSAValue& operand
         }
     }
 
-    return SSAValue::Constant(values);
+    if (values.size() == 1)
+        return SSAValue::Constant(values[0]);
+    else
+        return SSAValue::Constant(values);
+}
+
+std::optional<SSAValue> SSCPConstantFolder::foldAccessOp(const SSAValue& operand, const SSAValue& index)
+{
+    VecN ops;
+    if (!extractVecN(operand, ops) || ops.size() == 0)
+        return std::nullopt;
+
+    Integer idx;
+    if (!extractInteger(index, idx))
+        return std::nullopt;
+
+    if (ops.size() < (size_t)idx || idx < 0)
+        return std::nullopt;
+
+    return SSAValue::Constant(ops.at(idx));
 }
 
 std::optional<SSAValue> SSCPConstantFolder::foldVectorOp(const std::vector<SSAValue>& operands)
@@ -456,9 +475,13 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
     if (asg->Operator == SSAInstrAssign::OpKind::Assign && ops.size() == 1)
         return ops.front();
 
-    // Access xyzw
-    if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 1)
-        return foldAccessOp(ops.front(), asg->Swizzle);
+    // Swizzle xyzw
+    if (asg->Operator == SSAInstrAssign::OpKind::Swizzle && ops.size() == 1)
+        return foldSwizzleOp(ops.front(), asg->Swizzle);
+
+    // Access [i]
+    if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 2)
+        return foldAccessOp(ops.at(0), ops.at(1));
 
     // Vector [x,y,z,w]
     if (asg->Operator == SSAInstrAssign::OpKind::Vector)

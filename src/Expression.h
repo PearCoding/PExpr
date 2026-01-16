@@ -236,15 +236,15 @@ private:
     ParameterList mParameters;
 };
 
-/// A component access/swizzle expression.
-class AccessExpression : public Expression {
+/// A component swizzle expression.
+class SwizzleExpression : public Expression {
 public:
-    inline AccessExpression(const Location& loc, const Ptr<Expression>& expr, const std::string& swizzle)
-        : Expression(loc, ExpressionType::Access)
+    inline SwizzleExpression(const Location& loc, const Ptr<Expression>& expr, const std::string& swizzle)
+        : Expression(loc, ExpressionType::Swizzle)
         , mExpr(expr)
         , mSwizzle(swizzle)
     {
-        PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in access expression");
+        PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in swizzle expression");
         PEXPR_ASSERT(swizzle.size() > 0 && swizzle.size() <= 4, "Only support swizzling up to 4 components");
     }
 
@@ -256,6 +256,28 @@ public:
 private:
     Ptr<Expression> mExpr;
     std::string mSwizzle;
+};
+
+/// A component access expression.
+class AccessExpression : public Expression {
+public:
+    inline AccessExpression(const Location& loc, const Ptr<Expression>& expr, size_t index)
+        : Expression(loc, ExpressionType::Access)
+        , mExpr(expr)
+        , mIndex(index)
+    {
+        PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in access expression");
+    }
+
+    /// The inner expression the access operation is applied to.
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
+
+    /// The index of the vector.
+    [[nodiscard]] inline size_t index() const { return mIndex; }
+
+private:
+    Ptr<Expression> mExpr;
+    size_t mIndex;
 };
 
 class Closure;

@@ -66,12 +66,16 @@ public:
         s += ")";
         return s;
     }
-    std::string onAccess(const std::string& v, size_t, const std::vector<uint8>& perm) override
+    std::string onAccess(const std::string& v, size_t, const std::vector<size_t>& perm) override
     {
-        std::string s = v + ".";
-        for (size_t i = 0; i < perm.size(); ++i)
-            s += std::to_string(perm[i]);
-        return s;
+        if (perm.size() == 1) {
+            return v + "[" + std::to_string(perm[0]) + "]";
+        } else {
+            std::string s = v + ".";
+            for (size_t i = 0; i < perm.size(); ++i)
+                s += std::to_string(perm[i]);
+            return s;
+        }
     }
 };
 

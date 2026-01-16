@@ -1,7 +1,7 @@
 #pragma once
 
-#include "PExpr_Config.h"
 #include "Enums.h"
+#include "PExpr_Config.h"
 
 namespace PExpr {
 /// Available relational operations.
@@ -72,6 +72,6 @@ public:
         = 0;
 
     /// a.xyz Access operator for vector types
-    virtual Payload onAccess(const Payload& v, size_t inputSize, const std::vector<uint8>& outputPermutation) = 0;
+    virtual Payload onAccess(const Payload& v, size_t inputSize, const std::vector<size_t>& outputPermutation) = 0;
 };
 } // namespace PExpr

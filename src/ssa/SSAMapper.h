@@ -66,6 +66,7 @@ struct SSAInstrAssign : public SSAInstr {
                         Unary,
                         Binary,
                         CallOp,
+                        Swizzle,
                         Access,
                         Vector,
                         Cast,

@@ -49,6 +49,8 @@ private:
             return handleNode(std::reinterpret_pointer_cast<BinaryExpression>(expr));
         case ExpressionType::Call:
             return handleNode(std::reinterpret_pointer_cast<CallExpression>(expr));
+        case ExpressionType::Swizzle:
+            return handleNode(std::reinterpret_pointer_cast<SwizzleExpression>(expr));
         case ExpressionType::Access:
             return handleNode(std::reinterpret_pointer_cast<AccessExpression>(expr));
         default:
@@ -321,7 +323,7 @@ private:
         return mVisitor->onFunctionCall(funcName, def.value().returnType(), argTypes, args);
     }
 
-    Payload handleNode(const Ptr<AccessExpression>& expr)
+    Payload handleNode(const Ptr<SwizzleExpression>& expr)
     {
         const auto A = handle(expr->inner());
 
@@ -337,7 +339,7 @@ private:
         };
 
         const std::string& swizzle = expr->swizzle();
-        std::vector<uint8> outputPermutation;
+        std::vector<size_t> outputPermutation;
         if (swizzle.size() == 1) {
             outputPermutation = { charC(swizzle[0]) };
         } else if (swizzle.size() == 2) {
@@ -355,9 +357,19 @@ private:
         }
 
         const auto inputSize = typeArraySize(expr->inner()->returnType());
-        PEXPR_ASSERT(inputSize > 1, "Access operator can only be used with vector types");
+        PEXPR_ASSERT(inputSize > 1, "Swizzle operator can only be used with vector types");
 
         return mVisitor->onAccess(A, inputSize, outputPermutation);
+    }
+
+    Payload handleNode(const Ptr<AccessExpression>& expr)
+    {
+        const auto A = handle(expr->inner());
+
+        const auto inputSize = typeArraySize(expr->inner()->returnType());
+        PEXPR_ASSERT(inputSize > 1, "Access operator can only be used with vector types");
+
+        return mVisitor->onAccess(A, inputSize, { expr->index() });
     }
 
     const SymbolTable& mDefinitions;

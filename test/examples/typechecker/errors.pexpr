@@ -48,5 +48,9 @@ let inconsistent_closure = {
     }
 };
 
+// 11. Out of bounds
+let vec_2 = [1, 2, 3];
+let bad_access2 = vec_2[5]; // vector has only x,y,z
+
 // Note: This file should not compile successfully
 // Each case should produce a type error

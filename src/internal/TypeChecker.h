@@ -28,6 +28,7 @@ private:
     [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<CallExpression>& expr);
+    [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<CastExpression>& expr);
     [[nodiscard]] ElementaryType handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr);

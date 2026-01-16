@@ -149,6 +149,10 @@ void UpliftPass::collectCapturesFromExpression(const Ptr<Closure>& funcClosure, 
         for (const auto& p : c->parameters())
             collectCapturesFromExpression(funcClosure, closure, p, outCaptured);
     } break;
+    case ExpressionType::Swizzle: {
+        const auto a = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
+        collectCapturesFromExpression(funcClosure, closure, a->inner(), outCaptured);
+    } break;
     case ExpressionType::Access: {
         const auto a = std::reinterpret_pointer_cast<AccessExpression>(expr);
         collectCapturesFromExpression(funcClosure, closure, a->inner(), outCaptured);
@@ -219,6 +223,10 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Func
         const auto b = std::reinterpret_pointer_cast<BinaryExpression>(expr);
         updateCallsInExpression(b->left(), oldDef, newDef);
         updateCallsInExpression(b->right(), oldDef, newDef);
+    } break;
+    case ExpressionType::Swizzle: {
+        const auto a = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
+        updateCallsInExpression(a->inner(), oldDef, newDef);
     } break;
     case ExpressionType::Access: {
         const auto a = std::reinterpret_pointer_cast<AccessExpression>(expr);

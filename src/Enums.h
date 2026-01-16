@@ -100,7 +100,8 @@ enum class ExpressionType {
     Unary,    /// Unary operation.
     Binary,   /// Binary operation.
     Call,     /// Call to a function.
-    Access,   /// Component swizzle operation.
+    Swizzle,  /// Component swizzle operation.
+    Access,   /// Vector single component lookup
     Cast,     /// Implicit/explicit cast expression.
     Closure,  /// An enclosed closure
     Branch,   /// If, elif and else block
