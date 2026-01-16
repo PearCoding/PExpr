@@ -67,11 +67,9 @@ Ptr<Closure> Environment::parse(std::string_view str)
 bool Environment::doTypeChecking(const Ptr<Closure>& closure)
 {
     internal::TypeChecker checker(mReporter);
-    auto retType = checker.handle(closure);
-    if (retType == ElementaryType::Unspecified)
+    const auto retType = checker.handle(closure);
+    if (retType == ElementaryType::Unspecified || retType == ElementaryType::Error)
         return false;
-
-    closure->expression()->setReturnType(retType);
     return true;
 }
 } // namespace PExpr

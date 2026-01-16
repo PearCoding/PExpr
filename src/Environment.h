@@ -21,18 +21,14 @@ public:
     void registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType);
 
     /// Parse the stream until eof and return the corresponding AST tree.
-    /// If skipTypeChecking is true, no typechecking will be performed and no variables or functions have to be defined in advance.
-    /// This is useful, as no returnType() will be specified and further exploration can be done at later stages.
     /// If an error was detected, a nullptr will be returned instead.
     Ptr<Closure> parse(std::istream& stream);
 
     /// Parse the given string and return the corresponding AST tree.
-    /// If skipTypeChecking is true, no typechecking will be performed and no variables or functions have to be defined in advance.
-    /// This is useful, as no returnType() will be specified and further exploration can be done at later stages.
     /// If an error was detected, a nullptr will be returned instead.
     Ptr<Closure> parse(std::string_view str);
 
-    /// Together will the mandatory visitor the given AST will be transpiled.
+    /// Transpile over the AST.
     /// The template payload has to be defined by the user.
     template <typename Payload>
     inline Payload transpile(const Ptr<Closure>& closure, TranspileVisitor<Payload>* visitor) const

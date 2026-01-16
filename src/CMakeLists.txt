@@ -52,7 +52,7 @@ set(SRC
     internal/UpliftPass.h
 )
 
-add_library(pexpr ${SRC})
+add_library(pexpr STATIC ${SRC})
 if(NOT WIN32)
     find_package(Threads REQUIRED)
     target_link_libraries(pexpr PUBLIC Threads::Threads)

@@ -96,7 +96,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-constant-folding,!--no-opt-constant-folding", optimizationOptions.EnableConstantFolding, "Enable constant folding");
     app.add_flag("--opt-math-folding,!--no-opt-math-folding", optimizationOptions.EnableConstantFoldingNumber, "Enable constant folding on numbers");
     app.add_flag("--opt-dead-code,!--no-opt-dead-code", optimizationOptions.RemoveDeadCode, "Enable removal of dead code");
-    app.add_flag("--opt-inline-functions,!--no-opt-inline-functions", optimizationOptions.InlineFunctions, "Attemp to inline functions");
+    app.add_flag("--opt-inline-functions,!--no-opt-inline-functions", optimizationOptions.InlineFunctions, "Attempt to inline functions");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization,!--no-skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
 
     const auto dumpOutput = [&](const std::string& result) {
         if (useStdOutput) {
-            std::cout << result;
+            std::cout << result << std::flush;
         } else {
             std::ofstream f(outputFile);
             f << result;
@@ -170,14 +170,9 @@ int main(int argc, char** argv)
     ssa::SSAMapper mapper;
     auto program = mapper.map(ast);
 
-    if (warningAsError && env.reporter().warningCount() > 0) {
-        std::cerr << "Terminating as a warning was generated" << std::endl;
-        return env.reporter().warningCount();
-    }
-
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
         std::cerr << "The SSA will be invalid due to unspecified typing!" << std::endl;
-        return env.reporter().errorCount();
+        return env.reporter().errorCount() + 1;
     }
 
     if (skipOptimizationPass) {
@@ -187,17 +182,11 @@ int main(int argc, char** argv)
 
     // Optimize
     ssa::SSAPassSSCP::Run(optimizationOptions, program);
-
-    if (warningAsError && env.reporter().warningCount() > 0) {
-        std::cerr << "Terminating as a warning was generated" << std::endl;
-        return env.reporter().warningCount();
-    }
-
     dumpOutput(program.dump());
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
         std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;
-        return env.reporter().errorCount();
+        return env.reporter().errorCount() + 1;
     }
 
     return env.reporter().errorCount();

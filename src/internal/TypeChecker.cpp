@@ -43,7 +43,10 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
 
     for (const auto& statement : closure->statements())
         handleNode(closure, statement);
-    return handleNode(closure, closure->expression());
+
+    const ElementaryType type = handleNode(closure, closure->expression());
+    closure->expression()->setReturnType(type);
+    return type;
 }
 
 void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& statement)
