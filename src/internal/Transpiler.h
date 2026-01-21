@@ -104,7 +104,7 @@ private:
 
             // Register the function in the dynamic symbol table so calls can be resolved.
             const ElementaryType returnType = funcStmt->closure() ? funcStmt->closure()->expression()->returnType() : ElementaryType::Unspecified;
-            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()));
+            mDynamicDefinitions.addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern(), funcStmt->hasSideEffects()));
         } break;
         default:
             break;

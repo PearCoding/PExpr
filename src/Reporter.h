@@ -13,11 +13,12 @@ namespace PExpr {
 enum ReportType {
     RT_ERROR = 0x1, ///< All type of errors. These can not be disabled individually.
 
-    RT_WARNING_TRAILING_SEMICOLON = 0x100, ///< Warn about a trailing semicolon in expressions.
-    RT_WARNING_IMPLICIT_CAST      = 0x101, ///< Warn about all implicit casts
+    RT_WARNING_TRAILING_SEMICOLON      = 0x100, ///< Warn about a trailing semicolon in expressions.
+    RT_WARNING_IMPLICIT_CAST           = 0x101, ///< Warn about all implicit casts
+    RT_WARNING_PURE_INTERNAL_FUNCTIONS = 0x102, ///< Warn when internal functions are marked as pure (which they are by default)
 
-    RT_WARNING_DEFAULT = RT_WARNING_TRAILING_SEMICOLON,
-    RT_WARNING_ALL     = RT_WARNING_TRAILING_SEMICOLON | RT_WARNING_IMPLICIT_CAST,
+    RT_WARNING_DEFAULT = RT_WARNING_TRAILING_SEMICOLON | RT_WARNING_PURE_INTERNAL_FUNCTIONS,
+    RT_WARNING_ALL     = RT_WARNING_DEFAULT | RT_WARNING_IMPLICIT_CAST,
 };
 
 struct ReporterEntry {

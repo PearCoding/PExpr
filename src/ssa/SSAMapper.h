@@ -137,8 +137,9 @@ struct SSAFunction {
     ElementaryType ReturnType = ElementaryType::Unspecified;
 
     // Mark whether this function is external (declared but not defined).
-    // External functions are considered to have side-effects.
     bool External = false;
+    // Mark whether this function has side-effects. Only external functions can have side-effects
+    bool HasSideEffect = false;
 
     [[nodiscard]] std::string dump() const;
 };
@@ -169,7 +170,6 @@ private:
     [[nodiscard]] SSAProgram mapClosure(const Ptr<Closure>& closure);
     void mapStatement(SSAProgram& program, const Ptr<Statement>& stmt);
     [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<Expression>& expr);
-
 
     // Inline a mapped closure body into the current program by replacing any
     // SSAInstrReturn instructions with assignments to a fresh temporary variable.

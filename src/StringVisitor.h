@@ -91,10 +91,15 @@ private:
     static std::string dump(const Ptr<FunctionDeclarationStatement>& statement)
     {
         std::stringstream stream;
-        if (statement->isExtern())
-            stream << "extern ";
+        stream << "fn ";
+        if (statement->isExtern()) {
+            stream << "[[ extern";
+            if (!statement->hasSideEffects())
+                stream << ", pure";
+            stream << " ]] ";
+        }
 
-        stream << "fn " << statement->name() << "(";
+        stream << statement->name() << "(";
         for (size_t i = 0; i < statement->parameters().size(); ++i) {
             const auto param = statement->parameters().at(i);
             stream << param.Name;

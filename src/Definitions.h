@@ -39,27 +39,29 @@ private:
 class FunctionDef {
 public:
     /// Construct a function definition with a given name and a ParameterList.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, ElementaryType retType, bool isExtern)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, ElementaryType retType, bool isExtern, bool hasSideEffects)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
         , mParameters(params)
         , mIsExtern(isExtern)
+        , mHasSideEffects(hasSideEffects)
     {
-        if (isExtern)
-            PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(!isExtern || retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(isExtern || !hasSideEffects, "Only external functions can be marked side-effect free");
     }
 
     /// Construct a function definition with a given name and a ParameterList (rvalue)
-    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, ElementaryType retType, bool isExtern)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, ElementaryType retType, bool isExtern, bool hasSideEffects)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
         , mParameters(std::move(params))
         , mIsExtern(isExtern)
+        , mHasSideEffects(hasSideEffects)
     {
-        if (isExtern)
-            PEXPR_ASSERT(retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(!isExtern || retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(isExtern || !hasSideEffects, "Only external functions can be marked side-effect free");
     }
 
     /// The identifier the function is named with.
@@ -74,6 +76,7 @@ public:
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
 
     [[nodiscard]] inline bool isExtern() const { return mIsExtern; }
+    [[nodiscard]] inline bool hasSideEffects() const { return isExtern() && mHasSideEffects; }
 
 private:
     std::string mName;
@@ -81,6 +84,7 @@ private:
     ElementaryType mReturnType;
     ParameterList mParameters;
     bool mIsExtern;
+    bool mHasSideEffects;
 };
 
 } // namespace PExpr

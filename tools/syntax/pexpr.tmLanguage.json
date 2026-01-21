@@ -45,7 +45,11 @@
                 },
                 {
                     "name": "keyword.declaration.pexpr",
-                    "match": "\\b(let|mut|fn|extern|as)\\b"
+                    "match": "\\b(let|mut|fn|as)\\b"
+                },
+                {
+                    "name": "keyword.attribute.pexpr",
+                    "match": "\\b(extern|pure)\\b"
                 },
                 {
                     "name": "constant.language.boolean.pexpr",
