@@ -38,18 +38,15 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunctio
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    if (shouldInlineFunctionCall(call, func)) {
-                        // Try advanced inlining first (for constant parameters)
-                        if (attemptAdvancedInlining(call, func, body, i)) {
-                            changed = true;
-                            break;
-                        }
-                    } else if (mCallCounts[func.Name] == 1) {
-                        // Fall back to basic inlining for single-call functions
-                        if (inlineFunctionCall(call, func, body, i)) {
-                            changed = true;
-                            break;
-                        }
+                    if (attemptAdvancedInlining(call, func, body, i)) { //< Try advanced inlining first (for constant parameters)
+                        changed = true;
+                        break;
+                    } else if (mCallCounts[func.Name] == 1 && inlineFunctionCall(call, func, body, i)) { //< Fall back to basic inlining for single-call functions
+                        changed = true;
+                        break;
+                    } else if (tryInlineIntrinsic(call, func, body, i)) {
+                        changed = true;
+                        break;
                     }
                 }
             }
@@ -74,6 +71,9 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunctio
 
 bool SSCPFunctionInliner::inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
 {
+    if (func.External)
+        return false;
+
     PEXPR_ASSERT(func.Parameters.size() == call->Arguments.size(), "Call parameters must match function parameters at this point");
 
     // Create a mapping from parameter names to argument values
@@ -250,6 +250,9 @@ bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& orig
 
 bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
 {
+    if (!shouldInlineFunctionCall(call, func))
+        return false;
+
     auto& attemptInfo = mInlineAttempts[func.Name];
     attemptInfo.attempts++;
 
@@ -367,4 +370,64 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunctio
     return true;
 }
 
+bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex)
+{
+    // Only external functions can be intrinsics
+    if (!func.External)
+        return false;
+
+    // All must be constant
+    for (const auto& val : call->Arguments) {
+        if (val.Kind != SSAValue::Kind::Constant)
+            return false;
+    }
+
+    const auto bound = mIntrinsics.equal_range(call->PublicFunctionName);
+
+    for (auto it = bound.first; it != bound.second; ++it) {
+        if (!it->second.Definition.isExtern())
+            continue;
+
+        // Do we even have enough parameters?
+        const auto& params = it->second.Definition.parameters();
+        if (params.size() != call->Arguments.size())
+            continue;
+
+        std::vector<ExtendedValueVariant> args;
+        args.reserve(params.size());
+
+        // Check if the parameter types match
+        bool isEqual = true;
+        for (size_t i = 0; i < params.size(); ++i) {
+            if (params[i].Type != call->Arguments[i].Type) {
+                isEqual = false;
+                break;
+            }
+
+            args.push_back(call->Arguments[i].Value);
+        }
+        if (!isEqual)
+            continue;
+
+        // We found it!
+        const auto constant = it->second.Callback(args);
+        if (!constant.has_value())
+            continue;
+
+        // TODO: Check if the expected return type and the type inside the variant match
+
+        // Replace the return statement and assign the return value of it to the target
+        auto value = SSAValue(SSAValue::Kind::Constant, "", it->second.Definition.returnType(), constant.value());
+
+        auto assign             = std::make_shared<SSAInstrAssign>();
+        assign->Target          = call->Target;
+        assign->Operator        = SSAInstrAssign::OpKind::Assign;
+        assign->Operands        = { value };
+        instructions[callIndex] = std::move(assign);
+
+        return true;
+    }
+
+    return false;
+}
 } // namespace PExpr::ssa
