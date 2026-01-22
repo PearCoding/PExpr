@@ -1,25 +1,34 @@
 #include "SSCPFunctionInliner.h"
 
 namespace PExpr::ssa::intrinsics {
-static Number sin_intrinsic(Number a) { return std::sin(a); }
-static Number cos_intrinsic(Number a) { return std::cos(a); }
-static Number tan_intrinsic(Number a) { return std::tan(a); }
-static Number asin_intrinsic(Number a) { return std::asin(a); }
-static Number acos_intrinsic(Number a) { return std::acos(a); }
-static Number atan_intrinsic(Number a) { return std::atan(a); }
-
 void setupIntrinsics(SSCPFunctionInliner& inliner)
 {
-    auto addP1N = [&](const std::string& name, std::function<Number(Number)> callback) {
-        inliner.addIntrinsic(FunctionDef(name, name, { Parameter{ "v", ElementaryType::Number } }, ElementaryType::Number, true, false),
+    const auto addP1N = [&](const std::string& name, std::function<Number(Number)> callback) {
+        inliner.addIntrinsic(FunctionDef(name, name, { Parameter{ "p0", ElementaryType::Number } }, ElementaryType::Number, true, false),
                              [callback](const std::vector<ExtendedValueVariant>& args) -> ExtendedValueVariant { return callback(std::get<Number>(args.at(0))); });
     };
 
-    addP1N("sin", sin_intrinsic);
-    addP1N("cos", cos_intrinsic);
-    addP1N("tan", tan_intrinsic);
-    addP1N("asin", asin_intrinsic);
-    addP1N("acos", acos_intrinsic);
-    addP1N("atan", atan_intrinsic);
+    const auto addP2N = [&](const std::string& name, std::function<Number(Number, Number)> callback) {
+        inliner.addIntrinsic(FunctionDef(name, name, { Parameter{ "p0", ElementaryType::Number }, Parameter{ "p1", ElementaryType::Number } }, ElementaryType::Number, true, false),
+                             [callback](const std::vector<ExtendedValueVariant>& args) -> ExtendedValueVariant { return callback(std::get<Number>(args.at(0)), std::get<Number>(args.at(1))); });
+    };
+
+    addP1N("sin", [](Number a) { return std::sin(a); });
+    addP1N("cos", [](Number a) { return std::cos(a); });
+    addP1N("tan", [](Number a) { return std::tan(a); });
+    addP1N("asin", [](Number a) { return std::asin(a); });
+    addP1N("acos", [](Number a) { return std::acos(a); });
+    addP1N("atan", [](Number a) { return std::atan(a); });
+
+    addP1N("exp", [](Number a) { return std::exp(a); });
+    addP1N("exp2", [](Number a) { return std::exp2(a); });
+    addP1N("log", [](Number a) { return std::log(a); });
+    addP1N("log2", [](Number a) { return std::log2(a); });
+
+    addP1N("sqrt", [](Number a) { return std::sqrt(a); });
+    addP1N("cbrt", [](Number a) { return std::cbrt(a); });
+
+    addP2N("pow", [](Number a, Number b) { return std::pow(a, b); });
+    addP2N("atan2", [](Number a, Number b) { return std::atan2(a, b); });
 }
 } // namespace PExpr::ssa::intrinsics
