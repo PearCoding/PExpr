@@ -128,13 +128,9 @@ private:
             if (P.accept(TokenType::Let)) {
                 // Variable declaration
                 closure->addStatement(p_variable_statement(true));
-            } else if (P.accept(TokenType::Extern)) {
-                // Function (extern)
-                P.accept(TokenType::Function);
-                closure->addStatement(p_function_statement(true));
             } else if (P.accept(TokenType::Function)) {
-                // Function (intern)
-                closure->addStatement(p_function_statement(false));
+                // Function
+                closure->addStatement(p_function_statement());
             } else if (P.cur(0).Type == TokenType::Identifier) {
                 if (P.cur(1).Type == TokenType::Assign) {
                     // Variable
@@ -215,10 +211,59 @@ private:
         return list;
     }
 
-    inline Ptr<Statement> p_function_statement(bool is_extern)
+    struct FunctionAttributes {
+        bool Extern        = false;
+        bool HasSideEffect = false;
+    };
+    inline FunctionAttributes p_function_attributes()
+    {
+        if (P.cur().Type == TokenType::ClosedSquareBracket)
+            return FunctionAttributes{};
+
+        bool hadExtern = false;
+        bool hadPure   = false;
+        do {
+            const std::string attrName = std::get<std::string>(P.cur().Value);
+            P.expect(TokenType::Identifier);
+
+            if (attrName == "extern") {
+                hadExtern = true;
+            } else if (attrName == "pure") {
+                hadPure = true;
+            } else {
+                P.signalError();
+                P.mReporter.errorf(P.cur().Location, "Unknown attribute '%s'", attrName.c_str());
+            }
+        } while (P.accept(TokenType::Comma));
+
+        if (hadExtern) {
+            return FunctionAttributes{
+                .Extern        = true,
+                .HasSideEffect = !hadPure
+            };
+        } else {
+            if (hadPure)
+                P.mReporter.warningf(RT_WARNING_PURE_INTERNAL_FUNCTIONS, P.cur().Location, "No need to mark an internal function as pure");
+            return FunctionAttributes{
+                .Extern        = false,
+                .HasSideEffect = false
+            };
+        }
+    }
+
+    inline Ptr<Statement> p_function_statement()
     {
         const auto loc = P.cur().Location;
 
+        // Get attribute list
+        FunctionAttributes attr;
+        if (P.accept(TokenType::OpenSquareBracket) && P.accept(TokenType::OpenSquareBracket)) {
+            attr = p_function_attributes();
+            P.expect(TokenType::ClosedSquareBracket);
+            P.expect(TokenType::ClosedSquareBracket);
+        }
+
+        // Get function name
         std::string funcName;
         if (const auto fnptr = std::get_if<std::string>(&P.cur().Value))
             funcName = *fnptr;
@@ -244,7 +289,7 @@ private:
 
         const std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
 
-        if (!is_extern) {
+        if (!attr.Extern) {
             auto closure    = std::make_shared<Closure>(loc, mCurrentClosure);
             mCurrentClosure = closure.get();
 
@@ -261,14 +306,14 @@ private:
                 closure->setParent(mCurrentClosure);
             }
 
-            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled);
+            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled, false);
         } else {
             if (returnType == ElementaryType::Unspecified) {
                 P.signalError();
                 P.mReporter.errorf(P.cur().Location, "Expected an explicit return type for the given function");
             }
             P.expect(TokenType::Semicolon);
-            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, nullptr, returnType, mangled);
+            return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, nullptr, returnType, mangled, attr.HasSideEffect);
         }
     }
 

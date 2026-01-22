@@ -93,8 +93,6 @@ std::string Token::toString(TokenType type)
         return "mut";
     case TokenType::Function:
         return "fn";
-    case TokenType::Extern:
-        return "extern";
     case TokenType::BooleanType:
         return "bool";
     case TokenType::IntegerType:

@@ -8,3 +8,6 @@
 - [x] Make functions in PExpr side-effect free
 - [x] Uplift nested functions
 - [ ] Do not reorder side-effected functions!
+- [ ] Collapse branches to select operations if possible
+- [x] External pure functions
+- [ ] Constant folding of intrinsic functions

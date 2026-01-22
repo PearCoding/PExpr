@@ -16,7 +16,7 @@ void SSCPSideEffectAnalyzer::propagateSideEffects(const SSAProgram& program)
         for (const auto& p : f.Parameters)
             params.insert(p);
         funcParams[f.Name] = std::move(params);
-        if (f.External)
+        if (f.External && f.HasSideEffect)
             mSideEffectFunctions.insert(f.Name);
     }
 

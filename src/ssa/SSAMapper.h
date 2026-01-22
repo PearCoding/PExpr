@@ -134,8 +134,9 @@ struct SSAFunction {
     ElementaryType ReturnType = ElementaryType::Unspecified;
 
     // Mark whether this function is external (declared but not defined).
-    // External functions are considered to have side-effects.
     bool External = false;
+    // Mark whether this function has side-effects. Only external functions can have side-effects
+    bool HasSideEffect = false;
 
     [[nodiscard]] std::string dump() const;
 };

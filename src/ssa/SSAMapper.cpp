@@ -226,8 +226,10 @@ std::string SSAInstrPhi::dump() const
 std::string SSAFunction::dump() const
 {
     std::stringstream ss;
-    if (Body.empty())
+    if (External)
         ss << "extern ";
+    if (External && !HasSideEffect)
+        ss << "pure ";
     ss << "fn " << Name << "(";
     for (size_t i = 0; i < Parameters.size(); ++i) {
         if (i)
@@ -408,8 +410,9 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         func.Parameters.reserve(f->parameters().size());
         for (const auto& p : f->parameters())
             func.Parameters.push_back(p.Name);
-        func.ReturnType = f->returnType();
-        func.External   = f->isExtern();
+        func.ReturnType    = f->returnType();
+        func.External      = f->isExtern();
+        func.HasSideEffect = f->hasSideEffects();
 
         // Acquire inner closure
         auto innerProg = mapClosure(f->closure());

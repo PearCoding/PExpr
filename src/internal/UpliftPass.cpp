@@ -58,14 +58,14 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
                 const std::string newMangled = makeMangledNameFromTypes(f->name(), newParamTypes, closure.get());
 
                 // Update local symbol table: replace function entry
-                const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern());
-                const auto newDef = FunctionDef(f->name(), newMangled, newParams, f->returnType(), f->isExtern());
+                const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern(), f->hasSideEffects());
+                const auto newDef = FunctionDef(f->name(), newMangled, newParams, f->returnType(), f->isExtern(), f->hasSideEffects());
 
                 closure->symbols().removeFunction(oldDef);
                 closure->symbols().replaceFunction(FunctionDef(newDef));
 
                 // Replace the function declaration by constructing a new one and replacing in the closure
-                auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, f->closure(), f->returnType(), newMangled);
+                auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, f->closure(), f->returnType(), newMangled, f->hasSideEffects());
 
                 PEXPR_ASSERT(newFunc->name() == f->name(), "Name of function should stay the same after uplift");
                 PEXPR_ASSERT(newFunc->returnType() == f->returnType(), "Return type of function should stay the same after uplift");

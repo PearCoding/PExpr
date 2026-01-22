@@ -23,7 +23,7 @@ void Environment::registerVariable(const std::string& name, ElementaryType type)
     mGlobals.addVariable(VariableDef(name, type, false));
 }
 
-void Environment::registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType)
+void Environment::registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType, bool hasSideEffect)
 {
     // Build a ParameterList using default parameter names p0, p1, ...
     ParameterList params;
@@ -32,7 +32,7 @@ void Environment::registerFunction(const std::string& name, const std::vector<El
         params.push_back(Parameter{ "p" + std::to_string(i), parameterTypes[i] });
 
     const std::string mangledName = internal::makeMangledNameFromTypes(name, parameterTypes, nullptr);
-    mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true));
+    mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true, hasSideEffect));
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream)

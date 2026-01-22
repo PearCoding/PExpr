@@ -48,7 +48,6 @@ enum class TokenType {
     Let,      // let
     Mutable,  // mut
     Function, // fn
-    Extern,   // extern
 
     BooleanType, // bool
     IntegerType, // int

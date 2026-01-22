@@ -71,12 +71,13 @@ private:
 
 class FunctionDeclarationStatement : public Statement {
 public:
-    FunctionDeclarationStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Closure>& closure, ElementaryType returnType, const std::string& mangledName)
+    FunctionDeclarationStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Closure>& closure, ElementaryType returnType, const std::string& mangledName, bool hasSideEffects)
         : Statement(loc, name, StatementType::FunctionDeclaration)
         , mParameters(parameters)
         , mReturnType(returnType)
         , mMangledName(mangledName)
         , mClosure(closure)
+        , mHasSideEffects(hasSideEffects)
     {
     }
 
@@ -84,6 +85,7 @@ public:
 
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
     [[nodiscard]] inline bool isExtern() const { return mClosure == nullptr; }
+    [[nodiscard]] inline bool hasSideEffects() const { return mHasSideEffects; }
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
 
     [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
@@ -95,5 +97,6 @@ private:
     ElementaryType mReturnType;
     const std::string mMangledName;
     const Ptr<Closure> mClosure;
+    const bool mHasSideEffects;
 };
 } // namespace PExpr

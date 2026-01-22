@@ -31,6 +31,7 @@ set(SRC
     Logger.cpp
     Reporter.cpp
 
+    ssa/Intrinsics.cpp
     ssa/SSAMapper.cpp
     ssa/SSAValidator.cpp
     ssa/SSAPassSSCP.cpp

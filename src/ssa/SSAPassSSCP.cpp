@@ -6,6 +6,10 @@
 
 namespace PExpr::ssa {
 
+namespace intrinsics {
+extern void setupIntrinsics(SSCPFunctionInliner& inliner);
+}
+
 SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     : mOptions(opts)
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
@@ -13,6 +17,7 @@ SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     , mFunctionInliner(std::make_unique<SSCPFunctionInliner>(opts))
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
 {
+    intrinsics::setupIntrinsics(*mFunctionInliner);
 }
 
 SSAPassSSCP::~SSAPassSSCP() = default;
@@ -57,9 +62,6 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
         if (mOptions.InlineFunctions) {
             // Check if we can inline some functions
             for (auto& func : program.Functions) {
-                if (func.External)
-                    continue;
-
                 if (mFunctionInliner->attempFunctionInlining(program, func))
                     changed = true;
             }

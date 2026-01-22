@@ -133,8 +133,6 @@ Token Lexer::next()
                 return Token(prevLoc, TokenType::Mutable);
             if (mTemp == "fn")
                 return Token(prevLoc, TokenType::Function);
-            if (mTemp == "extern")
-                return Token(prevLoc, TokenType::Extern);
             if (mTemp == "bool")
                 return Token(prevLoc, TokenType::BooleanType);
             if (mTemp == "int")

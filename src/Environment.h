@@ -18,7 +18,7 @@ public:
     void registerVariable(const std::string& name, ElementaryType type);
 
     /// Register an external function.
-    void registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType);
+    void registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType, bool hasSideEffect = true);
 
     /// Parse the stream until eof and return the corresponding AST tree.
     /// If an error was detected, a nullptr will be returned instead.

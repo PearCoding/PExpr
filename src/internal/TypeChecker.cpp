@@ -37,7 +37,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
         const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
         // Pre-register a provisional function definition
-        if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern())))
+        if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
             mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
     }
 
@@ -152,7 +152,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         }
 
         if (!funcStmt->isExtern())
-            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern()));
+            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern(), funcStmt->hasSideEffects()));
 
         const auto declared = funcStmt->returnType();
         if (isConvertible(returnType, declared) && returnType != declared) {
