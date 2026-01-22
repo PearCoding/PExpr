@@ -1,5 +1,7 @@
 #include "Lexer.h"
 #include "Reporter.h"
+
+#include <charconv>
 #include <sstream>
 
 namespace PExpr::internal {
