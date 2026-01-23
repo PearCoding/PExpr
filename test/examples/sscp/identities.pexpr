@@ -1,0 +1,54 @@
+fn [[extern]] getInput() -> num;
+
+// Intrinsics (defined in Intrinsics.cpp)
+fn [[extern, pure]] sin(a:num) -> num;
+fn [[extern, pure]] cos(a:num) -> num;
+fn [[extern, pure]] tan(a:num) -> num;
+fn [[extern, pure]] asin(a:num) -> num;
+fn [[extern, pure]] acos(a:num) -> num;
+fn [[extern, pure]] atan(a:num) -> num;
+
+// https://en.wikipedia.org/wiki/List_of_trigonometric_identities
+
+fn identity_1(a:num) = sin(a)^2 + cos(a)^2; // = 1   (Priority 1)
+fn identity_2(a:num) = a*a;                 // = a^2 (Priority 1)
+
+fn identity_3(a:num, b:num) = sin(a)*cos(b) + cos(a)*sin(b); // = sin(a + b) (Priority 2)
+fn identity_4(a:num, b:num) = sin(a)*cos(b) - cos(a)*sin(b); // = sin(a - b) (Priority 2)
+fn identity_5(a:num, b:num) = cos(a)*cos(b) + sin(a)*sin(b); // = cos(a - b) (Priority 2)
+fn identity_6(a:num, b:num) = cos(a)*cos(b) - sin(a)*sin(b); // = cos(a + b) (Priority 2)
+
+fn identity_7(a:num)  = 2*sin(a)*cos(a);       // = sin(2*a) (Priority 2)
+fn identity_8(a:num)  = 2*cos(a)*cos(a) - 1;   // = cos(2*a) (Priority 2)
+fn identity_9(a:num)  = 3*sin(a) - 4*sin(a)^3; // = sin(3*a) (Priority 2)
+fn identity_10(a:num) = 4*cos(a)^3 - 3*cos(a); // = cos(3*a) (Priority 2)
+// -> Or Chebyshev method
+
+fn identity_11(a:num) = (1-cos(2*a)) / 2; // = sin(a)^2          (Priority 2)
+fn identity_12(a:num) = (1+cos(2*a)) / 2; // = cos(a)^2          (Priority 2)
+fn identity_13(a:num) = (1-cos(4*a)) / 8; // = sin(a)^2*cos(a)^2 (Priority 2)
+
+fn identity_14(a:num) = sin(asin(a)); // = a           (Priority 1)
+fn identity_15(a:num) = cos(asin(a)); // = sqrt(1-a^2) (Priority 2)
+fn identity_16(a:num) = sin(acos(a)); // = sqrt(1-a^2) (Priority 2)
+fn identity_17(a:num) = cos(acos(a)); // = a           (Priority 1)
+fn identity_18(a:num) = tan(atan(a)); // = a           (Priority 1)
+
+identity_1(getInput()) 
+    + identity_2(getInput()) 
+    + identity_3(getInput(), getInput()) 
+    + identity_4(getInput(), getInput()) 
+    + identity_5(getInput(), getInput()) 
+    + identity_6(getInput(), getInput()) 
+    + identity_7(getInput()) 
+    + identity_8(getInput()) 
+    + identity_9(getInput()) 
+    + identity_10(getInput()) 
+    + identity_11(getInput()) 
+    + identity_12(getInput()) 
+    + identity_13(getInput()) 
+    + identity_14(getInput()) 
+    + identity_15(getInput()) 
+    + identity_16(getInput()) 
+    + identity_17(getInput()) 
+    + identity_18(getInput()) 
