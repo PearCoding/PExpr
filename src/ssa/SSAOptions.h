@@ -4,30 +4,33 @@
 
 namespace PExpr::ssa {
 struct SSAOptions {
-    bool EnableConstantFolding        = true;
-    bool EnableConstantFoldingNumber  = true;
-    bool RemoveDeadCode               = true;
-    bool InlineFunctions              = true;
-    bool ApplyMathIdentities          = true; // < Standard math identities
-    bool ApplyTrigonometricIdentities = true; // < Trigonometric identities (sin, cos, ...)
+    bool EnableConstantFolding         = true;
+    bool EnableConstantFoldingNumber   = true;
+    bool RemoveDeadCode                = true;
+    bool InlineFunctions               = true;
+    bool ApplyMathIdentities           = true; // < Standard math identities
+    bool ApplyTrigonometricIdentities  = true; // < Trigonometric identities (sin, cos, ...)
+    bool EliminateCommonSubexpressions = true;
 
     [[nodiscard]] inline static SSAOptions None()
     {
         return SSAOptions{
-            .EnableConstantFolding        = false,
-            .EnableConstantFoldingNumber  = false,
-            .RemoveDeadCode               = false,
-            .InlineFunctions              = false,
-            .ApplyMathIdentities          = false,
-            .ApplyTrigonometricIdentities = false,
+            .EnableConstantFolding         = false,
+            .EnableConstantFoldingNumber   = false,
+            .RemoveDeadCode                = false,
+            .InlineFunctions               = false,
+            .ApplyMathIdentities           = false,
+            .ApplyTrigonometricIdentities  = false,
+            .EliminateCommonSubexpressions = false,
         };
     }
 
     [[nodiscard]] inline static SSAOptions Low()
     {
-        auto opts                  = None();
-        opts.EnableConstantFolding = true;
-        opts.RemoveDeadCode        = true;
+        auto opts                          = None();
+        opts.EnableConstantFolding         = true;
+        opts.RemoveDeadCode                = true;
+        opts.EliminateCommonSubexpressions = true;
         return opts;
     }
 

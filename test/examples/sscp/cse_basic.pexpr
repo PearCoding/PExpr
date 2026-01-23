@@ -1,0 +1,24 @@
+// Common subexpression elimination (CSE) - basic arithmetic
+// The expression 'a * b' appears twice and should be computed only once
+
+fn [[extern]] getInput() -> num;
+
+let a = getInput();
+let b = getInput();
+
+// Duplicate multiplication - CSE should eliminate the second one
+let x = a * b;
+let y = a * b;
+
+// Another duplicate with different variable names
+let c = getInput();
+let d = getInput();
+let result1 = (a + b) * c;
+let result2 = (a + b) * c;  // Same as result1
+
+// Mixed operations with common subexpressions
+let expr1 = a * a + b * b;
+let expr2 = a * a + b * b;  // Same as expr1
+
+// Final result uses all computed values
+x + y + result1 + result2 + expr1 + expr2

@@ -1,0 +1,49 @@
+// Common subexpression elimination (CSE) - complex nested expressions
+// Tests deep nesting and pattern recognition
+
+fn [[extern]] getInput() -> num;
+fn [[extern, pure]] sin(a:num) -> num;
+fn [[extern, pure]] cos(a:num) -> num;
+fn [[extern, pure]] sqrt(a:num) -> num;
+fn [[extern, pure]] log(a:num) -> num;
+
+let a = getInput();
+let b = getInput();
+let c = getInput();
+
+// Deeply nested expressions with multiple common subexpressions
+let expr1 = sin(a * b + c) * cos(a * b + c);
+let expr2 = sin(a * b + c) * cos(a * b + c);  // Same as expr1
+
+// The subexpression (a * b + c) appears 4 times in expr1 and expr2
+// sin(a * b + c) appears twice, cos(a * b + c) appears twice
+
+// Complex mathematical formula appearing multiple times
+// Pythagorean identity pattern: sin(x)^2 + cos(x)^2
+let x = a + b;
+let identity1 = sin(x) * sin(x) + cos(x) * cos(x);
+let identity2 = sin(x) * sin(x) + cos(x) * cos(x);  // Same as identity1
+
+// Nested power operations
+let power_expr1 = (a + b) ^ (c * 2.0);
+let power_expr2 = (a + b) ^ (c * 2.0);  // Same as power_expr1
+
+// Complex chain of operations with intermediate duplicates
+let chain1 = sqrt(sin(a) * sin(a) + cos(b) * cos(b)) * log(a + b);
+let chain2 = sqrt(sin(a) * sin(a) + cos(b) * cos(b)) * log(a + b);  // Same as chain1
+
+// Multiple independent common subexpressions in one expression
+let multi_cse = (a * b) + (a * b) + (c * c) + (c * c) + sin(a) + sin(a);
+// Should compute a*b once, c*c once, sin(a) once
+
+// Pattern with commutative operations (addition is commutative)
+let comm1 = a + b + c;
+let comm2 = b + a + c;  // Same as comm1 due to commutativity
+let comm3 = c + b + a;  // Same as comm1 due to commutativity
+
+// Mixed types and operations
+let mixed1 = [a, b, c].x * sin(a) + [a, b, c].y * cos(b);
+let mixed2 = [a, b, c].x * sin(a) + [a, b, c].y * cos(b);  // Same as mixed1
+
+// Final result
+expr1 + expr2 + identity1 + identity2 + power_expr1 + power_expr2 + chain1 + chain2 + multi_cse + comm1 + comm2 + comm3 + mixed1 + mixed2

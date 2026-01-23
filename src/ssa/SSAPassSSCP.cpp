@@ -15,6 +15,7 @@ SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     , mFunctionInliner(std::make_unique<SSCPFunctionInliner>(opts))
     , mIdentityOptimizer(std::make_unique<SSCPIdentityOptimizer>(opts))
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
+    , mCommonSubexpressionEliminator(std::make_unique<SSCPCommonSubexpressionEliminator>(opts))
 {
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
@@ -104,22 +105,28 @@ bool SSAPassSSCP::processBody(InstructionList& body)
     if (mIdentityOptimizer->applyIdentities(mContext.get(), body))
         changed = true;
 
+    if (mOptions.EliminateCommonSubexpressions) {
+        // 4) Apply common subexpression elimination
+        if (mCommonSubexpressionEliminator->applyCSE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
+            changed = true;
+    }
+
     if (mOptions.RemoveDeadCode) {
-        // 4) Remove dead assigns without side effects
+        // 5) Remove dead assigns without side effects
         if (mDeadCodeOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
             changed = true;
     }
 
-    // 5) Remove empty branches
+    // 6) Remove empty branches
     if (mControlFlowOptimizer->removeEmptyBranches(body))
         changed = true;
 
-    // 6) Handle unused labels
+    // 7) Handle unused labels
     if (mControlFlowOptimizer->removeObsoleteLabels(body))
         changed = true;
 
     if (mOptions.RemoveDeadCode) {
-        // 7) Collapse phi nodes
+        // 8) Collapse phi nodes
         if (mControlFlowOptimizer->collapsePhiNodes(body))
             changed = true;
     }

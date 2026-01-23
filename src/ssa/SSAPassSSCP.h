@@ -8,6 +8,7 @@
 #include "SSCPFunctionInliner.h"
 #include "SSCPIdentityOptimizer.h"
 #include "SSCPSideEffectAnalyzer.h"
+#include "SSCPCommonSubexpressionEliminator.h"
 
 #include <memory>
 
@@ -44,6 +45,7 @@ private:
     std::unique_ptr<SSCPFunctionInliner> mFunctionInliner;
     std::unique_ptr<SSCPIdentityOptimizer> mIdentityOptimizer;
     std::unique_ptr<SSCPSideEffectAnalyzer> mSideEffectAnalyzer;
+    std::unique_ptr<SSCPCommonSubexpressionEliminator> mCommonSubexpressionEliminator;
 };
 
 } // namespace PExpr::ssa

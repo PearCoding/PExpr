@@ -1,0 +1,40 @@
+// Common subexpression elimination (CSE) - vector operations
+// Duplicate vector operations should be eliminated
+
+fn [[extern]] getInput() -> num;
+
+let a = getInput();
+let b = getInput();
+let c = getInput();
+let d = getInput();
+
+// Vector construction with duplicate components
+let v1 = [a, b, c, d];
+let v2 = [a, b, c, d];  // Same vector construction
+
+// Vector arithmetic with common subexpressions
+let sum1 = v1 + v2;
+let sum2 = v1 + v2;  // Same as sum1
+
+// Component-wise operations with duplicates
+let scaled1 = v1 * 2.0;
+let scaled2 = v1 * 2.0;  // Same as scaled1
+
+// Dot product pattern appearing multiple times
+let dot1 = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
+let dot2 = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;  // Same as dot1
+
+// Swizzle operations with common base
+let swizzle1 = v1.xyz;
+let swizzle2 = v1.xyz;  // Same swizzle
+
+// Vector component access with same index
+let comp1 = v1[0];
+let comp2 = v1[0];  // Same component access
+
+// Mixed vector-scalar operations
+let mixed1 = v1 * a + v2 * b;
+let mixed2 = v1 * a + v2 * b;  // Same as mixed1
+
+// Final result using all vector computations
+sum1.x + sum2.y + scaled1.z + scaled2.w + dot1 + dot2 + swizzle1.x + swizzle2.y + comp1 + comp2 + mixed1.x + mixed2.y

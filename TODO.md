@@ -12,3 +12,8 @@
 - [x] External pure functions
 - [x] Constant folding of intrinsic functions
 - [ ] SSCPIdentityOptimizer needs to inject intrinsics. Overhaul the intrinsics handling for checks and injections.
+- [x] Common subexpression elimination (CSE)
+- [ ] Algebraic simplification & strength reduction
+- [ ] Value range propagation
+- [ ] Tail call optimization
+- [ ] Memory/register allocation optimizations

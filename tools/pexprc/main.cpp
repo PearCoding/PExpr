@@ -77,7 +77,7 @@ int main(int argc, char** argv)
     app.add_option_function<std::string>("-W,--warning", handleWarningCmd, "Set warnings");
     app.add_flag_callback("--no-warnings", [&]() { warningFlags = 0; }, "Disable all warnings");
 
-    ssa::SSAOptions optimizationOptions;
+    ssa::SSAOptions optimizationOptions = ssa::SSAOptions::None();
     app.add_option_function<int>("-O", [&](int opt) { 
         if (opt == 0)
             optimizationOptions = ssa::SSAOptions::None();
@@ -94,6 +94,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-inline-functions,!--no-opt-inline-functions", optimizationOptions.InlineFunctions, "Attempt to inline functions");
     app.add_flag("--opt-math-identities,!--no-opt-math-identities", optimizationOptions.ApplyMathIdentities, "Apply math identities");
     app.add_flag("--opt-trigonometric-identities,!--no-opt-trigonometric-identities", optimizationOptions.ApplyTrigonometricIdentities, "Apply trigonometric identities");
+    app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization,!--no-skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");

@@ -1,0 +1,35 @@
+// Common subexpression elimination (CSE) - function calls
+// Duplicate calls to pure functions should be eliminated
+
+// Intrinsics (defined in Intrinsics.cpp)
+fn [[extern, pure]] sin(a:num) -> num;
+fn [[extern, pure]] cos(a:num) -> num;
+fn [[extern, pure]] sqrt(a:num) -> num;
+fn [[extern, pure]] log(a:num) -> num;
+
+fn [[extern]] getInput() -> num;
+
+let a = getInput();
+let b = getInput();
+
+// Duplicate trigonometric calls - should be computed once
+let sin_a = sin(a);
+let sin_a_again = sin(a);  // Same as sin_a
+
+let cos_b = cos(b);
+let cos_b_again = cos(b);  // Same as cos_b
+
+// Nested function calls with common subexpressions
+let expr1 = sin(a) * cos(b);
+let expr2 = sin(a) * cos(b);  // Same as expr1
+
+// Complex expressions with multiple duplicates
+let complex1 = sqrt(sin(a) * sin(a) + cos(b) * cos(b));
+let complex2 = sqrt(sin(a) * sin(a) + cos(b) * cos(b));  // Same as complex1
+
+// Logarithm with same argument appearing multiple times
+let log_expr1 = log(a + b) / log(a + b);  // Division by itself = 1, but log(a+b) computed once
+let log_expr2 = 2 * log(a + b) - log(a + b);  // log(a+b) appears twice
+
+// Final expression using all results
+sin_a + sin_a_again + cos_b + cos_b_again + expr1 + expr2 + complex1 + complex2 + log_expr1 + log_expr2
