@@ -20,7 +20,7 @@ public:
     }
 
     void analyzeCallGraph(const SSAProgram& program);
-    bool attempFunctionInlining(SSAProgram& program, SSAFunction& func);
+    bool attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func);
     void removeUnusedFunctions(SSAProgram& program);
 
     inline void addIntrinsic(const FunctionDef& func, SSAIntrinsicInlineCallback callback)
@@ -29,9 +29,19 @@ public:
     }
 
 private:
-    bool inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    /// Common helper to clone and map function body with parameter substitution
+    /// @oaram ctx SSA context
+    /// @param func The function to inline
+    /// @param call The call instruction
+    /// @param outInlinedBody Output parameter for the cloned and mapped instructions
+    /// @param runOptimization Apply optimization on this block only
+    void cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunction& func, const SSAInstrCall* call,
+                                 InstructionList& outInlinedBody,
+                                 bool runOptimization);
+
+    bool inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
     bool shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func);
-    bool attemptAdvancedInlining(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    bool attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
     bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
 
     bool tryInlineIntrinsic(SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex);

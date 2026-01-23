@@ -66,7 +66,7 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
         if (mOptions.InlineFunctions) {
             // Check if we can inline some functions
             for (auto& func : program.Functions) {
-                if (mFunctionInliner->attempFunctionInlining(program, func))
+                if (mFunctionInliner->attempFunctionInlining(mContext.get(), program, func))
                     changed = true;
             }
         }

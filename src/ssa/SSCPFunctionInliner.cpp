@@ -26,7 +26,7 @@ void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
         countCallsInBody(func.Body);
 }
 
-bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunction& func)
+bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func)
 {
     bool inlinedAny = false;
 
@@ -38,10 +38,10 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunctio
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    if (attemptAdvancedInlining(call, func, body, i)) { //< Try advanced inlining first (for constant parameters)
+                    if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first (for constant parameters)
                         changed = true;
                         break;
-                    } else if (mCallCounts[func.Name] == 1 && inlineFunctionCall(call, func, body, i)) { //< Fall back to basic inlining for single-call functions
+                    } else if (mCallCounts[func.Name] == 1 && inlineFunctionCall(ctx, call, func, body, i)) { //< Fall back to basic inlining for single-call functions
                         changed = true;
                         break;
                     } else if (tryInlineIntrinsic(call, func, body, i)) {
@@ -69,113 +69,86 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAProgram& program, SSAFunctio
     return inlinedAny;
 }
 
-bool SSCPFunctionInliner::inlineFunctionCall(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunction& func, const SSAInstrCall* call,
+                                                  InstructionList& outInlinedBody, bool runOptimization)
 {
-    if (func.External)
-        return false;
-
-    PEXPR_ASSERT(func.Parameters.size() == call->Arguments.size(), "Call parameters must match function parameters at this point");
+    PEXPR_UNUSED(ctx); // < TODO
+    
+    PEXPR_ASSERT(func.Parameters.size() == call->Arguments.size(), "Call parameters must match function parameters");
 
     // Create a mapping from parameter names to argument values
     std::unordered_map<std::string, SSAValue> paramMap;
     for (size_t i = 0; i < func.Parameters.size(); ++i)
         paramMap[func.Parameters[i]] = call->Arguments[i];
 
-    // Create instructions for the inlined body
-    InstructionList inlinedInstructions;
-    inlinedInstructions.reserve(func.Body.size());
+    // Lambda to map a value through the parameter map
+    auto mapValue = [&paramMap](SSAValue& val) {
+        if (val.Kind != SSAValue::Kind::Constant) {
+            if (auto paramIt = paramMap.find(val.Name); paramIt != paramMap.end())
+                val = paramIt->second;
+        }
+    };
 
-    SSAValue returnValue;
+    outInlinedBody.clear();
+    outInlinedBody.reserve(func.Body.size());
 
     for (const auto& instrPtr : func.Body) {
         if (!instrPtr)
             continue;
 
-        // Clone the instruction
+        // Clone instruction (works for any type due to copy semantics)
         std::shared_ptr<SSAInstr> cloned;
 
         if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
-            auto newAsg = std::make_shared<SSAInstrAssign>(*asg);
-
-            // Map operand names (parameters to arguments)
-            for (auto& op : newAsg->Operands) {
-                if (op.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(op.Name); paramIt != paramMap.end())
-                        op = paramIt->second;
-                }
-            }
-
-            cloned = newAsg;
-        } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
-            returnValue = ret->Value;
-
-            // Map the return value if needed
-            if (returnValue.Kind != SSAValue::Kind::Constant) {
-                if (auto paramIt = paramMap.find(returnValue.Name); paramIt != paramMap.end())
-                    returnValue = paramIt->second;
-            }
-
-            // Don't add the return instruction to the inlined body
-            continue;
-        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
-            auto newBr = std::make_shared<SSAInstrBranch>(*br);
-
-            // Map condition
-            if (newBr->Condition.Kind != SSAValue::Kind::Constant) {
-                if (auto paramIt = paramMap.find(newBr->Condition.Name); paramIt != paramMap.end())
-                    newBr->Condition = paramIt->second;
-            }
-
-            cloned = newBr;
+            cloned = std::make_shared<SSAInstrAssign>(*asg);
         } else if (auto callInstr = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
-            auto newCall = std::make_shared<SSAInstrCall>(*callInstr);
-
-            // Map arguments
-            for (auto& arg : newCall->Arguments) {
-                if (arg.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(arg.Name); paramIt != paramMap.end())
-                        arg = paramIt->second;
-                }
-            }
-
-            cloned = newCall;
+            cloned = std::make_shared<SSAInstrCall>(*callInstr);
+        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
+            cloned = std::make_shared<SSAInstrBranch>(*br);
         } else if (auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
-            auto newPhi = std::make_shared<SSAInstrPhi>(*phi);
-
-            // Map conditions and branches
-            for (auto& cond : newPhi->Conditions) {
-                if (cond.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(cond.Name); paramIt != paramMap.end())
-                        cond = paramIt->second;
-                }
-            }
-
-            for (auto& branch : newPhi->Branches) {
-                if (branch.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(branch.Name); paramIt != paramMap.end())
-                        branch = paramIt->second;
-                }
-            }
-
-            cloned = newPhi;
+            cloned = std::make_shared<SSAInstrPhi>(*phi);
+        } else if (auto label = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
+            cloned = std::make_shared<SSAInstrLabel>(*label);
+        } else if (auto gotoInstr = dynamic_cast<const SSAInstrGoto*>(instrPtr.get())) {
+            cloned = std::make_shared<SSAInstrGoto>(*gotoInstr);
+        } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
+            cloned = std::make_shared<SSAInstrReturn>(*ret);
         } else {
-            cloned = instrPtr;
+            PEXPR_ASSERT(false, "Unhandled SSAInstr type in cloneAndMapFunctionBody");
+            continue;
         }
 
-        if (cloned)
-            inlinedInstructions.push_back(cloned);
+        // Use forEachValue to map all parameters to arguments
+        cloned->forEachValue(mapValue);
+
+        outInlinedBody.push_back(cloned);
     }
 
-    // Replace the call with the inlined instructions
-    // Create an assignment from the return value to the call's target
+    // Apply all the optimization possible on instructions
+    if (runOptimization)
+        SSAPassSSCP::Run(mOptions, outInlinedBody);
 
-    auto assign      = std::make_shared<SSAInstrAssign>();
-    assign->Target   = call->Target;
-    assign->Operator = SSAInstrAssign::OpKind::Assign;
-    assign->Operands = { returnValue };
-    inlinedInstructions.push_back(assign);
+    PEXPR_ASSERT(dynamic_cast<const SSAInstrReturn*>(outInlinedBody.back().get()) != nullptr, "Expected the last entry to be a return statement");
 
-    // Replace the call with inlined instructions
+    // Replace the return statement and assign the return value of it to the target
+    auto assign           = std::make_shared<SSAInstrAssign>();
+    assign->Target        = call->Target;
+    assign->Operator      = SSAInstrAssign::OpKind::Assign;
+    assign->Operands      = { dynamic_cast<const SSAInstrReturn*>(outInlinedBody.back().get())->Value };
+    outInlinedBody.back() = std::move(assign);
+}
+
+bool SSCPFunctionInliner::inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+{
+    if (func.External)
+        return false;
+
+    InstructionList inlinedInstructions;
+
+    // Use common helper to clone and map function body
+    cloneAndMapFunctionBody(ctx, func, call, inlinedInstructions, false);
+
+    // Replace the call with the optimized inlined instructions
     instructions.erase(instructions.begin() + callIndex);
     instructions.insert(instructions.begin() + callIndex, inlinedInstructions.begin(), inlinedInstructions.end());
 
@@ -243,7 +216,7 @@ bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& orig
     // return inlinedEffective == 1 || inlinedEffective < originalEffective / 2;
 }
 
-bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+bool SSCPFunctionInliner::attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
 {
     if (!shouldInlineFunctionCall(call, func))
         return false;
@@ -251,95 +224,10 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunctio
     auto& attemptInfo = mInlineAttempts[func.Name];
     attemptInfo.attempts++;
 
-    // Create a mapping from parameter names to argument values
-    std::unordered_map<std::string, SSAValue> paramMap;
-    for (size_t i = 0; i < func.Parameters.size(); ++i)
-        paramMap[func.Parameters[i]] = call->Arguments[i];
-
-    // Create instructions for the inlined body
     InstructionList inlinedInstructions;
-    inlinedInstructions.reserve(func.Body.size());
 
-    for (const auto& instrPtr : func.Body) {
-        if (!instrPtr)
-            continue;
-
-        // Clone the instruction
-        std::shared_ptr<SSAInstr> cloned;
-
-        if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
-            auto newAsg = std::make_shared<SSAInstrAssign>(*asg);
-
-            // Map operand names (parameters to arguments)
-            for (auto& op : newAsg->Operands) {
-                if (op.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(op.Name); paramIt != paramMap.end())
-                        op = paramIt->second;
-                }
-            }
-
-            cloned = newAsg;
-        } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
-            auto newRet = std::make_shared<SSAInstrReturn>(*ret);
-
-            // Map the return value if needed
-            if (newRet->Value.Kind != SSAValue::Kind::Constant) {
-                if (auto paramIt = paramMap.find(newRet->Value.Name); paramIt != paramMap.end())
-                    newRet->Value = paramIt->second;
-            }
-
-            cloned = newRet;
-        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
-            auto newBr = std::make_shared<SSAInstrBranch>(*br);
-
-            // Map condition
-            if (newBr->Condition.Kind != SSAValue::Kind::Constant) {
-                if (auto paramIt = paramMap.find(newBr->Condition.Name); paramIt != paramMap.end())
-                    newBr->Condition = paramIt->second;
-            }
-
-            cloned = newBr;
-        } else if (auto callInstr = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
-            auto newCall = std::make_shared<SSAInstrCall>(*callInstr);
-
-            // Map arguments
-            for (auto& arg : newCall->Arguments) {
-                if (arg.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(arg.Name); paramIt != paramMap.end())
-                        arg = paramIt->second;
-                }
-            }
-
-            cloned = newCall;
-        } else if (auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
-            auto newPhi = std::make_shared<SSAInstrPhi>(*phi);
-
-            // Map conditions and branches
-            for (auto& cond : newPhi->Conditions) {
-                if (cond.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(cond.Name); paramIt != paramMap.end())
-                        cond = paramIt->second;
-                }
-            }
-
-            for (auto& branch : newPhi->Branches) {
-                if (branch.Kind != SSAValue::Kind::Constant) {
-                    if (auto paramIt = paramMap.find(branch.Name); paramIt != paramMap.end())
-                        branch = paramIt->second;
-                }
-            }
-
-            cloned = newPhi;
-        } else {
-            cloned = instrPtr;
-        }
-
-        if (cloned)
-            inlinedInstructions.push_back(cloned);
-    }
-
-    // Apply all the optimization possible on instructions
-    SSAPassSSCP::Run(mOptions, inlinedInstructions);
+    // Use common helper to clone and map function body (keep return instruction for optimization)
+    cloneAndMapFunctionBody(ctx, func, call, inlinedInstructions, true);
 
     // Check if optimization resulted in something simpler
     if (inlinedInstructions.empty() || !isSimplerAfterOptimization(func.Body, inlinedInstructions)) {
@@ -347,15 +235,6 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAInstrCall* call, SSAFunctio
         attemptInfo.failed = true;
         return false;
     }
-
-    PEXPR_ASSERT(dynamic_cast<const SSAInstrReturn*>(inlinedInstructions.back().get()) != nullptr, "Expected the last entry to be a return statement");
-
-    // Replace the return statement and assign the return value of it to the target
-    auto assign                = std::make_shared<SSAInstrAssign>();
-    assign->Target             = call->Target;
-    assign->Operator           = SSAInstrAssign::OpKind::Assign;
-    assign->Operands           = { dynamic_cast<const SSAInstrReturn*>(inlinedInstructions.back().get())->Value };
-    inlinedInstructions.back() = std::move(assign);
 
     // Replace the call with the optimized inlined instructions
     instructions.erase(instructions.begin() + callIndex);

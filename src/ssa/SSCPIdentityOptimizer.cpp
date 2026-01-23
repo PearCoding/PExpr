@@ -324,21 +324,20 @@ bool SSCPIdentityOptimizer::isConstantNumber(const SSAValue& val, Number& outVal
     return false;
 }
 
-std::string SSCPIdentityOptimizer::createTempAssignment(SSAContext* ctx,
-                                                        InstructionList& instructions, size_t insertPos,
-                                                        SSAInstrAssign::OpKind opKind,
-                                                        const std::vector<SSAValue>& operands,
-                                                        ElementaryType type)
+SSAValue SSCPIdentityOptimizer::createTempAssignment(SSAContext* ctx,
+                                                     InstructionList& instructions, size_t insertPos,
+                                                     SSAInstrAssign::OpKind opKind,
+                                                     const std::vector<SSAValue>& operands,
+                                                     ElementaryType type)
 {
-    const auto name    = ctx->fresh("%");
     auto newInstr      = std::make_shared<SSAInstrAssign>();
-    newInstr->Target   = SSAValue(SSAValue::Kind::Temp, name, type);
+    newInstr->Target   = SSAValue(SSAValue::Kind::Temp, ctx->fresh("%"), type);
     newInstr->Operator = opKind;
     newInstr->Operands = operands;
 
     instructions.insert(instructions.begin() + insertPos, newInstr);
 
-    return name;
+    return newInstr->Target;
 }
 
 } // namespace PExpr::ssa
