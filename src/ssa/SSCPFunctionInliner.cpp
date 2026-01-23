@@ -184,14 +184,9 @@ bool SSCPFunctionInliner::inlineFunctionCall(SSAInstrCall* call, SSAFunction& fu
 
 void SSCPFunctionInliner::removeUnusedFunctions(SSAProgram& program)
 {
-    // Remove functions that are never called and are not external
+    // Remove functions that are never called
     auto it = program.Functions.begin();
     while (it != program.Functions.end()) {
-        if (it->External) {
-            ++it;
-            continue;
-        }
-
         auto callCountIt = mCallCounts.find(it->Name);
         if (callCountIt == mCallCounts.end() || callCountIt->second == 0)
             it = program.Functions.erase(it);
