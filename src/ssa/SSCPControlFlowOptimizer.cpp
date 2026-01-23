@@ -247,32 +247,10 @@ void SSCPControlFlowOptimizer::countUsesInInstr(const SSAInstr* instr)
 {
     if (!instr)
         return;
-    if (auto a = dynamic_cast<const SSAInstrAssign*>(instr)) {
-        for (const auto& op : a->Operands) {
-            if (op.Kind != SSAValue::Kind::Constant)
-                ++mUseCount[op.Name];
-        }
-    } else if (auto c = dynamic_cast<const SSAInstrCall*>(instr)) {
-        for (const auto& arg : c->Arguments) {
-            if (arg.Kind != SSAValue::Kind::Constant)
-                ++mUseCount[arg.Name];
-        }
-    } else if (auto r = dynamic_cast<const SSAInstrReturn*>(instr)) {
-        if (r->Value.Kind != SSAValue::Kind::Constant)
-            ++mUseCount[r->Value.Name];
-    } else if (auto b = dynamic_cast<const SSAInstrBranch*>(instr)) {
-        if (b->Condition.Kind != SSAValue::Kind::Constant)
-            ++mUseCount[b->Condition.Name];
-    } else if (auto p = dynamic_cast<const SSAInstrPhi*>(instr)) {
-        for (const auto& s : p->Conditions) {
-            if (s.Kind != SSAValue::Kind::Constant)
-                ++mUseCount[s.Name];
-        }
-        for (const auto& s : p->Branches) {
-            if (s.Kind != SSAValue::Kind::Constant)
-                ++mUseCount[s.Name];
-        }
-    }
+    instr->forEachValue([this](const SSAValue& val) {
+        if (val.Kind != SSAValue::Kind::Constant)
+            ++mUseCount[val.Name];
+    });
 }
 
 bool SSCPControlFlowOptimizer::instrHasSideEffects(const SSAInstr* instr, const std::unordered_set<std::string>& sideEffectFunctions) const

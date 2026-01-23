@@ -1,9 +1,11 @@
 #pragma once
 
 #include "SSAOptions.h"
+#include "SSAContext.h"
 #include "SSCPConstantFolder.h"
 #include "SSCPControlFlowOptimizer.h"
 #include "SSCPFunctionInliner.h"
+#include "SSCPIdentityOptimizer.h"
 #include "SSCPSideEffectAnalyzer.h"
 
 #include <memory>
@@ -31,10 +33,14 @@ private:
 
     const SSAOptions mOptions;
 
+    // SSA Context for variable name generation
+    std::unique_ptr<SSAContext> mContext;
+
     // Components
     std::unique_ptr<SSCPConstantFolder> mConstantFolder;
     std::unique_ptr<SSCPControlFlowOptimizer> mControlFlowOptimizer;
     std::unique_ptr<SSCPFunctionInliner> mFunctionInliner;
+    std::unique_ptr<SSCPIdentityOptimizer> mIdentityOptimizer;
     std::unique_ptr<SSCPSideEffectAnalyzer> mSideEffectAnalyzer;
 };
 

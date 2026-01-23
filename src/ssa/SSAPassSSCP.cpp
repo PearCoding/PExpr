@@ -1,7 +1,9 @@
 #include "SSAPassSSCP.h"
+#include "SSAContext.h"
 #include "SSCPConstantFolder.h"
 #include "SSCPControlFlowOptimizer.h"
 #include "SSCPFunctionInliner.h"
+#include "SSCPIdentityOptimizer.h"
 #include "SSCPSideEffectAnalyzer.h"
 
 namespace PExpr::ssa {
@@ -12,9 +14,11 @@ extern void setupIntrinsics(SSCPFunctionInliner& inliner);
 
 SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     : mOptions(opts)
+    , mContext(std::make_unique<SSAContext>())
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
     , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>())
     , mFunctionInliner(std::make_unique<SSCPFunctionInliner>(opts))
+    , mIdentityOptimizer(std::make_unique<SSCPIdentityOptimizer>(opts))
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
 {
     intrinsics::setupIntrinsics(*mFunctionInliner);
@@ -67,16 +71,19 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
             }
         }
 
-        if (mOptions.RemoveDeadCode) {
-            // Remove unused functions after inlining
+        // Remove unused functions after inlining
+        if (mOptions.RemoveDeadCode)
             mFunctionInliner->removeUnusedFunctions(program);
-        }
     }
 }
 
 bool SSAPassSSCP::processBody(InstructionList& body)
 {
     bool changed = false;
+
+    // 0) Analyze body to update SSA context with current variable counters
+    mContext->reset();
+    mContext->analyze(body);
 
     // 1) Replace operands with known constants where possible
     if (mConstantFolder->replaceOperandIfConst(body))
@@ -88,25 +95,31 @@ bool SSAPassSSCP::processBody(InstructionList& body)
             changed = true;
     }
 
-    // 3) Count uses
+    if (mOptions.ApplyMathIdentities) {
+        // 3) Apply mathematical identity optimizations
+        if (mIdentityOptimizer->applyIdentities(mContext.get(), body))
+            changed = true;
+    }
+
+    // 4) Count uses
     mControlFlowOptimizer->resetAndCountUses(body);
 
     if (mOptions.RemoveDeadCode) {
-        // 4) Remove dead assigns without side effects
+        // 5) Remove dead assigns without side effects
         if (mControlFlowOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
             changed = true;
     }
 
-    // 5) Remove empty branches
+    // 6) Remove empty branches
     if (mControlFlowOptimizer->removeEmptyBranches(body))
         changed = true;
 
-    // 6) Handle unused labels
+    // 7) Handle unused labels
     if (mControlFlowOptimizer->removeObsoleteLabels(body))
         changed = true;
 
     if (mOptions.RemoveDeadCode) {
-        // 7) Collapse phi nodes
+        // 8) Collapse phi nodes
         if (mControlFlowOptimizer->collapsePhiNodes(body))
             changed = true;
     }

@@ -502,19 +502,16 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
     return std::nullopt;
 }
 
-bool SSCPConstantFolder::replaceOperandIfConst(std::vector<SSAValue>& ops)
+bool SSCPConstantFolder::replaceOperandIfConst(SSAValue& op)
 {
-    bool changed = false;
-    for (auto& o : ops) {
-        if (o.Kind == SSAValue::Kind::Constant)
-            continue;
-        auto it = mConstants.find(o.Name);
-        if (it != mConstants.end()) {
-            o       = it->second;
-            changed = true;
-        }
+    if (op.Kind == SSAValue::Kind::Constant)
+        return false;
+
+    if (const auto it = mConstants.find(op.Name); it != mConstants.end()) {
+        op = it->second;
+        return true;
     }
-    return changed;
+    return false;
 }
 
 bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
@@ -523,34 +520,10 @@ bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
     for (auto& instrPtr : instructions) {
         if (!instrPtr)
             continue;
-        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            if (replaceOperandIfConst(asg->Operands))
+        instrPtr->forEachValue([&](SSAValue& val) {
+            if (replaceOperandIfConst(val))
                 changed = true;
-        } else if (auto call = dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
-            if (replaceOperandIfConst(call->Arguments))
-                changed = true;
-        } else if (auto ret = dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
-            if (ret->Value.Kind != SSAValue::Kind::Constant) {
-                auto it = mConstants.find(ret->Value.Name);
-                if (it != mConstants.end()) {
-                    ret->Value = it->second;
-                    changed    = true;
-                }
-            }
-        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
-            if (replaceOperandIfConst(phi->Conditions))
-                changed = true;
-            if (replaceOperandIfConst(phi->Branches))
-                changed = true;
-        } else if (auto br = dynamic_cast<SSAInstrBranch*>(instrPtr.get())) {
-            if (br->Condition.Kind != SSAValue::Kind::Constant) {
-                auto it = mConstants.find(br->Condition.Name);
-                if (it != mConstants.end()) {
-                    br->Condition = it->second;
-                    changed       = true;
-                }
-            }
-        }
+        });
     }
     return changed;
 }

@@ -7,315 +7,13 @@
 #include <sstream>
 
 namespace PExpr::ssa {
-
-// Strings
-
-static inline std::string_view toInstructionString(UnaryOperation op)
-{
-    switch (op) {
-    case UnaryOperation::Pos:
-        return "pos";
-    case UnaryOperation::Neg:
-        return "neg";
-    case UnaryOperation::Not:
-        return "not";
-    default:
-        PEXPR_ASSERT(false, "Invalid unary operation enum");
-        return "";
-    }
-}
-
-static inline std::string_view toInstructionString(BinaryOperation op)
-{
-    switch (op) {
-    case BinaryOperation::Add:
-        return "add";
-    case BinaryOperation::Sub:
-        return "sub";
-    case BinaryOperation::Mul:
-        return "mul";
-    case BinaryOperation::Div:
-        return "div";
-    case BinaryOperation::Pow:
-        return "pow";
-    case BinaryOperation::Mod:
-        return "mod";
-    case BinaryOperation::And:
-        return "and";
-    case BinaryOperation::Or:
-        return "or";
-    case BinaryOperation::Less:
-        return "ls";
-    case BinaryOperation::Greater:
-        return "gt";
-    case BinaryOperation::LessEqual:
-        return "le";
-    case BinaryOperation::GreaterEqual:
-        return "ge";
-    case BinaryOperation::Equal:
-        return "eq";
-    case BinaryOperation::NotEqual:
-        return "neq";
-    default:
-        PEXPR_ASSERT(false, "Invalid binary operation enum");
-        return "";
-    }
-}
-
-// SSAValue / Instr dumps
-
-std::string SSAValue::toString(bool showType) const
-{
-    std::string prefix;
-    if (this->Kind == Kind::Constant) {
-        switch (this->Type) {
-        case ElementaryType::Boolean:
-            prefix = std::get<bool>(Value) ? "true" : "false";
-            break;
-        case ElementaryType::Integer:
-            prefix = std::to_string(std::get<Integer>(Value));
-            break;
-        case ElementaryType::Number:
-            prefix = std::to_string(std::get<Number>(Value));
-            break;
-        case ElementaryType::String:
-            prefix = "\"" + std::get<std::string>(Value) + "\"";
-            break;
-        default:
-            if (this->Type >= ElementaryType::Vec1) {
-                const auto v = std::get<VecN>(Value);
-                PEXPR_ASSERT(v.size() == typeArraySize(this->Type), "Vector data and vector type missmatch");
-
-                if (v.empty()) {
-                    prefix = "[]";
-                } else {
-                    prefix = "[" + std::to_string(v[0]);
-                    for (size_t i = 1; i < v.size(); ++i)
-                        prefix += "," + std::to_string(v[i]);
-                    prefix += "]";
-                }
-            } else {
-                PEXPR_ASSERT(false, "Expected specified type for SSAValue constants");
-            }
-        }
-    } else {
-        prefix = Name;
-    }
-
-    if (prefix.empty())
-        return std::string("_");
-
-    if ((showType || this->Kind == Kind::Constant) && Type != PExpr::ElementaryType::Unspecified) {
-        std::stringstream ss;
-        ss << prefix << ":" << std::string(PExpr::toString(Type));
-        return ss.str();
-    }
-    return prefix;
-}
-
-std::string SSAValue::baseName() const
-{
-    PEXPR_ASSERT(Kind == SSAValue::Kind::Named, "Only named values have a base name");
-    if (Name.empty())
-        return std::string();
-    auto pos = Name.find('.');
-    if (pos == std::string::npos)
-        return Name;
-    return Name.substr(0, pos);
-}
-
-std::string SSAInstrAssign::dump() const
-{
-    std::stringstream ss;
-    ss << Target.toString(true) << " = ";
-    switch (Operator) {
-    case OpKind::Assign:
-        ss << "assign";
-        break;
-    case OpKind::Unary:
-        ss << toInstructionString(UnaryOp);
-        break;
-    case OpKind::Binary:
-        ss << toInstructionString(BinaryOp);
-        break;
-    case OpKind::Swizzle:
-        ss << "swizzle[" << Swizzle << "]";
-        break;
-    case OpKind::Access:
-        ss << "access";
-        break;
-    case OpKind::Vector:
-        ss << "vec[" << Operands.size() << "]";
-        break;
-    case OpKind::Nop:
-        ss << "nop";
-        break;
-    case OpKind::Cast:
-        ss << "cast";
-        break;
-    default:
-        ss << "unknown";
-        break;
-    }
-    ss << "(";
-    for (size_t i = 0; i < Operands.size(); ++i) {
-        if (i)
-            ss << ", ";
-        ss << Operands[i].toString(false);
-    }
-    ss << ")";
-    return ss.str();
-}
-
-std::string SSAInstrCall::dump() const
-{
-    std::stringstream ss;
-    ss << Target.toString(true) << " = call[" << FunctionName << "](";
-    for (size_t i = 0; i < Arguments.size(); ++i) {
-        if (i)
-            ss << ", ";
-        ss << Arguments[i].toString(false);
-    }
-    ss << ")";
-    return ss.str();
-}
-
-std::string SSAInstrReturn::dump() const
-{
-    std::stringstream ss;
-    ss << "return " << Value.toString(false);
-    return ss.str();
-}
-
-std::string SSAInstrLabel::dump() const
-{
-    return std::string(Name + ":");
-}
-
-std::string SSAInstrBranch::dump() const
-{
-    std::stringstream ss;
-    ss << "br " << Condition.toString(false) << " -> " << TargetLabel;
-    return ss.str();
-}
-
-std::string SSAInstrGoto::dump() const
-{
-    return std::string("goto " + TargetLabel);
-}
-
-std::string SSAInstrPhi::dump() const
-{
-    std::stringstream ss;
-    ss << Target.toString(true) << " = phi[";
-    for (size_t i = 0; i < Conditions.size(); ++i) {
-        if (i)
-            ss << ", ";
-        ss << Conditions[i].toString(false);
-    }
-    ss << "](";
-    for (size_t i = 0; i < Branches.size(); ++i) {
-        if (i)
-            ss << ", ";
-        ss << Branches[i].toString(false);
-    }
-    ss << ")";
-    return ss.str();
-}
-
-std::string SSAFunction::dump() const
-{
-    std::stringstream ss;
-    if (External)
-        ss << "extern ";
-    if (External && !HasSideEffect)
-        ss << "pure ";
-    ss << "fn " << Name << "(";
-    for (size_t i = 0; i < Parameters.size(); ++i) {
-        if (i)
-            ss << ", ";
-        ss << Parameters[i];
-    }
-    ss << ")";
-    if (ReturnType != PExpr::ElementaryType::Unspecified)
-        ss << ":" << PExpr::toString(ReturnType);
-    ss << std::endl;
-
-    if (!Body.empty()) {
-        for (const auto& instr : Body)
-            ss << "  " << instr->dump() << std::endl;
-        ss << "endfn" << std::endl;
-    }
-    return ss.str();
-}
-
-std::string SSAProgram::dump() const
-{
-    std::stringstream ss;
-    for (const auto& f : Functions)
-        ss << f.dump() << std::endl;
-    for (const auto& instr : Body)
-        ss << instr->dump() << std::endl;
-    return ss.str();
-}
-
-// SSAMapper implementation
-
 SSAMapper::SSAMapper() = default;
 
 SSAProgram SSAMapper::map(const Ptr<Closure>& closure)
 {
-    mCounters.clear();
+    mContext.reset();
     mExprValues.clear();
-    mScopeStack.clear();
     return mapClosure(closure);
-}
-
-std::string SSAMapper::fresh(const std::string& base, bool updateScope)
-{
-    int& c = mCounters[base];
-    ++c;
-    if (updateScope && !mScopeStack.empty())
-        currentScope()[base] = c;
-    std::stringstream ss;
-    ss << base << "." << c;
-    return ss.str();
-}
-
-void SSAMapper::pushScope()
-{
-    if (mScopeStack.empty())
-        mScopeStack.emplace_back();
-    else
-        mScopeStack.push_back(currentScope()); // copy current scope
-}
-
-void SSAMapper::popScope()
-{
-    PEXPR_ASSERT(!mScopeStack.empty(), "Scope stack underflow");
-    mScopeStack.pop_back();
-}
-
-int SSAMapper::getCurrentVersion(const std::string& base) const
-{
-    if (mScopeStack.empty())
-        return 0;
-    const auto& scope = currentScope();
-    if (const auto it = scope.find(base); it != scope.end())
-        return it->second;
-    return 0;
-}
-
-std::unordered_map<std::string, int>& SSAMapper::currentScope()
-{
-    PEXPR_ASSERT(!mScopeStack.empty(), "No scope active");
-    return mScopeStack.back();
-}
-
-const std::unordered_map<std::string, int>& SSAMapper::currentScope() const
-{
-    PEXPR_ASSERT(!mScopeStack.empty(), "No scope active");
-    return mScopeStack.back();
 }
 
 // Inline a mapped closure body into the current program by replacing any
@@ -329,7 +27,7 @@ SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std
         if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
             // create assignment to capture returned value
             SSAInstrAssign asg;
-            SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), ret->Value.Type);
+            SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), ret->Value.Type);
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { ret->Value };
@@ -349,7 +47,7 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
     if (!closure)
         return SSAProgram{};
 
-    pushScope();
+    mContext.pushScope();
     auto program = SSAProgram{};
 
     // map statements
@@ -364,7 +62,7 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
         program.Body.push_back(ret);
     }
 
-    popScope();
+    mContext.popScope();
     return program;
 }
 
@@ -379,7 +77,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name(), true), rhs.Type);
+        SSAValue tgt(SSAValue::Kind::Named, mContext.fresh(var->name(), true), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -392,7 +90,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, fresh(var->name(), true), rhs.Type);
+        SSAValue tgt(SSAValue::Kind::Named, mContext.fresh(var->name(), true), rhs.Type);
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -426,7 +124,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         // unsupported - emit comment as an assign to a dummy temp
         {
             SSAInstrAssign asg;
-            asg.Target   = SSAValue(SSAValue::Kind::Temp, fresh("tmp"), ElementaryType::Unspecified);
+            asg.Target   = SSAValue(SSAValue::Kind::Temp, mContext.fresh("tmp"), ElementaryType::Unspecified);
             asg.Operator = SSAInstrAssign::OpKind::Nop;
             program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         }
@@ -483,7 +181,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     } break;
     case ExpressionType::Variable: {
         auto v      = std::reinterpret_pointer_cast<VariableExpression>(expr);
-        int version = getCurrentVersion(v->name());
+        int version = mContext.getCurrentVersion(v->name());
         if (version > 0) {
             std::stringstream ss;
             ss << v->name() << "." << version;
@@ -499,7 +197,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         for (const auto& e : v->entries())
             inners.push_back(mapExpression(program, e));
 
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), v->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), v->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Vector;
@@ -510,7 +208,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
         SSAValue inner = mapExpression(program, u->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), u->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Unary;
@@ -523,7 +221,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto b     = std::reinterpret_pointer_cast<BinaryExpression>(expr);
         SSAValue L = mapExpression(program, b->left());
         SSAValue R = mapExpression(program, b->right());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), b->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Binary;
@@ -540,7 +238,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             args.push_back(mapExpression(program, p));
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
-        SSAValue tgt(SSAValue::Kind::Temp, fresh(c->name()), c->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh(c->name()), c->returnType());
         auto call                = std::make_shared<SSAInstrCall>();
         call->Target             = tgt;
         call->FunctionName       = c->mangledName();
@@ -552,7 +250,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Swizzle: {
         auto a      = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
         SSAValue in = mapExpression(program, a->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), a->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Swizzle;
@@ -565,7 +263,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto a       = std::reinterpret_pointer_cast<AccessExpression>(expr);
         SSAValue in  = mapExpression(program, a->inner());
         SSAValue cst = SSAValue::Constant((Integer)a->index());
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), a->returnType());
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Access;
@@ -582,7 +280,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             result = inner;
         } else {
             SSAInstrAssign cast;
-            SSAValue tgt(SSAValue::Kind::Temp, fresh("%"), c->toType());
+            SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), c->toType());
             cast.Target   = tgt;
             cast.Operator = SSAInstrAssign::OpKind::Cast;
             cast.Operands = { inner };
@@ -604,9 +302,9 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         std::vector<std::string> branchLabels;
         branchLabels.reserve(br->branches().size());
         for (size_t i = 0; i < br->branches().size(); ++i)
-            branchLabels.push_back(fresh("lbl"));
-        std::string elseLabel = fresh("lbl");
-        std::string joinLabel = fresh("lbl");
+            branchLabels.push_back(mContext.fresh("lbl"));
+        std::string elseLabel = mContext.fresh("lbl");
+        std::string joinLabel = mContext.fresh("lbl");
 
         // Emit conditional branches for each branch condition that jump to their label
         std::vector<SSAValue> conditionVals;
@@ -663,7 +361,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         ElementaryType phiType = expr->returnType();
 
         // create phi target with chosen type
-        SSAValue tgt(SSAValue::Kind::Temp, fresh("phi"), phiType);
+        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("phi"), phiType);
         auto phi    = std::make_shared<SSAInstrPhi>();
         phi->Target = tgt;
 

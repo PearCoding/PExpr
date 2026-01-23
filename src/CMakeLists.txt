@@ -15,11 +15,14 @@ set(PUBLIC
     internal/ConsoleLogListener.h
     internal/Transpiler.h
     
+    ssa/SSAStructs.h
     ssa/SSAMapper.h
     ssa/SSAValidator.h
+    ssa/SSAContext.h
     ssa/SSCPConstantFolder.h
     ssa/SSCPControlFlowOptimizer.h
     ssa/SSCPFunctionInliner.h
+    ssa/SSCPIdentityOptimizer.h
     ssa/SSCPSideEffectAnalyzer.h
     ssa/SSAPassSSCP.h
 )
@@ -32,12 +35,15 @@ set(SRC
     Reporter.cpp
 
     ssa/Intrinsics.cpp
+    ssa/SSAStructs.cpp
     ssa/SSAMapper.cpp
     ssa/SSAValidator.cpp
+    ssa/SSAContext.cpp
     ssa/SSAPassSSCP.cpp
     ssa/SSCPConstantFolder.cpp
     ssa/SSCPControlFlowOptimizer.cpp
     ssa/SSCPFunctionInliner.cpp
+    ssa/SSCPIdentityOptimizer.cpp
     ssa/SSCPSideEffectAnalyzer.cpp
 
     internal/ConsoleLogListener.cpp
