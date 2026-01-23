@@ -34,7 +34,14 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
 
 bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    // The following is always enabled as it clears it up internally and has no side-effects
+    if (matchAssignIdentity(ctx, instructions, currentIndex))
+        return true;
+
     if (mOptions.ApplyMathIdentities) {
+        if (matchUnaryIdentity(ctx, instructions, currentIndex))
+            return true;
+
         if (matchSquareToPowerIdentity(ctx, instructions, currentIndex))
             return true;
     }
@@ -57,6 +64,81 @@ bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& i
     }
 
     return false;
+}
+
+bool SSCPIdentityOptimizer::matchAssignIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+{
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
+    if (asg->Operator != SSAInstrAssign::OpKind::Assign || asg->Operands.size() != 1)
+        return false;
+
+    const auto asg2 = dynamic_cast<const SSAInstrAssign*>(getDefinition(asg->Operands[0]));
+
+    if (!asg2)
+        return false;
+
+    if (asg2->Operator != SSAInstrAssign::OpKind::Assign || asg2->Operands.size() != 1)
+        return false;
+
+    auto newAsg      = std::make_shared<SSAInstrAssign>();
+    newAsg->Target   = asg->Target;
+    newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+    newAsg->Operands = { asg2->Operands[0] };
+
+    mDefinitions[newAsg->Target.Name] = newAsg.get();
+    instructions[currentIndex]        = std::move(newAsg);
+    return true;
+}
+
+bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+{
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
+    if (asg->Operator != SSAInstrAssign::OpKind::Unary || asg->Operands.size() != 1)
+        return false;
+
+    // +a = a | Essentially just syntatic sugar
+    if (asg->UnaryOp != UnaryOperation::Pos) {
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { asg->Operands[0] };
+
+        mDefinitions[newAsg->Target.Name] = newAsg.get();
+        instructions[currentIndex]        = std::move(newAsg);
+        return true;
+    }
+
+    const auto operand = dynamic_cast<const SSAInstrAssign*>(getDefinition(asg->Operands[0]));
+
+    if (!operand)
+        return false;
+
+    // --a = a, !!a = a
+    if (operand->Operator != SSAInstrAssign::OpKind::Unary || asg->UnaryOp != operand->UnaryOp || operand->Operands.size() != 1)
+        return false;
+
+    PEXPR_ASSERT(asg->UnaryOp == UnaryOperation::Neg || asg->UnaryOp == UnaryOperation::Not, "Unknown unary operator given");
+
+    {
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { operand->Operands[0] };
+
+        mDefinitions[newAsg->Target.Name] = newAsg.get();
+        instructions[currentIndex]        = std::move(newAsg);
+    }
+    return true;
 }
 
 bool SSCPIdentityOptimizer::matchPythagoreanIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
@@ -163,17 +245,15 @@ bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, I
         || (isIntrinsic(call, "acos") && isCallToIntrinsic(operand, "cos"))
         || (isIntrinsic(call, "atan") && isCallToIntrinsic(operand, "tan"))) {
 
-        if (const auto it = mDefinitions.find(operand.Name); it != mDefinitions.end()) {
-            if (const auto call2 = dynamic_cast<const SSAInstrCall*>(it->second)) {
-                auto newAsg      = std::make_shared<SSAInstrAssign>();
-                newAsg->Target   = call->Target;
-                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
-                newAsg->Operands = { call2->Arguments.at(0) };
+        if (const auto call2 = dynamic_cast<const SSAInstrCall*>(getDefinition(operand))) {
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = call->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+            newAsg->Operands = { call2->Arguments.at(0) };
 
-                mDefinitions[newAsg->Target.Name] = newAsg.get();
-                instructions[currentIndex]        = std::move(newAsg);
-                return true;
-            }
+            mDefinitions[newAsg->Target.Name] = newAsg.get();
+            instructions[currentIndex]        = std::move(newAsg);
+            return true;
         }
     }
 
@@ -256,12 +336,7 @@ bool SSCPIdentityOptimizer::isCallToIntrinsic(const SSAValue& val, std::string_v
         return false;
 
     // Look up the definition
-    auto it = mDefinitions.find(val.Name);
-    if (it == mDefinitions.end())
-        return false;
-
-    const SSAInstr* def = it->second;
-    if (const auto call = dynamic_cast<const SSAInstrCall*>(def))
+    if (const auto call = dynamic_cast<const SSAInstrCall*>(getDefinition(val)))
         return isIntrinsic(call, funcName);
 
     return false;
@@ -355,4 +430,14 @@ bool SSCPIdentityOptimizer::isConstantNumber(const SSAValue& val, Number& outVal
     return false;
 }
 
+const SSAInstr* SSCPIdentityOptimizer::getDefinition(const SSAValue& val) const
+{
+    if (val.Kind == SSAValue::Kind::Constant)
+        return nullptr;
+
+    if (const auto it = mDefinitions.find(val.Name); it != mDefinitions.end())
+        return it->second;
+
+    return nullptr;
+}
 } // namespace PExpr::ssa

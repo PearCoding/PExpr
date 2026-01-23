@@ -20,8 +20,8 @@ public:
     }
 
     void analyzeCallGraph(const SSAProgram& program);
-    bool attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func);
-    void removeUnusedFunctions(SSAProgram& program);
+    [[nodiscard]] bool attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func);
+    [[nodiscard]] bool removeUnusedFunctions(SSAProgram& program);
 
     inline void addIntrinsic(const FunctionDef& func, SSAIntrinsicInlineCallback callback)
     {
@@ -39,12 +39,12 @@ private:
                                  InstructionList& outInlinedBody,
                                  bool runOptimization);
 
-    bool inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    bool shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func);
-    bool attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
+    [[nodiscard]] bool inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func);
+    [[nodiscard]] bool attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
 
-    bool tryInlineIntrinsic(SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool tryInlineIntrinsic(SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex);
 
     const SSAOptions mOptions;
     std::unordered_map<std::string, int> mCallCounts;

@@ -253,81 +253,47 @@ std::string SSAProgram::dump() const
     return ss.str();
 }
 
-// forEachValue implementations
-
-void SSAInstrAssign::forEachValue(const std::function<void(SSAValue&)>& visitor)
+void SSAInstrAssign::forEachOperand(const std::function<void(SSAValue&)>& visitor)
 {
-    visitor(Target);
     for (auto& op : Operands)
         visitor(op);
 }
 
-void SSAInstrAssign::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
+void SSAInstrAssign::forEachOperand(const std::function<void(const SSAValue&)>& visitor) const
 {
-    visitor(Target);
     for (const auto& op : Operands)
         visitor(op);
 }
 
-void SSAInstrCall::forEachValue(const std::function<void(SSAValue&)>& visitor)
+void SSAInstrAssign::forEachTarget(const std::function<void(SSAValue&)>& visitor) { visitor(Target); }
+
+void SSAInstrAssign::forEachTarget(const std::function<void(const SSAValue&)>& visitor) const { visitor(Target); }
+
+void SSAInstrCall::forEachOperand(const std::function<void(SSAValue&)>& visitor)
 {
-    visitor(Target);
     for (auto& arg : Arguments)
         visitor(arg);
 }
 
-void SSAInstrCall::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
+void SSAInstrCall::forEachOperand(const std::function<void(const SSAValue&)>& visitor) const
 {
-    visitor(Target);
     for (const auto& arg : Arguments)
         visitor(arg);
 }
 
-void SSAInstrReturn::forEachValue(const std::function<void(SSAValue&)>& visitor)
-{
-    visitor(Value);
-}
+void SSAInstrCall::forEachTarget(const std::function<void(SSAValue&)>& visitor) { visitor(Target); }
 
-void SSAInstrReturn::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
-{
-    visitor(Value);
-}
+void SSAInstrCall::forEachTarget(const std::function<void(const SSAValue&)>& visitor) const { visitor(Target); }
 
-void SSAInstrLabel::forEachValue(const std::function<void(SSAValue&)>& visitor)
-{
-    // Labels don't contain any SSAValues
-    (void)visitor;
-}
+void SSAInstrReturn::forEachOperand(const std::function<void(SSAValue&)>& visitor) { visitor(Value); }
 
-void SSAInstrLabel::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
-{
-    // Labels don't contain any SSAValues
-    (void)visitor;
-}
+void SSAInstrReturn::forEachOperand(const std::function<void(const SSAValue&)>& visitor) const { visitor(Value); }
 
-void SSAInstrBranch::forEachValue(const std::function<void(SSAValue&)>& visitor)
-{
-    visitor(Condition);
-}
+void SSAInstrBranch::forEachOperand(const std::function<void(SSAValue&)>& visitor) { visitor(Condition); }
 
-void SSAInstrBranch::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
-{
-    visitor(Condition);
-}
+void SSAInstrBranch::forEachOperand(const std::function<void(const SSAValue&)>& visitor) const { visitor(Condition); }
 
-void SSAInstrGoto::forEachValue(const std::function<void(SSAValue&)>& visitor)
-{
-    // Gotos don't contain any SSAValues
-    (void)visitor;
-}
-
-void SSAInstrGoto::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
-{
-    // Gotos don't contain any SSAValues
-    (void)visitor;
-}
-
-void SSAInstrPhi::forEachValue(const std::function<void(SSAValue&)>& visitor)
+void SSAInstrPhi::forEachOperand(const std::function<void(SSAValue&)>& visitor)
 {
     visitor(Target);
     for (auto& cond : Conditions)
@@ -336,7 +302,7 @@ void SSAInstrPhi::forEachValue(const std::function<void(SSAValue&)>& visitor)
         visitor(branch);
 }
 
-void SSAInstrPhi::forEachValue(const std::function<void(const SSAValue&)>& visitor) const
+void SSAInstrPhi::forEachOperand(const std::function<void(const SSAValue&)>& visitor) const
 {
     visitor(Target);
     for (const auto& cond : Conditions)
@@ -344,5 +310,9 @@ void SSAInstrPhi::forEachValue(const std::function<void(const SSAValue&)>& visit
     for (const auto& branch : Branches)
         visitor(branch);
 }
+
+void SSAInstrPhi::forEachTarget(const std::function<void(SSAValue&)>& visitor) { visitor(Target); }
+
+void SSAInstrPhi::forEachTarget(const std::function<void(const SSAValue&)>& visitor) const { visitor(Target); }
 
 } // namespace PExpr::ssa

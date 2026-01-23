@@ -48,12 +48,29 @@ public:
 struct SSAInstr {
     virtual ~SSAInstr()              = default;
     virtual std::string dump() const = 0;
-    
+
     /// Visit all SSAValues contained in this instruction
-    /// This allows generic traversal of instruction values without knowing the concrete type
     /// @param visitor A function that will be called for each SSAValue reference
-    virtual void forEachValue(const std::function<void(SSAValue&)>& visitor) = 0;
-    virtual void forEachValue(const std::function<void(const SSAValue&)>& visitor) const = 0;
+    inline void forEachValue(const std::function<void(SSAValue&)>& visitor)
+    {
+        forEachTarget(visitor);
+        forEachOperand(visitor);
+    };
+    inline void forEachValue(const std::function<void(const SSAValue&)>& visitor) const
+    {
+        forEachTarget(visitor);
+        forEachOperand(visitor);
+    };
+
+    /// Visit all SSAValues used as operands/arguments contained in this instruction
+    /// @param visitor A function that will be called for each SSAValue reference
+    virtual void forEachOperand(const std::function<void(SSAValue&)>& visitor) { PEXPR_UNUSED(visitor); };
+    virtual void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const { PEXPR_UNUSED(visitor); };
+
+    /// Visit all SSAValues used as targets contained in this instruction
+    /// @param visitor A function that will be called for each SSAValue reference
+    virtual void forEachTarget(const std::function<void(SSAValue&)>& visitor) { PEXPR_UNUSED(visitor); };
+    virtual void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const { PEXPR_UNUSED(visitor); };
 };
 
 struct SSAInstrAssign : public SSAInstr {
@@ -77,8 +94,10 @@ struct SSAInstrAssign : public SSAInstr {
     std::vector<SSAValue> Operands;
 
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachTarget(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 struct SSAInstrCall : public SSAInstr {
@@ -88,15 +107,17 @@ struct SSAInstrCall : public SSAInstr {
     std::vector<SSAValue> Arguments;
 
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachTarget(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 struct SSAInstrReturn : public SSAInstr {
     SSAValue Value;
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 // Label instruction to mark basic blocks in the SSA body. Labels are useful
@@ -105,8 +126,6 @@ struct SSAInstrReturn : public SSAInstr {
 struct SSAInstrLabel : public SSAInstr {
     std::string Name;
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 // Conditional branch instruction: if Condition is true jump to TargetLabel.
@@ -114,16 +133,14 @@ struct SSAInstrBranch : public SSAInstr {
     SSAValue Condition;
     std::string TargetLabel;
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 // Unconditional jump to a label.
 struct SSAInstrGoto : public SSAInstr {
     std::string TargetLabel;
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 struct SSAInstrPhi : public SSAInstr {
@@ -131,8 +148,10 @@ struct SSAInstrPhi : public SSAInstr {
     std::vector<SSAValue> Conditions;
     std::vector<SSAValue> Branches; // One more than Conditions due to 'else' case
     [[nodiscard]] std::string dump() const override;
-    void forEachValue(const std::function<void(SSAValue&)>& visitor) override;
-    void forEachValue(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
+    void forEachTarget(const std::function<void(SSAValue&)>& visitor) override;
+    void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
 struct SSAFunction {

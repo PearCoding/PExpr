@@ -10,4 +10,5 @@
 - [ ] Do not reorder side-effected functions!
 - [ ] Collapse branches to select operations if possible
 - [x] External pure functions
-- [ ] Constant folding of intrinsic functions
+- [x] Constant folding of intrinsic functions
+- [ ] SSCPIdentityOptimizer needs to inject intrinsics. Overhaul the intrinsics handling for checks and injections.

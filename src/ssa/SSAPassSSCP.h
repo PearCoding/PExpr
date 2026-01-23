@@ -1,9 +1,10 @@
 #pragma once
 
-#include "SSAOptions.h"
 #include "SSAContext.h"
+#include "SSAOptions.h"
 #include "SSCPConstantFolder.h"
 #include "SSCPControlFlowOptimizer.h"
+#include "SSCPDeadCodeOptimizer.h"
 #include "SSCPFunctionInliner.h"
 #include "SSCPIdentityOptimizer.h"
 #include "SSCPSideEffectAnalyzer.h"
@@ -39,6 +40,7 @@ private:
     // Components
     std::unique_ptr<SSCPConstantFolder> mConstantFolder;
     std::unique_ptr<SSCPControlFlowOptimizer> mControlFlowOptimizer;
+    std::unique_ptr<SSCPDeadCodeOptimizer> mDeadCodeOptimizer;
     std::unique_ptr<SSCPFunctionInliner> mFunctionInliner;
     std::unique_ptr<SSCPIdentityOptimizer> mIdentityOptimizer;
     std::unique_ptr<SSCPSideEffectAnalyzer> mSideEffectAnalyzer;

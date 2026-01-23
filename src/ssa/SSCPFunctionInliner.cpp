@@ -38,7 +38,7 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& pr
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first (for constant parameters)
+                    if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first
                         changed = true;
                         break;
                     } else if (mCallCounts[func.Name] == 1 && inlineFunctionCall(ctx, call, func, body, i)) { //< Fall back to basic inlining for single-call functions
@@ -106,11 +106,9 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
         if (!instrPtr)
             continue;
 
-        if (auto label = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
-            // Generate fresh label name and store mapping
-            std::string freshLabel = ctx->fresh("lbl");
-            labelMap[label->Name]  = freshLabel;
-        }
+        // Generate fresh label name and store mapping
+        if (auto label = dynamic_cast<const SSAInstrLabel*>(instrPtr.get()))
+            labelMap[label->Name] = ctx->fresh("lbl");
     }
 
     // Second pass: clone instructions
@@ -128,24 +126,20 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
         } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
             auto newBr = std::make_shared<SSAInstrBranch>(*br);
             // Remap target label
-            auto labelIt = labelMap.find(br->TargetLabel);
-            if (labelIt != labelMap.end()) {
+            if (const auto labelIt = labelMap.find(br->TargetLabel); labelIt != labelMap.end())
                 newBr->TargetLabel = labelIt->second;
-            }
             cloned = std::move(newBr);
         } else if (auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
             cloned = std::make_shared<SSAInstrPhi>(*phi);
         } else if (auto label = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
             auto newLabel  = std::make_shared<SSAInstrLabel>();
-            newLabel->Name = labelMap.at(label->Name);
+            newLabel->Name = labelMap.at(label->Name); //< It must exist or the previous pass did fail horribly
             cloned         = std::move(newLabel);
         } else if (auto gotoInstr = dynamic_cast<const SSAInstrGoto*>(instrPtr.get())) {
             auto newGoto = std::make_shared<SSAInstrGoto>(*gotoInstr);
             // Remap target label
-            auto labelIt = labelMap.find(gotoInstr->TargetLabel);
-            if (labelIt != labelMap.end()) {
+            if (const auto labelIt = labelMap.find(gotoInstr->TargetLabel); labelIt != labelMap.end())
                 newGoto->TargetLabel = labelIt->second;
-            }
             cloned = std::move(newGoto);
         } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
             cloned = std::make_shared<SSAInstrReturn>(*ret);
@@ -191,17 +185,22 @@ bool SSCPFunctionInliner::inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call
     return true;
 }
 
-void SSCPFunctionInliner::removeUnusedFunctions(SSAProgram& program)
+bool SSCPFunctionInliner::removeUnusedFunctions(SSAProgram& program)
 {
+    bool changed = false;
     // Remove functions that are never called
     auto it = program.Functions.begin();
     while (it != program.Functions.end()) {
         auto callCountIt = mCallCounts.find(it->Name);
-        if (callCountIt == mCallCounts.end() || callCountIt->second == 0)
-            it = program.Functions.erase(it);
-        else
+        if (callCountIt == mCallCounts.end() || callCountIt->second == 0) {
+            changed = true;
+            it      = program.Functions.erase(it);
+        } else {
             ++it;
+        }
     }
+
+    return changed;
 }
 
 bool SSCPFunctionInliner::shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func)
@@ -276,8 +275,8 @@ bool SSCPFunctionInliner::attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall*
     }
 
     // Replace the call with the optimized inlined instructions
-    instructions.erase(instructions.begin() + callIndex);
-    instructions.insert(instructions.begin() + callIndex, inlinedInstructions.begin(), inlinedInstructions.end());
+    const auto prevCallIt = instructions.erase(instructions.begin() + callIndex);
+    instructions.insert(prevCallIt, inlinedInstructions.begin(), inlinedInstructions.end());
 
     attemptInfo.succeeded = true;
     return true;

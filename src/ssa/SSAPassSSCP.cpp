@@ -1,10 +1,4 @@
 #include "SSAPassSSCP.h"
-#include "SSAContext.h"
-#include "SSCPConstantFolder.h"
-#include "SSCPControlFlowOptimizer.h"
-#include "SSCPFunctionInliner.h"
-#include "SSCPIdentityOptimizer.h"
-#include "SSCPSideEffectAnalyzer.h"
 
 namespace PExpr::ssa {
 
@@ -17,6 +11,7 @@ SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     , mContext(std::make_unique<SSAContext>())
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
     , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>())
+    , mDeadCodeOptimizer(std::make_unique<SSCPDeadCodeOptimizer>())
     , mFunctionInliner(std::make_unique<SSCPFunctionInliner>(opts))
     , mIdentityOptimizer(std::make_unique<SSCPIdentityOptimizer>(opts))
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
@@ -29,12 +24,21 @@ SSAPassSSCP::~SSAPassSSCP() = default;
 void SSAPassSSCP::Run(const SSAOptions& opts, SSAProgram& program)
 {
     SSAPassSSCP sscp(opts);
+
+    // 0) Analyze body to update SSA context with current variable counters
+    sscp.mContext->reset();
+    sscp.mContext->analyze(program);
+
     sscp.runProgram(program);
 }
 
 void SSAPassSSCP::Run(const SSAOptions& opts, InstructionList& body)
 {
     SSAPassSSCP sscp(opts);
+
+    // 0) Analyze body to update SSA context with current variable counters
+    sscp.mContext->reset();
+    sscp.mContext->analyze(body);
 
     // Keep optimizing until no changes are possible
     bool changed = true;
@@ -51,6 +55,14 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
     while (changed) {
         changed = false;
 
+        mFunctionInliner->analyzeCallGraph(program);
+
+        // Remove unused functions at the beginning to speed up stuff later
+        if (mOptions.RemoveDeadCode) {
+            if (mFunctionInliner->removeUnusedFunctions(program))
+                changed = true; // < Should not really change something, but lets still try
+        }
+
         // Process main program body
         if (processBody(program.Body))
             changed = true;
@@ -61,8 +73,6 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
                 changed = true;
         }
 
-        mFunctionInliner->analyzeCallGraph(program);
-
         if (mOptions.InlineFunctions) {
             // Check if we can inline some functions
             for (auto& func : program.Functions) {
@@ -70,20 +80,15 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
                     changed = true;
             }
         }
-
-        // Remove unused functions after inlining
-        if (mOptions.RemoveDeadCode)
-            mFunctionInliner->removeUnusedFunctions(program);
     }
 }
 
 bool SSAPassSSCP::processBody(InstructionList& body)
 {
-    bool changed = false;
+    if (body.empty())
+        return false;
 
-    // 0) Analyze body to update SSA context with current variable counters
-    mContext->reset();
-    mContext->analyze(body);
+    bool changed = false;
 
     // 1) Replace operands with known constants where possible
     if (mConstantFolder->replaceOperandIfConst(body))
@@ -95,31 +100,26 @@ bool SSAPassSSCP::processBody(InstructionList& body)
             changed = true;
     }
 
-    if (mOptions.ApplyMathIdentities) {
-        // 3) Apply mathematical identity optimizations
-        if (mIdentityOptimizer->applyIdentities(mContext.get(), body))
-            changed = true;
-    }
-
-    // 4) Count uses
-    mControlFlowOptimizer->resetAndCountUses(body);
+    // 3) Apply identity optimizations
+    if (mIdentityOptimizer->applyIdentities(mContext.get(), body))
+        changed = true;
 
     if (mOptions.RemoveDeadCode) {
-        // 5) Remove dead assigns without side effects
-        if (mControlFlowOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
+        // 4) Remove dead assigns without side effects
+        if (mDeadCodeOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
             changed = true;
     }
 
-    // 6) Remove empty branches
+    // 5) Remove empty branches
     if (mControlFlowOptimizer->removeEmptyBranches(body))
         changed = true;
 
-    // 7) Handle unused labels
+    // 6) Handle unused labels
     if (mControlFlowOptimizer->removeObsoleteLabels(body))
         changed = true;
 
     if (mOptions.RemoveDeadCode) {
-        // 8) Collapse phi nodes
+        // 7) Collapse phi nodes
         if (mControlFlowOptimizer->collapsePhiNodes(body))
             changed = true;
     }

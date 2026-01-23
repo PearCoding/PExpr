@@ -29,12 +29,14 @@ private:
     /// Pattern matching for specific identities
     [[nodiscard]] bool tryApplyIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);
 
-    // Priority 1 identities (simple, always beneficial)
+    [[nodiscard]] bool matchAssignIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a=a (internal cleanup)
+
+    [[nodiscard]] bool matchUnaryIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);        // -(-a) = a, +a = a, !!a = a
+    [[nodiscard]] bool matchSquareToPowerIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a*a = a^2
+
     [[nodiscard]] bool matchPythagoreanIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);          // sin(a)^2 + cos(a)^2 = 1
-    [[nodiscard]] bool matchSquareToPowerIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);        // a*a = a^2
     [[nodiscard]] bool matchInverseTrigonometricIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // sin(asin(a)) = a, etc.
 
-    // Priority 2 identities (more complex, may or may not be beneficial)
     [[nodiscard]] bool matchAngleAdditionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);  // sin(a)*cos(b) +/- cos(a)*sin(b)
     [[nodiscard]] bool matchDoubleAngleIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);    // 2*sin(a)*cos(a) = sin(2*a)
     [[nodiscard]] bool matchPowerReductionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // (1-cos(2*a))/2 = sin(a)^2
@@ -59,6 +61,8 @@ private:
 
     /// Helper to check if a value is a constant number
     [[nodiscard]] bool isConstantNumber(const SSAValue& val, Number& outValue) const;
+
+    [[nodiscard]] const SSAInstr* getDefinition(const SSAValue& val) const;
 
     /// Map from variable name to its defining assignment
     std::unordered_map<std::string, const SSAInstr*> mDefinitions;
