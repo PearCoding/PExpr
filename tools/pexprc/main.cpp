@@ -158,7 +158,6 @@ int main(int argc, char** argv)
     // Parse
     Environment env;
     env.reporter().setOutputMask(warningFlags);
-    std::cout << warningFlags << std::endl;
 
     auto ast = env.parse(sourceFile);
 
