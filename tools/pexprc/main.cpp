@@ -80,26 +80,13 @@ int main(int argc, char** argv)
     ssa::SSAOptions optimizationOptions;
     app.add_option_function<int>("-O", [&](int opt) { 
         if (opt == 0)
-            optimizationOptions = ssa::SSAOptions{
-                .EnableConstantFolding = false,
-                .EnableConstantFoldingNumber = false,
-                .RemoveDeadCode = false,
-                .InlineFunctions = false,
-            };
+            optimizationOptions = ssa::SSAOptions::None();
         else if (opt == 1)
-            optimizationOptions = ssa::SSAOptions{
-                .EnableConstantFolding = true,
-                .EnableConstantFoldingNumber = false,
-                .RemoveDeadCode = true,
-                .InlineFunctions = false,
-            };
+            optimizationOptions = ssa::SSAOptions::Low();
+        else if (opt == 2)
+            optimizationOptions = ssa::SSAOptions::Medium();
        else 
-            optimizationOptions = ssa::SSAOptions{
-                .EnableConstantFolding = true,
-                .EnableConstantFoldingNumber = true,
-                .RemoveDeadCode = true,
-                .InlineFunctions = true,
-            }; }, "Set optimization level");
+            optimizationOptions = ssa::SSAOptions::High(); }, "Set optimization level");
 
     app.add_flag("--opt-constant-folding,!--no-opt-constant-folding", optimizationOptions.EnableConstantFolding, "Enable constant folding");
     app.add_flag("--opt-math-folding,!--no-opt-math-folding", optimizationOptions.EnableConstantFoldingNumber, "Enable constant folding on numbers");

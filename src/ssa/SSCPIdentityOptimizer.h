@@ -27,26 +27,29 @@ public:
 
 private:
     /// Pattern matching for specific identities
-    [[nodiscard]] bool tryApplyIdentity(SSAContext* ctx, SSAInstrAssign* asg, InstructionList& instructions, size_t currentIndex);
+    [[nodiscard]] bool tryApplyIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);
 
     // Priority 1 identities (simple, always beneficial)
-    [[nodiscard]] std::optional<SSAValue> matchPythagoreanIdentity(const SSAInstrAssign* asg);                       // sin(a)^2 + cos(a)^2 = 1
-    [[nodiscard]] std::optional<std::pair<SSAValue, SSAValue>> matchSquareToPoweIdentity(const SSAInstrAssign* asg); // a*a = a^2
-    [[nodiscard]] std::optional<SSAValue> matchInverseTrigoIdentity(const SSAInstrAssign* asg);                      // sin(asin(a)) = a, etc.
+    [[nodiscard]] bool matchPythagoreanIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);          // sin(a)^2 + cos(a)^2 = 1
+    [[nodiscard]] bool matchSquareToPowerIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);        // a*a = a^2
+    [[nodiscard]] bool matchInverseTrigonometricIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // sin(asin(a)) = a, etc.
 
     // Priority 2 identities (more complex, may or may not be beneficial)
-    [[nodiscard]] std::optional<SSAValue> matchAngleAdditionIdentity(const SSAInstrAssign* asg);                       // sin(a)*cos(b) +/- cos(a)*sin(b)
-    [[nodiscard]] std::optional<SSAValue> matchDoubleAngleIdentity(const SSAInstrAssign* asg);                         // 2*sin(a)*cos(a) = sin(2*a)
-    [[nodiscard]] std::optional<std::pair<SSAValue, SSAValue>> matchPowerReductionIdentity(const SSAInstrAssign* asg); // (1-cos(2*a))/2 = sin(a)^2
+    [[nodiscard]] bool matchAngleAdditionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);  // sin(a)*cos(b) +/- cos(a)*sin(b)
+    [[nodiscard]] bool matchDoubleAngleIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex);    // 2*sin(a)*cos(a) = sin(2*a)
+    [[nodiscard]] bool matchPowerReductionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // (1-cos(2*a))/2 = sin(a)^2
 
     /// Helper to check if an assignment is a function call
     [[nodiscard]] bool isCallToIntrinsic(const SSAValue& val, std::string_view funcName) const;
+
+    /// Helper to check if callback is an intrinsic
+    [[nodiscard]] bool isIntrinsic(const SSAInstrCall* call, std::string_view funcName) const;
 
     /// Helper to check if two values are the same (same name or both constant with same value)
     [[nodiscard]] bool isSameValue(const SSAValue& a, const SSAValue& b) const;
 
     /// Helper to find the assignment that defines a given value
-    [[nodiscard]] const SSAInstrAssign* findDefinition(const std::string& name) const;
+    [[nodiscard]] const SSAInstr* findDefinition(const std::string& name) const;
 
     /// Helper to check if a value is a binary operation with specific operator
     [[nodiscard]] bool isBinaryOp(const SSAValue& val, BinaryOperation op, SSAValue& left, SSAValue& right) const;
@@ -57,15 +60,8 @@ private:
     /// Helper to check if a value is a constant number
     [[nodiscard]] bool isConstantNumber(const SSAValue& val, Number& outValue) const;
 
-    /// Helper to create a new temporary assignment
-    [[nodiscard]] SSAValue createTempAssignment(SSAContext* ctx,
-                                                InstructionList& instructions, size_t insertPos,
-                                                SSAInstrAssign::OpKind opKind,
-                                                const std::vector<SSAValue>& operands,
-                                                ElementaryType type);
-
     /// Map from variable name to its defining assignment
-    std::unordered_map<std::string, const SSAInstrAssign*> mDefinitions;
+    std::unordered_map<std::string, const SSAInstr*> mDefinitions;
 
     const SSAOptions mOptions;
 };

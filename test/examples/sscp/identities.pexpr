@@ -8,47 +8,66 @@ fn [[extern, pure]] asin(a:num) -> num;
 fn [[extern, pure]] acos(a:num) -> num;
 fn [[extern, pure]] atan(a:num) -> num;
 
+fn [[extern, pure]] abs(a:num) -> num;
+fn [[extern, pure]] sqrt(a:num) -> num;
+fn [[extern, pure]] pow(a:num, b:num) -> num;
+
 // https://en.wikipedia.org/wiki/List_of_trigonometric_identities
 
-fn identity_1(a:num) = sin(a)^2 + cos(a)^2; // = 1   (Priority 1)
-fn identity_2(a:num) = a*a;                 // = a^2 (Priority 1)
+// Basic identities (we can not assume a/b with b != 0)
+fn identity_b1(a:num) = a*a;            // = a^2
+fn identity_b2(a:num) = -(-a);          // = a
+fn identity_b3(a:num, b:num) = (a^b)*a; // = a^(b+1)
+fn identity_b4(a:num) = sqrt(a)^2;      // = abs(a)
+fn identity_b5(a:num) = sqrt(a^2);      // = abs(a)
+fn identity_b6(a:num) = a + 0;          // = a
+fn identity_b7(a:num) = a - 0;          // = a
+fn identity_b8(a:num) = a * 1;          // = a
+fn identity_b9(a:num) = a / 1;          // = a
 
-fn identity_3(a:num, b:num) = sin(a)*cos(b) + cos(a)*sin(b); // = sin(a + b) (Priority 2)
-fn identity_4(a:num, b:num) = sin(a)*cos(b) - cos(a)*sin(b); // = sin(a - b) (Priority 2)
-fn identity_5(a:num, b:num) = cos(a)*cos(b) + sin(a)*sin(b); // = cos(a - b) (Priority 2)
-fn identity_6(a:num, b:num) = cos(a)*cos(b) - sin(a)*sin(b); // = cos(a + b) (Priority 2)
+fn identity_1(a:num) = sin(a)^2 + cos(a)^2; // = 1
 
-fn identity_7(a:num)  = 2*sin(a)*cos(a);       // = sin(2*a) (Priority 2)
-fn identity_8(a:num)  = 2*cos(a)*cos(a) - 1;   // = cos(2*a) (Priority 2)
-fn identity_9(a:num)  = 3*sin(a) - 4*sin(a)^3; // = sin(3*a) (Priority 2)
-fn identity_10(a:num) = 4*cos(a)^3 - 3*cos(a); // = cos(3*a) (Priority 2)
+fn identity_2(a:num, b:num) = sin(a)*cos(b) + cos(a)*sin(b); // = sin(a + b)
+fn identity_3(a:num, b:num) = sin(a)*cos(b) - cos(a)*sin(b); // = sin(a - b)
+fn identity_4(a:num, b:num) = cos(a)*cos(b) + sin(a)*sin(b); // = cos(a - b)
+fn identity_5(a:num, b:num) = cos(a)*cos(b) - sin(a)*sin(b); // = cos(a + b)
+
+fn identity_6(a:num) = 2*sin(a)*cos(a);       // = sin(2*a)
+fn identity_7(a:num) = 2*cos(a)*cos(a) - 1;   // = cos(2*a)
+fn identity_8(a:num) = 3*sin(a) - 4*sin(a)^3; // = sin(3*a)
+fn identity_9(a:num) = 4*cos(a)^3 - 3*cos(a); // = cos(3*a)
 // -> Or Chebyshev method
 
-fn identity_11(a:num) = (1-cos(2*a)) / 2; // = sin(a)^2          (Priority 2)
-fn identity_12(a:num) = (1+cos(2*a)) / 2; // = cos(a)^2          (Priority 2)
-fn identity_13(a:num) = (1-cos(4*a)) / 8; // = sin(a)^2*cos(a)^2 (Priority 2)
+fn identity_10(a:num) = (1-cos(2*a)) / 2; // = sin(a)^2
+fn identity_11(a:num) = (1+cos(2*a)) / 2; // = cos(a)^2
+fn identity_12(a:num) = (1-cos(4*a)) / 8; // = sin(a)^2*cos(a)^2
 
-fn identity_14(a:num) = sin(asin(a)); // = a           (Priority 1)
-fn identity_15(a:num) = cos(asin(a)); // = sqrt(1-a^2) (Priority 2)
-fn identity_16(a:num) = sin(acos(a)); // = sqrt(1-a^2) (Priority 2)
-fn identity_17(a:num) = cos(acos(a)); // = a           (Priority 1)
-fn identity_18(a:num) = tan(atan(a)); // = a           (Priority 1)
+fn identity_13(a:num) = sin(asin(a)); // = a
+fn identity_14(a:num) = cos(asin(a)); // = sqrt(1-a^2)
+fn identity_15(a:num) = sin(acos(a)); // = sqrt(1-a^2)
+fn identity_16(a:num) = cos(acos(a)); // = a
+fn identity_17(a:num) = tan(atan(a)); // = a
 
-identity_1(getInput()) 
-    + identity_2(getInput()) 
-    + identity_3(getInput(), getInput()) 
-    + identity_4(getInput(), getInput()) 
-    + identity_5(getInput(), getInput()) 
-    + identity_6(getInput(), getInput()) 
-    + identity_7(getInput()) 
-    + identity_8(getInput()) 
-    + identity_9(getInput()) 
-    + identity_10(getInput()) 
-    + identity_11(getInput()) 
-    + identity_12(getInput()) 
+0
+    // + identity_b1(getInput())
+    // + identity_b2(getInput())
+    // + identity_b3(getInput(), getInput())
+    // + identity_b4(getInput())
+    // + identity_b5(getInput())
+    // + identity_1(getInput()) 
+    // + identity_2(getInput(), getInput()) 
+    // + identity_3(getInput(), getInput()) 
+    // + identity_4(getInput(), getInput()) 
+    // + identity_5(getInput(), getInput()) 
+    // + identity_6(getInput()) 
+    // + identity_7(getInput()) 
+    // + identity_8(getInput()) 
+    // + identity_9(getInput()) 
+    // + identity_10(getInput()) 
+    // + identity_11(getInput()) 
+    // + identity_12(getInput()) 
     + identity_13(getInput()) 
-    + identity_14(getInput()) 
-    + identity_15(getInput()) 
-    + identity_16(getInput()) 
-    + identity_17(getInput()) 
-    + identity_18(getInput()) 
+    // + identity_14(getInput()) 
+    // + identity_15(getInput()) 
+    // + identity_16(getInput()) 
+    // + identity_17(getInput()) 

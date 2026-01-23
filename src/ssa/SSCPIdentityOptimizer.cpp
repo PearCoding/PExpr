@@ -12,83 +12,67 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
     // Build definition map
     mDefinitions.clear();
     for (const auto& instrPtr : instructions) {
-        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            if (!asg->Target.Name.empty())
-                mDefinitions[asg->Target.Name] = asg;
-        }
+        if (!instrPtr)
+            continue;
+
+        // TODO: Would be nice if this could be polymorphed out?
+        if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
+            mDefinitions[asg->Target.Name] = asg;
+        else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
+            mDefinitions[call->Target.Name] = call;
+        else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get()))
+            mDefinitions[phi->Target.Name] = phi;
     }
 
     bool changed = false;
     for (size_t i = 0; i < instructions.size(); ++i) {
-        if (auto asg = dynamic_cast<SSAInstrAssign*>(instructions[i].get())) {
-            if (tryApplyIdentity(ctx, asg, instructions, i))
-                changed = true;
-        }
+        if (tryApplyIdentity(ctx, instructions, i))
+            changed = true;
     }
     return changed;
 }
 
-bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, SSAInstrAssign* asg, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
-    (void)ctx;          // Unused for now
-    (void)instructions; // Unused for now
-    (void)currentIndex; // Unused for now
-
-    // Try each identity pattern in order
-
-    // Priority 1: Simple identities
-    if (auto result = matchPythagoreanIdentity(asg)) {
-        asg->Operator = SSAInstrAssign::OpKind::Assign;
-        asg->Operands = { *result };
-        return true;
+    if (mOptions.ApplyMathIdentities) {
+        if (matchSquareToPowerIdentity(ctx, instructions, currentIndex))
+            return true;
     }
 
-    if (auto result = matchSquareToPoweIdentity(asg)) {
-        asg->Operator = SSAInstrAssign::OpKind::Binary;
-        asg->BinaryOp = BinaryOperation::Pow;
-        asg->Operands = { result->first, result->second };
-        return true;
-    }
+    if (mOptions.ApplyTrigonometricIdentities) {
+        if (matchPythagoreanIdentity(ctx, instructions, currentIndex))
+            return true;
 
-    if (auto result = matchInverseTrigoIdentity(asg)) {
-        asg->Operator = SSAInstrAssign::OpKind::Assign;
-        asg->Operands = { *result };
-        return true;
-    }
+        if (matchInverseTrigonometricIdentity(ctx, instructions, currentIndex))
+            return true;
 
-    // Priority 2: More complex identities
-    if (auto result = matchAngleAdditionIdentity(asg)) {
-        // Replace with call to sin or cos with angle addition/subtraction
-        // This requires creating a temporary for the angle operation
-        asg->Operator = SSAInstrAssign::OpKind::CallOp;
-        asg->Operands = { *result };
-        return true;
-    }
+        if (matchAngleAdditionIdentity(ctx, instructions, currentIndex))
+            return true;
 
-    if (auto result = matchDoubleAngleIdentity(asg)) {
-        asg->Operator = SSAInstrAssign::OpKind::CallOp;
-        asg->Operands = { *result };
-        return true;
-    }
+        if (matchDoubleAngleIdentity(ctx, instructions, currentIndex))
+            return true;
 
-    if (auto result = matchPowerReductionIdentity(asg)) {
-        asg->Operator = SSAInstrAssign::OpKind::Binary;
-        asg->BinaryOp = BinaryOperation::Pow;
-        asg->Operands = { result->first, result->second };
-        return true;
+        if (matchPowerReductionIdentity(ctx, instructions, currentIndex))
+            return true;
     }
 
     return false;
 }
 
-std::optional<SSAValue> SSCPIdentityOptimizer::matchPythagoreanIdentity(const SSAInstrAssign* asg)
+bool SSCPIdentityOptimizer::matchPythagoreanIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
     // Match: sin(a)^2 + cos(a)^2 = 1
     if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->BinaryOp != BinaryOperation::Add)
-        return std::nullopt;
+        return false;
 
     if (asg->Operands.size() != 2)
-        return std::nullopt;
+        return false;
 
     SSAValue sinSquared, cosSquared;
     SSAValue sinBase, cosBase;
@@ -99,15 +83,15 @@ std::optional<SSAValue> SSCPIdentityOptimizer::matchPythagoreanIdentity(const SS
     bool secondIsPower = isPowerOp(asg->Operands[1], cosSquared, cosExp);
 
     if (!firstIsPower || !secondIsPower)
-        return std::nullopt;
+        return false;
 
     // Check if exponents are 2
     Number exp1, exp2;
     if (!isConstantNumber(sinExp, exp1) || !isConstantNumber(cosExp, exp2))
-        return std::nullopt;
+        return false;
 
     if (exp1 != Number(2.0) || exp2 != Number(2.0))
-        return std::nullopt;
+        return false;
 
     // Check if one is sin(a) and the other is cos(a) with the same argument
     bool firstIsSin  = isCallToIntrinsic(sinSquared, "sin");
@@ -120,78 +104,103 @@ std::optional<SSAValue> SSCPIdentityOptimizer::matchPythagoreanIdentity(const SS
         // const SSAInstrCall* call1 = nullptr;
         // const SSAInstrCall* call2 = nullptr;
 
-        for (const auto& [name, def] : mDefinitions) {
-            if (name == sinSquared.Name) {
-                // This is a hack - we need to find the actual call instruction
-                // For now, we'll check if the arguments match by name comparison
-            }
-        }
-
-        // Simplified check: if both are function calls to sin/cos, assume they have the same argument
-        // A more robust implementation would track call instructions separately
-        return SSAValue::Constant(Number(1.0));
+        // TODO
     }
 
-    return std::nullopt;
+    return false;
 }
 
-std::optional<std::pair<SSAValue, SSAValue>> SSCPIdentityOptimizer::matchSquareToPoweIdentity(const SSAInstrAssign* asg)
+bool SSCPIdentityOptimizer::matchSquareToPowerIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
     // Match: a*a = a^2
     if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->BinaryOp != BinaryOperation::Mul)
-        return std::nullopt;
+        return false;
 
     if (asg->Operands.size() != 2)
-        return std::nullopt;
+        return false;
 
     // Check if both operands are the same
     if (isSameValue(asg->Operands[0], asg->Operands[1])) {
-        return std::make_pair(asg->Operands[0], SSAValue::Constant(Number(2.0)));
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+        newAsg->BinaryOp = BinaryOperation::Pow;
+        newAsg->Operands = { asg->Operands[0], SSAValue::Constant(Number(2.0)) };
+
+        mDefinitions[newAsg->Target.Name] = newAsg.get();
+        instructions[currentIndex]        = std::move(newAsg);
+        return true;
     }
 
-    return std::nullopt;
+    return false;
 }
 
-std::optional<SSAValue> SSCPIdentityOptimizer::matchInverseTrigoIdentity(const SSAInstrAssign* asg)
+bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    PEXPR_UNUSED(ctx);
+
+    const auto call = dynamic_cast<const SSAInstrCall*>(instructions.at(currentIndex).get());
+    if (!call)
+        return false;
+
     // Match: sin(asin(a)) = a, cos(acos(a)) = a, tan(atan(a)) = a
-    if (asg->Operator != SSAInstrAssign::OpKind::CallOp)
-        return std::nullopt;
+    if (call->Arguments.size() != 1)
+        return false;
 
-    // This would need to check if asg is a call instruction
-    // Since SSAInstrAssign doesn't directly represent calls in this form,
-    // we need to look for the pattern in the operands
-
-    if (asg->Operands.size() != 1)
-        return std::nullopt;
-
-    const SSAValue& operand = asg->Operands[0];
+    const SSAValue& operand = call->Arguments[0];
 
     // Check if operand is a call to asin, acos, or atan
-    if (isCallToIntrinsic(operand, "asin")) {
-        // This is asin(x), check if the outer operation is sin
-        // This requires tracking what function this assignment represents
-        // which we don't have in the current structure
+    if ((isIntrinsic(call, "sin") && isCallToIntrinsic(operand, "asin"))
+        || (isIntrinsic(call, "cos") && isCallToIntrinsic(operand, "acos"))
+        || (isIntrinsic(call, "tan") && isCallToIntrinsic(operand, "atan"))
+        || (isIntrinsic(call, "asin") && isCallToIntrinsic(operand, "sin"))
+        || (isIntrinsic(call, "acos") && isCallToIntrinsic(operand, "cos"))
+        || (isIntrinsic(call, "atan") && isCallToIntrinsic(operand, "tan"))) {
+
+        if (const auto it = mDefinitions.find(operand.Name); it != mDefinitions.end()) {
+            if (const auto call2 = dynamic_cast<const SSAInstrCall*>(it->second)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = call->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { call2->Arguments.at(0) };
+
+                mDefinitions[newAsg->Target.Name] = newAsg.get();
+                instructions[currentIndex]        = std::move(newAsg);
+                return true;
+            }
+        }
     }
 
-    return std::nullopt;
+    return false;
 }
 
-std::optional<SSAValue> SSCPIdentityOptimizer::matchAngleAdditionIdentity(const SSAInstrAssign* asg)
+bool SSCPIdentityOptimizer::matchAngleAdditionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
     // Match: sin(a)*cos(b) + cos(a)*sin(b) = sin(a+b)
     // Match: sin(a)*cos(b) - cos(a)*sin(b) = sin(a-b)
     // Match: cos(a)*cos(b) + sin(a)*sin(b) = cos(a-b)
     // Match: cos(a)*cos(b) - sin(a)*sin(b) = cos(a+b)
 
     if (asg->Operator != SSAInstrAssign::OpKind::Binary)
-        return std::nullopt;
+        return false;
 
     if (asg->BinaryOp != BinaryOperation::Add && asg->BinaryOp != BinaryOperation::Sub)
-        return std::nullopt;
+        return false;
 
     if (asg->Operands.size() != 2)
-        return std::nullopt;
+        return false;
 
     // This is complex pattern matching that would require analyzing
     // the structure of both operands to see if they match the pattern
@@ -200,34 +209,45 @@ std::optional<SSAValue> SSCPIdentityOptimizer::matchAngleAdditionIdentity(const 
     // 2. Check if the factors are sin/cos calls
     // 3. Verify the pattern matches one of the identities
 
-    return std::nullopt;
+    return false;
 }
 
-std::optional<SSAValue> SSCPIdentityOptimizer::matchDoubleAngleIdentity(const SSAInstrAssign* asg)
+bool SSCPIdentityOptimizer::matchDoubleAngleIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
     // Match: 2*sin(a)*cos(a) = sin(2*a)
     // Match: 2*cos(a)*cos(a) - 1 = cos(2*a)
 
     if (asg->Operator != SSAInstrAssign::OpKind::Binary)
-        return std::nullopt;
+        return false;
 
-    // This would require complex pattern matching similar to angle addition
+    // TODO: This would require complex pattern matching similar to angle addition
 
-    return std::nullopt;
+    return false;
 }
 
-std::optional<std::pair<SSAValue, SSAValue>> SSCPIdentityOptimizer::matchPowerReductionIdentity(const SSAInstrAssign* asg)
+bool SSCPIdentityOptimizer::matchPowerReductionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
     // Match: (1-cos(2*a))/2 = sin(a)^2
     // Match: (1+cos(2*a))/2 = cos(a)^2
 
     if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->BinaryOp != BinaryOperation::Div)
-        return std::nullopt;
+        return false;
 
-    // This would require analyzing the structure to match the pattern
-    // For now, returning nullopt as this is a complex pattern
+    // TODO: This would require analyzing the structure to match the pattern
 
-    return std::nullopt;
+    return false;
 }
 
 bool SSCPIdentityOptimizer::isCallToIntrinsic(const SSAValue& val, std::string_view funcName) const
@@ -240,13 +260,20 @@ bool SSCPIdentityOptimizer::isCallToIntrinsic(const SSAValue& val, std::string_v
     if (it == mDefinitions.end())
         return false;
 
-    const SSAInstrAssign* def = it->second;
-    if (def->Operator != SSAInstrAssign::OpKind::CallOp)
+    const SSAInstr* def = it->second;
+    if (const auto call = dynamic_cast<const SSAInstrCall*>(def))
+        return isIntrinsic(call, funcName);
+
+    return false;
+}
+
+bool SSCPIdentityOptimizer::isIntrinsic(const SSAInstrCall* call, std::string_view funcName) const
+{
+    if (!call)
         return false;
 
-    // We would need additional information to determine the function name
-    // This is a limitation of the current structure
-    return false;
+    // FIXME: This will not work when the function name is overwritten in a closure.
+    return call->PublicFunctionName == funcName;
 }
 
 bool SSCPIdentityOptimizer::isSameValue(const SSAValue& a, const SSAValue& b) const
@@ -273,7 +300,7 @@ bool SSCPIdentityOptimizer::isSameValue(const SSAValue& a, const SSAValue& b) co
     return false;
 }
 
-const SSAInstrAssign* SSCPIdentityOptimizer::findDefinition(const std::string& name) const
+const SSAInstr* SSCPIdentityOptimizer::findDefinition(const std::string& name) const
 {
     auto it = mDefinitions.find(name);
     if (it != mDefinitions.end())
@@ -286,18 +313,22 @@ bool SSCPIdentityOptimizer::isBinaryOp(const SSAValue& val, BinaryOperation op, 
     if (val.Kind == SSAValue::Kind::Constant)
         return false;
 
-    const SSAInstrAssign* def = findDefinition(val.Name);
+    const SSAInstr* def = findDefinition(val.Name);
     if (!def)
         return false;
 
-    if (def->Operator != SSAInstrAssign::OpKind::Binary || def->BinaryOp != op)
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(def);
+    if (!asg)
         return false;
 
-    if (def->Operands.size() != 2)
+    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->BinaryOp != op)
         return false;
 
-    left  = def->Operands[0];
-    right = def->Operands[1];
+    if (asg->Operands.size() != 2)
+        return false;
+
+    left  = asg->Operands[0];
+    right = asg->Operands[1];
     return true;
 }
 
@@ -322,22 +353,6 @@ bool SSCPIdentityOptimizer::isConstantNumber(const SSAValue& val, Number& outVal
     }
 
     return false;
-}
-
-SSAValue SSCPIdentityOptimizer::createTempAssignment(SSAContext* ctx,
-                                                     InstructionList& instructions, size_t insertPos,
-                                                     SSAInstrAssign::OpKind opKind,
-                                                     const std::vector<SSAValue>& operands,
-                                                     ElementaryType type)
-{
-    auto newInstr      = std::make_shared<SSAInstrAssign>();
-    newInstr->Target   = SSAValue(SSAValue::Kind::Temp, ctx->fresh("%"), type);
-    newInstr->Operator = opKind;
-    newInstr->Operands = operands;
-
-    instructions.insert(instructions.begin() + insertPos, newInstr);
-
-    return newInstr->Target;
 }
 
 } // namespace PExpr::ssa

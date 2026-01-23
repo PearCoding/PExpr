@@ -60,7 +60,6 @@ struct SSAInstrAssign : public SSAInstr {
     enum class OpKind { Assign,
                         Unary,
                         Binary,
-                        CallOp,
                         Swizzle,
                         Access,
                         Vector,

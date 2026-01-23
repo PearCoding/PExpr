@@ -247,6 +247,7 @@ void SSCPControlFlowOptimizer::countUsesInInstr(const SSAInstr* instr)
 {
     if (!instr)
         return;
+
     instr->forEachValue([this](const SSAValue& val) {
         if (val.Kind != SSAValue::Kind::Constant)
             ++mUseCount[val.Name];
@@ -263,9 +264,9 @@ bool SSCPControlFlowOptimizer::instrHasSideEffects(const SSAInstr* instr, const 
         if (sideEffectFunctions.find(c->FunctionName) != sideEffectFunctions.end())
             return true;
         return false;
-    }
-    if (dynamic_cast<const SSAInstrReturn*>(instr))
+    } else if (dynamic_cast<const SSAInstrReturn*>(instr)) {
         return true; // returns must be preserved
+    }
 
     // other instructions are assumed side-effect free
     return false;
