@@ -72,31 +72,53 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& pr
 void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunction& func, const SSAInstrCall* call,
                                                   InstructionList& outInlinedBody, bool runOptimization)
 {
-    PEXPR_UNUSED(ctx); // < TODO
-    
     PEXPR_ASSERT(func.Parameters.size() == call->Arguments.size(), "Call parameters must match function parameters");
 
-    // Create a mapping from parameter names to argument values
-    std::unordered_map<std::string, SSAValue> paramMap;
-    for (size_t i = 0; i < func.Parameters.size(); ++i)
-        paramMap[func.Parameters[i]] = call->Arguments[i];
+    // Create mappings
+    std::unordered_map<std::string, SSAValue> valueMap;    // Old variable names -> new values
+    std::unordered_map<std::string, std::string> labelMap; // Old label names -> new label names
 
-    // Lambda to map a value through the parameter map
-    auto mapValue = [&paramMap](SSAValue& val) {
-        if (val.Kind != SSAValue::Kind::Constant) {
-            if (auto paramIt = paramMap.find(val.Name); paramIt != paramMap.end())
-                val = paramIt->second;
+    // Map parameters to arguments
+    for (size_t i = 0; i < func.Parameters.size(); ++i)
+        valueMap[func.Parameters[i]] = call->Arguments[i];
+
+    // Lambda to map and rename a value, generating fresh names for non-parameter variables
+    auto mapAndRenameValue = [&](SSAValue& val) {
+        if (val.Kind == SSAValue::Kind::Constant)
+            return; // Constants don't need renaming
+
+        // Check if already in map
+        if (const auto it = valueMap.find(val.Name); it != valueMap.end()) {
+            val = it->second;
+        } else {
+            // This is a new variable from the function body - generate a fresh name to avoid clashes
+            SSAValue renamed(val.Kind, ctx->fresh(val.baseName()), val.Type, val.Value);
+            valueMap[val.Name] = renamed;
+            val                = renamed;
         }
     };
 
     outInlinedBody.clear();
     outInlinedBody.reserve(func.Body.size());
 
+    // First pass: build label mapping
     for (const auto& instrPtr : func.Body) {
         if (!instrPtr)
             continue;
 
-        // Clone instruction (works for any type due to copy semantics)
+        if (auto label = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
+            // Generate fresh label name and store mapping
+            std::string freshLabel = ctx->fresh("lbl");
+            labelMap[label->Name]  = freshLabel;
+        }
+    }
+
+    // Second pass: clone instructions
+    for (const auto& instrPtr : func.Body) {
+        if (!instrPtr)
+            continue;
+
+        // Clone instruction
         std::shared_ptr<SSAInstr> cloned;
 
         if (auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
@@ -104,13 +126,27 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
         } else if (auto callInstr = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
             cloned = std::make_shared<SSAInstrCall>(*callInstr);
         } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
-            cloned = std::make_shared<SSAInstrBranch>(*br);
+            auto newBr = std::make_shared<SSAInstrBranch>(*br);
+            // Remap target label
+            auto labelIt = labelMap.find(br->TargetLabel);
+            if (labelIt != labelMap.end()) {
+                newBr->TargetLabel = labelIt->second;
+            }
+            cloned = std::move(newBr);
         } else if (auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
             cloned = std::make_shared<SSAInstrPhi>(*phi);
         } else if (auto label = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
-            cloned = std::make_shared<SSAInstrLabel>(*label);
+            auto newLabel  = std::make_shared<SSAInstrLabel>();
+            newLabel->Name = labelMap.at(label->Name);
+            cloned         = std::move(newLabel);
         } else if (auto gotoInstr = dynamic_cast<const SSAInstrGoto*>(instrPtr.get())) {
-            cloned = std::make_shared<SSAInstrGoto>(*gotoInstr);
+            auto newGoto = std::make_shared<SSAInstrGoto>(*gotoInstr);
+            // Remap target label
+            auto labelIt = labelMap.find(gotoInstr->TargetLabel);
+            if (labelIt != labelMap.end()) {
+                newGoto->TargetLabel = labelIt->second;
+            }
+            cloned = std::move(newGoto);
         } else if (auto ret = dynamic_cast<const SSAInstrReturn*>(instrPtr.get())) {
             cloned = std::make_shared<SSAInstrReturn>(*ret);
         } else {
@@ -118,8 +154,8 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
             continue;
         }
 
-        // Use forEachValue to map all parameters to arguments
-        cloned->forEachValue(mapValue);
+        // Use forEachValue to map and rename all variables
+        cloned->forEachValue(mapAndRenameValue);
 
         outInlinedBody.push_back(cloned);
     }
@@ -191,29 +227,32 @@ bool SSCPFunctionInliner::shouldInlineFunctionCall(SSAInstrCall* call, SSAFuncti
 
 bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody)
 {
-    // TODO: Due to SSA value name clashes we can not simply inline larger blocks of code
-    PEXPR_UNUSED(originalBody);
-    return inlinedBody.size() == 1;
     // Count effective instructions (excluding labels, gotos that will be optimized)
-    // size_t originalEffective = 0;
-    // size_t inlinedEffective = 0;
+    size_t originalEffective = 0;
+    size_t inlinedEffective  = 0;
 
-    // for (const auto& instr : originalBody) {
-    //     if (!instr) continue;
-    //     if (dynamic_cast<const SSAInstrLabel*>(instr.get())) continue;
-    //     if (dynamic_cast<const SSAInstrGoto*>(instr.get())) continue;
-    //     ++originalEffective;
-    // }
+    for (const auto& instr : originalBody) {
+        if (!instr)
+            continue;
+        if (dynamic_cast<const SSAInstrLabel*>(instr.get()))
+            continue;
+        if (dynamic_cast<const SSAInstrGoto*>(instr.get()))
+            continue;
+        ++originalEffective;
+    }
 
-    // for (const auto& instr : inlinedBody) {
-    //     if (!instr) continue;
-    //     if (dynamic_cast<const SSAInstrLabel*>(instr.get())) continue;
-    //     if (dynamic_cast<const SSAInstrGoto*>(instr.get())) continue;
-    //     ++inlinedEffective;
-    // }
+    for (const auto& instr : inlinedBody) {
+        if (!instr)
+            continue;
+        if (dynamic_cast<const SSAInstrLabel*>(instr.get()))
+            continue;
+        if (dynamic_cast<const SSAInstrGoto*>(instr.get()))
+            continue;
+        ++inlinedEffective;
+    }
 
-    // // Significant size reduction
-    // return inlinedEffective == 1 || inlinedEffective < originalEffective / 2;
+    // Significant size reduction
+    return inlinedEffective <= 2 || inlinedEffective < originalEffective / 2;
 }
 
 bool SSCPFunctionInliner::attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)

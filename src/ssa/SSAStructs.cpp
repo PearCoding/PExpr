@@ -110,13 +110,12 @@ std::string SSAValue::toString(bool showType) const
 
 std::string SSAValue::baseName() const
 {
-    PEXPR_ASSERT(Kind == SSAValue::Kind::Named, "Only named values have a base name");
-    if (Name.empty())
-        return std::string();
-    auto pos = Name.find('.');
-    if (pos == std::string::npos)
-        return Name;
-    return Name.substr(0, pos);
+    PEXPR_ASSERT(Kind != SSAValue::Kind::Constant, "Only named and temporary values have a base name");
+    PEXPR_ASSERT(!Name.empty(), "The name should never be empty!");
+
+    if (const auto pos = Name.rfind('.'); pos != std::string::npos)
+        return Name.substr(0, pos);
+    return Name;
 }
 
 std::string SSAInstrAssign::dump() const
