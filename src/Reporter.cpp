@@ -33,12 +33,14 @@ std::string Reporter::vformat(const char* fmt, va_list args) const
 
 void Reporter::report(LogLevel level, ReportType type, const Location& loc, const std::string& message)
 {
+    const bool enableOutput = (mOutputMask & type) == type;
+
     {
         std::lock_guard<std::mutex> l(mMutex);
         mEntries.push_back(ReporterEntry{ level, loc, message, type });
         if (level == LogLevel::Error)
             ++mErrorCount;
-        else if (level == LogLevel::Warning && (mOutputMask & type) == type)
+        else if (level == LogLevel::Warning && enableOutput)
             ++mWarningCount;
     }
 
@@ -51,7 +53,7 @@ void Reporter::report(LogLevel level, ReportType type, const Location& loc, cons
         PEXPR_LOG(LogLevel::Error) << loc << ": " << message << std::endl;
         break;
     case LogLevel::Warning:
-        if ((mOutputMask & type) == type)
+        if (enableOutput)
             PEXPR_LOG(LogLevel::Warning) << loc << ": " << message << std::endl;
         break;
     case LogLevel::Info:

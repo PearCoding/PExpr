@@ -58,15 +58,19 @@ int main(int argc, char** argv)
         else if (name == "trailing-semicolon")
             warningFlags |= RT_WARNING_TRAILING_SEMICOLON;
         else if (name == "no-trailing-semicolon")
-            warningFlags &= ~RT_WARNING_TRAILING_SEMICOLON;
+            warningFlags &= ~(uint32_t)RT_WARNING_TRAILING_SEMICOLON;
         else if (name == "implicit-cast")
             warningFlags |= RT_WARNING_IMPLICIT_CAST;
         else if (name == "no-implicit-cast")
-            warningFlags &= ~RT_WARNING_IMPLICIT_CAST;
+            warningFlags &= ~(uint32_t)RT_WARNING_IMPLICIT_CAST;
         else if (name == "implicit-cast-int")
             warningFlags |= RT_WARNING_IMPLICIT_CAST_INT;
         else if (name == "no-implicit-cast-int")
-            warningFlags &= ~RT_WARNING_IMPLICIT_CAST_INT;
+            warningFlags &= ~(uint32_t)RT_WARNING_IMPLICIT_CAST_INT;
+        else if (name == "pure-internal-function")
+            warningFlags |= RT_WARNING_PURE_INTERNAL_FUNCTIONS;
+        else if (name == "no-pure-internal-function")
+            warningFlags &= ~(uint32_t)RT_WARNING_PURE_INTERNAL_FUNCTIONS;
         else
             throw CLI::RuntimeError();
     };
@@ -154,6 +158,7 @@ int main(int argc, char** argv)
     // Parse
     Environment env;
     env.reporter().setOutputMask(warningFlags);
+    std::cout << warningFlags << std::endl;
 
     auto ast = env.parse(sourceFile);
 
