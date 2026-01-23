@@ -5,6 +5,7 @@ namespace PExpr {
 
 Reporter::Reporter()
     : mOutputMask(RT_WARNING_DEFAULT | RT_ERROR)
+    , mQuiet(false)
     , mErrorCount(0)
     , mWarningCount(0)
 {
