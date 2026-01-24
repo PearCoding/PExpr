@@ -43,14 +43,14 @@ void SSCPPreOptimizer::identifyExpressions(const InstructionList& instructions, 
 
     size_t nextExpressionId = 0;
 
-    // Use the existing CSE hash logic to identify equivalent expressions
-    // For simplicity, we'll reuse the CSE logic
+    // TODO: Use the existing CSE hash logic to identify equivalent expressions
 
     // This is a simplified implementation
     // In practice, we would need to track expressions across basic blocks
 
-    for (size_t i = 0; i < instructions.size(); ++i) {
-        const auto& instr = instructions[i];
+    for (const auto& instr : instructions) {
+        if (!instr)
+            continue;
 
         // Only consider assignments and calls that produce values
         if (auto asg = dynamic_cast<const SSAInstrAssign*>(instr.get())) {
@@ -113,7 +113,7 @@ void SSCPPreOptimizer::computeAvailability()
                     for (size_t pred : basicBlocks[blockIdx].predecessors) {
                         std::unordered_set<size_t> temp;
                         for (size_t block : newEntry) {
-                            if (info.availableAtExit.contains(block)) 
+                            if (info.availableAtExit.contains(block))
                                 temp.insert(block);
                         }
                         newEntry = std::move(temp);
@@ -161,7 +161,7 @@ void SSCPPreOptimizer::computeAnticipability()
             for (auto& [exprId, info] : mExpressionInfo) {
                 // Compute anticipated at exit: union of anticipated at entry of successors
                 std::unordered_set<size_t> newExit;
-                for (size_t succ : basicBlocks[i].successors) 
+                for (size_t succ : basicBlocks[i].successors)
                     newExit.insert(succ);
 
                 // Compute anticipated at entry: anticipated at exit ∪ generated in block
@@ -223,7 +223,7 @@ void SSCPPreOptimizer::computeLatestPlacement()
                     }
                 }
 
-                if (!hasSuccessorPlacement) 
+                if (!hasSuccessorPlacement)
                     info.latest.insert(i);
             }
         }
@@ -245,7 +245,7 @@ void SSCPPreOptimizer::computeInsertionDeletionPoints()
         // Delete where expression is redundant
         // For each block where expression is available at entry and anticipated at entry
         for (size_t i = 0; i < numBlocks; ++i) {
-            if (info.availableAtEntry.contains(i) && info.anticipatedAtEntry.contains(i)) 
+            if (info.availableAtEntry.contains(i) && info.anticipatedAtEntry.contains(i))
                 info.delete_.insert(i);
         }
     }

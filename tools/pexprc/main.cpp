@@ -95,6 +95,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-math-identities,!--no-opt-math-identities", optimizationOptions.ApplyMathIdentities, "Apply math identities");
     app.add_flag("--opt-trigonometric-identities,!--no-opt-trigonometric-identities", optimizationOptions.ApplyTrigonometricIdentities, "Apply trigonometric identities");
     app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
+    app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization,!--no-skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");

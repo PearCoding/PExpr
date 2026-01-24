@@ -134,8 +134,8 @@ bool SSAPassSSCP::processBody(InstructionList& body)
 
     if (mOptions.EliminatePartialRedundancies) {
         // 9) Apply partial redundancy elimination
-        if (mPreOptimizer->applyPRE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
-            changed = true;
+        // if (mPreOptimizer->applyPRE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
+        //     changed = true;
     }
 
     return changed;
