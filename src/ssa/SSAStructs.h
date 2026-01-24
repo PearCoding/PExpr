@@ -31,7 +31,6 @@ public:
     ElementaryType Type = ElementaryType::Unspecified;
     ExtendedValueVariant Value;
 
-    [[nodiscard]] std::string toString(bool showType = true) const;
     [[nodiscard]] std::string baseName() const;
 
     /// Compute a hash for this value
@@ -54,7 +53,6 @@ public:
 
 struct SSAInstr {
     virtual ~SSAInstr()              = default;
-    virtual std::string dump() const = 0;
 
     /// Compute a hash for this instruction
     [[nodiscard]] virtual size_t hash() const = 0;
@@ -106,7 +104,6 @@ struct SSAInstrAssign : public SSAInstr {
     std::string Swizzle;
     std::vector<SSAValue> Operands;
 
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override;
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override;
     void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
@@ -121,7 +118,6 @@ struct SSAInstrCall : public SSAInstr {
     std::string PublicFunctionName; ///< User given name
     std::vector<SSAValue> Arguments;
 
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override;
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override;
     void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
@@ -132,7 +128,6 @@ struct SSAInstrCall : public SSAInstr {
 
 struct SSAInstrReturn : public SSAInstr {
     SSAValue Value;
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override { return Value.hash(); }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
@@ -149,7 +144,6 @@ struct SSAInstrReturn : public SSAInstr {
 // are emitted when inlining branch/closure bodies.
 struct SSAInstrLabel : public SSAInstr {
     std::string Name;
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override { return std::hash<std::string>{}(Name); }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
@@ -163,7 +157,6 @@ struct SSAInstrLabel : public SSAInstr {
 struct SSAInstrBranch : public SSAInstr {
     SSAValue Condition;
     std::string TargetLabel;
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override
     {
         size_t h = Condition.hash();
@@ -183,7 +176,6 @@ struct SSAInstrBranch : public SSAInstr {
 // Unconditional jump to a label.
 struct SSAInstrGoto : public SSAInstr {
     std::string TargetLabel;
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override { return std::hash<std::string>{}(TargetLabel); }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
@@ -197,7 +189,6 @@ struct SSAInstrPhi : public SSAInstr {
     SSAValue Target;
     std::vector<SSAValue> Conditions;
     std::vector<SSAValue> Branches; // One more than Conditions due to 'else' case
-    [[nodiscard]] std::string dump() const override;
     [[nodiscard]] size_t hash() const override
     {
         size_t h = Target.hash();
@@ -244,14 +235,10 @@ struct SSAFunction {
     bool External = false;
     // Mark whether this function has side-effects. Only external functions can have side-effects
     bool HasSideEffect = false;
-
-    [[nodiscard]] std::string dump() const;
 };
 
 struct SSAProgram {
     std::vector<std::shared_ptr<SSAInstr>> Body;
     std::vector<SSAFunction> Functions;
-
-    [[nodiscard]] std::string dump() const;
 };
 } // namespace PExpr::ssa

@@ -14,4 +14,5 @@
 
 #include "ssa/SSAMapper.h"
 #include "ssa/SSAPassSSCP.h"
+#include "ssa/SSASerializer.h"
 #include "ssa/SSAValidator.h"

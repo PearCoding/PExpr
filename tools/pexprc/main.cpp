@@ -43,6 +43,9 @@ int main(int argc, char** argv)
     bool emitAST = false;
     app.add_flag("--emit-ast", emitAST, "Emit AST instead of the IR");
 
+    bool readSSAIR = false;
+    app.add_flag("--input-ir", readSSAIR, "Read SSA IR produced by a previous run instead of a file with PExpr syntax");
+
     uint32_t warningFlags = RT_WARNING_DEFAULT;
     bool warningAsError   = false;
 
@@ -122,6 +125,11 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
+    if (readSSAIR && emitAST) {
+        std::cerr << "Can't read SSA IR and emit AST afterwards" << std::endl;
+        return 1;
+    }
+
     if (outputFile.empty()) {
         outputFile = inputFile;
         if (emitAST)
@@ -150,24 +158,29 @@ int main(int argc, char** argv)
     Environment env;
     env.reporter().setOutputMask(warningFlags);
 
-    auto ast = env.parse(sourceFile);
+    ssa::SSAProgram program;
+    if (!readSSAIR) {
+        auto ast = env.parse(sourceFile);
 
-    if (ast == nullptr)
-        return env.reporter().errorCount();
+        if (ast == nullptr)
+            return env.reporter().errorCount();
 
-    if (warningAsError && env.reporter().warningCount() > 0) {
-        std::cerr << "Terminating as a warning was generated" << std::endl;
-        return env.reporter().warningCount();
+        if (warningAsError && env.reporter().warningCount() > 0) {
+            std::cerr << "Terminating as a warning was generated" << std::endl;
+            return env.reporter().warningCount();
+        }
+
+        if (emitAST) {
+            dumpOutput(StringVisitor::visit(ast) + "\n");
+            return env.reporter().errorCount();
+        }
+
+        // Map to IR
+        ssa::SSAMapper mapper;
+        program = mapper.map(ast);
+    } else {
+        program = ssa::SSASerializer::read(sourceFile);
     }
-
-    if (emitAST) {
-        dumpOutput(StringVisitor::visit(ast) + "\n");
-        return env.reporter().errorCount();
-    }
-
-    // Map to IR
-    ssa::SSAMapper mapper;
-    auto program = mapper.map(ast);
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
         std::cerr << "The SSA will be invalid due to unspecified typing!" << std::endl;
@@ -175,13 +188,13 @@ int main(int argc, char** argv)
     }
 
     if (skipOptimizationPass) {
-        dumpOutput(program.dump());
+        dumpOutput(ssa::SSASerializer::serialize(program));
         return env.reporter().errorCount();
     }
 
     // Optimize
     ssa::SSAPassSSCP::Run(optimizationOptions, program);
-    dumpOutput(program.dump());
+    dumpOutput(ssa::SSASerializer::serialize(program));
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
         std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;

@@ -5,6 +5,7 @@
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSAPassSSCP.h"
+#include "ssa/SSASerializer.h"
 
 using namespace PExpr;
 using namespace PExpr::ssa;
@@ -27,7 +28,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination basic", "[sscp][cse]")
     auto prog = mapper.map(ast);
 
     // Count occurrences of "a * b" before optimization
-    auto before             = prog.dump();
+    auto before             = SSASerializer::serialize(prog);
     size_t mul_count_before = 0;
     size_t pos              = 0;
     while ((pos = before.find("mul(", pos)) != std::string::npos) {
@@ -38,7 +39,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination basic", "[sscp][cse]")
     // Run SSCP pass
     SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
 
-    auto after = prog.dump();
+    auto after = SSASerializer::serialize(prog);
 
     // Count occurrences of "mul" after optimization
     size_t mul_count_after = 0;
@@ -63,12 +64,12 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with constants", "[sscp
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    auto before = prog.dump();
+    auto before = SSASerializer::serialize(prog);
 
     // Run SSCP pass
     SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
 
-    auto after = prog.dump();
+    auto after = SSASerializer::serialize(prog);
 
     // Check that we have fewer sin/cos calls (CSE should eliminate duplicates)
     size_t sin_count_before = 0, sin_count_after = 0;
@@ -122,7 +123,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with different names", 
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    auto before             = prog.dump();
+    auto before             = SSASerializer::serialize(prog);
     size_t add_count_before = 0;
     size_t pos              = 0;
     while ((pos = before.find("add(", pos)) != std::string::npos) {
@@ -133,7 +134,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with different names", 
     // Run SSCP pass
     SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
 
-    auto after             = prog.dump();
+    auto after             = SSASerializer::serialize(prog);
     size_t add_count_after = 0;
     pos                    = 0;
     while ((pos = after.find("add(", pos)) != std::string::npos) {
@@ -159,7 +160,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination preserves side effects"
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    auto before                     = prog.dump();
+    auto before                     = SSASerializer::serialize(prog);
     size_t side_effect_count_before = 0;
     size_t pos                      = 0;
     while ((pos = before.find("call[_Z11side_effect", pos)) != std::string::npos) {
@@ -170,7 +171,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination preserves side effects"
     // Run SSCP pass
     SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
 
-    auto after                     = prog.dump();
+    auto after                     = SSASerializer::serialize(prog);
     size_t side_effect_count_after = 0;
     pos                            = 0;
     while ((pos = after.find("call[_Z11side_effect", pos)) != std::string::npos) {
@@ -198,7 +199,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination complex pattern", "[ssc
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    auto before             = prog.dump();
+    auto before             = SSASerializer::serialize(prog);
     size_t add_count_before = 0, mul_count_before = 0;
     size_t pos = 0;
     while ((pos = before.find("add(", pos)) != std::string::npos) {
@@ -214,7 +215,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination complex pattern", "[ssc
     // Run SSCP pass
     SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
 
-    auto after             = prog.dump();
+    auto after             = SSASerializer::serialize(prog);
     size_t add_count_after = 0, mul_count_after = 0;
     pos = 0;
     while ((pos = after.find("add(", pos)) != std::string::npos) {

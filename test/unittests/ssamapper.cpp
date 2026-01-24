@@ -4,6 +4,7 @@
 
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
+#include "ssa/SSASerializer.h"
 
 using namespace PExpr;
 using namespace PExpr::ssa;
@@ -16,7 +17,7 @@ TEST_CASE("SSAMapper: simple variable and expression", "[ssamapper]")
 
     SSAMapper mapper;
     auto prog   = mapper.map(ast);
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // Expect an assignment for x, and a return
     REQUIRE(dumped.find("assign(") != std::string::npos);
@@ -31,7 +32,7 @@ TEST_CASE("SSAMapper: function declaration and call", "[ssamapper]")
 
     SSAMapper mapper;
     auto prog   = mapper.map(ast);
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // Expect a function named '_Z1f*' (mangled) and a call to f in main body
     REQUIRE(dumped.find("fn _Z1f") != std::string::npos);
@@ -45,7 +46,7 @@ TEST_CASE("SSAMapper: branch produces phi", "[ssamapper]")
 
     SSAMapper mapper;
     auto prog   = mapper.map(ast);
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // Expect a phi node for merged branch results
     REQUIRE(dumped.find("phi[") != std::string::npos);
@@ -68,6 +69,6 @@ TEST_CASE("SSAMapper: recursion function mapping", "[ssamapper]")
     }
     REQUIRE(foundFunc);
 
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
     REQUIRE(dumped.find("call") != std::string::npos);
 }

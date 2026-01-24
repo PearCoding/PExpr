@@ -44,9 +44,8 @@ inline std::string makeMangledNameFromTypes(const std::string& name, std::span<c
             ss << "L" << l.line() << "C" << l.column();
             parts.push_back(ss.str());
         }
-        for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+        for (auto it = parts.rbegin(); it != parts.rend(); ++it)
             mangled += "_" + *it;
-        }
     }
     return mangled;
 }

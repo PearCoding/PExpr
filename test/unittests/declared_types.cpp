@@ -4,6 +4,7 @@
 
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
+#include "ssa/SSASerializer.h"
 
 using namespace PExpr;
 using namespace PExpr::ssa;
@@ -18,7 +19,7 @@ TEST_CASE("DeclaredTypes: implicit int->num declaration injects SSA cast", "[dec
 
     SSAMapper mapper;
     auto prog   = mapper.map(ast);
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // Expect a cast instruction inserted by lowering the injected CastExpression
     REQUIRE(dumped.find("cast(") != std::string::npos);
@@ -33,7 +34,7 @@ TEST_CASE("DeclaredTypes: explicit num->int declaration using 'as' is accepted a
 
     SSAMapper mapper;
     auto prog   = mapper.map(ast);
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     REQUIRE(dumped.find("cast(") != std::string::npos);
 }

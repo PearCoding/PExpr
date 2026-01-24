@@ -5,6 +5,7 @@
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSAPassSSCP.h"
+#include "ssa/SSASerializer.h"
 
 using namespace PExpr;
 using namespace PExpr::ssa;
@@ -22,7 +23,7 @@ TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
     // run SSCP pass
     SSAPassSSCP::Run(SSAOptions(), prog);
 
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // Expect the constant value "5" present
     REQUIRE(dumped.find("5") != std::string::npos);
@@ -38,12 +39,12 @@ TEST_CASE("SSAPassSSCP: dead code elimination removes unused assigns", "[sscp]")
     auto prog = mapper.map(ast);
 
     // Ensure y assign exists before pass (sanity)
-    auto before = prog.dump();
+    auto before = SSASerializer::serialize(prog);
     REQUIRE((before.find("y.") != std::string::npos || before.find("y:") != std::string::npos));
 
     SSAPassSSCP::Run(SSAOptions(), prog);
 
-    auto after = prog.dump();
+    auto after = SSASerializer::serialize(prog);
 
     // After pass, 'y' assignment should be removed (dead)
     REQUIRE(after.find("y.") == std::string::npos);
@@ -63,7 +64,7 @@ TEST_CASE("SSAPassSSCP: constant folding for vectors", "[sscp]")
     // run SSCP pass
     SSAPassSSCP::Run(SSAOptions(), prog);
 
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // The vector addition should be folded to 4.0
     REQUIRE(dumped.find("4.0") != std::string::npos);
@@ -81,7 +82,7 @@ TEST_CASE("SSAPassSSCP: vector arithmetic operations", "[sscp]")
 
     SSAPassSSCP::Run(SSAOptions(), prog);
 
-    auto dumped = prog.dump();
+    auto dumped = SSASerializer::serialize(prog);
 
     // Check that constant folding occurred for vector operations
     REQUIRE(dumped.find("14.5") != std::string::npos);
