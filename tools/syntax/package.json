@@ -1,8 +1,8 @@
 {
     "name": "pexpr-language-support",
     "displayName": "PExpr Language Support",
-    "description": "Syntax highlighting for PExpr language",
-    "version": "0.0.1",
+    "description": "Syntax highlighting for PExpr language and the SSA IR language",
+    "version": "0.0.2",
     "publisher": "Ömercan Yazici",
     "engines": {
         "vscode": "^1.85.0"
@@ -11,16 +11,41 @@
         "Programming Languages"
     ],
     "contributes": {
-        "languages": [{
-            "id": "pexpr",
-            "aliases": ["PExpr", "pexpr"],
-            "extensions": [".pexpr"],
-            "configuration": "./pexpr-language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "pexpr",
-            "scopeName": "source.pexpr",
-            "path": "./pexpr.tmLanguage.json"
-        }]
+        "languages": [
+            {
+                "id": "pexpr",
+                "aliases": [
+                    "PExpr",
+                    "pexpr"
+                ],
+                "extensions": [
+                    ".pexpr"
+                ],
+                "configuration": "./pexpr-language-configuration.json"
+            },
+            {
+                "id": "pexprir",
+                "aliases": [
+                    "PExprIR",
+                    "pexprir"
+                ],
+                "extensions": [
+                    ".pexprir"
+                ],
+                "configuration": "./pexprir-language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "pexpr",
+                "scopeName": "source.pexpr",
+                "path": "./pexpr.tmLanguage.json"
+            },
+            {
+                "language": "pexprir",
+                "scopeName": "source.pexprir",
+                "path": "./pexprir.tmLanguage.json"
+            }
+        ]
     }
 }
