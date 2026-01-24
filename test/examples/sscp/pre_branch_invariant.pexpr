@@ -1,0 +1,60 @@
+// Partial Redundancy Elimination (PRE) - Branch-invariant code motion
+// Tests moving computations out of conditional branches when they appear in multiple paths
+
+fn [[extern]] getInput() -> num;
+fn [[extern, pure]] sin(a:num) -> num;
+fn [[extern, pure]] cos(a:num) -> num;
+
+let a = getInput();
+let b = getInput();
+let cond1 = getInput() > 0.0;
+let cond2 = getInput() > 0.5;
+
+// Expression 'a * b' appears in both branches - should be moved before the branch
+let result1 = if cond1 {
+    let x = a * b;  // This computation appears in both branches
+    x + 1.0
+} else {
+    let y = a * b;  // Same computation as in the true branch
+    y - 1.0
+};
+
+// More complex: nested branches with common subexpressions
+let result2 = if cond1 {
+    // Branch 1
+    if cond2 {
+        let z = sin(a) + cos(b);  // Appears in multiple paths
+        z * 2.0
+    } else {
+        let w = sin(a) + cos(b);  // Same as above
+        w * 3.0
+    }
+} else {
+    // Branch 2 - different computation but 'a * b' appears here too
+    let v = a * b;
+    v * 4.0
+};
+
+// Expression appearing in all three paths of a conditional chain
+let result3 = if cond1 {
+    let t1 = a * a + b * b;  // Common pattern
+    t1 * 1.0
+} elif cond2 {
+    let t2 = a * a + b * b;  // Same as above
+    t2 * 2.0
+} else {
+    let t3 = a * a + b * b;  // Same as above
+    t3 * 3.0
+};
+
+// Function calls with same arguments in different branches
+let result4 = if cond1 {
+    let f1 = sin(a) * cos(b);  // Function call pattern
+    f1 + 1.0
+} else {
+    let f2 = sin(a) * cos(b);  // Same function calls
+    f2 - 1.0
+};
+
+// Final result uses all computed values
+result1 + result2 + result3 + result4
