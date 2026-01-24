@@ -16,6 +16,7 @@ SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     , mIdentityOptimizer(std::make_unique<SSCPIdentityOptimizer>(opts))
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
     , mCommonSubexpressionEliminator(std::make_unique<SSCPCommonSubexpressionEliminator>(opts))
+    , mPreOptimizer(std::make_unique<SSCPPreOptimizer>(opts))
 {
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
@@ -106,7 +107,7 @@ bool SSAPassSSCP::processBody(InstructionList& body)
         changed = true;
 
     if (mOptions.EliminateCommonSubexpressions) {
-        // 4) Apply common subexpression elimination
+        // 4) Apply common subexpression elimination per basic block
         if (mCommonSubexpressionEliminator->applyCSE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
             changed = true;
     }
@@ -128,6 +129,12 @@ bool SSAPassSSCP::processBody(InstructionList& body)
     if (mOptions.RemoveDeadCode) {
         // 8) Collapse phi nodes
         if (mControlFlowOptimizer->collapsePhiNodes(body))
+            changed = true;
+    }
+
+    if (mOptions.EliminatePartialRedundancies) {
+        // 9) Apply partial redundancy elimination
+        if (mPreOptimizer->applyPRE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
             changed = true;
     }
 

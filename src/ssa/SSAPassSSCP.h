@@ -9,6 +9,7 @@
 #include "SSCPIdentityOptimizer.h"
 #include "SSCPSideEffectAnalyzer.h"
 #include "SSCPCommonSubexpressionEliminator.h"
+#include "SSCPPreOptimizer.h"
 
 #include <memory>
 
@@ -46,6 +47,7 @@ private:
     std::unique_ptr<SSCPIdentityOptimizer> mIdentityOptimizer;
     std::unique_ptr<SSCPSideEffectAnalyzer> mSideEffectAnalyzer;
     std::unique_ptr<SSCPCommonSubexpressionEliminator> mCommonSubexpressionEliminator;
+    std::unique_ptr<SSCPPreOptimizer> mPreOptimizer;
 };
 
 } // namespace PExpr::ssa

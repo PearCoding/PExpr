@@ -3,11 +3,11 @@
 - [x] Constant folding
 - [x] Dead-code elimination
 - [x] Global value numbering
-- [ ] Partial-redundancy elimination
+- [x] Partial-redundancy elimination
 - [ ] Parameter/Constant/Function unused warning
 - [x] Make functions in PExpr side-effect free
 - [x] Uplift nested functions
-- [ ] Do not reorder side-effected functions!
+- [x] Do not reorder side-effected functions!
 - [ ] Collapse branches to select operations if possible
 - [x] External pure functions
 - [x] Constant folding of intrinsic functions
@@ -17,3 +17,9 @@
 - [ ] Value range propagation
 - [ ] Tail call optimization
 - [ ] Memory/register allocation optimizations
+- [ ] Most optimization ignore code blocks. Fix that by extracting basic blocks and applying on them. Only some passes should be applied to all blocks. 
+- [ ] Allow attributes for every statement and expression. Give intrinsics special names. 
+- [ ] Add loop expression (like https://zig.guide/language-basics/loops-as-expressions/)
+- [ ] Add loop statements
+- [ ] Add if statements
+- [ ] Refactor code to use std::ranges if applicable

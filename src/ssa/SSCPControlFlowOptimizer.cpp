@@ -100,20 +100,10 @@ bool SSCPControlFlowOptimizer::removeObsoleteLabels(InstructionList& instruction
     for (auto& instrPtr : instructions) {
         if (!instrPtr)
             continue;
-        if (auto l = dynamic_cast<const SSAInstrLabel*>(instrPtr.get())) {
-            if (counter.find(l->Name) == counter.end())
-                counter[l->Name] = 0;
-        } else if (auto g = dynamic_cast<const SSAInstrGoto*>(instrPtr.get())) {
-            if (auto it = counter.find(g->TargetLabel); it != counter.end())
-                it->second += 1;
-            else
-                counter[g->TargetLabel] = 1;
-        } else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get())) {
-            if (auto it = counter.find(br->TargetLabel); it != counter.end())
-                it->second += 1;
-            else
-                counter[br->TargetLabel] = 1;
-        }
+        if (auto g = dynamic_cast<const SSAInstrGoto*>(instrPtr.get()))
+            counter[g->TargetLabel]++;
+        else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get()))
+            counter[br->TargetLabel]++;
     }
 
     bool changed = false;
@@ -125,7 +115,7 @@ bool SSCPControlFlowOptimizer::removeObsoleteLabels(InstructionList& instruction
         }
 
         if (auto l = dynamic_cast<const SSAInstrLabel*>(it->get())) {
-            if (counter.at(l->Name) == 0) {
+            if (!counter.contains(l->Name) || counter.at(l->Name) == 0) {
                 it      = instructions.erase(it);
                 changed = true;
                 continue;

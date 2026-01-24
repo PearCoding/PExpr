@@ -7,7 +7,7 @@
 
 namespace PExpr::ssa {
 
-bool SSCPCommonSubexpressionEliminator::applyCSE(SSAContext* ctx, InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions)
+bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, InstructionList::iterator begin, InstructionList::iterator end, const std::unordered_set<std::string>& sideEffectedFunctions)
 {
     PEXPR_UNUSED(ctx);
 
@@ -18,7 +18,8 @@ bool SSCPCommonSubexpressionEliminator::applyCSE(SSAContext* ctx, InstructionLis
     bool changed = false;
 
     // First pass: compute hashes for all values
-    for (const auto& instrPtr : instructions) {
+    for (auto it = begin; it != end; ++it) {
+        const auto& instrPtr = *it;
         if (!instrPtr)
             continue;
 
@@ -37,7 +38,8 @@ bool SSCPCommonSubexpressionEliminator::applyCSE(SSAContext* ctx, InstructionLis
     }
 
     // Second pass: eliminate common subexpressions
-    for (auto& instrPtr : instructions) {
+    for (auto it = begin; it != end; ++it) {
+        auto& instrPtr = *it;
         if (!instrPtr)
             continue;
 
@@ -73,9 +75,9 @@ bool SSCPCommonSubexpressionEliminator::applyCSE(SSAContext* ctx, InstructionLis
             continue;
 
         // Check if we've seen this expression before
-        if (const auto it = mExpressionMap.find(*currentHash); it != mExpressionMap.end()) {
+        if (const auto itMap = mExpressionMap.find(*currentHash); itMap != mExpressionMap.end()) {
             // Found a duplicate expression! Replace with reference to previous result
-            const SSAValue& existingValue = it->second;
+            const SSAValue& existingValue = itMap->second;
 
             // Don't replace with ourselves
             if (existingValue.Name == targetName)
@@ -102,6 +104,34 @@ bool SSCPCommonSubexpressionEliminator::applyCSE(SSAContext* ctx, InstructionLis
             else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
                 mExpressionMap[*currentHash] = call->Target;
         }
+    }
+
+    return changed;
+}
+
+bool SSCPCommonSubexpressionEliminator::applyCSE(SSAContext* ctx, InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions)
+{
+    mBlockAnalyzer.identifyBasicBlocks(instructions);
+    // mBlockAnalyzer.buildControlFlowGraph(instructions); // < Not needed here
+
+    bool changed = false;
+
+    // Process each basic block separately
+    const auto& blocks = mBlockAnalyzer.getBasicBlocks();
+    for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
+        const auto& block = blocks[blockIdx];
+        if (block.startIndex >= instructions.size()
+            || block.endIndex > instructions.size()
+            || block.startIndex >= block.endIndex)
+            continue;
+
+        // Apply CSE to this basic block range
+        auto blockBegin   = instructions.begin() + block.startIndex;
+        auto blockEnd     = instructions.begin() + block.endIndex;
+        bool blockChanged = applyCSEToRange(ctx, blockBegin, blockEnd, sideEffectedFunctions);
+
+        if (blockChanged)
+            changed = true;
     }
 
     return changed;

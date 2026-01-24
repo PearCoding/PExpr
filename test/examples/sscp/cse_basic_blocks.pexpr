@@ -1,0 +1,113 @@
+// Example demonstrating why CSE needs to respect basic block boundaries
+// This program contains identical expressions in different basic blocks
+// that should NOT be eliminated because they appear on different control flow paths
+
+fn [[extern]] getInput() -> num; // < Artificial way to add side-effects and ensure it does not get removed
+fn [[extern, pure]] getInputPure() -> num;
+
+fn branchCSEExample(cond: bool) -> num = {
+    // This function demonstrates the need for basic-block-aware CSE 
+    // Branch creates separate basic blocks
+    if cond {
+        // Basic Block 1 (true branch)
+        let a = getInput();
+        let b = getInput();
+        // Compute expression: a * b + 5.0
+        let x = a * b + 5.0;
+        
+        // Another identical expression in the SAME basic block
+        // This SHOULD be eliminated by CSE
+        let y = a * b + 5.0;  // Same as x, should be eliminated
+        
+        x + y  // Should become: x + x
+    } else {
+        // Basic Block 2 (false branch)
+        let a = getInput();
+        let b = getInput();
+        // Compute IDENTICAL expression: a * b + 5.0
+        // But in a DIFFERENT basic block
+        let x = a * b + 5.0;
+        
+        // This is also identical but in the same basic block
+        // Should be eliminated within this block
+        let z = a * b + 5.0;  // Same as x, should be eliminated
+        
+        x * z  // Should become: x * x
+    }
+};
+
+// More complex example with nested control flow
+fn complexCSEExample(cond1: bool, cond2: bool) -> num = {    
+    // Outer branch
+    if cond1 {
+        // Basic Block A
+        let base = 10.0;
+        
+        // Inner branch
+        if cond2 {
+            // Basic Block A1
+            let x = getInputPure();
+            let v = x + base;
+            
+            // Same expression in same block - should be eliminated
+            let y = getInputPure();  // Should reuse x
+            v + y
+        } else {
+            // Basic Block A2  
+            let x = getInputPure();  // Different block from A1, should NOT reuse
+            let v = x - base;
+            
+            // Same expression in same block - should be eliminated
+            let y = getInputPure();  // Should reuse x within A2
+            v * y
+        }
+    } else {
+        // Basic Block B
+        let base = 20.0;
+        let x = getInputPure();  // Different block from A1/A2
+        
+        x + base
+        // Loop creates another basic block
+        /*for i in 0..3 {
+            // Basic Block B1 (loop body)
+            let temp = getInput();  // Inside loop - different basic block
+            
+            // Same expression within same loop iteration - should be eliminated
+            let temp2 = getInput();  // Should reuse temp within this iteration
+            result = result + temp + temp2;
+        }*/
+    }
+};
+
+// Example showing why CSE across blocks is unsafe
+fn unsafeCrossBlockCSE(cond: bool) -> num = {
+    let x = if cond {
+        // Block 1
+        let a = getInput();  // May have side effects
+        a * 2.0
+    } else {
+        0.0
+    };
+    
+    // Block 2 (after the branch)
+    // WRONG optimization: reusing 'a * 2.0' from Block 1
+    // This is unsafe because:
+    // 1. 'a' is not defined in this block if cond was false
+    // 2. getInput() may have different side effects on second call
+    // 3. The expression lives in a different dominance region
+    
+    let y = getInput() * 2.0;  // Must recompute, cannot reuse from Block 1
+    
+    x + y
+};
+
+// Test the examples
+let test1 = branchCSEExample(true);
+let test2 = branchCSEExample(false);
+let test3 = complexCSEExample(true, true);
+let test4 = complexCSEExample(true, false);
+let test5 = complexCSEExample(false, true);
+let test6 = unsafeCrossBlockCSE(true);
+let test7 = unsafeCrossBlockCSE(false);
+
+test1 + test2 + test3 + test4 + test5 + test6 + test7

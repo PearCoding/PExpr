@@ -10,7 +10,8 @@ struct SSAOptions {
     bool InlineFunctions               = true;
     bool ApplyMathIdentities           = true; // < Standard math identities
     bool ApplyTrigonometricIdentities  = true; // < Trigonometric identities (sin, cos, ...)
-    bool EliminateCommonSubexpressions = true;
+    bool EliminateCommonSubexpressions = true; // < Common subexpression elimination (CSE)
+    bool EliminatePartialRedundancies  = true; // < Partial redundancy elimination (PRE)
 
     [[nodiscard]] inline static SSAOptions None()
     {
@@ -22,6 +23,7 @@ struct SSAOptions {
             .ApplyMathIdentities           = false,
             .ApplyTrigonometricIdentities  = false,
             .EliminateCommonSubexpressions = false,
+            .EliminatePartialRedundancies  = false,
         };
     }
 
@@ -36,8 +38,9 @@ struct SSAOptions {
 
     [[nodiscard]] inline static SSAOptions Medium()
     {
-        auto opts            = Low();
-        opts.InlineFunctions = true;
+        auto opts                         = Low();
+        opts.InlineFunctions              = true;
+        opts.EliminatePartialRedundancies = true;
         return opts;
     }
 
