@@ -291,6 +291,41 @@ static std::string trim(const std::string& str)
     return str.substr(start, end - start + 1);
 }
 
+// Helper function to strip comments from a line
+static std::string stripComments(const std::string& line, bool& inBlockComment)
+{
+    std::string result;
+    result.reserve(line.size());
+    
+    for (size_t i = 0; i < line.size(); ++i) {
+        if (inBlockComment) {
+            // Check for end of block comment
+            if (i + 1 < line.size() && line[i] == '*' && line[i + 1] == '/') {
+                inBlockComment = false;
+                ++i; // Skip the '/'
+            }
+            continue;
+        }
+        
+        // Check for start of block comment
+        if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*') {
+            inBlockComment = true;
+            ++i; // Skip the '*'
+            continue;
+        }
+        
+        // Check for line comment
+        if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/') {
+            // Line comment, ignore the rest of the line
+            break;
+        }
+        
+        result += line[i];
+    }
+    
+    return result;
+}
+
 static std::vector<std::string> split(const std::string& str, char delimiter)
 {
     std::vector<std::string> tokens;
@@ -655,8 +690,11 @@ SSAProgram SSASerializer::read(std::istream& is)
     SSAProgram program;
     std::string line;
     std::shared_ptr<SSAFunction> currentFunction = nullptr;
+    bool inBlockComment = false;
 
     while (std::getline(is, line)) {
+        // Strip comments from the line
+        line = stripComments(line, inBlockComment);
         line = trim(line);
         if (line.empty())
             continue;

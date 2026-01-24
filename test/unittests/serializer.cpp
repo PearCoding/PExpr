@@ -181,6 +181,7 @@ TEST_CASE("SSASerializer: handles empty program", "[serializer]")
 
     SSAProgram deserialized  = SSASerializer::deserialize(serialized);
     std::string reserialized = SSASerializer::serialize(deserialized);
+
     REQUIRE(serialized == reserialized);
 }
 
@@ -199,4 +200,120 @@ TEST_CASE("SSASerializer: round-trip with multiple instructions", "[serializer]"
     std::string reserialized = SSASerializer::serialize(deserialized);
 
     REQUIRE(serialized == reserialized);
+}
+
+TEST_CASE("SSASerializer: handles comments in PExprIR", "[serializer]")
+{
+    SECTION("Line comments")
+    {
+        std::string program = R"(
+// This is a line comment
+fn test_func(a:num):num
+  // Another line comment
+  b.1:num = add(a:num, 1.0:num)
+  return b.1:num
+endfn
+)";
+
+        SSAProgram prog = SSASerializer::deserialize(program);
+        REQUIRE(prog.Functions.size() == 1);
+        REQUIRE(prog.Functions[0].Name == "test_func");
+        REQUIRE(prog.Functions[0].Parameters.size() == 1);
+        REQUIRE(prog.Functions[0].Parameters[0] == "a");
+
+        // Reserialize and ensure comments are stripped
+        std::string reserialized = SSASerializer::serialize(prog);
+        REQUIRE(reserialized.find("//") == std::string::npos);
+    }
+
+    SECTION("Block comments")
+    {
+        std::string program = R"(
+/* This is a 
+   block comment
+   spanning multiple lines */
+fn test_func(x:int):int
+  /* Comment inside function */
+  y.1:int = add(x:int, 5:int)
+  return y.1:int
+endfn
+)";
+
+        SSAProgram prog = SSASerializer::deserialize(program);
+        REQUIRE(prog.Functions.size() == 1);
+        REQUIRE(prog.Functions[0].Name == "test_func");
+
+        // Reserialize and ensure comments are stripped
+        std::string reserialized = SSASerializer::serialize(prog);
+        REQUIRE(reserialized.find("/*") == std::string::npos);
+        REQUIRE(reserialized.find("*/") == std::string::npos);
+    }
+
+    SECTION("Mixed comments")
+    {
+        std::string program = R"(
+// Line comment before function
+[[extern, pure]] fn test_func():bool
+  /* Block comment
+     inside function */
+  result.1:bool = assign(true:bool)
+  return result.1:bool // Inline comment
+endfn
+// Line comment after function
+)";
+
+        SSAProgram prog = SSASerializer::deserialize(program);
+        REQUIRE(prog.Functions.size() == 1);
+        REQUIRE(prog.Functions[0].Name == "test_func");
+        REQUIRE(prog.Functions[0].External == true);
+        REQUIRE(prog.Functions[0].HasSideEffect == false);
+
+        // Reserialize and ensure comments are stripped
+        std::string reserialized = SSASerializer::serialize(prog);
+        REQUIRE(reserialized.find("//") == std::string::npos);
+        REQUIRE(reserialized.find("/*") == std::string::npos);
+        REQUIRE(reserialized.find("*/") == std::string::npos);
+    }
+
+    SECTION("Comment at end of line")
+    {
+        std::string program = R"(
+fn test_func():num
+  a.1:num = assign(1.0:num) // inline comment
+  b.1:num = add(a.1:num, 2.0:num) /* another inline */
+  return b.1:num
+endfn
+)";
+
+        SSAProgram prog = SSASerializer::deserialize(program);
+        REQUIRE(prog.Functions.size() == 1);
+        REQUIRE(prog.Functions[0].Name == "test_func");
+
+        // Reserialize and compare
+        std::string reserialized = SSASerializer::serialize(prog);
+        SSAProgram reparsed      = SSASerializer::deserialize(reserialized);
+        REQUIRE(reparsed.Functions.size() == 1);
+    }
+
+    SECTION("Unclosed block comment continues across lines")
+    {
+        std::string program = R"(
+/* This block comment is not closed on this line
+fn ignored_function():bool
+  result.1:bool = assign(false:bool)
+  return result.1:bool
+endfn
+*/ // The comment ends here
+
+fn actual_function():num
+  value.1:num = assign(42.0:num)
+  return value.1:num
+endfn
+)";
+
+        SSAProgram prog = SSASerializer::deserialize(program);
+        // Only actual_function should be parsed
+        REQUIRE(prog.Functions.size() == 1);
+        REQUIRE(prog.Functions[0].Name == "actual_function");
+    }
 }
