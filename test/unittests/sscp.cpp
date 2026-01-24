@@ -4,14 +4,14 @@
 
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
-#include "ssa/SSAPassSSCP.h"
+#include "ssa/SSAOptimizer.h"
 #include "ssa/SSASerializer.h"
 
 using namespace PExpr;
 using namespace PExpr::ssa;
 using namespace PExpr::internal;
 
-TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
+TEST_CASE("SSAOptimizer: constant folding of binary ops", "[sscp]")
 {
     std::stringstream stream("let mut a = 2; let mut b = 3; let mut c = a + b; c");
     Environment env;
@@ -21,7 +21,7 @@ TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAPassSSCP::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(SSAOptions(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -29,7 +29,7 @@ TEST_CASE("SSAPassSSCP: constant folding of binary ops", "[sscp]")
     REQUIRE(dumped.find("5") != std::string::npos);
 }
 
-TEST_CASE("SSAPassSSCP: dead code elimination removes unused assigns", "[sscp]")
+TEST_CASE("SSAOptimizer: dead code elimination removes unused assigns", "[sscp]")
 {
     std::stringstream stream("let x = 1; let y = 2; x");
     Environment env;
@@ -42,7 +42,7 @@ TEST_CASE("SSAPassSSCP: dead code elimination removes unused assigns", "[sscp]")
     auto before = SSASerializer::serialize(prog);
     REQUIRE((before.find("y.") != std::string::npos || before.find("y:") != std::string::npos));
 
-    SSAPassSSCP::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(SSAOptions(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -52,7 +52,7 @@ TEST_CASE("SSAPassSSCP: dead code elimination removes unused assigns", "[sscp]")
     REQUIRE(after.find("return ") != std::string::npos);
 }
 
-TEST_CASE("SSAPassSSCP: constant folding for vectors", "[sscp]")
+TEST_CASE("SSAOptimizer: constant folding for vectors", "[sscp]")
 {
     std::stringstream stream("let v1 = [1.0, 2.0]; let v2 = [3.0, 4.0]; let v3 = v1 + v2; v3.x");
     Environment env;
@@ -62,7 +62,7 @@ TEST_CASE("SSAPassSSCP: constant folding for vectors", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAPassSSCP::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(SSAOptions(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -70,7 +70,7 @@ TEST_CASE("SSAPassSSCP: constant folding for vectors", "[sscp]")
     REQUIRE(dumped.find("4.0") != std::string::npos);
 }
 
-TEST_CASE("SSAPassSSCP: vector arithmetic operations", "[sscp]")
+TEST_CASE("SSAOptimizer: vector arithmetic operations", "[sscp]")
 {
     // Test various vector operations: add, sub, mul, div
     std::stringstream stream("let v1 = [1.0, 2.0, 3.0]; let v2 = [2.0, 3.0, 4.0]; let add = v1 + v2; let sub = v1 - v2; let mul = v1 * v2; let div = v1 / v2; add.x + sub.y + mul.z + div.x");
@@ -80,7 +80,7 @@ TEST_CASE("SSAPassSSCP: vector arithmetic operations", "[sscp]")
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    SSAPassSSCP::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(SSAOptions(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 

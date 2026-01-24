@@ -13,6 +13,6 @@
 #include "TranspileVisitor.h"
 
 #include "ssa/SSAMapper.h"
-#include "ssa/SSAPassSSCP.h"
+#include "ssa/SSAOptimizer.h"
 #include "ssa/SSASerializer.h"
 #include "ssa/SSAValidator.h"

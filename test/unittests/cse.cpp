@@ -4,7 +4,7 @@
 
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
-#include "ssa/SSAPassSSCP.h"
+#include "ssa/SSAOptimizer.h"
 #include "ssa/SSASerializer.h"
 
 using namespace PExpr;
@@ -15,10 +15,11 @@ using namespace PExpr::internal;
 {
     SSAOptions options                    = SSAOptions::None();
     options.EliminateCommonSubexpressions = true;
+    options.RemoveDeadCode                = true;
     return options;
 }
 
-TEST_CASE("SSAPassSSCP: common subexpression elimination basic", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination basic", "[sscp][cse]")
 {
     std::stringstream stream("let a = 2.0; let b = 3.0; let x = a * b; let y = a * b; x + y");
     Environment env;
@@ -37,7 +38,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination basic", "[sscp][cse]")
     }
 
     // Run SSCP pass
-    SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
+    SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -55,7 +56,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination basic", "[sscp][cse]")
     REQUIRE(mul_count_after >= 1);
 }
 
-TEST_CASE("SSAPassSSCP: common subexpression elimination with constants", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination with constants", "[sscp][cse]")
 {
     std::stringstream stream("fn [[extern, pure]] sin(a:num)->num; fn [[extern, pure]] cos(a:num)->num; let a = 5.0; let x = sin(a) * cos(a); let y = sin(a) * cos(a); x + y");
     Environment env;
@@ -67,7 +68,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with constants", "[sscp
     auto before = SSASerializer::serialize(prog);
 
     // Run SSCP pass
-    SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
+    SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -114,7 +115,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with constants", "[sscp
     REQUIRE(mul_count_after < mul_count_before);
 }
 
-TEST_CASE("SSAPassSSCP: common subexpression elimination with different names", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination with different names", "[sscp][cse]")
 {
     // Same computation with different variable names should still be eliminated
     Environment env;
@@ -132,7 +133,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with different names", 
     }
 
     // Run SSCP pass
-    SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
+    SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after             = SSASerializer::serialize(prog);
     size_t add_count_after = 0;
@@ -146,7 +147,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination with different names", 
     REQUIRE(add_count_after < add_count_before);
 }
 
-TEST_CASE("SSAPassSSCP: common subexpression elimination preserves side effects", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination preserves side effects", "[sscp][cse]")
 {
     // Functions with side effects should not be eliminated
     Environment env;
@@ -169,7 +170,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination preserves side effects"
     }
 
     // Run SSCP pass
-    SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
+    SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after                     = SSASerializer::serialize(prog);
     size_t side_effect_count_after = 0;
@@ -183,7 +184,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination preserves side effects"
     REQUIRE(side_effect_count_after == side_effect_count_before);
 }
 
-TEST_CASE("SSAPassSSCP: common subexpression elimination complex pattern", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination complex pattern", "[sscp][cse]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -213,7 +214,7 @@ TEST_CASE("SSAPassSSCP: common subexpression elimination complex pattern", "[ssc
     }
 
     // Run SSCP pass
-    SSAPassSSCP::Run(MakeCSEOnlyOption(), prog);
+    SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after             = SSASerializer::serialize(prog);
     size_t add_count_after = 0, mul_count_after = 0;

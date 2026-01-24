@@ -1,4 +1,4 @@
-#include "SSAPassSSCP.h"
+#include "SSAOptimizer.h"
 
 namespace PExpr::ssa {
 
@@ -6,7 +6,7 @@ namespace intrinsics {
 extern void setupIntrinsics(SSCPFunctionInliner& inliner);
 }
 
-SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
+SSAOptimizer::SSAOptimizer(const SSAOptions& opts)
     : mOptions(opts)
     , mContext(std::make_unique<SSAContext>())
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
@@ -21,11 +21,11 @@ SSAPassSSCP::SSAPassSSCP(const SSAOptions& opts)
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
 
-SSAPassSSCP::~SSAPassSSCP() = default;
+SSAOptimizer::~SSAOptimizer() = default;
 
-void SSAPassSSCP::Run(const SSAOptions& opts, SSAProgram& program)
+void SSAOptimizer::Run(const SSAOptions& opts, SSAProgram& program)
 {
-    SSAPassSSCP sscp(opts);
+    SSAOptimizer sscp(opts);
 
     // 0) Analyze body to update SSA context with current variable counters
     sscp.mContext->reset();
@@ -34,9 +34,9 @@ void SSAPassSSCP::Run(const SSAOptions& opts, SSAProgram& program)
     sscp.runProgram(program);
 }
 
-void SSAPassSSCP::Run(const SSAOptions& opts, InstructionList& body)
+void SSAOptimizer::Run(const SSAOptions& opts, InstructionList& body)
 {
-    SSAPassSSCP sscp(opts);
+    SSAOptimizer sscp(opts);
 
     // 0) Analyze body to update SSA context with current variable counters
     sscp.mContext->reset();
@@ -48,7 +48,7 @@ void SSAPassSSCP::Run(const SSAOptions& opts, InstructionList& body)
         changed = sscp.processBody(body);
 }
 
-void SSAPassSSCP::runProgram(SSAProgram& program)
+void SSAOptimizer::runProgram(SSAProgram& program)
 {
     mSideEffectAnalyzer->propagateSideEffects(program);
 
@@ -85,7 +85,7 @@ void SSAPassSSCP::runProgram(SSAProgram& program)
     }
 }
 
-bool SSAPassSSCP::processBody(InstructionList& body)
+bool SSAOptimizer::processBody(InstructionList& body)
 {
     if (body.empty())
         return false;

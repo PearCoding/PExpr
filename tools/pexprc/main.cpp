@@ -193,7 +193,7 @@ int main(int argc, char** argv)
     }
 
     // Optimize
-    ssa::SSAPassSSCP::Run(optimizationOptions, program);
+    ssa::SSAOptimizer::Run(optimizationOptions, program);
     dumpOutput(ssa::SSASerializer::serialize(program));
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {

@@ -16,7 +16,7 @@
 namespace PExpr::ssa {
 
 /// Sparse Conditional Constant Propagation (SSCP) pass for the SSA IR.
-class SSAPassSSCP {
+class SSAOptimizer {
 public:
     using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
 
@@ -27,8 +27,8 @@ public:
     static void Run(const SSAOptions& opts, InstructionList& body);
 
 private:
-    SSAPassSSCP(const SSAOptions& opts);
-    ~SSAPassSSCP();
+    SSAOptimizer(const SSAOptions& opts);
+    ~SSAOptimizer();
 
     /// Run the pass on a program. Modifies the program in-place.
     void runProgram(SSAProgram& program);

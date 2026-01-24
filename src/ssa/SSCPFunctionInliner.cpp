@@ -1,6 +1,6 @@
 #include "SSCPFunctionInliner.h"
 #include "SSAMapper.h"
-#include "SSAPassSSCP.h"
+#include "SSAOptimizer.h"
 
 namespace PExpr::ssa {
 
@@ -156,7 +156,7 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
 
     // Apply all the optimization possible on instructions
     if (runOptimization)
-        SSAPassSSCP::Run(mOptions, outInlinedBody);
+        SSAOptimizer::Run(mOptions, outInlinedBody);
 
     PEXPR_ASSERT(dynamic_cast<const SSAInstrReturn*>(outInlinedBody.back().get()) != nullptr, "Expected the last entry to be a return statement");
 
