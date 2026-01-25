@@ -65,24 +65,24 @@ static inline std::string_view toInstructionString(BinaryOperation op)
 void SSASerializer::write(std::ostream& os, const SSAValue& value)
 {
     std::string prefix;
-    if (value.Kind == SSAValue::Kind::Constant) {
-        switch (value.Type) {
+    if (value.isConstant()) {
+        switch (value.type()) {
         case ElementaryType::Boolean:
-            prefix = std::get<bool>(value.Value) ? "true" : "false";
+            prefix = value.valueAs<bool>() ? "true" : "false";
             break;
         case ElementaryType::Integer:
-            prefix = std::to_string(std::get<Integer>(value.Value));
+            prefix = std::to_string(value.valueAs<Integer>());
             break;
         case ElementaryType::Number:
-            prefix = std::to_string(std::get<Number>(value.Value));
+            prefix = std::to_string(value.valueAs<Number>());
             break;
         case ElementaryType::String:
-            prefix = "\"" + escapeString(std::get<std::string>(value.Value)) + "\"";
+            prefix = "\"" + escapeString(value.valueAs<std::string>()) + "\"";
             break;
         default:
-            if (value.Type >= ElementaryType::Vec1) {
-                const auto v = std::get<VecN>(value.Value);
-                PEXPR_ASSERT(v.size() == typeArraySize(value.Type), "Vector data and vector type mismatch");
+            if (value.type() >= ElementaryType::Vec1) {
+                const auto v = value.valueAs<VecN>();
+                PEXPR_ASSERT(v.size() == typeArraySize(value.type()), "Vector data and vector type mismatch");
 
                 if (v.empty()) {
                     prefix = "[]";
@@ -97,7 +97,7 @@ void SSASerializer::write(std::ostream& os, const SSAValue& value)
             }
         }
     } else {
-        prefix = value.Name;
+        prefix = value.name();
     }
 
     if (prefix.empty()) {
@@ -105,7 +105,7 @@ void SSASerializer::write(std::ostream& os, const SSAValue& value)
         return;
     }
 
-    os << prefix << ":" << std::string(PExpr::toString(value.Type));
+    os << prefix << ":" << std::string(PExpr::toString(value.type()));
 }
 
 void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
@@ -381,14 +381,14 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
     // Check if it's a constant
     if (name == "true" || name == "false") {
         bool val = (name == "true");
-        outValue = SSAValue(SSAValue::Kind::Constant, {}, type, val);
+        outValue = SSAValue::Constant(val);
     } else if (name.find('.') != std::string::npos && std::all_of(name.begin(), name.end(), [](char c) {
                    return isdigit(c) || c == '.' || c == '-';
                })) {
         // Number constant
         try {
             double val = std::stod(name);
-            outValue   = SSAValue(SSAValue::Kind::Constant, {}, type, val);
+            outValue   = SSAValue::Constant(val);
         } catch (...) {
             return false;
         }
@@ -396,7 +396,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
         // Integer constant
         try {
             int64_t val = std::stoll(name);
-            outValue    = SSAValue(SSAValue::Kind::Constant, {}, type, val);
+            outValue    = SSAValue::Constant(val);
         } catch (...) {
             return false;
         }
@@ -419,10 +419,10 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
         if (vec.size() != typeArraySize(type))
             return false;
 
-        outValue = SSAValue(SSAValue::Kind::Constant, {}, type, vec);
+        outValue = SSAValue::Constant(vec);
     } else {
         // Named value
-        outValue = SSAValue(SSAValue::Kind::Named, name, type);
+        outValue = SSAValue::Named(name, type);
     }
 
     return true;

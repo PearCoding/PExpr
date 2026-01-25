@@ -84,17 +84,17 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
 
     // Lambda to map and rename a value, generating fresh names for non-parameter variables
     auto mapAndRenameValue = [&](SSAValue& val) {
-        if (val.Kind == SSAValue::Kind::Constant)
+        if (val.isConstant())
             return; // Constants don't need renaming
 
         // Check if already in map
-        if (const auto it = valueMap.find(val.Name); it != valueMap.end()) {
+        if (const auto it = valueMap.find(val.name()); it != valueMap.end()) {
             val = it->second;
         } else {
             // This is a new variable from the function body - generate a fresh name to avoid clashes
-            SSAValue renamed(val.Kind, ctx->fresh(val.baseName()), val.Type, val.Value);
-            valueMap[val.Name] = renamed;
-            val                = renamed;
+            SSAValue renamed     = SSAValue::Named(ctx->fresh(val.baseName()), val.type());
+            valueMap[val.name()] = renamed;
+            val                  = renamed;
         }
     };
 
@@ -217,7 +217,7 @@ bool SSCPFunctionInliner::shouldInlineFunctionCall(SSAInstrCall* call, SSAFuncti
 
     // Check if all arguments are constants
     for (const auto& arg : call->Arguments) {
-        if (arg.Kind != SSAValue::Kind::Constant)
+        if (!arg.isConstant())
             return false;
     }
 
@@ -290,7 +290,7 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
 
     // All must be constant
     for (const auto& val : call->Arguments) {
-        if (val.Kind != SSAValue::Kind::Constant)
+        if (!val.isConstant())
             return false;
     }
 
@@ -311,12 +311,12 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
         // Check if the parameter types match
         bool isEqual = true;
         for (size_t i = 0; i < params.size(); ++i) {
-            if (params[i].Type != call->Arguments[i].Type) {
+            if (params[i].Type != call->Arguments[i].type()) {
                 isEqual = false;
                 break;
             }
 
-            args.push_back(call->Arguments[i].Value);
+            args.push_back(call->Arguments[i].rawValue());
         }
         if (!isEqual)
             continue;
@@ -329,7 +329,7 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
         // TODO: Check if the expected return type and the type inside the variant match
 
         // Replace the return statement and assign the return value of it to the target
-        auto value = SSAValue(SSAValue::Kind::Constant, "", it->second.Definition.returnType(), constant.value());
+        auto value = SSAValue(true, it->second.Definition.returnType(), constant.value());
 
         auto assign             = std::make_shared<SSAInstrAssign>();
         assign->Target          = call->Target;

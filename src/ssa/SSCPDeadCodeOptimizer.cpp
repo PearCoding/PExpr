@@ -39,7 +39,7 @@ bool SSCPDeadCodeOptimizer::removeDeadAssigns(InstructionList& instructions, con
         }
 
         int uses = 0;
-        if (auto uit = mUseCount.find(target.Name); uit != mUseCount.end())
+        if (auto uit = mUseCount.find(target.name()); uit != mUseCount.end())
             uses = uit->second;
 
         if (uses == 0 && !instrHasSideEffects(it->get(), sideEffectedFunctions)) {
@@ -59,8 +59,8 @@ void SSCPDeadCodeOptimizer::countUsesInInstr(const SSAInstr* instr)
         return;
 
     instr->forEachOperand([this](const SSAValue& val) {
-        if (val.Kind != SSAValue::Kind::Constant)
-            ++mUseCount[val.Name];
+        if (!val.isConstant())
+            ++mUseCount[val.name()];
     });
 }
 

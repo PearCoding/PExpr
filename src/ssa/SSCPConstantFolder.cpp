@@ -10,7 +10,7 @@ namespace PExpr::ssa {
 
 bool SSCPConstantFolder::extractBool(const SSAValue& vv, bool& out)
 {
-    if (const bool* b = std::get_if<bool>(&vv.Value)) {
+    if (const bool* b = vv.valueAsIf<bool>()) {
         out = *b;
         return true;
     }
@@ -19,7 +19,7 @@ bool SSCPConstantFolder::extractBool(const SSAValue& vv, bool& out)
 
 bool SSCPConstantFolder::extractInteger(const SSAValue& vv, Integer& out)
 {
-    if (const Integer* i = std::get_if<Integer>(&vv.Value)) {
+    if (const Integer* i = vv.valueAsIf<Integer>()) {
         out = static_cast<Integer>(*i);
         return true;
     }
@@ -28,11 +28,11 @@ bool SSCPConstantFolder::extractInteger(const SSAValue& vv, Integer& out)
 
 bool SSCPConstantFolder::extractNumber(const SSAValue& vv, Number& out)
 {
-    if (const Number* n = std::get_if<Number>(&vv.Value)) {
+    if (const Number* n = vv.valueAsIf<Number>()) {
         out = static_cast<Number>(*n);
         return true;
     }
-    if (const Integer* i = std::get_if<Integer>(&vv.Value)) {
+    if (const Integer* i = vv.valueAsIf<Integer>()) {
         out = static_cast<Number>(*i);
         return true;
     }
@@ -41,7 +41,7 @@ bool SSCPConstantFolder::extractNumber(const SSAValue& vv, Number& out)
 
 bool SSCPConstantFolder::extractString(const SSAValue& vv, std::string& out)
 {
-    if (const std::string* s = std::get_if<std::string>(&vv.Value)) {
+    if (const std::string* s = vv.valueAsIf<std::string>()) {
         out = *s;
         return true;
     }
@@ -50,7 +50,7 @@ bool SSCPConstantFolder::extractString(const SSAValue& vv, std::string& out)
 
 bool SSCPConstantFolder::extractVecN(const SSAValue& vv, VecN& out)
 {
-    if (const VecN* n = std::get_if<VecN>(&vv.Value)) {
+    if (const VecN* n = vv.valueAsIf<VecN>()) {
         out = static_cast<VecN>(*n);
         return true;
     }
@@ -182,7 +182,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
         }
 
         // Vector arithmetic folding
-        if (L.Type == R.Type && ::PExpr::isArray(L.Type)) {
+        if (L.type() == R.type() && ::PExpr::isArray(L.type())) {
             // Helper lambda to perform component-wise operation on arrays
             auto applyToArrays = [&](auto&& opFunc) -> std::optional<SSAValue> {
                 if (VecN lv; extractVecN(L, lv)) {
@@ -235,9 +235,9 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
 
         // Vector-scalar arithmetic folding (vector * scalar, vector / scalar, vector % scalar, vector ^ scalar)
         // Note: Add and Sub are not allowed between vectors and scalars
-        if (::PExpr::isArithmetic(L.Type) && ::PExpr::isArithmetic(R.Type)) {
-            const bool LIsArray = ::PExpr::isArray(L.Type);
-            const bool RIsArray = ::PExpr::isArray(R.Type);
+        if (::PExpr::isArithmetic(L.type()) && ::PExpr::isArithmetic(R.type())) {
+            const bool LIsArray = ::PExpr::isArray(L.type());
+            const bool RIsArray = ::PExpr::isArray(R.type());
 
             if (LIsArray != RIsArray) { // One is vector, one is scalar
                 const SSAValue& vecOp    = LIsArray ? L : R;
@@ -430,7 +430,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldVectorOp(const std::vector<SSAVa
 std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, ElementaryType targetType)
 {
     // Is it even useful?
-    if (targetType == operand.Type)
+    if (targetType == operand.type())
         return operand;
 
     if (targetType == ElementaryType::Number) {
@@ -458,10 +458,10 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
     ops.reserve(asg->Operands.size());
     for (const auto& op : asg->Operands) {
         SSAValue resolved;
-        if (op.Kind == SSAValue::Kind::Constant) {
+        if (op.isConstant()) {
             resolved = op;
         } else {
-            const auto it = mConstants.find(op.Name);
+            const auto it = mConstants.find(op.name());
             if (it == mConstants.end()) // not a constant
                 return std::nullopt;
             resolved = it->second;
@@ -489,7 +489,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
 
     // Cast
     if (asg->Operator == SSAInstrAssign::OpKind::Cast && ops.size() == 1)
-        return foldCastOp(ops.front(), asg->Target.Type);
+        return foldCastOp(ops.front(), asg->Target.type());
 
     // Unary fold
     if (asg->Operator == SSAInstrAssign::OpKind::Unary && ops.size() == 1)
@@ -504,10 +504,10 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
 
 bool SSCPConstantFolder::replaceOperandIfConst(SSAValue& op)
 {
-    if (op.Kind == SSAValue::Kind::Constant)
+    if (op.isConstant())
         return false;
 
-    if (const auto it = mConstants.find(op.Name); it != mConstants.end()) {
+    if (const auto it = mConstants.find(op.name()); it != mConstants.end()) {
         op = it->second;
         return true;
     }
@@ -537,16 +537,16 @@ bool SSCPConstantFolder::foldToConstants(bool foldNumber, InstructionList& body)
         if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
             auto folded = foldAssign(foldNumber, asg);
             if (folded) {
-                if (!asg->Target.Name.empty()) {
-                    mConstants[asg->Target.Name] = *folded;
-                    // mutate instruction to literal form
-                    SSAInstrAssign lit;
-                    lit.Target   = asg->Target;
-                    lit.Operator = SSAInstrAssign::OpKind::Assign;
-                    lit.Operands = { *folded };
-                    *asg         = std::move(lit);
-                    changed      = true;
-                }
+                PEXPR_ASSERT(!asg->Target.isConstant() && !asg->Target.name().empty(), "foldAssign does not return a proper target value");
+                mConstants[asg->Target.name()] = *folded;
+
+                // mutate instruction to literal form
+                SSAInstrAssign lit;
+                lit.Target   = asg->Target;
+                lit.Operator = SSAInstrAssign::OpKind::Assign;
+                lit.Operands = { *folded };
+                *asg         = std::move(lit);
+                changed      = true;
             }
         }
     }

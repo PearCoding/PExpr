@@ -26,10 +26,10 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
         // Compute hash for the instruction if it produces a value
         if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
             if (auto hash = hashInstruction(asg))
-                mValueHashes[asg->Target.Name] = *hash;
+                mValueHashes[asg->Target.name()] = *hash;
         } else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
             if (auto hash = hashInstruction(call))
-                mValueHashes[call->Target.Name] = *hash;
+                mValueHashes[call->Target.name()] = *hash;
         } else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
             // Skip phi nodes (they're too complex for CSE and handled by PRE)
             PEXPR_UNUSED(phi);
@@ -60,14 +60,14 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
                 continue;
 
             currentHash = hashInstruction(asg);
-            targetName  = asg->Target.Name;
+            targetName  = asg->Target.name();
         } else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
             // Skip calls with side effects
             if (sideEffectedFunctions.contains(call->FunctionName))
                 continue;
 
             currentHash = hashInstruction(call);
-            targetName  = call->Target.Name;
+            targetName  = call->Target.name();
         } else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
             // Skip phi nodes (they're too complex for CSE and handled by PRE)
             PEXPR_UNUSED(phi);
@@ -83,16 +83,14 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
             const SSAValue& existingValue = itMap->second;
 
             // Don't replace with ourselves
-            if (existingValue.Name == targetName)
+            if (!existingValue.isConstant() && existingValue.name() == targetName)
                 continue;
 
             // Create a new assignment: target = existingValue
-            auto newAsg         = std::make_shared<SSAInstrAssign>();
-            newAsg->Target.Name = targetName;
-            newAsg->Target.Type = existingValue.Type;
-            newAsg->Target.Kind = SSAValue::Kind::Named;
-            newAsg->Operator    = SSAInstrAssign::OpKind::Assign;
-            newAsg->Operands    = { existingValue };
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = SSAValue::Named(targetName, existingValue.type());
+            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+            newAsg->Operands = { existingValue };
 
             // Update our maps
             mValueHashes[targetName] = *currentHash;
@@ -153,11 +151,11 @@ SSCPCommonSubexpressionEliminator::hashInstruction(const SSAInstr* instr) const
 
     // Get the result type from the instruction
     if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instr)) {
-        type = asg->Target.Type;
+        type = asg->Target.type();
     } else if (const auto call = dynamic_cast<const SSAInstrCall*>(instr)) {
-        type = call->Target.Type;
+        type = call->Target.type();
     } else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instr)) {
-        type = phi->Target.Type;
+        type = phi->Target.type();
     } else {
         // Other instruction types don't produce values for CSE
         return std::nullopt;

@@ -282,7 +282,7 @@ bool SSCPPreOptimizer::applyCodeMotion(SSAContext* ctx, InstructionList& instruc
                     // Check if all operands are defined outside the loop
                     bool allOperandsOutsideLoop                 = true;
                     std::function<void(SSAValue&)> checkOperand = [&](SSAValue& val) {
-                        if (val.Kind != SSAValue::Kind::Constant) {
+                        if (!val.isConstant()) {
                             // Need to track where variables are defined
                             // Simplified: assume variables defined in loop are not invariant
                             allOperandsOutsideLoop = false;

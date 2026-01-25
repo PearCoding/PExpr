@@ -5,44 +5,44 @@
 namespace PExpr::ssa {
 std::string SSAValue::baseName() const
 {
-    PEXPR_ASSERT(Kind != SSAValue::Kind::Constant, "Only named and temporary values have a base name");
-    PEXPR_ASSERT(!Name.empty(), "The name should never be empty!");
+    PEXPR_ASSERT(!isConstant(), "Only named have a base name");
 
-    if (const auto pos = Name.rfind('.'); pos != std::string::npos)
-        return Name.substr(0, pos);
-    return Name;
+    const auto thisName = name();
+    if (const auto pos = thisName.rfind('.'); pos != std::string::npos)
+        return thisName.substr(0, pos);
+    return thisName;
 }
 
 // SSAValue hash implementation
 size_t SSAValue::hash(bool includeName) const
 {
-    size_t h = std::hash<int>{}(static_cast<int>(Kind));
+    size_t h = std::hash<int>{}(static_cast<bool>(isConstant()));
     if (includeName)
-        h = h * 31 + std::hash<std::string>{}(Name);
-    h = h * 31 + std::hash<int>{}(static_cast<int>(Type));
+        h = h * 31 + std::hash<std::string>{}(name());
+    h = h * 31 + std::hash<int>{}(static_cast<int>(type()));
 
-    if (Kind == Kind::Constant) {
+    if (isConstant()) {
         // Hash the constant value based on type
-        switch (Type) {
+        switch (type()) {
         case ElementaryType::Boolean:
-            if (const bool* b = std::get_if<bool>(&Value))
+            if (const bool* b = std::get_if<bool>(&mValue))
                 h = h * 31 + std::hash<bool>{}(*b);
             break;
         case ElementaryType::Integer:
-            if (const Integer* i = std::get_if<Integer>(&Value))
+            if (const Integer* i = std::get_if<Integer>(&mValue))
                 h = h * 31 + std::hash<Integer>{}(*i);
             break;
         case ElementaryType::Number:
-            if (const Number* n = std::get_if<Number>(&Value))
+            if (const Number* n = std::get_if<Number>(&mValue))
                 h = h * 31 + std::hash<Number>{}(*n);
             break;
         case ElementaryType::String:
-            if (const std::string* s = std::get_if<std::string>(&Value))
+            if (const std::string* s = std::get_if<std::string>(&mValue))
                 h = h * 31 + std::hash<std::string>{}(*s);
             break;
         default:
-            if (Type >= ElementaryType::Vec1) {
-                if (const VecN* v = std::get_if<VecN>(&Value)) {
+            if (type() >= ElementaryType::Vec1) {
+                if (const VecN* v = std::get_if<VecN>(&mValue)) {
                     for (Number n : *v)
                         h = h * 31 + std::hash<Number>{}(n);
                 }
@@ -55,32 +55,29 @@ size_t SSAValue::hash(bool includeName) const
 
 bool SSAValue::operator==(const SSAValue& other) const
 {
-    if (Kind != other.Kind || Type != other.Type)
+    if (isConstant() != other.isConstant() || type() != other.type())
         return false;
 
-    if (Kind == Kind::Constant) {
+    if (isConstant()) {
         // Compare constant values
-        if (Type != other.Type)
-            return false;
-
-        switch (Type) {
+        switch (type()) {
         case ElementaryType::Boolean:
-            return std::get<bool>(Value) == std::get<bool>(other.Value);
+            return std::get<bool>(mValue) == std::get<bool>(other.mValue);
         case ElementaryType::Integer:
-            return std::get<Integer>(Value) == std::get<Integer>(other.Value);
+            return std::get<Integer>(mValue) == std::get<Integer>(other.mValue);
         case ElementaryType::Number:
-            return std::get<Number>(Value) == std::get<Number>(other.Value);
+            return std::get<Number>(mValue) == std::get<Number>(other.mValue);
         case ElementaryType::String:
-            return std::get<std::string>(Value) == std::get<std::string>(other.Value);
+            return std::get<std::string>(mValue) == std::get<std::string>(other.mValue);
         default:
-            if (Type >= ElementaryType::Vec1) {
-                return std::get<VecN>(Value) == std::get<VecN>(other.Value);
+            if (type() >= ElementaryType::Vec1) {
+                return std::get<VecN>(mValue) == std::get<VecN>(other.mValue);
             }
             return false;
         }
     } else {
         // For Named/Temp values, compare names
-        return Name == other.Name;
+        return name() == other.name();
     }
 }
 } // namespace PExpr::ssa

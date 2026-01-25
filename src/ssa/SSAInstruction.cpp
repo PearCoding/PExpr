@@ -39,7 +39,7 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
             h = h * 31 + op.hash(includeTargetName);
         break;
     case OpKind::Cast:
-        h = h * 31 + std::hash<int>{}(static_cast<int>(Target.Type));
+        h = h * 31 + std::hash<int>{}(static_cast<int>(Target.type()));
         if (!Operands.empty())
             h = h * 31 + Operands[0].hash(includeTargetName);
         break;
@@ -58,7 +58,7 @@ bool SSAInstrAssign::isEquivalent(const SSAInstr* other) const
         if (Operator != otherAsg->Operator)
             return false;
 
-        if (Target.Type != otherAsg->Target.Type)
+        if (Target.type() != otherAsg->Target.type())
             return false;
 
         if (Operands.size() != otherAsg->Operands.size())
@@ -78,7 +78,7 @@ bool SSAInstrAssign::isEquivalent(const SSAInstr* other) const
                 return false;
             break;
         case OpKind::Cast:
-            if (Target.Type != otherAsg->Target.Type)
+            if (Target.type() != otherAsg->Target.type())
                 return false;
             break;
         default:
@@ -112,7 +112,7 @@ bool SSAInstrCall::isEquivalent(const SSAInstr* other) const
             return false;
         if (Arguments.size() != otherCall->Arguments.size())
             return false;
-        if (Target.Type != otherCall->Target.Type)
+        if (Target.type() != otherCall->Target.type())
             return false;
         for (size_t i = 0; i < Arguments.size(); ++i) {
             if (Arguments[i] != otherCall->Arguments[i])

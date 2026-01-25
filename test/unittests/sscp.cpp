@@ -11,6 +11,15 @@ using namespace PExpr;
 using namespace PExpr::ssa;
 using namespace PExpr::internal;
 
+[[nodiscard]] inline static auto MakeConstantFoldingOptimizer()
+{
+    auto opts                        = SSAOptions::None();
+    opts.EnableConstantFolding       = true;
+    opts.EnableConstantFoldingNumber = true;
+    opts.RemoveDeadCode              = true;
+    return opts;
+}
+
 TEST_CASE("SSAOptimizer: constant folding of binary ops", "[sscp]")
 {
     std::stringstream stream("let mut a = 2; let mut b = 3; let mut c = a + b; c");
@@ -21,7 +30,7 @@ TEST_CASE("SSAOptimizer: constant folding of binary ops", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAOptimizer::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -42,7 +51,7 @@ TEST_CASE("SSAOptimizer: dead code elimination removes unused assigns", "[sscp]"
     auto before = SSASerializer::serialize(prog);
     REQUIRE((before.find("y.") != std::string::npos || before.find("y:") != std::string::npos));
 
-    SSAOptimizer::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -62,7 +71,7 @@ TEST_CASE("SSAOptimizer: constant folding for vectors", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAOptimizer::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -80,7 +89,7 @@ TEST_CASE("SSAOptimizer: vector arithmetic operations", "[sscp]")
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    SSAOptimizer::Run(SSAOptions(), prog);
+    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 

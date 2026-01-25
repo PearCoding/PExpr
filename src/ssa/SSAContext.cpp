@@ -29,17 +29,17 @@ void SSAContext::analyze(const SSAProgram& program)
 
 void SSAContext::analyzeValue(const SSAValue& val)
 {
-    // Only analyze named and temp values (not constants)
-    if (val.Kind == SSAValue::Kind::Constant)
+    // Only analyze named values (not constants)
+    if (val.isConstant())
         return;
 
-    if (val.Name.empty())
+    if (val.name().empty())
         return;
 
     // Try to parse the variable name
     std::string base;
     int version;
-    if (parseVariableName(val.Name, base, version)) {
+    if (parseVariableName(val.name(), base, version)) {
         // Update the counter if this version is higher than current
         auto& counter = mCounters[base];
         if (version > counter)

@@ -114,10 +114,10 @@ TEST_CASE("SSASerializer: round-trip with external function", "[serializer]")
 
     // Add a call to the external function
     auto call                = std::make_shared<SSAInstrCall>();
-    call->Target             = SSAValue(SSAValue::Kind::Named, "result.1", ElementaryType::Integer);
+    call->Target             = SSAValue::Named("result.1", ElementaryType::Integer);
     call->FunctionName       = "_Z8external_P_L5C0";
     call->PublicFunctionName = "external";
-    call->Arguments.push_back(SSAValue(SSAValue::Kind::Constant, {}, ElementaryType::Integer, static_cast<int64_t>(42)));
+    call->Arguments.push_back(SSAValue::Constant(static_cast<Integer>(42)));
 
     prog.Functions.push_back(extFunc);
     prog.Body.push_back(call);

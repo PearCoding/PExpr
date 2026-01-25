@@ -17,11 +17,11 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
 
         // TODO: Would be nice if this could be polymorphed out?
         if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
-            mDefinitions[asg->Target.Name] = asg;
+            mDefinitions[asg->Target.name()] = asg;
         else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
-            mDefinitions[call->Target.Name] = call;
+            mDefinitions[call->Target.name()] = call;
         else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get()))
-            mDefinitions[phi->Target.Name] = phi;
+            mDefinitions[phi->Target.name()] = phi;
     }
 
     bool changed = false;
@@ -90,8 +90,8 @@ bool SSCPIdentityOptimizer::matchAssignIdentity(SSAContext* ctx, InstructionList
     newAsg->Operator = SSAInstrAssign::OpKind::Assign;
     newAsg->Operands = { asg2->Operands[0] };
 
-    mDefinitions[newAsg->Target.Name] = newAsg.get();
-    instructions[currentIndex]        = std::move(newAsg);
+    mDefinitions[newAsg->Target.name()] = newAsg.get();
+    instructions[currentIndex]          = std::move(newAsg);
     return true;
 }
 
@@ -113,8 +113,8 @@ bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList&
         newAsg->Operator = SSAInstrAssign::OpKind::Assign;
         newAsg->Operands = { asg->Operands[0] };
 
-        mDefinitions[newAsg->Target.Name] = newAsg.get();
-        instructions[currentIndex]        = std::move(newAsg);
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        instructions[currentIndex]          = std::move(newAsg);
         return true;
     }
 
@@ -135,8 +135,8 @@ bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList&
         newAsg->Operator = SSAInstrAssign::OpKind::Assign;
         newAsg->Operands = { operand->Operands[0] };
 
-        mDefinitions[newAsg->Target.Name] = newAsg.get();
-        instructions[currentIndex]        = std::move(newAsg);
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        instructions[currentIndex]          = std::move(newAsg);
     }
     return true;
 }
@@ -215,8 +215,8 @@ bool SSCPIdentityOptimizer::matchSquareToPowerIdentity(SSAContext* ctx, Instruct
         newAsg->BinaryOp = BinaryOperation::Pow;
         newAsg->Operands = { asg->Operands[0], SSAValue::Constant(Number(2.0)) };
 
-        mDefinitions[newAsg->Target.Name] = newAsg.get();
-        instructions[currentIndex]        = std::move(newAsg);
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        instructions[currentIndex]          = std::move(newAsg);
         return true;
     }
 
@@ -251,8 +251,8 @@ bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, I
             newAsg->Operator = SSAInstrAssign::OpKind::Assign;
             newAsg->Operands = { call2->Arguments.at(0) };
 
-            mDefinitions[newAsg->Target.Name] = newAsg.get();
-            instructions[currentIndex]        = std::move(newAsg);
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
             return true;
         }
     }
@@ -332,7 +332,8 @@ bool SSCPIdentityOptimizer::matchPowerReductionIdentity(SSAContext* ctx, Instruc
 
 bool SSCPIdentityOptimizer::isCallToIntrinsic(const SSAValue& val, std::string_view funcName) const
 {
-    if (val.Kind == SSAValue::Kind::Constant)
+    // The function inliner takes care of constant calls
+    if (val.isConstant())
         return false;
 
     // Look up the definition
@@ -353,26 +354,7 @@ bool SSCPIdentityOptimizer::isIntrinsic(const SSAInstrCall* call, std::string_vi
 
 bool SSCPIdentityOptimizer::isSameValue(const SSAValue& a, const SSAValue& b) const
 {
-    if (a.Kind == SSAValue::Kind::Constant && b.Kind == SSAValue::Kind::Constant) {
-        // Compare constant values
-        if (const Number* an = std::get_if<Number>(&a.Value)) {
-            if (const Number* bn = std::get_if<Number>(&b.Value)) {
-                return *an == *bn;
-            }
-        }
-        if (const Integer* ai = std::get_if<Integer>(&a.Value)) {
-            if (const Integer* bi = std::get_if<Integer>(&b.Value)) {
-                return *ai == *bi;
-            }
-        }
-        return false;
-    }
-
-    if (a.Kind != SSAValue::Kind::Constant && b.Kind != SSAValue::Kind::Constant) {
-        return a.Name == b.Name;
-    }
-
-    return false;
+    return a == b;
 }
 
 const SSAInstr* SSCPIdentityOptimizer::findDefinition(const std::string& name) const
@@ -385,10 +367,11 @@ const SSAInstr* SSCPIdentityOptimizer::findDefinition(const std::string& name) c
 
 bool SSCPIdentityOptimizer::isBinaryOp(const SSAValue& val, BinaryOperation op, SSAValue& left, SSAValue& right) const
 {
-    if (val.Kind == SSAValue::Kind::Constant)
+    // Constant folding takes care
+    if (val.isConstant())
         return false;
 
-    const SSAInstr* def = findDefinition(val.Name);
+    const SSAInstr* def = findDefinition(val.name());
     if (!def)
         return false;
 
@@ -414,15 +397,15 @@ bool SSCPIdentityOptimizer::isPowerOp(const SSAValue& val, SSAValue& base, SSAVa
 
 bool SSCPIdentityOptimizer::isConstantNumber(const SSAValue& val, Number& outValue) const
 {
-    if (val.Kind != SSAValue::Kind::Constant)
+    if (!val.isConstant())
         return false;
 
-    if (const Number* n = std::get_if<Number>(&val.Value)) {
+    if (const Number* n = val.valueAsIf<Number>()) {
         outValue = *n;
         return true;
     }
 
-    if (const Integer* i = std::get_if<Integer>(&val.Value)) {
+    if (const Integer* i = val.valueAsIf<Integer>()) {
         outValue = static_cast<Number>(*i);
         return true;
     }
@@ -432,10 +415,10 @@ bool SSCPIdentityOptimizer::isConstantNumber(const SSAValue& val, Number& outVal
 
 const SSAInstr* SSCPIdentityOptimizer::getDefinition(const SSAValue& val) const
 {
-    if (val.Kind == SSAValue::Kind::Constant)
+    if (val.isConstant())
         return nullptr;
 
-    if (const auto it = mDefinitions.find(val.Name); it != mDefinitions.end())
+    if (const auto it = mDefinitions.find(val.name()); it != mDefinitions.end())
         return it->second;
 
     return nullptr;

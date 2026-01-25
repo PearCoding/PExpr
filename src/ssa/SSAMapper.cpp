@@ -21,13 +21,13 @@ SSAProgram SSAMapper::map(const Ptr<Closure>& closure)
 // Returns the SSAValue representing the last returned value (or a nil constant).
 SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std::shared_ptr<SSAInstr>>& body)
 {
-    SSAValue lastVal = SSAValue(SSAValue::Kind::Constant, "nil", ElementaryType::Error);
+    SSAValue lastVal;
 
     for (const auto& instr : body) {
         if (auto ret = dynamic_cast<SSAInstrReturn*>(instr.get())) {
             // create assignment to capture returned value
             SSAInstrAssign asg;
-            SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), ret->Value.Type);
+            SSAValue tgt = SSAValue::Named(mContext.fresh("%"), ret->Value.type());
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { ret->Value };
@@ -77,7 +77,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, mContext.fresh(var->name(), true), rhs.Type);
+        SSAValue tgt = SSAValue::Named(mContext.fresh(var->name(), true), rhs.type());
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -90,7 +90,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs = mapExpression(program, var->expression());
 
         SSAInstrAssign asg;
-        SSAValue tgt(SSAValue::Kind::Named, mContext.fresh(var->name(), true), rhs.Type);
+        SSAValue tgt = SSAValue::Named(mContext.fresh(var->name(), true), rhs.type());
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = { rhs };
@@ -121,13 +121,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         program.Functions.push_back(std::move(func));
     } break;
     default:
-        // unsupported - emit comment as an assign to a dummy temp
-        {
-            SSAInstrAssign asg;
-            asg.Target   = SSAValue(SSAValue::Kind::Temp, mContext.fresh("tmp"), ElementaryType::Unspecified);
-            asg.Operator = SSAInstrAssign::OpKind::Nop;
-            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-        }
+        PEXPR_ASSERT(false, "unsupported statement type");
         break;
     }
 }
@@ -135,7 +129,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
 SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
 {
     if (!expr)
-        return SSAValue{ SSAValue::Kind::Constant, "nil", ElementaryType::Error };
+        return SSAValue();
 
     // reuse cached value if present
     auto it = mExprValues.find(expr.get());
@@ -149,33 +143,22 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto lit = std::reinterpret_pointer_cast<LiteralExpression>(expr);
         std::string sval;
         SSAValue v;
-        v.Kind = SSAValue::Kind::Constant;
-        v.Type = lit->returnType();
         switch (lit->returnType()) {
         case ElementaryType::Boolean:
-            sval    = lit->getBool() ? "true" : "false";
-            v.Name  = sval;
-            v.Value = ExtendedValueVariant(lit->getBool());
+            v = SSAValue::Constant(lit->getBool());
             break;
         case ElementaryType::Integer:
-            sval    = std::to_string(lit->getInteger());
-            v.Name  = sval;
-            v.Value = ExtendedValueVariant(static_cast<Integer>(lit->getInteger()));
+            v = SSAValue::Constant(lit->getInteger());
             break;
         case ElementaryType::Number:
-            sval    = std::to_string(lit->getNumber());
-            v.Name  = sval;
-            v.Value = ExtendedValueVariant(static_cast<Number>(lit->getNumber()));
+            v = SSAValue::Constant(lit->getNumber());
             break;
         case ElementaryType::String:
-            sval    = std::string("\"") + lit->getString() + "\"";
-            v.Name  = sval;
-            v.Value = ExtendedValueVariant(lit->getString());
+            v = SSAValue::Constant(lit->getString());
             break;
         default:
-            sval    = "unknown";
-            v.Name  = sval;
-            v.Value = ExtendedValueVariant(std::string());
+            PEXPR_ASSERT(false, "Unknown literal return type");
+            break;
         }
         result = v;
     } break;
@@ -185,9 +168,9 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         if (version > 0) {
             std::stringstream ss;
             ss << v->name() << "." << version;
-            result = SSAValue(SSAValue::Kind::Named, ss.str(), v->returnType());
+            result = SSAValue::Named(ss.str(), v->returnType());
         } else {
-            result = SSAValue(SSAValue::Kind::Named, v->name(), v->returnType());
+            result = SSAValue::Named(v->name(), v->returnType());
         }
     } break;
     case ExpressionType::Vector: {
@@ -197,7 +180,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         for (const auto& e : v->entries())
             inners.push_back(mapExpression(program, e));
 
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), v->returnType());
+        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), v->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Vector;
@@ -208,7 +191,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
         SSAValue inner = mapExpression(program, u->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), u->returnType());
+        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Unary;
@@ -221,7 +204,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto b     = std::reinterpret_pointer_cast<BinaryExpression>(expr);
         SSAValue L = mapExpression(program, b->left());
         SSAValue R = mapExpression(program, b->right());
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), b->returnType());
+        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Binary;
@@ -238,7 +221,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             args.push_back(mapExpression(program, p));
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh(c->name()), c->returnType());
+        SSAValue tgt = SSAValue::Named(mContext.fresh(c->name()), c->returnType());
         auto call                = std::make_shared<SSAInstrCall>();
         call->Target             = tgt;
         call->FunctionName       = c->mangledName();
@@ -250,7 +233,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Swizzle: {
         auto a      = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
         SSAValue in = mapExpression(program, a->inner());
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), a->returnType());
+        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Swizzle;
@@ -263,7 +246,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto a       = std::reinterpret_pointer_cast<AccessExpression>(expr);
         SSAValue in  = mapExpression(program, a->inner());
         SSAValue cst = SSAValue::Constant((Integer)a->index());
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), a->returnType());
+        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Access;
@@ -276,11 +259,11 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         // Map inner expression and emit an SSA cast instruction
         SSAValue inner = mapExpression(program, c->inner());
         // If both types match do nothing else typechecker should ensure correctness
-        if (inner.Type == c->toType()) {
+        if (inner.type() == c->toType()) {
             result = inner;
         } else {
             SSAInstrAssign cast;
-            SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("%"), c->toType());
+            SSAValue tgt = SSAValue::Named(mContext.fresh("%"), c->toType());
             cast.Target   = tgt;
             cast.Operator = SSAInstrAssign::OpKind::Cast;
             cast.Operands = { inner };
@@ -361,7 +344,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         ElementaryType phiType = expr->returnType();
 
         // create phi target with chosen type
-        SSAValue tgt(SSAValue::Kind::Temp, mContext.fresh("phi"), phiType);
+        SSAValue tgt = SSAValue::Named(mContext.fresh("phi"), phiType);
         auto phi    = std::make_shared<SSAInstrPhi>();
         phi->Target = tgt;
 
@@ -374,12 +357,9 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         result = tgt;
     } break;
     default:
-        result = SSAValue{ SSAValue::Kind::Constant, "unknown", ElementaryType::Unspecified };
+        PEXPR_ASSERT(false, "Unknown expression type");
         break;
     }
-
-    // attach type from AST (if typechecker ran)
-    result.Type = expr->returnType();
 
     // cache result
     mExprValues[expr.get()] = result;
