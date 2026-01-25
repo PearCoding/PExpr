@@ -22,10 +22,14 @@ There are two kinds of statements handled inside a closure:
 
 statement ::= variable_statement | function_statement
 
-variable_statement ::= Identifier [ ':' elementary_type ] '=' expression ';'
-                     | 'mut' Identifier [ ':' elementary_type ] '=' expression ';'
+// Attributes can appear before any statement or expression
+attributes ::= '[[' attribute ( ',' attribute )* ']]'
+attribute ::= Identifier [ '=' ( BooleanLiteral | IntegerLiteral | NumberLiteral | StringLiteral ) ]
 
-function_statement ::= [ 'extern' ] 'fn' Identifier '(' parameter_def_list ')' [ '->' elementary_type ] '=' expression ';'
+function_statement ::= [ attributes ] 'fn' Identifier '(' parameter_def_list ')' [ '->' elementary_type ] '=' expression ';'
+
+variable_statement ::= [ attributes ] ( 'let' [ 'mut' ] Identifier [ ':' elementary_type ] '=' expression ';'
+                                     | Identifier '=' expression ';' )
 
 parameter_def_list (for function declarations)
 ----------------------------------------------

@@ -111,6 +111,24 @@ public:
     }
 
 private:
+    // Attribute value variant
+    struct Attribute {
+        std::string name;
+        std::variant<bool, Integer, Number, std::string> value;
+
+        bool isBool() const { return std::holds_alternative<bool>(value); }
+        bool isInt() const { return std::holds_alternative<Integer>(value); }
+        bool isNum() const { return std::holds_alternative<Number>(value); }
+        bool isString() const { return std::holds_alternative<std::string>(value); }
+
+        bool getBool() const { return std::get<bool>(value); }
+        Integer getInt() const { return std::get<Integer>(value); }
+        Number getNum() const { return std::get<Number>(value); }
+        const std::string& getString() const { return std::get<std::string>(value); }
+    };
+
+    using AttributeList = std::vector<Attribute>;
+
     Closure* mCurrentClosure = nullptr;
     const SymbolTable* mGlobals;
 
@@ -125,16 +143,26 @@ private:
             mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
 
         while (true) {
+            // Check for attributes before statement
+            AttributeList attrs;
+            if (P.cur(0).Type == TokenType::OpenSquareBracket && P.cur(1).Type == TokenType::OpenSquareBracket) {
+                P.expect(TokenType::OpenSquareBracket);
+                P.expect(TokenType::OpenSquareBracket);
+                attrs = p_attributes();
+                P.expect(TokenType::ClosedSquareBracket);
+                P.expect(TokenType::ClosedSquareBracket);
+            }
+
             if (P.accept(TokenType::Let)) {
                 // Variable declaration
-                closure->addStatement(p_variable_statement(true));
+                closure->addStatement(p_variable_statement(true, attrs));
             } else if (P.accept(TokenType::Function)) {
                 // Function
-                closure->addStatement(p_function_statement());
+                closure->addStatement(p_function_statement(attrs));
             } else if (P.cur(0).Type == TokenType::Identifier) {
                 if (P.cur(1).Type == TokenType::Assign) {
-                    // Variable
-                    closure->addStatement(p_variable_statement(false));
+                    // Variable assignment
+                    closure->addStatement(p_variable_statement(false, attrs));
                 } else {
                     break;
                 }
@@ -151,9 +179,10 @@ private:
 
         closure->setExpression(p_expression());
 
-        // TODO: The location of the warning is incorrect and slightly off (a single token wide)
+        // Check for a trailing semicolon
+        const auto semicolonLoc = P.cur().Location;
         if (P.accept(TokenType::Semicolon))
-            P.mReporter.warningf(RT_WARNING_TRAILING_SEMICOLON, P.cur().Location, "Trailing '%s' at the end of an expression", Token::toString(TokenType::Semicolon).data());
+            P.mReporter.warningf(RT_WARNING_TRAILING_SEMICOLON, semicolonLoc, "Trailing '%s' at the end of an expression", Token::toString(TokenType::Semicolon).data());
 
         mCurrentClosure = mCurrentClosure->parent();
 
@@ -161,8 +190,10 @@ private:
     }
 
     // Statements
-    inline Ptr<Statement> p_variable_statement(bool is_declaration)
+    inline Ptr<Statement> p_variable_statement(bool is_declaration, const AttributeList& attrs)
     {
+        PEXPR_UNUSED(attrs);
+
         const auto loc = P.cur().Location;
 
         bool is_mutable = false;
@@ -198,70 +229,88 @@ private:
         do {
             const std::string paramName = std::get<std::string>(P.cur().Value);
             P.expect(TokenType::Identifier);
-
-            // if (P.cur().Type == TokenType::Colon) {
             P.expect(TokenType::Colon);
             const ElementaryType type = p_elementary_type();
             list.push_back(Parameter{ paramName, type });
-            // } else {
-            //     list.push_back(FunctionStatement::Parameter{ paramName, ElementaryType::Unspecified });
-            // }
         } while (P.accept(TokenType::Comma));
 
         return list;
     }
 
-    struct FunctionAttributes {
-        bool Extern        = false;
-        bool HasSideEffect = false;
-    };
-    inline FunctionAttributes p_function_attributes()
+    inline AttributeList p_attributes()
     {
-        if (P.cur().Type == TokenType::ClosedSquareBracket)
-            return FunctionAttributes{};
+        AttributeList attributes;
 
-        bool hadExtern = false;
-        bool hadPure   = false;
+        if (P.cur().Type == TokenType::ClosedSquareBracket)
+            return attributes;
+
         do {
             const std::string attrName = std::get<std::string>(P.cur().Value);
             P.expect(TokenType::Identifier);
 
-            if (attrName == "extern") {
-                hadExtern = true;
-            } else if (attrName == "pure") {
-                hadPure = true;
+            Attribute attr;
+            attr.name = attrName;
+
+            // Check for value assignment
+            if (P.accept(TokenType::Assign)) {
+                // Parse value based on token type
+                if (P.cur().Type == TokenType::BooleanLiteral) {
+                    attr.value = std::get<bool>(P.cur().Value);
+                    P.expect(TokenType::BooleanLiteral);
+                } else if (P.cur().Type == TokenType::IntegerLiteral) {
+                    attr.value = std::get<Integer>(P.cur().Value);
+                    P.expect(TokenType::IntegerLiteral);
+                } else if (P.cur().Type == TokenType::NumberLiteral) {
+                    attr.value = std::get<Number>(P.cur().Value);
+                    P.expect(TokenType::NumberLiteral);
+                } else if (P.cur().Type == TokenType::StringLiteral) {
+                    attr.value = std::get<std::string>(P.cur().Value);
+                    P.expect(TokenType::StringLiteral);
+                } else {
+                    P.signalError();
+                    P.mReporter.errorf(P.cur().Location, "Expected boolean, integer, number, or string literal for attribute value");
+                }
             } else {
-                P.signalError();
-                P.mReporter.errorf(P.cur().Location, "Unknown attribute '%s'", attrName.c_str());
+                // Boolean attribute without value defaults to true
+                attr.value = true;
             }
+
+            attributes.push_back(attr);
         } while (P.accept(TokenType::Comma));
 
-        if (hadExtern) {
-            return FunctionAttributes{
-                .Extern        = true,
-                .HasSideEffect = !hadPure
-            };
-        } else {
-            if (hadPure)
-                P.mReporter.warningf(RT_WARNING_PURE_INTERNAL_FUNCTIONS, P.cur().Location, "No need to mark an internal function as pure");
-            return FunctionAttributes{
-                .Extern        = false,
-                .HasSideEffect = false
-            };
-        }
+        return attributes;
     }
 
-    inline Ptr<Statement> p_function_statement()
+    struct FunctionAttributes {
+        bool Extern        = false;
+        bool HasSideEffect = false;
+
+        static FunctionAttributes fromAttributes(const AttributeList& attrs)
+        {
+            FunctionAttributes result;
+            bool hadPure = false;
+            for (const auto& attr : attrs) {
+                if (attr.name == "extern") {
+                    result.Extern = attr.isBool() ? attr.getBool() : true;
+                    if (!hadPure)
+                        result.HasSideEffect = true; // Default we assume external functions have side effects
+                } else if (attr.name == "pure") {
+                    // pure attribute means no side effect
+                    bool pure            = attr.isBool() ? attr.getBool() : true;
+                    result.HasSideEffect = !pure;
+                    hadPure              = true;
+                }
+            }
+            return result;
+        }
+    };
+
+    inline Ptr<Statement> p_function_statement(const AttributeList& attrs)
     {
         const auto loc = P.cur().Location;
 
         // Get attribute list
-        FunctionAttributes attr;
-        if (P.accept(TokenType::OpenSquareBracket) && P.accept(TokenType::OpenSquareBracket)) {
-            attr = p_function_attributes();
-            P.expect(TokenType::ClosedSquareBracket);
-            P.expect(TokenType::ClosedSquareBracket);
-        }
+        FunctionAttributes attr = FunctionAttributes::fromAttributes(attrs);
 
         // Get function name
         std::string funcName;

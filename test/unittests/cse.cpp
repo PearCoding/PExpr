@@ -58,7 +58,7 @@ TEST_CASE("SSAOptimizer: common subexpression elimination basic", "[sscp][cse]")
 
 TEST_CASE("SSAOptimizer: common subexpression elimination with constants", "[sscp][cse]")
 {
-    std::stringstream stream("fn [[extern, pure]] sin(a:num)->num; fn [[extern, pure]] cos(a:num)->num; let a = 5.0; let x = sin(a) * cos(a); let y = sin(a) * cos(a); x + y");
+    std::stringstream stream("[[extern, pure]] fn sin(a:num)->num; [[extern, pure]] fn cos(a:num)->num; let a = 5.0; let x = sin(a) * cos(a); let y = sin(a) * cos(a); x + y");
     Environment env;
     auto ast = env.parse(stream);
 
@@ -152,7 +152,7 @@ TEST_CASE("SSAOptimizer: common subexpression elimination preserves side effects
     // Functions with side effects should not be eliminated
     Environment env;
     auto ast = env.parse(R"(
-        fn [[extern]] side_effect() -> num;
+        [[extern]] fn side_effect() -> num;
         let x = side_effect();
         let y = side_effect();
         x + y

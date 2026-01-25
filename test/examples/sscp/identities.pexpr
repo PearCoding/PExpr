@@ -1,16 +1,16 @@
-fn [[extern]] getInput() -> num;
+[[extern]] fn getInput() -> num;
 
 // Intrinsics (defined in Intrinsics.cpp)
-fn [[extern, pure]] sin(a:num) -> num;
-fn [[extern, pure]] cos(a:num) -> num;
-fn [[extern, pure]] tan(a:num) -> num;
-fn [[extern, pure]] asin(a:num) -> num;
-fn [[extern, pure]] acos(a:num) -> num;
-fn [[extern, pure]] atan(a:num) -> num;
+[[extern, pure]] fn sin(a:num) -> num;
+[[extern, pure]] fn cos(a:num) -> num;
+[[extern, pure]] fn tan(a:num) -> num;
+[[extern, pure]] fn asin(a:num) -> num;
+[[extern, pure]] fn acos(a:num) -> num;
+[[extern, pure]] fn atan(a:num) -> num;
 
-fn [[extern, pure]] abs(a:num) -> num;
-fn [[extern, pure]] sqrt(a:num) -> num;
-fn [[extern, pure]] pow(a:num, b:num) -> num;
+[[extern, pure]] fn abs(a:num) -> num;
+[[extern, pure]] fn sqrt(a:num) -> num;
+[[extern, pure]] fn pow(a:num, b:num) -> num;
 
 // https://en.wikipedia.org/wiki/List_of_trigonometric_identities
 

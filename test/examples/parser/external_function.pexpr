@@ -1,5 +1,5 @@
 // Function
-fn [[extern]] foo(v:int) -> int;
-fn [[extern, pure]] foo_pure(v:int) -> int;
+[[extern]] fn foo(v:int) -> int;
+[[extern, pure]] fn foo_pure(v:int) -> int;
 
 foo(5) + foo_pure(4) * 0

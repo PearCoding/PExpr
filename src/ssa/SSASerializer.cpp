@@ -708,8 +708,15 @@ SSAProgram SSASerializer::read(std::istream& is)
             currentFunction = std::make_shared<SSAFunction>();
 
             // Parse attributes if present
-            if (line.find("[[") != std::string::npos)
-                parseFunctionAttributes(line, currentFunction->External, currentFunction->HasSideEffect);
+            if (line.find("[[") != std::string::npos) {
+                size_t attrStart = line.find("[["); // This is where attributes start
+                size_t attrEnd   = line.find("]]");
+                if (attrEnd != std::string::npos) {
+                    // Extract the part from [[ to ]] including attributes
+                    std::string attrContent = line.substr(attrStart, attrEnd - attrStart + 2);
+                    parseFunctionAttributes(attrContent, currentFunction->External, currentFunction->HasSideEffect);
+                }
+            }
 
             // Find function name (skip over attributes if present)
             size_t nameStart  = fnPos + 3;

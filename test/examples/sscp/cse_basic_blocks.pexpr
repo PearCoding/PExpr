@@ -2,8 +2,8 @@
 // This program contains identical expressions in different basic blocks
 // that should NOT be eliminated because they appear on different control flow paths
 
-fn [[extern]] getInput() -> num; // < Artificial way to add side-effects and ensure it does not get removed
-fn [[extern, pure]] getInputPure() -> num;
+[[extern]] fn getInput() -> num; // < Artificial way to add side-effects and ensure it does not get removed
+[[extern, pure]] fn getInputPure() -> num;
 
 fn branchCSEExample(cond: bool) -> num = {
     // This function demonstrates the need for basic-block-aware CSE 

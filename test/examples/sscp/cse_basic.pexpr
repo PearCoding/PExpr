@@ -1,7 +1,7 @@
 // Common subexpression elimination (CSE) - basic arithmetic
 // The expression 'a * b' appears twice and should be computed only once
 
-fn [[extern]] getInput() -> num;
+[[extern]] fn getInput() -> num;
 
 let a = getInput();
 let b = getInput();

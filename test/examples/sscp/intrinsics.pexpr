@@ -1,5 +1,5 @@
 // Intrinsics (defined in Intrinsics.cpp)
-fn [[extern, pure]] sin(a:num) -> num;
-fn [[extern, pure]] cos(a:num) -> num;
+[[extern, pure]] fn sin(a:num) -> num;
+[[extern, pure]] fn cos(a:num) -> num;
 
 sin(2)^2 + cos(2)^2
