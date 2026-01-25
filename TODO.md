@@ -22,5 +22,5 @@
 - [ ] Add loop expression (like https://zig.guide/language-basics/loops-as-expressions/)
 - [ ] Add loop statements
 - [ ] Add if statements
-- [ ] Refactor code to use std::ranges if applicable
+- [x] Refactor code to use std::ranges if applicable
 - [x] Add SSA IR serialization with write and read functionality
