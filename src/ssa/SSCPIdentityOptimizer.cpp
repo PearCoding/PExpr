@@ -3,6 +3,7 @@
 #include "SSAMapper.h"
 
 #include <cmath>
+#include <ranges>
 #include <sstream>
 
 namespace PExpr::ssa {
@@ -11,18 +12,14 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
 {
     // Build definition map
     mDefinitions.clear();
-    for (const auto& instrPtr : instructions) {
-        if (!instrPtr)
-            continue;
-
-        // TODO: Would be nice if this could be polymorphed out?
+    std::ranges::for_each(instructions, [this](const auto& instrPtr) {
         if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
             mDefinitions[asg->Target.name()] = asg;
         else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
             mDefinitions[call->Target.name()] = call;
         else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get()))
             mDefinitions[phi->Target.name()] = phi;
-    }
+    });
 
     bool changed = false;
     for (size_t i = 0; i < instructions.size(); ++i) {

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 #include <sstream>
 
 namespace PExpr::ssa {
@@ -517,14 +518,12 @@ bool SSCPConstantFolder::replaceOperandIfConst(SSAValue& op)
 bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
 {
     bool changed = false;
-    for (auto& instrPtr : instructions) {
-        if (!instrPtr)
-            continue;
-        instrPtr->forEachOperand([&](SSAValue& val) {
+    std::ranges::for_each(instructions, [this, &changed](auto& instrPtr) {
+        instrPtr->forEachOperand([this, &changed](SSAValue& val) {
             if (replaceOperandIfConst(val))
                 changed = true;
         });
-    }
+    });
     return changed;
 }
 

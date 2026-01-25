@@ -1,6 +1,9 @@
 #include "SSCPControlFlowOptimizer.h"
 #include "SSAMapper.h"
 
+#include <algorithm>
+#include <ranges>
+
 namespace PExpr::ssa {
 
 bool SSCPControlFlowOptimizer::removeEmptyBranches(InstructionList& instructions)
@@ -31,7 +34,7 @@ bool SSCPControlFlowOptimizer::removeEmptyBranches(InstructionList& instructions
                             br->TargetLabel = g->TargetLabel;
                     } else if (auto gt = dynamic_cast<SSAInstrGoto*>(instructions[j].get())) {
                         if (gt->TargetLabel == l->Name)
-                            br->TargetLabel = g->TargetLabel;
+                            gt->TargetLabel = g->TargetLabel;
                     }
                 }
 
@@ -49,7 +52,7 @@ bool SSCPControlFlowOptimizer::removeEmptyBranches(InstructionList& instructions
                             br->TargetLabel = l2->Name;
                     } else if (auto gt = dynamic_cast<SSAInstrGoto*>(instructions[j].get())) {
                         if (gt->TargetLabel == l->Name)
-                            br->TargetLabel = l2->Name;
+                            gt->TargetLabel = l2->Name;
                     }
                 }
 
@@ -97,34 +100,22 @@ bool SSCPControlFlowOptimizer::removeObsoleteLabels(InstructionList& instruction
 {
     // Count the usage of the labels
     std::unordered_map<std::string, size_t> counter;
-    for (auto& instrPtr : instructions) {
-        if (!instrPtr)
-            continue;
+    std::ranges::for_each(instructions, [&counter](const auto& instrPtr) {
         if (auto g = dynamic_cast<const SSAInstrGoto*>(instrPtr.get()))
             counter[g->TargetLabel]++;
         else if (auto br = dynamic_cast<const SSAInstrBranch*>(instrPtr.get()))
             counter[br->TargetLabel]++;
-    }
+    });
 
-    bool changed = false;
     // Remove labels without usage
-    for (auto it = instructions.begin(); it != instructions.end();) {
-        if (!*it) {
-            ++it;
-            continue;
-        }
+    const auto pred = [&counter](const std::shared_ptr<SSAInstr>& instrPtr) -> bool {
+        if (auto l = dynamic_cast<const SSAInstrLabel*>(instrPtr.get()))
+            return !counter.contains(l->Name) || counter.at(l->Name) == 0;
+        return false;
+    };
 
-        if (auto l = dynamic_cast<const SSAInstrLabel*>(it->get())) {
-            if (!counter.contains(l->Name) || counter.at(l->Name) == 0) {
-                it      = instructions.erase(it);
-                changed = true;
-                continue;
-            }
-        }
-        ++it;
-    }
-
-    return changed;
+    const auto removed = std::erase_if(instructions, pred);
+    return removed > 0;
 }
 
 bool SSCPControlFlowOptimizer::collapsePhiNodes(InstructionList& instructions)

@@ -4,6 +4,7 @@
 #include "Statement.h"
 
 #include <algorithm>
+#include <ranges>
 #include <sstream>
 
 namespace PExpr::ssa {
@@ -44,8 +45,7 @@ SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std
 
 SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
 {
-    if (!closure)
-        return SSAProgram{};
+    PEXPR_ASSERT(closure, "Expected valid closure to map");
 
     mContext.pushScope();
     auto program = SSAProgram{};
@@ -68,8 +68,7 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
 
 void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
 {
-    if (!stmt)
-        return;
+    PEXPR_ASSERT(stmt, "Expected valid statement to map");
 
     switch (stmt->type()) {
     case StatementType::VariableDeclaration: {
@@ -112,12 +111,15 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         func.External      = f->isExtern();
         func.HasSideEffect = f->hasSideEffects();
 
-        // Acquire inner closure
-        auto innerProg = mapClosure(f->closure());
-        func.Body      = std::move(innerProg.Body);
+        // Acquire inner closure if available
+        if (f->closure()) {
+            auto innerProg = mapClosure(f->closure());
+            func.Body      = std::move(innerProg.Body);
 
-        // Given the uplifting all functions are global
-        program.Functions.insert(program.Functions.end(), innerProg.Functions.begin(), innerProg.Functions.end());
+            // Given the uplifting all functions are global
+            program.Functions.insert(program.Functions.end(), innerProg.Functions.begin(), innerProg.Functions.end());
+        }
+
         program.Functions.push_back(std::move(func));
     } break;
     default:
@@ -128,8 +130,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
 
 SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
 {
-    if (!expr)
-        return SSAValue();
+    PEXPR_ASSERT(expr, "Expected valid expression to map");
 
     // reuse cached value if present
     auto it = mExprValues.find(expr.get());
@@ -191,7 +192,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
         SSAValue inner = mapExpression(program, u->inner());
-        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), u->returnType());
+        SSAValue tgt   = SSAValue::Named(mContext.fresh("%"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
         asg.Operator = SSAInstrAssign::OpKind::Unary;
@@ -201,9 +202,9 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         result = tgt;
     } break;
     case ExpressionType::Binary: {
-        auto b     = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        SSAValue L = mapExpression(program, b->left());
-        SSAValue R = mapExpression(program, b->right());
+        auto b       = std::reinterpret_pointer_cast<BinaryExpression>(expr);
+        SSAValue L   = mapExpression(program, b->left());
+        SSAValue R   = mapExpression(program, b->right());
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
@@ -221,7 +222,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             args.push_back(mapExpression(program, p));
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
-        SSAValue tgt = SSAValue::Named(mContext.fresh(c->name()), c->returnType());
+        SSAValue tgt             = SSAValue::Named(mContext.fresh(c->name()), c->returnType());
         auto call                = std::make_shared<SSAInstrCall>();
         call->Target             = tgt;
         call->FunctionName       = c->mangledName();
@@ -231,8 +232,8 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         result = tgt;
     } break;
     case ExpressionType::Swizzle: {
-        auto a      = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
-        SSAValue in = mapExpression(program, a->inner());
+        auto a       = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
+        SSAValue in  = mapExpression(program, a->inner());
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
@@ -263,7 +264,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             result = inner;
         } else {
             SSAInstrAssign cast;
-            SSAValue tgt = SSAValue::Named(mContext.fresh("%"), c->toType());
+            SSAValue tgt  = SSAValue::Named(mContext.fresh("%"), c->toType());
             cast.Target   = tgt;
             cast.Operator = SSAInstrAssign::OpKind::Cast;
             cast.Operands = { inner };
@@ -345,8 +346,8 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
 
         // create phi target with chosen type
         SSAValue tgt = SSAValue::Named(mContext.fresh("phi"), phiType);
-        auto phi    = std::make_shared<SSAInstrPhi>();
-        phi->Target = tgt;
+        auto phi     = std::make_shared<SSAInstrPhi>();
+        phi->Target  = tgt;
 
         // Insert into phi block
         phi->Conditions = std::move(conditionVals);

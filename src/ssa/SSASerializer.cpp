@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <ranges>
 #include <sstream>
 #include <string_view>
 
@@ -296,7 +297,7 @@ static std::string stripComments(const std::string& line, bool& inBlockComment)
 {
     std::string result;
     result.reserve(line.size());
-    
+
     for (size_t i = 0; i < line.size(); ++i) {
         if (inBlockComment) {
             // Check for end of block comment
@@ -306,23 +307,23 @@ static std::string stripComments(const std::string& line, bool& inBlockComment)
             }
             continue;
         }
-        
+
         // Check for start of block comment
         if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*') {
             inBlockComment = true;
             ++i; // Skip the '*'
             continue;
         }
-        
+
         // Check for line comment
         if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/') {
             // Line comment, ignore the rest of the line
             break;
         }
-        
+
         result += line[i];
     }
-    
+
     return result;
 }
 
@@ -333,35 +334,34 @@ static std::vector<std::string> split(const std::string& str, char delimiter)
     std::istringstream tokenStream(str);
     while (std::getline(tokenStream, token, delimiter)) {
         token = trim(token);
-        if (!token.empty()) {
+        if (!token.empty())
             tokens.push_back(token);
-        }
     }
     return tokens;
 }
 
 ElementaryType SSASerializer::parseType(const std::string& typeStr)
 {
-    if (typeStr == "bool")
+    if (typeStr == "bool") {
         return ElementaryType::Boolean;
-    if (typeStr == "int")
+    } else if (typeStr == "int") {
         return ElementaryType::Integer;
-    if (typeStr == "num")
+    } else if (typeStr == "num") {
         return ElementaryType::Number;
-    if (typeStr == "str")
+    } else if (typeStr == "str") {
         return ElementaryType::String;
-    if (typeStr.rfind("vec", 0) == 0) {
+    } else if (typeStr.rfind("vec", 0) == 0) {
         // Vector type like vec1, vec2, vec3, vec4
         try {
             size_t num = std::stoul(typeStr.substr(3));
-            if (num >= 1 && num <= 4) {
+            if (num >= 1 && num <= 4)
                 return static_cast<ElementaryType>(static_cast<int>(ElementaryType::Vec1) + num - 1);
-            }
         } catch (...) {
             // fall through
         }
+    } else {
+        return ElementaryType::Unspecified;
     }
-    return ElementaryType::Unspecified;
 }
 
 bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
@@ -382,8 +382,8 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
     if (name == "true" || name == "false") {
         bool val = (name == "true");
         outValue = SSAValue::Constant(val);
-    } else if (name.find('.') != std::string::npos && std::all_of(name.begin(), name.end(), [](char c) {
-                   return isdigit(c) || c == '.' || c == '-';
+    } else if (name.find('.') != std::string::npos && std::ranges::all_of(name, [](char c) {
+                   return isdigit(c) || c == '.' || c == '-'; // TODO: e notation support
                })) {
         // Number constant
         try {
@@ -690,7 +690,7 @@ SSAProgram SSASerializer::read(std::istream& is)
     SSAProgram program;
     std::string line;
     std::shared_ptr<SSAFunction> currentFunction = nullptr;
-    bool inBlockComment = false;
+    bool inBlockComment                          = false;
 
     while (std::getline(is, line)) {
         // Strip comments from the line

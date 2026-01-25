@@ -1,6 +1,7 @@
 #include "SSAContext.h"
 
 #include <algorithm>
+#include <ranges>
 #include <sstream>
 
 namespace PExpr::ssa {

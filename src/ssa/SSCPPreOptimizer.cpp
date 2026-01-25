@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <ranges>
 
 namespace PExpr::ssa {
 

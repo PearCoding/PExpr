@@ -1,56 +1,42 @@
 #include "SSCPDeadCodeOptimizer.h"
 #include "SSAMapper.h"
 
+#include <algorithm>
+#include <ranges>
+
 namespace PExpr::ssa {
 
 void SSCPDeadCodeOptimizer::resetAndCountUses(const InstructionList& instructions)
 {
     mUseCount.clear();
-    for (const auto& instrPtr : instructions) {
-        if (!instrPtr)
-            continue;
-
-        countUsesInInstr(instrPtr.get());
-    }
+    std::ranges::for_each(instructions, [this](const auto& instrPtr) { countUsesInInstr(instrPtr.get()); });
 }
 
 bool SSCPDeadCodeOptimizer::removeDeadAssigns(InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions)
 {
     resetAndCountUses(instructions);
 
-    bool changed = false;
-
-    for (auto it = instructions.begin(); it != instructions.end();) {
-        if (!*it) {
-            ++it;
-            continue;
-        }
-
+    const auto pred = [this, &sideEffectedFunctions](const std::shared_ptr<SSAInstr>& instrPtr) -> bool {
         SSAValue target;
-        if (auto asg = dynamic_cast<SSAInstrAssign*>(it->get())) {
+        if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
             target = asg->Target;
-        } else if (auto c = dynamic_cast<SSAInstrCall*>(it->get())) {
+        } else if (auto c = dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
             target = c->Target;
-        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(it->get())) {
+        } else if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
             target = phi->Target;
         } else {
-            ++it;
-            continue;
+            return false;
         }
 
         int uses = 0;
         if (auto uit = mUseCount.find(target.name()); uit != mUseCount.end())
             uses = uit->second;
 
-        if (uses == 0 && !instrHasSideEffects(it->get(), sideEffectedFunctions)) {
-            changed = true;
-            it      = instructions.erase(it);
-            continue;
-        }
-        ++it;
-    }
+        return uses == 0 && !instrHasSideEffects(instrPtr.get(), sideEffectedFunctions);
+    };
 
-    return changed;
+    const auto removed = std::erase_if(instructions, pred);
+    return removed > 0;
 }
 
 void SSCPDeadCodeOptimizer::countUsesInInstr(const SSAInstr* instr)

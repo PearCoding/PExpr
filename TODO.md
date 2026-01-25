@@ -23,4 +23,4 @@
 - [ ] Add loop statements
 - [ ] Add if statements
 - [ ] Refactor code to use std::ranges if applicable
-- [ ] Add SSA IR serialization with write and read functionality
+- [x] Add SSA IR serialization with write and read functionality

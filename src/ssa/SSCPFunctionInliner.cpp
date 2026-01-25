@@ -2,6 +2,8 @@
 #include "SSAMapper.h"
 #include "SSAOptimizer.h"
 
+#include <ranges>
+
 namespace PExpr::ssa {
 
 void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)

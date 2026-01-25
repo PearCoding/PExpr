@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <ranges>
 #include <sstream>
 
 namespace PExpr::ssa {
@@ -18,11 +19,7 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
     bool changed = false;
 
     // First pass: compute hashes for all values
-    for (auto it = begin; it != end; ++it) {
-        const auto& instrPtr = *it;
-        if (!instrPtr)
-            continue;
-
+    std::ranges::for_each(std::ranges::subrange(begin, end), [this](const auto& instrPtr) {
         // Compute hash for the instruction if it produces a value
         if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
             if (auto hash = hashInstruction(asg))
@@ -34,7 +31,7 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
             // Skip phi nodes (they're too complex for CSE and handled by PRE)
             PEXPR_UNUSED(phi);
         }
-    }
+    });
 
     // Second pass: eliminate common subexpressions
     for (auto it = begin; it != end; ++it) {
