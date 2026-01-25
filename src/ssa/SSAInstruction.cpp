@@ -44,7 +44,6 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
             h = h * 31 + Operands[0].hash(includeTargetName);
         break;
     case OpKind::Assign:
-    case OpKind::Nop:
     case OpKind::Phi:
         // These don't contribute to expression hash
         break;

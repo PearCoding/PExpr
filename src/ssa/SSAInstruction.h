@@ -48,7 +48,6 @@ struct SSAInstrAssign : public SSAInstr {
                         Access,
                         Vector,
                         Cast,
-                        Nop,
                         Phi };
 
     SSAValue Target;

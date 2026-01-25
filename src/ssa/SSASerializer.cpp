@@ -133,9 +133,6 @@ void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
     case SSAInstrAssign::OpKind::Vector:
         os << "vec[" << instr.Operands.size() << "]";
         break;
-    case SSAInstrAssign::OpKind::Nop:
-        os << "nop";
-        break;
     case SSAInstrAssign::OpKind::Cast:
         os << "cast";
         break;
@@ -662,8 +659,6 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
             assign->UnaryOp  = UnaryOperation::Not;
         } else if (op == "cast") {
             assign->Operator = SSAInstrAssign::OpKind::Cast;
-        } else if (op == "nop") {
-            assign->Operator = SSAInstrAssign::OpKind::Nop;
         } else if (op.find("swizzle[") == 0) {
             assign->Operator = SSAInstrAssign::OpKind::Swizzle;
             size_t start     = op.find('[') + 1;
