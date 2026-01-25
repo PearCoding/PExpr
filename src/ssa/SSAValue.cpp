@@ -14,11 +14,12 @@ std::string SSAValue::baseName() const
 }
 
 // SSAValue hash implementation
-size_t SSAValue::hash() const
+size_t SSAValue::hash(bool includeName) const
 {
     size_t h = std::hash<int>{}(static_cast<int>(Kind));
-    h        = h * 31 + std::hash<std::string>{}(Name);
-    h        = h * 31 + std::hash<int>{}(static_cast<int>(Type));
+    if (includeName)
+        h = h * 31 + std::hash<std::string>{}(Name);
+    h = h * 31 + std::hash<int>{}(static_cast<int>(Type));
 
     if (Kind == Kind::Constant) {
         // Hash the constant value based on type

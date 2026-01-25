@@ -22,7 +22,7 @@ TEST_CASE("SSASerializer: round-trip serialization of simple program", "[seriali
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());
 
-    // Deserialize back0
+    // Deserialize back
     SSAProgram deserialized = SSASerializer::deserialize(serialized);
 
     // Reserialize and compare

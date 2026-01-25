@@ -146,7 +146,9 @@ SSCPCommonSubexpressionEliminator::hashInstruction(const SSAInstr* instr) const
     if (!instr)
         return std::nullopt;
 
-    size_t hash         = instr->hash();
+    // For CSE, we don't want to include target names in the hash
+    // because identical expressions with different target names should be eliminated
+    size_t hash         = instr->hash(false);
     ElementaryType type = ElementaryType::Unspecified;
 
     // Get the result type from the instruction

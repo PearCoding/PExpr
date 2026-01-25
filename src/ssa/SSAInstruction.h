@@ -8,10 +8,10 @@
 
 namespace PExpr::ssa {
 struct SSAInstr {
-    virtual ~SSAInstr()              = default;
+    virtual ~SSAInstr() = default;
 
     /// Compute a hash for this instruction
-    [[nodiscard]] virtual size_t hash() const = 0;
+    [[nodiscard]] virtual size_t hash(bool includeTargetName = true) const = 0;
 
     /// Check if two instructions are equivalent
     [[nodiscard]] virtual bool isEquivalent(const SSAInstr* other) const = 0;
@@ -60,7 +60,7 @@ struct SSAInstrAssign : public SSAInstr {
     std::string Swizzle;
     std::vector<SSAValue> Operands;
 
-    [[nodiscard]] size_t hash() const override;
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override;
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override;
     void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
     void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
@@ -74,7 +74,7 @@ struct SSAInstrCall : public SSAInstr {
     std::string PublicFunctionName; ///< User given name
     std::vector<SSAValue> Arguments;
 
-    [[nodiscard]] size_t hash() const override;
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override;
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override;
     void forEachOperand(const std::function<void(SSAValue&)>& visitor) override;
     void forEachOperand(const std::function<void(const SSAValue&)>& visitor) const override;
@@ -84,7 +84,7 @@ struct SSAInstrCall : public SSAInstr {
 
 struct SSAInstrReturn : public SSAInstr {
     SSAValue Value;
-    [[nodiscard]] size_t hash() const override { return Value.hash(); }
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override { return Value.hash(includeTargetName); }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
         if (const auto* otherReturn = dynamic_cast<const SSAInstrReturn*>(other))
@@ -100,7 +100,11 @@ struct SSAInstrReturn : public SSAInstr {
 // are emitted when inlining branch/closure bodies.
 struct SSAInstrLabel : public SSAInstr {
     std::string Name;
-    [[nodiscard]] size_t hash() const override { return std::hash<std::string>{}(Name); }
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override
+    {
+        PEXPR_UNUSED(includeTargetName);
+        return std::hash<std::string>{}(Name);
+    }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
         if (const auto* otherLabel = dynamic_cast<const SSAInstrLabel*>(other))
@@ -113,9 +117,9 @@ struct SSAInstrLabel : public SSAInstr {
 struct SSAInstrBranch : public SSAInstr {
     SSAValue Condition;
     std::string TargetLabel;
-    [[nodiscard]] size_t hash() const override
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override
     {
-        size_t h = Condition.hash();
+        size_t h = Condition.hash(includeTargetName);
         h        = h * 31 + std::hash<std::string>{}(TargetLabel);
         return h;
     }
@@ -132,7 +136,11 @@ struct SSAInstrBranch : public SSAInstr {
 // Unconditional jump to a label.
 struct SSAInstrGoto : public SSAInstr {
     std::string TargetLabel;
-    [[nodiscard]] size_t hash() const override { return std::hash<std::string>{}(TargetLabel); }
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override
+    {
+        PEXPR_UNUSED(includeTargetName);
+        return std::hash<std::string>{}(TargetLabel);
+    }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
         if (const auto* otherGoto = dynamic_cast<const SSAInstrGoto*>(other))
@@ -145,15 +153,15 @@ struct SSAInstrPhi : public SSAInstr {
     SSAValue Target;
     std::vector<SSAValue> Conditions;
     std::vector<SSAValue> Branches; // One more than Conditions due to 'else' case
-    [[nodiscard]] size_t hash() const override
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override
     {
-        size_t h = Target.hash();
+        size_t h = Target.hash(includeTargetName);
         h        = h * 31 + std::hash<size_t>{}(Conditions.size());
         for (const auto& cond : Conditions)
-            h = h * 31 + cond.hash();
+            h = h * 31 + cond.hash(includeTargetName);
         h = h * 31 + std::hash<size_t>{}(Branches.size());
         for (const auto& branch : Branches)
-            h = h * 31 + branch.hash();
+            h = h * 31 + branch.hash(includeTargetName);
         return h;
     }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override

@@ -34,7 +34,7 @@ public:
     [[nodiscard]] std::string baseName() const;
 
     /// Compute a hash for this value
-    [[nodiscard]] size_t hash() const;
+    [[nodiscard]] size_t hash(bool includeName = true) const;
 
     /// Check if two values are equivalent (same kind, type, and value/name)
     [[nodiscard]] bool operator==(const SSAValue& other) const;
