@@ -136,9 +136,6 @@ void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
     case SSAInstrAssign::OpKind::Cast:
         os << "cast";
         break;
-    case SSAInstrAssign::OpKind::Phi:
-        os << "phi";
-        break;
     default:
         PEXPR_ASSERT(false, "Unknown operator");
         os << "unknown";

@@ -47,8 +47,7 @@ struct SSAInstrAssign : public SSAInstr {
                         Swizzle,
                         Access,
                         Vector,
-                        Cast,
-                        Phi };
+                        Cast };
 
     SSAValue Target;
     OpKind Operator;
