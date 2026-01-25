@@ -12,12 +12,10 @@ void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
 
     // Count all calls to functions
     auto countCallsInBody = [&](const InstructionList& body) {
-        for (const auto& instrPtr : body) {
-            if (!instrPtr)
-                continue;
+        std::ranges::for_each(body, [this](const auto& instrPtr) {
             if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
                 ++mCallCounts[call->FunctionName];
-        }
+        });
     };
 
     // Count in main body
@@ -228,29 +226,8 @@ bool SSCPFunctionInliner::shouldInlineFunctionCall(SSAInstrCall* call, SSAFuncti
 
 bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody)
 {
-    // Count effective instructions (excluding labels, gotos that will be optimized)
-    size_t originalEffective = 0;
-    size_t inlinedEffective  = 0;
-
-    for (const auto& instr : originalBody) {
-        if (!instr)
-            continue;
-        if (dynamic_cast<const SSAInstrLabel*>(instr.get()))
-            continue;
-        if (dynamic_cast<const SSAInstrGoto*>(instr.get()))
-            continue;
-        ++originalEffective;
-    }
-
-    for (const auto& instr : inlinedBody) {
-        if (!instr)
-            continue;
-        if (dynamic_cast<const SSAInstrLabel*>(instr.get()))
-            continue;
-        if (dynamic_cast<const SSAInstrGoto*>(instr.get()))
-            continue;
-        ++inlinedEffective;
-    }
+    const size_t originalEffective = originalBody.size();
+    const size_t inlinedEffective  = inlinedBody.size();
 
     // Significant size reduction
     return inlinedEffective <= 2 || inlinedEffective < originalEffective / 2;

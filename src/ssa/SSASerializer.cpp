@@ -359,6 +359,7 @@ ElementaryType SSASerializer::parseType(const std::string& typeStr)
         } catch (...) {
             // fall through
         }
+        return ElementaryType::Unspecified;
     } else {
         return ElementaryType::Unspecified;
     }
