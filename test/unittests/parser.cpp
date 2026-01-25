@@ -130,7 +130,7 @@ TEST_CASE("Parser: attribute parsing edge cases", "[parser]")
 {
     SECTION("Empty attribute list")
     {
-        auto ast              = parseOnly("[[]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("[[]] fn foo(v:int) -> int = v; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("foo(") != std::string::npos);
     }
