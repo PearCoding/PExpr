@@ -351,10 +351,10 @@ ElementaryType SSASerializer::parseType(const std::string& typeStr)
     } else if (typeStr == "str") {
         return ElementaryType::String;
     } else if (typeStr.rfind("vec", 0) == 0) {
-        // Vector type like vec1, vec2, vec3, vec4
+        // Vector type like vec1, vec2, vec3, vec4, ...
         try {
             size_t num = std::stoul(typeStr.substr(3));
-            if (num >= 1 && num <= 4)
+            if (num >= 1)
                 return static_cast<ElementaryType>(static_cast<int>(ElementaryType::Vec1) + num - 1);
         } catch (...) {
             // fall through
