@@ -22,10 +22,10 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
     });
 
     bool changed = false;
-    for (size_t i = 0; i < instructions.size(); ++i) {
+    std::ranges::for_each(std::views::iota(0u, instructions.size()), [&](size_t i) {
         if (tryApplyIdentity(ctx, instructions, i))
             changed = true;
-    }
+    });
     return changed;
 }
 
@@ -75,7 +75,6 @@ bool SSCPIdentityOptimizer::matchAssignIdentity(SSAContext* ctx, InstructionList
         return false;
 
     const auto asg2 = dynamic_cast<const SSAInstrAssign*>(getDefinition(asg->Operands[0]));
-
     if (!asg2)
         return false;
 

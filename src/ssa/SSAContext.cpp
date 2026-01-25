@@ -8,14 +8,12 @@ namespace PExpr::ssa {
 void SSAContext::analyze(const InstructionList& instructions)
 {
     // Scan all instructions and extract variable names to build counters
-    for (const auto& instrPtr : instructions) {
-        if (!instrPtr)
-            continue;
-
+    std::ranges::for_each(instructions, [this](const auto& instrPtr) {
+        PEXPR_ASSERT(instrPtr, "Expected valid instructions inside the list");
         instrPtr->forEachValue([this](const SSAValue& val) {
             analyzeValue(val);
         });
-    }
+    });
 }
 
 void SSAContext::analyze(const SSAProgram& program)
@@ -34,8 +32,7 @@ void SSAContext::analyzeValue(const SSAValue& val)
     if (val.isConstant())
         return;
 
-    if (val.name().empty())
-        return;
+    PEXPR_ASSERT(!val.name().empty(), "A non-constant value must have a valid name");
 
     // Try to parse the variable name
     std::string base;

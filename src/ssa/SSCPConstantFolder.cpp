@@ -530,9 +530,7 @@ bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
 bool SSCPConstantFolder::foldToConstants(bool foldNumber, InstructionList& body)
 {
     bool changed = false;
-    for (auto& instrPtr : body) {
-        if (!instrPtr)
-            continue;
+    std::ranges::for_each(body, [&](auto& instrPtr) {
         if (auto asg = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
             auto folded = foldAssign(foldNumber, asg);
             if (folded) {
@@ -548,7 +546,7 @@ bool SSCPConstantFolder::foldToConstants(bool foldNumber, InstructionList& body)
                 changed      = true;
             }
         }
-    }
+    });
     return changed;
 }
 
