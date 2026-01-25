@@ -15,6 +15,7 @@ using namespace PExpr::internal;
 {
     SSAOptions options                    = SSAOptions::None();
     options.EliminateCommonSubexpressions = true;
+    options.EnableConstantFolding         = true;
     options.RemoveDeadCode                = true;
     return options;
 }

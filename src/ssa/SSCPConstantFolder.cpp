@@ -451,8 +451,12 @@ std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, 
 
 std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SSAInstrAssign* asg)
 {
-    if (!asg)
-        return std::nullopt;
+    PEXPR_ASSERT(asg, "Expected a valid assign instruction to constant fold");
+
+    // TODO: Check the following change if it even works with mutables
+    // Assignment (regardless of constant or not)
+    if (asg->Operator == SSAInstrAssign::OpKind::Assign && asg->Operands.size() == 1)
+        return asg->Operands.front();
 
     // Collect resolved operand constants
     std::vector<SSAValue> ops;
@@ -471,10 +475,6 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
     }
 
     // -- This section is only reached when all operands are constant!
-
-    // Assignment
-    if (asg->Operator == SSAInstrAssign::OpKind::Assign && ops.size() == 1)
-        return ops.front();
 
     // Swizzle xyzw
     if (asg->Operator == SSAInstrAssign::OpKind::Swizzle && ops.size() == 1)
