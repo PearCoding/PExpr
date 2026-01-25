@@ -520,7 +520,7 @@ bool SSCPConstantFolder::replaceOperandIfConst(InstructionList& instructions)
     for (auto& instrPtr : instructions) {
         if (!instrPtr)
             continue;
-        instrPtr->forEachValue([&](SSAValue& val) {
+        instrPtr->forEachOperand([&](SSAValue& val) {
             if (replaceOperandIfConst(val))
                 changed = true;
         });
