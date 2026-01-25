@@ -96,8 +96,8 @@ bool SSAOptimizer::processBody(InstructionList& body)
     if (mConstantFolder->replaceOperandIfConst(body))
         changed = true;
 
-    // 2) Try to fold assignments into constants
-    if (mOptions.EnableConstantFolding) {
+    // 2) Try to fold assignments into constants. This requires dead code removal, or it will just go on for ever.
+    if (mOptions.EnableConstantFolding && mOptions.RemoveDeadCode) {
         if (mConstantFolder->foldToConstants(mOptions.EnableConstantFoldingNumber, body))
             changed = true;
     }

@@ -14,26 +14,9 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
 
     // Clear previous state
     mExpressionMap.clear();
-    mValueHashes.clear();
 
     bool changed = false;
 
-    // First pass: compute hashes for all values
-    std::ranges::for_each(std::ranges::subrange(begin, end), [this](const auto& instrPtr) {
-        // Compute hash for the instruction if it produces a value
-        if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
-            if (auto hash = hashInstruction(asg))
-                mValueHashes[asg->Target.name()] = *hash;
-        } else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
-            if (auto hash = hashInstruction(call))
-                mValueHashes[call->Target.name()] = *hash;
-        } else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
-            // Skip phi nodes (they're too complex for CSE and handled by PRE)
-            PEXPR_UNUSED(phi);
-        }
-    });
-
-    // Second pass: eliminate common subexpressions
     for (auto it = begin; it != end; ++it) {
         auto& instrPtr = *it;
         if (!instrPtr)
@@ -48,7 +31,7 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
         }
 
         // Get hash for this instruction
-        std::optional<ExpressionHash> currentHash;
+        std::vector<ExpressionHash> currentHashes;
         std::string targetName;
 
         if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get())) {
@@ -56,51 +39,68 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
             if (asg->Operator == SSAInstrAssign::OpKind::Assign)
                 continue;
 
-            currentHash = hashInstruction(asg);
-            targetName  = asg->Target.name();
+            const auto hash = hashInstruction(asg);
+            if (hash) {
+                currentHashes.push_back(*hash);
+
+                // Check for commutativity stuff
+                if (asg->Operator == SSAInstrAssign::OpKind::Binary) {
+                    if (asg->BinaryOp == BinaryOperation::Add
+                        || asg->BinaryOp == BinaryOperation::Mul
+                        || asg->BinaryOp == BinaryOperation::And
+                        || asg->BinaryOp == BinaryOperation::Or
+                        || asg->BinaryOp == BinaryOperation::Equal
+                        || asg->BinaryOp == BinaryOperation::NotEqual) {
+                        SSAInstrAssign copy = *asg;
+                        std::swap(copy.Operands[0], copy.Operands[1]);
+                        const auto cumHash = hashInstruction(&copy);
+                        if (cumHash)
+                            currentHashes.push_back(*cumHash);
+                    }
+                }
+            }
+            targetName = asg->Target.name();
         } else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
             // Skip calls with side effects
             if (sideEffectedFunctions.contains(call->FunctionName))
                 continue;
 
-            currentHash = hashInstruction(call);
-            targetName  = call->Target.name();
+            const auto hash = hashInstruction(call);
+            if (hash)
+                currentHashes.push_back(*hash);
+            targetName = call->Target.name();
         } else if (const auto phi = dynamic_cast<const SSAInstrPhi*>(instrPtr.get())) {
             // Skip phi nodes (they're too complex for CSE and handled by PRE)
             PEXPR_UNUSED(phi);
             continue;
         }
 
-        if (!currentHash)
-            continue;
+        for (const auto hash : currentHashes) {
+            // Check if we've seen this expression before
+            if (const auto itMap = mExpressionMap.find(hash); itMap != mExpressionMap.end()) {
+                // Found a duplicate expression! Replace with reference to previous result
+                const SSAValue& existingValue = itMap->second;
 
-        // Check if we've seen this expression before
-        if (const auto itMap = mExpressionMap.find(*currentHash); itMap != mExpressionMap.end()) {
-            // Found a duplicate expression! Replace with reference to previous result
-            const SSAValue& existingValue = itMap->second;
+                // Don't replace with ourselves
+                if (!existingValue.isConstant() && existingValue.name() == targetName)
+                    continue;
 
-            // Don't replace with ourselves
-            if (!existingValue.isConstant() && existingValue.name() == targetName)
-                continue;
+                // Create a new assignment: target = existingValue
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = SSAValue::Named(targetName, existingValue.type());
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { existingValue };
 
-            // Create a new assignment: target = existingValue
-            auto newAsg      = std::make_shared<SSAInstrAssign>();
-            newAsg->Target   = SSAValue::Named(targetName, existingValue.type());
-            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
-            newAsg->Operands = { existingValue };
-
-            // Update our maps
-            mValueHashes[targetName] = *currentHash;
-
-            // Replace instruction
-            instrPtr = std::move(newAsg);
-            changed  = true;
-        } else {
-            // First time seeing this expression, add to map
-            if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
-                mExpressionMap[*currentHash] = asg->Target;
-            else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
-                mExpressionMap[*currentHash] = call->Target;
+                // Replace instruction
+                instrPtr = std::move(newAsg);
+                changed  = true;
+            } else {
+                // First time seeing this expression, add to map
+                if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
+                    mExpressionMap[hash] = asg->Target;
+                else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
+                    mExpressionMap[hash] = call->Target;
+            }
         }
     }
 

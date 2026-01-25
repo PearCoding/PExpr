@@ -543,7 +543,7 @@ bool SSCPConstantFolder::foldToConstants(bool foldNumber, InstructionList& body)
                 lit.Operator = SSAInstrAssign::OpKind::Assign;
                 lit.Operands = { *folded };
                 *asg         = std::move(lit);
-                changed      = true;
+                changed      = !lit.isEquivalent(asg);
             }
         }
     });

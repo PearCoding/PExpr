@@ -49,9 +49,6 @@ private:
     /// Map from expression hash to the SSA value that computes it
     std::unordered_map<ExpressionHash, SSAValue, ExpressionHash::Hash> mExpressionMap;
 
-    /// Map from variable name to its hash (for fast lookup)
-    std::unordered_map<std::string, ExpressionHash> mValueHashes;
-
     BasicBlockAnalyzer mBlockAnalyzer;
     const SSAOptions mOptions;
 };

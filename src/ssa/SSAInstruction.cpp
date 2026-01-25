@@ -81,6 +81,7 @@ bool SSAInstrAssign::isEquivalent(const SSAInstr* other) const
                 return false;
             break;
         default:
+            PEXPR_ASSERT(false, "Non exhaustive Operator check in isEquivalent");
             break;
         }
 
