@@ -82,7 +82,11 @@ struct SSAInstrCall : public SSAInstr {
 
 struct SSAInstrReturn : public SSAInstr {
     SSAValue Value;
-    [[nodiscard]] size_t hash(bool includeTargetName = true) const override { return Value.hash(includeTargetName); }
+    [[nodiscard]] size_t hash(bool includeTargetName = true) const override
+    {
+        PEXPR_UNUSED(includeTargetName);
+        return Value.hash(true);
+    }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override
     {
         if (const auto* otherReturn = dynamic_cast<const SSAInstrReturn*>(other))
@@ -117,7 +121,8 @@ struct SSAInstrBranch : public SSAInstr {
     std::string TargetLabel;
     [[nodiscard]] size_t hash(bool includeTargetName = true) const override
     {
-        size_t h = Condition.hash(includeTargetName);
+        PEXPR_UNUSED(includeTargetName);
+        size_t h = Condition.hash(true);
         h        = h * 31 + std::hash<std::string>{}(TargetLabel);
         return h;
     }
@@ -156,10 +161,10 @@ struct SSAInstrPhi : public SSAInstr {
         size_t h = Target.hash(includeTargetName);
         h        = h * 31 + std::hash<size_t>{}(Conditions.size());
         for (const auto& cond : Conditions)
-            h = h * 31 + cond.hash(includeTargetName);
+            h = h * 31 + cond.hash(true);
         h = h * 31 + std::hash<size_t>{}(Branches.size());
         for (const auto& branch : Branches)
-            h = h * 31 + branch.hash(includeTargetName);
+            h = h * 31 + branch.hash(true);
         return h;
     }
     [[nodiscard]] bool isEquivalent(const SSAInstr* other) const override

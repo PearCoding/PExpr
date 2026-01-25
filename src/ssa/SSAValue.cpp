@@ -17,7 +17,7 @@ std::string SSAValue::baseName() const
 size_t SSAValue::hash(bool includeName) const
 {
     size_t h = std::hash<int>{}(static_cast<bool>(isConstant()));
-    if (includeName)
+    if (includeName && !isConstant())
         h = h * 31 + std::hash<std::string>{}(name());
     h = h * 31 + std::hash<int>{}(static_cast<int>(type()));
 

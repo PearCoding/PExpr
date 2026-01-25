@@ -36,9 +36,10 @@ inline std::string makeMangledNameFromTypes(const std::string& name, std::span<c
         mangled += encodeElemType(t);
 
     // include closure chain locations (outermost first)
+    // but skip the global closure (which is identified by having no parent)
     if (currentClosure) {
         std::vector<std::string> parts;
-        for (const Closure* c = currentClosure; c != nullptr; c = c->parent()) {
+        for (const Closure* c = currentClosure; c->parent() != nullptr /* Stop at the global closure */; c = c->parent()) {
             const Location& l = c->location();
             std::stringstream ss;
             ss << "L" << l.line() << "C" << l.column();

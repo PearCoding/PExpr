@@ -25,7 +25,7 @@ public:
 
     inline void addIntrinsic(const FunctionDef& func, SSAIntrinsicInlineCallback callback)
     {
-        mIntrinsics.insert({ func.name(), FunctionInlinePair{ func, callback } });
+        mIntrinsics.insert({ func.mangledName(), FunctionInlinePair{ func, callback } });
     }
 
 private:

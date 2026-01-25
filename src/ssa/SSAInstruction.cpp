@@ -13,39 +13,39 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
     case OpKind::Unary:
         h = h * 31 + std::hash<int>{}(static_cast<int>(UnaryOp));
         if (!Operands.empty())
-            h = h * 31 + Operands[0].hash(includeTargetName);
+            h = h * 31 + Operands[0].hash(true);
         break;
     case OpKind::Binary:
         h = h * 31 + std::hash<int>{}(static_cast<int>(BinaryOp));
         if (Operands.size() >= 2) {
-            h = h * 31 + Operands[0].hash(includeTargetName);
-            h = h * 31 + Operands[1].hash(includeTargetName);
+            h = h * 31 + Operands[0].hash(true);
+            h = h * 31 + Operands[1].hash(true);
         }
         break;
     case OpKind::Swizzle:
         h = h * 31 + std::hash<std::string>{}(Swizzle);
         if (!Operands.empty())
-            h = h * 31 + Operands[0].hash(includeTargetName);
+            h = h * 31 + Operands[0].hash(true);
         break;
     case OpKind::Access:
         if (Operands.size() >= 2) {
-            h = h * 31 + Operands[0].hash(includeTargetName);
-            h = h * 31 + Operands[1].hash(includeTargetName);
+            h = h * 31 + Operands[0].hash(true);
+            h = h * 31 + Operands[1].hash(true);
         }
         break;
     case OpKind::Vector:
         h = h * 31 + std::hash<size_t>{}(Operands.size());
         for (const auto& op : Operands)
-            h = h * 31 + op.hash(includeTargetName);
+            h = h * 31 + op.hash(true);
         break;
     case OpKind::Cast:
         h = h * 31 + std::hash<int>{}(static_cast<int>(Target.type()));
         if (!Operands.empty())
-            h = h * 31 + Operands[0].hash(includeTargetName);
+            h = h * 31 + Operands[0].hash(true);
         break;
     case OpKind::Assign:
         if (!Operands.empty())
-            h = h * 31 + Operands[0].hash(includeTargetName);
+            h = h * 31 + Operands[0].hash(true);
         break;
     }
     return h;
@@ -97,6 +97,7 @@ bool SSAInstrAssign::isEquivalent(const SSAInstr* other) const
 size_t SSAInstrCall::hash(bool includeTargetName) const
 {
     size_t h = std::hash<std::string>{}(FunctionName);
+    h        = h * 31 + std::hash<std::string>{}(PublicFunctionName);
     h        = h * 31 + Target.hash(includeTargetName);
     h        = h * 31 + std::hash<size_t>{}(Arguments.size());
     for (const auto& arg : Arguments)
@@ -108,6 +109,8 @@ bool SSAInstrCall::isEquivalent(const SSAInstr* other) const
 {
     if (const auto* otherCall = dynamic_cast<const SSAInstrCall*>(other)) {
         if (FunctionName != otherCall->FunctionName)
+            return false;
+        if (PublicFunctionName != otherCall->PublicFunctionName)
             return false;
         if (Arguments.size() != otherCall->Arguments.size())
             return false;

@@ -18,7 +18,7 @@
 - [ ] Tail call optimization
 - [ ] Memory/register allocation optimizations
 - [ ] Most optimization ignore code blocks. Fix that by extracting basic blocks and applying on them. Only some passes should be applied to all blocks. 
-- [ ] Allow attributes for every statement and expression. Give intrinsics special names. 
+- [x] Allow attributes for every statement. Give intrinsics special names. 
 - [ ] Add loop expression (like https://zig.guide/language-basics/loops-as-expressions/)
 - [ ] Add loop statements
 - [ ] Add if statements

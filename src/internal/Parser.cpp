@@ -245,6 +245,9 @@ private:
             return attributes;
 
         do {
+            if (P.cur().Type != TokenType::Identifier)
+                break;
+
             const std::string attrName = std::get<std::string>(P.cur().Value);
             P.expect(TokenType::Identifier);
 

@@ -273,8 +273,7 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
             return false;
     }
 
-    const auto bound = mIntrinsics.equal_range(call->PublicFunctionName);
-
+    const auto bound = mIntrinsics.equal_range(call->FunctionName);
     for (auto it = bound.first; it != bound.second; ++it) {
         if (!it->second.Definition.isExtern())
             continue;
@@ -305,7 +304,27 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
         if (!constant.has_value())
             continue;
 
-        // TODO: Check if the expected return type and the type inside the variant match
+        // Check if the expected return type and the type inside the variant match
+        // TODO: Maybe refactor this to the ElementaryType stuff
+        const auto expectedType = it->second.Definition.returnType();
+        if (std::holds_alternative<bool>(*constant) && expectedType != ElementaryType::Boolean)
+            continue;
+
+        if (std::holds_alternative<Integer>(*constant) && expectedType != ElementaryType::Number && expectedType != ElementaryType::Integer)
+            continue;
+
+        if (std::holds_alternative<Number>(*constant) && expectedType != ElementaryType::Number)
+            continue;
+
+        if (std::holds_alternative<std::string>(*constant) && expectedType != ElementaryType::String)
+            continue;
+
+        if (std::holds_alternative<VecN>(*constant) && expectedType >= ElementaryType::Vec1) {
+            auto vecN                 = std::get_if<VecN>(&constant.value());
+            const size_t expectedSize = (size_t)expectedType - (size_t)ElementaryType::Vec1 + 1;
+            if (vecN->size() != expectedSize)
+                continue;
+        }
 
         // Replace the return statement and assign the return value of it to the target
         auto value = SSAValue(true, it->second.Definition.returnType(), constant.value());
