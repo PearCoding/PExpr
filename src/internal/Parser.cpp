@@ -159,6 +159,9 @@ private:
             } else if (P.accept(TokenType::Function)) {
                 // Function
                 closure->addStatement(p_function_statement(attrs));
+            } else if (P.accept(TokenType::Using)) {
+                // Type alias
+                closure->addStatement(p_type_alias_statement(attrs));
             } else if (P.cur(0).Type == TokenType::Identifier) {
                 if (P.cur(1).Type == TokenType::Assign) {
                     // Variable assignment
@@ -448,7 +451,7 @@ private:
     inline Ptr<Expression> p_postfix_expression()
     {
         auto expr = p_call_expression();
-        
+
         // Loop to handle chained postfix operators
         while (true) {
             if (P.cur().Type == TokenType::Dot) {
@@ -469,7 +472,7 @@ private:
                 // Use the expression's original location for the cast node
                 const auto loc    = expr->location();
                 const auto toType = p_type();
-                expr = std::make_shared<CastExpression>(loc, toType, expr);
+                expr              = std::make_shared<CastExpression>(loc, toType, expr);
                 continue;
             }
 
@@ -655,22 +658,45 @@ private:
             return {};
     }
 
+    inline Ptr<Statement> p_type_alias_statement(const AttributeList& attrs)
+    {
+        PEXPR_UNUSED(attrs);
+
+        const auto loc              = P.cur().Location;
+        const std::string aliasName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
+        P.expect(TokenType::Identifier);
+        P.expect(TokenType::Assign);
+        const auto aliasedType = p_type();
+        P.expect(TokenType::Semicolon);
+
+        // Register the type alias in the current symbol table
+        if (mCurrentClosure) {
+            if (!mCurrentClosure->symbols().addTypeAlias(aliasName, aliasedType)) {
+                P.signalError();
+                P.mReporter.errorf(loc, "Type alias '%s' already defined in the current scope", aliasName.c_str());
+            }
+        }
+
+        return std::make_shared<TypeAliasStatement>(loc, aliasName, aliasedType);
+    }
+
     inline Type p_type()
     {
-        switch (P.cur().Type) {
-        case TokenType::BooleanType:
+        // First check if it's an identifier (could be a type alias)
+        if (P.cur().Type == TokenType::Identifier) {
+            const std::string name = std::get<std::string>(P.cur().Value);
             P.next();
-            return Type(TypeKind::Boolean);
-        case TokenType::IntegerType:
-            P.next();
-            return Type(TypeKind::Integer);
-        case TokenType::NumberType:
-            P.next();
-            return Type(TypeKind::Number);
-        case TokenType::StringType:
-            P.next();
-            return Type(TypeKind::String);
-        case TokenType::OpenSquareBracket: {
+
+            // Try to resolve as a type alias from the current symbol table
+            if (mCurrentClosure) {
+                if (const auto alias = mCurrentClosure->symbols().lookupTypeAlias(name); alias.has_value())
+                    return *alias;
+            }
+
+            // Not a known type alias
+            P.mReporter.errorf(P.cur().Location, "Unknown type name '%s'", name.c_str());
+            return Type(TypeKind::Error);
+        } else if (P.cur().Type == TokenType::OpenSquareBracket) {
             // Tuple type: [T1, T2, ...]
             P.expect(TokenType::OpenSquareBracket);
             std::vector<Type> components;
@@ -686,16 +712,9 @@ private:
                 return Type(TypeKind::Error);
             }
             return Type(std::move(components));
-        }
-        default:
-            if (P.cur().Type >= TokenType::Vec1Type) {
-                size_t vecSize = P.cur().arraySize();
-                P.next();
-                return Type::AsVector(vecSize);
-            } else {
-                P.error(std::to_array<TokenType>({ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType, TokenType::StringType, TokenType::OpenSquareBracket }));
-                return Type(TypeKind::Error);
-            }
+        } else {
+            P.error(std::to_array<TokenType>({ TokenType::Identifier, TokenType::OpenSquareBracket }));
+            return Type(TypeKind::Error);
         }
     }
 };

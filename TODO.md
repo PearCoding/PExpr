@@ -24,6 +24,6 @@
 - [ ] Add if statements
 - [x] Refactor code to use std::ranges if applicable
 - [x] Add SSA IR serialization with write and read functionality
-- [ ] Add support for tuples
-- [ ] Add support for type alias (needed for tuples)
+- [x] Add support for tuples
+- [x] Add support for type alias (needed for tuples)
 - [ ] To add more statement types the rule of mutability for closures must be rewritten. Extend lambda uplifting to work with mutable variables, by explicitly tracking them and updating them at the end of a SSA call.

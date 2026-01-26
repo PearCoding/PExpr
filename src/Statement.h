@@ -100,4 +100,18 @@ private:
     const Ptr<Closure> mClosure;
     const bool mHasSideEffects;
 };
+
+class TypeAliasStatement : public Statement {
+public:
+    TypeAliasStatement(const Location& loc, const std::string& name, const Type& aliasedType)
+        : Statement(loc, name, StatementType::TypeAlias)
+        , mAliasedType(aliasedType)
+    {
+    }
+
+    [[nodiscard]] inline const Type& aliasedType() const { return mAliasedType; }
+
+private:
+    const Type mAliasedType;
+};
 } // namespace PExpr

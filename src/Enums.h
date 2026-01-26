@@ -49,6 +49,7 @@ enum class StatementType {
     VariableDeclaration, /// New declaration of a variable
     VariableAssignment,  /// Update of a variable
     FunctionDeclaration, /// New declaration of a function
+    TypeAlias,           /// Type alias declaration using 'using'
 };
 
 /// Returns printable representation of the given operation.

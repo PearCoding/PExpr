@@ -1,0 +1,59 @@
+// Test file for type aliases using the 'using' keyword
+
+// Basic type aliases
+using MyInt = int;
+using MyNum = num;
+using MyBool = bool;
+using MyStr = str;
+
+let x: MyInt = 42;
+let y: MyNum = 3.14;
+let z: MyBool = true;
+let s: MyStr = "hello";
+
+// Tuple type aliases
+using Pair = [num, int];
+using Triple = [bool, str, num];
+
+let p: Pair = [2.71, 7];
+let t: Triple = [false, "test", 1.618];
+
+// Vector type aliases (using built-in vec2, vec3, vec4)
+using Vector2 = vec2;
+using Vector3 = vec3;
+using Vector4 = vec4;
+
+let v2: Vector2 = [1.0, 2.0];
+let v3: Vector3 = [1.0, 2.0, 3.0];
+let v4: Vector4 = [1.0, 2.0, 3.0, 4.0];
+
+// Complex nested type aliases
+using Matrix2x2 = [vec2, vec2];
+using IntPair = [int, int];
+
+let m: Matrix2x2 = [[1.0, 2.0], [3.0, 4.0]];
+let ip: IntPair = [5, 10];
+
+// Type aliases can be used in function signatures
+fn addPair(a: Pair, b: Pair) -> Pair = [a[0] + b[0], a[1] + b[1]];
+fn identity(x: MyInt) -> MyInt = x;
+
+// Elementary types can be used as function names
+fn int(x: num) -> int = x as int;
+fn num(x: int) -> num = x as num;
+fn bool(x: int) -> bool = x > 0;
+fn str(x: str) -> str = x;
+
+// Test function calls with type aliases
+let result1 = addPair([1.0, 2], [3.0, 4]);
+let result2 = identity(100);
+let result3 = int(3.14);
+let result4 = num(42);
+let result5 = bool(10);
+let result6 = str("world");
+
+// Type aliases in variable declarations with explicit types
+let explicit: Pair = [result3 as num, result4 as int];
+
+// Return final expression
+result1[0] + result2 as num + explicit[1] as num

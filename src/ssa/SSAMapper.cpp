@@ -122,6 +122,9 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
 
         program.Functions.push_back(std::move(func));
     } break;
+    case StatementType::TypeAlias:
+        // Type aliases are compile-time only, nothing to map
+        break;
     default:
         PEXPR_ASSERT(false, "unsupported statement type");
         break;

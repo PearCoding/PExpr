@@ -22,6 +22,8 @@ public:
             return dump(std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement));
         case StatementType::FunctionDeclaration:
             return dump(std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement));
+        case StatementType::TypeAlias:
+            return dump(std::reinterpret_pointer_cast<TypeAliasStatement>(statement));
         default:
             return "ERROR";
         }
@@ -207,6 +209,13 @@ private:
         }
 
         stream << "]";
+        return stream.str();
+    }
+
+    static std::string dump(const Ptr<TypeAliasStatement>& statement)
+    {
+        std::stringstream stream;
+        stream << "using " << statement->name() << " = " << statement->aliasedType().toString() << ";";
         return stream.str();
     }
 };

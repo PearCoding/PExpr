@@ -14,9 +14,8 @@ TokenType enum defines all possible tokens:
 - Punctuation: Comma (,), Colon (:), Semicolon (;), Assign (=), ArrowRight (->),
                OpenParentheses ((), ClosedParentheses ()), OpenBraces ({), ClosedBraces (}),
                OpenSquareBracket ([), ClosedSquareBracket (])
-- Keywords: If, Elif, Else, As, Let, Mutable, Function (fn)
-- Type keywords: BooleanType (bool), IntegerType (int), NumberType (num), 
-                StringType (str), Vec1Type (vec1) through Vec4Type (vec4)
+- Keywords: If, Elif, Else, As, Let, Mutable, Function (fn), Using
+- Predefined type names: bool, int, num, str, vec1, vec2, vec3, vec4
 
 Comments: Line comments start with `//`, block comments are `/* ... */`
 
@@ -37,7 +36,9 @@ There are two kinds of statements handled inside a closure:
 - variable_statement (mutable or immutable)
 - function_statement (extern or intern, with attributes)
 
-statement ::= variable_statement | function_statement
+statement ::= variable_statement | function_statement | type_alias_statement
+
+type_alias_statement ::= 'using' Identifier '=' type ';'
 
 Attributes
 ----------
@@ -138,17 +139,21 @@ primary_expression ::=
 
 Types
 -----
-type ::= elementary_type | tuple_type
+type ::= Identifier | '[' type ( ',' type )+ ']'
 
-elementary_type ::= 'bool'
-                  | 'int'
-                  | 'num'
-                  | 'str'
-                  | 'vec1' | 'vec2' | 'vec3' | 'vec4'
+Note: Elementary types (bool, int, num, str) and vector types (vec1, vec2, vec3, vec4) are predefined type aliases
+in the global symbol table. They can be used as identifiers for function names.
 
-tuple_type ::= '[' type ( ',' type )+ ']'
+Type aliases
+------------
+type_alias_statement ::= 'using' Identifier '=' type ';'
 
-Note: vecN is syntactic sugar for [num, num, ...] (N times)
+Examples:
+- `using MyInt = int;`
+- `using Pair = [num, int];`
+- `using Vector2 = vec2;`
+
+The SymbolTable contains default type aliases for: bool, int, num, str, vec1, vec2, vec3, vec4.
 
 Additional parser behavior notes
 --------------------------------

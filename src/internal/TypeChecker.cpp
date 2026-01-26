@@ -26,14 +26,16 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
     // Preregister functions in this closure
     for (const auto& statement : closure->statements()) {
-        if (statement->type() != StatementType::FunctionDeclaration)
-            continue;
+        if (statement->type() == StatementType::FunctionDeclaration) {
+            const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
-        const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
-
-        // Pre-register a provisional function definition
-        if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
-            mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+            // Pre-register a provisional function definition
+            if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
+                mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+        } else if (statement->type() == StatementType::TypeAlias) {
+            // Type aliases are already registered by the parser immediately
+            // No need to re-register here
+        }
     }
 
     for (const auto& statement : closure->statements())

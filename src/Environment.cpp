@@ -12,6 +12,7 @@ Environment::Environment()
     : mGlobals()
     , mReporter()
 {
+    mGlobals.addDefaultTypeAliases();
 }
 
 Environment::~Environment()

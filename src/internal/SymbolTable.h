@@ -22,6 +22,18 @@ public:
 
     inline static SymbolTable Connect(const SymbolTable* parent) { return SymbolTable(parent); }
 
+    inline void addDefaultTypeAliases()
+    {
+        addTypeAlias("bool", Type(TypeKind::Boolean));
+        addTypeAlias("int", Type(TypeKind::Integer));
+        addTypeAlias("num", Type(TypeKind::Number));
+        addTypeAlias("str", Type(TypeKind::String));
+        addTypeAlias("vec1", Type::AsVector(1));
+        addTypeAlias("vec2", Type::AsVector(2));
+        addTypeAlias("vec3", Type::AsVector(3));
+        addTypeAlias("vec4", Type::AsVector(4));
+    }
+
     inline bool addVariable(VariableDef&& var)
     {
         if (mVariables.contains(var.name()))
@@ -30,6 +42,24 @@ public:
         const std::string name = var.name();
         mVariables.emplace(name, std::move(var));
         return true;
+    }
+
+    inline bool addTypeAlias(const std::string& name, const Type& type)
+    {
+        if (mTypeAliases.contains(name))
+            return false;
+
+        mTypeAliases.emplace(name, type);
+        return true;
+    }
+
+    [[nodiscard]] inline std::optional<Type> lookupTypeAlias(const std::string& name) const
+    {
+        if (const auto it = mTypeAliases.find(name); it != mTypeAliases.end()) {
+            return it->second;
+        }
+
+        return mParent ? mParent->lookupTypeAlias(name) : std::nullopt;
     }
 
     [[nodiscard]] inline std::optional<VariableDef> lookupVariable(const Location& loc, const std::string& name, const SymbolTable** tbl = nullptr) const
@@ -165,5 +195,6 @@ private:
     const SymbolTable* mParent;
     std::unordered_map<std::string, VariableDef> mVariables;
     std::unordered_multimap<std::string, FunctionDef> mFunctions;
+    std::unordered_map<std::string, Type> mTypeAliases;
 };
 } // namespace PExpr::internal

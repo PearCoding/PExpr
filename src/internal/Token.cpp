@@ -5,12 +5,8 @@ std::string Token::toString(TokenType type)
 {
     switch (type) {
     default:
-        if (type >= TokenType::Vec1Type)
-            return std::string("vec") + std::to_string(Token::arraySize(type));
-        else {
-            PEXPR_ASSERT(false, "Invalid token type enum");
-            return "ERROR";
-        }
+        PEXPR_ASSERT(false, "Invalid token type enum");
+        return "ERROR";
     case TokenType::Error:
         return "Error";
     case TokenType::Eof:
@@ -93,14 +89,8 @@ std::string Token::toString(TokenType type)
         return "mut";
     case TokenType::Function:
         return "fn";
-    case TokenType::BooleanType:
-        return "bool";
-    case TokenType::IntegerType:
-        return "int";
-    case TokenType::NumberType:
-        return "num";
-    case TokenType::StringType:
-        return "str";
+    case TokenType::Using:
+        return "using";
     }
 }
 } // namespace PExpr::internal

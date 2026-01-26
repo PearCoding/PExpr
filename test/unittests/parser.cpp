@@ -3,13 +3,14 @@
 #include <string>
 
 #include "StringVisitor.h"
+#include "Type.h"
 #include "internal/Lexer.h"
 #include "internal/Parser.h"
 
 using namespace PExpr;
 using namespace PExpr::internal;
 
-inline static auto parseOnly(std::string_view str)
+inline static auto parseOnly(std::string_view str, bool shouldPass = true)
 {
     Reporter reporter;
     reporter.setQuiet(true);
@@ -17,9 +18,10 @@ inline static auto parseOnly(std::string_view str)
     internal::Lexer lexer(stream, reporter);
     internal::Parser parser(lexer, reporter);
     internal::SymbolTable globals;
+    globals.addDefaultTypeAliases();
     auto ast = parser.parse(&globals);
 
-    REQUIRE(!parser.hasError());
+    REQUIRE(parser.hasError() != shouldPass);
     return ast;
 }
 
@@ -104,6 +106,36 @@ TEST_CASE("Parser: attributes before fn keyword", "[parser]")
         auto ast              = parseOnly("[[name=\"test\", extern=true]] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
+    }
+}
+
+TEST_CASE("Parser: type alias declarations", "[parser]")
+{
+    SECTION("Simple type alias")
+    {
+        auto ast              = parseOnly("using MyInt = int; let x: MyInt = 42; x");
+        const std::string out = StringVisitor::visit(ast);
+        REQUIRE(out.find("using MyInt = int;") != std::string::npos);
+        REQUIRE(out.find("x:int = 42;") != std::string::npos);
+    }
+
+    SECTION("Tuple type alias")
+    {
+        auto ast              = parseOnly("using Pair = [num, int]; let p: Pair = [3.14, 5]; p");
+        const std::string out = StringVisitor::visit(ast);
+        REQUIRE(out.find("using Pair = [num, int];") != std::string::npos);
+    }
+
+    SECTION("Vector type alias")
+    {
+        auto ast              = parseOnly("using V2 = vec2; let v: V2 = [1.0, 2.0]; v");
+        const std::string out = StringVisitor::visit(ast);
+        REQUIRE(out.find("using V2 = vec2;") != std::string::npos);
+    }
+
+    SECTION("Type alias shadowing")
+    {
+        parseOnly("using T = int; using T = num;", false);
     }
 }
 
