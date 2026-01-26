@@ -574,7 +574,7 @@ private:
 
         // [ ... ]
         if (P.accept(TokenType::OpenSquareBracket)) {
-            auto expr = p_vector_expression();
+            auto expr = p_tuple_expression();
             P.expect(TokenType::ClosedSquareBracket);
             return expr;
         }
@@ -582,7 +582,7 @@ private:
         return p_primary_expression();
     }
 
-    inline Ptr<Expression> p_vector_expression()
+    inline Ptr<Expression> p_tuple_expression()
     {
         const auto loc = P.cur().Location;
         std::vector<Ptr<Expression>> vector;
@@ -592,12 +592,12 @@ private:
             vector.push_back(expr);
         } while (P.accept(TokenType::Comma));
 
-        if (vector.size() < 2 || vector.size() > 4) {
+        if (vector.size() == 0) {
             P.signalError();
-            P.mReporter.errorf(loc, "Invalid size vector of %zu given", vector.size());
+            P.mReporter.errorf(loc, "Invalid empty tuple given");
         }
 
-        return std::make_shared<VectorExpression>(loc, std::move(vector));
+        return std::make_shared<TupleExpression>(loc, std::move(vector));
     }
 
     inline Ptr<Expression> p_primary_expression()

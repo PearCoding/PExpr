@@ -30,7 +30,7 @@ private:
     [[nodiscard]] Type handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpression>& expr);
     [[nodiscard]] Type handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr);
     [[nodiscard]] Type handleNode(const Ptr<Closure>& closure, const Ptr<CastExpression>& expr);
-    [[nodiscard]] Type handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr);
+    [[nodiscard]] Type handleNode(const Ptr<Closure>& closure, const Ptr<TupleExpression>& expr);
 
     Reporter& mReporter;
 };

@@ -161,8 +161,8 @@ void UpliftPass::collectCapturesFromExpression(const Ptr<Closure>& funcClosure, 
         const auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
         collectCapturesFromExpression(funcClosure, closure, c->inner(), outCaptured);
     } break;
-    case ExpressionType::Vector: {
-        const auto v = std::reinterpret_pointer_cast<VectorExpression>(expr);
+    case ExpressionType::Tuple: {
+        const auto v = std::reinterpret_pointer_cast<TupleExpression>(expr);
         for (const auto& e : v->entries())
             collectCapturesFromExpression(funcClosure, closure, e, outCaptured);
     } break;
@@ -236,8 +236,8 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Func
         const auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
         updateCallsInExpression(c->inner(), oldDef, newDef);
     } break;
-    case ExpressionType::Vector: {
-        const auto v = std::reinterpret_pointer_cast<VectorExpression>(expr);
+    case ExpressionType::Tuple: {
+        const auto v = std::reinterpret_pointer_cast<TupleExpression>(expr);
         for (const auto& e : v->entries())
             updateCallsInExpression(e, oldDef, newDef);
     } break;

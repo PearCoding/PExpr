@@ -41,7 +41,7 @@ enum class ExpressionType {
     Cast,     /// Implicit/explicit cast expression.
     Closure,  /// An enclosed closure
     Branch,   /// If, elif and else block
-    Vector,   /// Vector [x,y,z,w]
+    Tuple,    /// Vector [x,y,z,w]
 };
 
 enum class StatementType {

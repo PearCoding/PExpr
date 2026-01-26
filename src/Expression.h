@@ -326,19 +326,19 @@ private:
 };
 
 /// Basic vector construction [ a, b, c, d ]
-class VectorExpression : public Expression {
+class TupleExpression : public Expression {
 public:
-    inline VectorExpression(const Location& loc, const std::vector<Ptr<Expression>>& entries)
-        : Expression(loc, ExpressionType::Vector)
+    inline TupleExpression(const Location& loc, const std::vector<Ptr<Expression>>& entries)
+        : Expression(loc, ExpressionType::Tuple)
         , mEntries(entries)
     {
-        PEXPR_ASSERT(mEntries.size() >= 2 && mEntries.size() <= 4, "Expected valid sized entries for vector expression");
+        PEXPR_ASSERT(mEntries.size() >= 1, "Expected valid sized entries for tuple expression");
     }
-    inline VectorExpression(const Location& loc, std::vector<Ptr<Expression>>&& entries)
-        : Expression(loc, ExpressionType::Vector)
+    inline TupleExpression(const Location& loc, std::vector<Ptr<Expression>>&& entries)
+        : Expression(loc, ExpressionType::Tuple)
         , mEntries(std::move(entries))
     {
-        PEXPR_ASSERT(mEntries.size() >= 2 && mEntries.size() <= 4, "Expected valid sized entries for vector expression");
+        PEXPR_ASSERT(mEntries.size() >= 1, "Expected valid sized entries for tuple expression");
     }
 
     [[nodiscard]] inline const std::vector<Ptr<Expression>> entries() const { return mEntries; }

@@ -189,8 +189,8 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>&
         return handleNode(closure, std::reinterpret_pointer_cast<SwizzleExpression>(expr));
     case ExpressionType::Access:
         return handleNode(closure, std::reinterpret_pointer_cast<AccessExpression>(expr));
-    case ExpressionType::Vector:
-        return handleNode(closure, std::reinterpret_pointer_cast<VectorExpression>(expr));
+    case ExpressionType::Tuple:
+        return handleNode(closure, std::reinterpret_pointer_cast<TupleExpression>(expr));
     case ExpressionType::Cast:
         return handleNode(closure, std::reinterpret_pointer_cast<CastExpression>(expr));
     case ExpressionType::Closure:
@@ -540,15 +540,14 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpres
     return expr->returnType();
 }
 
-Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<TupleExpression>& expr)
 {
     if (expr->entries().size() == 0) {
         mReporter.errorf(expr->location(), "Can not create an empty vector");
         return Type(TypeKind::Error);
     }
 
-    // Ensure each entry is type-checked and, if necessary, inject an implicit
-    // CastExpression to Number so downstream passes (SSA) see explicit casts.
+    // Ensure each entry is type-checked.
     std::vector<Type> innerTypes;
     for (size_t i = 0; i < expr->entries().size(); ++i) {
         auto orig        = expr->entries().at(i);
@@ -557,40 +556,6 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpres
             return pType; // Error handled somewhere else
 
         innerTypes.push_back(pType);
-    }
-
-    bool convertibleToVector = true;
-    for (const auto& type : innerTypes) {
-        if (!isConvertible(type, TypeKind::Number)) {
-            convertibleToVector = false;
-            break;
-        }
-    }
-
-    if (convertibleToVector) {
-        for (size_t i = 0; i < expr->entries().size(); ++i) {
-            auto orig        = expr->entries().at(i);
-            const auto pType = innerTypes.at(i);
-
-            // Allow implicit conversion to Number (e.g. Integer -> Number) by injecting a cast.
-            if (isConvertible(pType, TypeKind::Number)) {
-                ReportType rt = RT_WARNING_IMPLICIT_CAST;
-                // Special case: `int` literal for a `num` parameter
-                if (pType.kind() == TypeKind::Integer)
-                    rt = RT_WARNING_IMPLICIT_CAST_INT;
-
-                mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for vector parameter %zu", pType.toString().data(), Type(TypeKind::Number).toString().data(), i);
-
-                auto castExpr = std::make_shared<CastExpression>(orig->location(), Type(TypeKind::Number), orig, false);
-                expr->replaceEntry(i, castExpr);
-
-                innerTypes[i] = Type(TypeKind::Number);
-                continue;
-            }
-
-            mReporter.errorf(orig->location(), "Expected vector values to be convertible to '%s'", Type(TypeKind::Number).toString().data());
-            return Type(TypeKind::Error);
-        }
     }
 
     expr->setReturnType(Type(innerTypes));

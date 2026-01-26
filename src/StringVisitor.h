@@ -44,8 +44,8 @@ public:
             return dump(std::reinterpret_pointer_cast<SwizzleExpression>(expr));
         case ExpressionType::Access:
             return dump(std::reinterpret_pointer_cast<AccessExpression>(expr));
-        case ExpressionType::Vector:
-            return dump(std::reinterpret_pointer_cast<VectorExpression>(expr));
+        case ExpressionType::Tuple:
+            return dump(std::reinterpret_pointer_cast<TupleExpression>(expr));
         case ExpressionType::Cast:
             return dump(std::reinterpret_pointer_cast<CastExpression>(expr));
         case ExpressionType::Closure:
@@ -196,7 +196,7 @@ private:
         return stream.str();
     }
 
-    static std::string dump(const Ptr<VectorExpression>& expr)
+    static std::string dump(const Ptr<TupleExpression>& expr)
     {
         std::stringstream stream;
 

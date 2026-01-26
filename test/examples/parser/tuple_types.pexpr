@@ -1,0 +1,67 @@
+// Tuple type tests
+let simpleTuple: [int, num] = [1, 2.5];
+let vec3: vec3 = [1.0, 2.0, 3.0];
+let nestedTuple: [bool, [int, num]] = [true, [42, 3.14]];
+let heterogeneous: [bool, int, num, str] = [false, 10, 2.718, "hello"];
+
+// Tuple type inference
+let inferred = [true, 5, 3.14, "world"];
+
+// Empty tuple (should error)
+// let empty: [] = []; // Not allowed
+
+// Single element tuple
+let singleton: [int] = [100];
+
+// Vector as homogeneous tuple of numbers
+let vec2: vec2 = [1.0, 2.0];
+let vec4: vec4 = [1.0, 2.0, 3.0, 4.0];
+
+// Tuple access
+let first = simpleTuple[0];
+let second = simpleTuple[1];
+
+// Nested tuple access
+let inner = nestedTuple[1];
+let innerFirst = nestedTuple[1][0];
+let innerSecond = nestedTuple[1][1];
+
+// Type annotations with complex types
+fn tupleParam(p: [bool, int]) -> num {
+    if p[0] {
+        p[1] as num
+    } else {
+        0.0
+    }
+}
+
+fn returnTuple() -> [int, num] {
+    [42, 3.14]
+}
+
+// Test calling with tuple
+let result = tupleParam([true, 5]);
+let returned = returnTuple();
+
+// Vector operations
+let vecA: vec3 = [1.0, 2.0, 3.0];
+let vecB: vec3 = [4.0, 5.0, 6.0];
+let scalar = 2.0;
+
+// Vector addition
+let vecSum = vecA + vecB;
+
+// Vector scalar multiplication
+let scaled = vecA * scalar;
+
+// Vector swizzle
+let xy = vecA.xy;
+let xyz = vecA.xyz;
+
+// Tuple conversions
+let intToNum: num = 5; // implicit conversion
+let tupleConversion: [num, num] = [1, 2]; // implicit conversion of ints to nums
+
+// Explicit casts
+let explicitCast = (5 as num);
+let tupleCast = ([1, 2] as [num, num]);

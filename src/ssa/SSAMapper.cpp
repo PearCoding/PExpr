@@ -174,8 +174,8 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             result = SSAValue::Named(v->name(), v->returnType());
         }
     } break;
-    case ExpressionType::Vector: {
-        auto v = std::reinterpret_pointer_cast<VectorExpression>(expr);
+    case ExpressionType::Tuple: {
+        auto v = std::reinterpret_pointer_cast<TupleExpression>(expr);
         std::vector<SSAValue> inners;
         inners.reserve(v->entries().size());
         for (const auto& e : v->entries())

@@ -60,7 +60,7 @@ public:
             tuple->elements.push_back(v[i]);
         }
 
-        return SSAValue(true, Type(innerTypes), tuple);
+        return SSAValue(true, Type(std::move(innerTypes)), std::move(tuple));
     }
 
 private:
