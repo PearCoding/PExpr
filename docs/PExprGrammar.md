@@ -15,7 +15,7 @@ TokenType enum defines all possible tokens:
                OpenParentheses ((), ClosedParentheses ()), OpenBraces ({), ClosedBraces (}),
                OpenSquareBracket ([), ClosedSquareBracket (])
 - Keywords: If, Elif, Else, As, Let, Mutable, Function (fn), Using
-- Predefined type names: bool, int, num, str, vec1, vec2, vec3, vec4
+- Predefined type names: bool, int, num, str, vec2, vec3, vec4
 
 Comments: Line comments start with `//`, block comments are `/* ... */`
 
@@ -141,7 +141,7 @@ Types
 -----
 type ::= Identifier | '[' type ( ',' type )+ ']'
 
-Note: Elementary types (bool, int, num, str) and vector types (vec1, vec2, vec3, vec4) are predefined type aliases
+Note: Elementary types (bool, int, num, str) and vector types (vec2, vec3, vec4) are predefined type aliases
 in the global symbol table. They can be used as identifiers for function names.
 
 Type aliases
@@ -153,7 +153,7 @@ Examples:
 - `using Pair = [num, int];`
 - `using Vector2 = vec2;`
 
-The SymbolTable contains default type aliases for: bool, int, num, str, vec1, vec2, vec3, vec4.
+The SymbolTable contains default type aliases for: bool, int, num, str, vec2, vec3, vec4.
 
 Additional parser behavior notes
 --------------------------------

@@ -142,19 +142,16 @@ TEST_CASE("SSASerializer: parseType handles vector types", "[serializer]")
     REQUIRE(SSASerializer::parseType("str").kind() == TypeKind::String);
     REQUIRE(SSASerializer::parseType("invalid").kind() == TypeKind::Unspecified);
 
-    // Test vector types - they should be calculated relative to Vec1
-    const auto vec1 = SSASerializer::parseType("vec1");
+    // Test vector types
     const auto vec2 = SSASerializer::parseType("vec2");
     const auto vec3 = SSASerializer::parseType("vec3");
     const auto vec4 = SSASerializer::parseType("vec4");
 
-    REQUIRE(vec1.isVector());
     REQUIRE(vec2.isVector());
     REQUIRE(vec3.isVector());
     REQUIRE(vec4.isVector());
 
     // Verify size works correctly
-    REQUIRE(vec1.size() == 1);
     REQUIRE(vec2.size() == 2);
     REQUIRE(vec3.size() == 3);
     REQUIRE(vec4.size() == 4);

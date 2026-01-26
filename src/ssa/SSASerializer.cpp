@@ -337,7 +337,7 @@ Type SSASerializer::parseType(const std::string& typeStr)
     } else if (typeStr == "str") {
         return Type(TypeKind::String);
     } else if (typeStr.rfind("vec", 0) == 0) {
-        // Vector type like vec1, vec2, vec3, vec4, ...
+        // Vector type like vec2, vec3, vec4, ...
         try {
             size_t num = std::stoul(typeStr.substr(3));
             if (num >= 1)
