@@ -448,41 +448,51 @@ private:
     inline Ptr<Expression> p_postfix_expression()
     {
         auto expr = p_call_expression();
-        if (P.cur().Type == TokenType::Dot) {
-            const auto loc = P.cur().Location;
-            auto swizzle   = p_swizzle();
+        
+        // Loop to handle chained postfix operators
+        while (true) {
+            if (P.cur().Type == TokenType::Dot) {
+                const auto loc = P.cur().Location;
+                auto swizzle   = p_swizzle();
 
-            if (!checkSwizzle(swizzle)) {
-                P.signalError();
-                P.mReporter.errorf(loc, "Given access '%s' is invalid", std::string(swizzle).c_str());
+                if (!checkSwizzle(swizzle)) {
+                    P.signalError();
+                    P.mReporter.errorf(loc, "Given access '%s' is invalid", std::string(swizzle).c_str());
+                }
+
+                expr = std::make_shared<SwizzleExpression>(loc, expr, swizzle);
+                continue;
             }
 
-            return std::make_shared<SwizzleExpression>(loc, expr, swizzle);
-        }
-
-        // explicit cast syntax: "<expr> as <type>"
-        if (P.accept(TokenType::As)) {
-            // Use the expression's original location for the cast node
-            const auto loc    = expr->location();
-            const auto toType = p_type();
-            return std::make_shared<CastExpression>(loc, toType, expr);
-        }
-
-        // [i]
-        if (P.accept(TokenType::OpenSquareBracket)) {
-            size_t index     = 0;
-            const auto token = P.cur();
-            P.accept(TokenType::IntegerLiteral);
-            const Integer i = std::get<Integer>(token.Value);
-            if (i < 0) {
-                P.signalError();
-                P.mReporter.errorf(token.Location, "Negative index given for vector lookup");
-            } else {
-                index = (size_t)i;
+            // explicit cast syntax: "<expr> as <type>"
+            if (P.accept(TokenType::As)) {
+                // Use the expression's original location for the cast node
+                const auto loc    = expr->location();
+                const auto toType = p_type();
+                expr = std::make_shared<CastExpression>(loc, toType, expr);
+                continue;
             }
-            P.expect(TokenType::ClosedSquareBracket);
 
-            return std::make_shared<AccessExpression>(token.Location, expr, index);
+            // [i]
+            if (P.accept(TokenType::OpenSquareBracket)) {
+                size_t index     = 0;
+                const auto token = P.cur();
+                P.accept(TokenType::IntegerLiteral);
+                const Integer i = std::get<Integer>(token.Value);
+                if (i < 0) {
+                    P.signalError();
+                    P.mReporter.errorf(token.Location, "Negative index given for vector lookup");
+                } else {
+                    index = (size_t)i;
+                }
+                P.expect(TokenType::ClosedSquareBracket);
+
+                expr = std::make_shared<AccessExpression>(token.Location, expr, index);
+                continue;
+            }
+
+            // No more postfix operators
+            break;
         }
 
         return expr;
