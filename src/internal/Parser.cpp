@@ -530,7 +530,7 @@ private:
         } while (P.accept(TokenType::Comma));
     }
 
-    inline Ptr<Expression> p_if_branch()
+    inline Ptr<Expression> p_if_expression()
     {
         const auto loc = P.cur().Location;
         BranchExpression::ClosureList branches;
@@ -565,7 +565,7 @@ private:
     {
         // if ... { ... } else { ... }
         if (P.cur(0).Type == TokenType::If) {
-            return p_if_branch();
+            return p_if_expression();
         }
 
         // { ... }
