@@ -25,18 +25,17 @@ public:
     [[nodiscard]] inline bool isConstant() const { return mIsConstant; }
     [[nodiscard]] inline const Type& type() const { return mType; }
 
-    /// Compute a hash for this value
-    [[nodiscard]] size_t hash(bool includeName = true) const;
-
-    /// Check if two values are equivalent (same kind, type, and value/name)
-    [[nodiscard]] bool operator==(const SSAValue& other) const;
-    [[nodiscard]] bool operator!=(const SSAValue& other) const { return !(*this == other); }
-
     template <typename T>
     [[nodiscard]] inline const T& valueAs() const { return std::get<T>(mValue); }
     template <typename T>
     [[nodiscard]] inline const T* valueAsIf() const { return std::get_if<T>(&mValue); }
     [[nodiscard]] inline const auto& rawValue() const { return mValue; }
+
+    /// Compute a hash for this value
+    [[nodiscard]] size_t hash(bool includeName = true) const;
+
+    /// Check if two values are equivalent (same kind, type, and value/name)
+    [[nodiscard]] bool operator==(const SSAValue& other) const;
 
     [[nodiscard]] inline static SSAValue Named(const std::string& name, const Type& type) { return SSAValue(false, type, name); }
 

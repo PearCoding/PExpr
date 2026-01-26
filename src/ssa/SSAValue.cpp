@@ -38,6 +38,37 @@ static size_t hashValueVariant(const Type& type, const ValueVariant& value)
     }
 }
 
+static bool checkValueVariant(const ValueVariant& valueA, const ValueVariant& valueB)
+{
+    if (valueA.index() != valueB.index())
+        return false;
+
+    if (std::holds_alternative<bool>(valueA)) {
+        return std::get<bool>(valueA) == std::get<bool>(valueB);
+    } else if (std::holds_alternative<Integer>(valueA)) {
+        return std::get<Integer>(valueA) == std::get<Integer>(valueB);
+    } else if (std::holds_alternative<Number>(valueA)) {
+        return std::get<Number>(valueA) == std::get<Number>(valueB);
+    } else if (std::holds_alternative<std::string>(valueA)) {
+        return std::get<std::string>(valueA) == std::get<std::string>(valueB);
+    } else if (std::holds_alternative<Tuple>(valueA)) {
+        const auto& tupleA = *std::get<Tuple>(valueA);
+        const auto& tupleB = *std::get<Tuple>(valueB);
+
+        if (tupleA.elements.size() != tupleB.elements.size())
+            return false;
+
+        for (size_t i = 0; i < tupleA.elements.size(); ++i) {
+            if (!checkValueVariant(tupleA.elements[i], tupleB.elements.at(i)))
+                return false;
+        }
+        return true;
+    } else {
+        PEXPR_ASSERT(false, "Non exhaustive type in hashValueVariant");
+        return false;
+    }
+}
+
 size_t SSAValue::hash(bool includeName) const
 {
     size_t h = std::hash<int>{}(static_cast<bool>(isConstant()));
@@ -45,9 +76,8 @@ size_t SSAValue::hash(bool includeName) const
         h = h * 31 + std::hash<std::string>{}(name());
     h = h * 31 + type().hash();
 
-    if (isConstant()) {
+    if (isConstant())
         h = h * 31 + hashValueVariant(type(), mValue);
-    }
     return h;
 }
 
@@ -57,7 +87,7 @@ bool SSAValue::operator==(const SSAValue& other) const
         return false;
 
     if (isConstant()) {
-        return mValue == other.mValue;
+        return checkValueVariant(mValue, other.mValue);
     } else {
         // For Named/Temp values, compare names
         return name() == other.name();
