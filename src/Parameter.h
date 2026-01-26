@@ -10,7 +10,7 @@ namespace PExpr {
 /// A simple parameter representation used by function declarations and definitions
 struct Parameter {
     std::string Name;
-    Type Type;
+    Type ParamType;
 };
 
 using ParameterList = std::vector<Parameter>;

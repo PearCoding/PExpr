@@ -61,7 +61,7 @@ public:
         for (auto it = range.first; it != range.second; ++it) {
             if (func.parameters().size() == it->second.parameters().size()
                 && std::equal(func.parameters().begin(), func.parameters().end(), it->second.parameters().begin(),
-                              [](const Parameter& a, const Parameter& b) { return a.Type == b.Type; })) {
+                              [](const Parameter& a, const Parameter& b) { return a.ParamType == b.ParamType; })) {
                 mFunctions.erase(it);
                 mFunctions.emplace(func.name(), std::move(func));
                 return true;
@@ -78,7 +78,7 @@ public:
         for (auto it = range.first; it != range.second; ++it) {
             if (func.parameters().size() == it->second.parameters().size()
                 && std::equal(func.parameters().begin(), func.parameters().end(), it->second.parameters().begin(),
-                              [](const Parameter& a, const Parameter& b) { return a.Type == b.Type; })) {
+                              [](const Parameter& a, const Parameter& b) { return a.ParamType == b.ParamType; })) {
                 mFunctions.erase(it);
                 return true;
             }
@@ -126,14 +126,14 @@ private:
         if (strict) {
             for (auto it = range.first; it != range.second; ++it) {
                 if (parameterTypes.size() == it->second.parameters().size()) {
-                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](const Type& aType, const Parameter& b) { return aType == b.Type; }))
+                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](const Type& aType, const Parameter& b) { return aType == b.ParamType; }))
                         return it;
                 }
             }
         } else {
             for (auto it = range.first; it != range.second; ++it) {
                 if (parameterTypes.size() == it->second.parameters().size()) {
-                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](const Type& aType, const Parameter& b) { return isConvertible(aType, b.Type); }))
+                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](const Type& aType, const Parameter& b) { return isConvertible(aType, b.ParamType); }))
                         return it;
                 }
             }
@@ -147,14 +147,14 @@ private:
         if (strict) {
             for (auto it = range.first; it != range.second; ++it) {
                 if (parameters.size() == it->second.parameters().size()) {
-                    if (parameters.size() == 0 || std::equal(parameters.begin(), parameters.end(), it->second.parameters().begin(), [](const Parameter& a, const Parameter& b) { return a.Type == b.Type; }))
+                    if (parameters.size() == 0 || std::equal(parameters.begin(), parameters.end(), it->second.parameters().begin(), [](const Parameter& a, const Parameter& b) { return a.ParamType == b.ParamType; }))
                         return it;
                 }
             }
         } else {
             for (auto it = range.first; it != range.second; ++it) {
                 if (parameters.size() == it->second.parameters().size()) {
-                    if (parameters.size() == 0 || std::equal(parameters.begin(), parameters.end(), it->second.parameters().begin(), [](const Parameter& a, const Parameter& b) { return isConvertible(a.Type, b.Type); }))
+                    if (parameters.size() == 0 || std::equal(parameters.begin(), parameters.end(), it->second.parameters().begin(), [](const Parameter& a, const Parameter& b) { return isConvertible(a.ParamType, b.ParamType); }))
                         return it;
                 }
             }

@@ -346,8 +346,23 @@ Type SSASerializer::parseType(const std::string& typeStr)
             // fall through
         }
         return Type(TypeKind::Unspecified);
+    } else if (typeStr.front() == '[' && typeStr.back() == ']') {
+        // Tuple type: [T1, T2, ...]
+        std::string inner = typeStr.substr(1, typeStr.size() - 2);
+        std::vector<Type> components;
+        if (!inner.empty()) {
+            std::vector<std::string> tokens = split(inner, ',');
+            for (const auto& token : tokens) {
+                Type component = parseType(trim(token));
+                if (component.kind() == TypeKind::Unspecified)
+                    return Type(TypeKind::Unspecified);
+                components.push_back(component);
+            }
+        }
+        if (components.empty())
+            return Type(TypeKind::Unspecified);
+        return Type(std::move(components));
     } else {
-        // TODO Tuple!
         return Type(TypeKind::Unspecified);
     }
 }
@@ -370,53 +385,78 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
     if (name == "true" || name == "false") {
         bool val = (name == "true");
         outValue = SSAValue::Constant(val);
-    } else if (name.find('.') != std::string::npos && std::ranges::all_of(name, [](char c) {
-                   return isdigit(c) || c == '.' || c == '-'; // TODO: e notation support
-               })) {
-        // Number constant
-        try {
-            Number val = std::stod(name);
-            outValue   = SSAValue::Constant(val);
-        } catch (...) {
-            return false;
-        }
-    } else if (name.find_first_not_of("0123456789") == std::string::npos) {
-        // Integer constant
+        return true;
+    }
+
+    // Integer constant (digits only)
+    if (name.find_first_not_of("0123456789") == std::string::npos) {
         try {
             Integer val = std::stoll(name);
             if (type.kind() == TypeKind::Number)
                 outValue = SSAValue::Constant(static_cast<Number>(val));
             else
                 outValue = SSAValue::Constant(val);
+            return true;
         } catch (...) {
             return false;
         }
-    } else if (name.front() == '[' && name.back() == ']') {
-        // TODO: Other stuff
-        // Vector constant: [1.0,2.0,3.0]
-        if (!type.isVector())
-            return false;
-
-        std::string inner              = name.substr(1, name.size() - 2);
-        std::vector<std::string> parts = split(inner, ',');
-        std::vector<Number> vec;
-        try {
-            for (const auto& part : parts)
-                vec.push_back(std::stod(trim(part)));
-        } catch (...) {
-            return false;
-        }
-
-        // Verify vector size matches type
-        if (vec.size() != type.size())
-            return false;
-
-        outValue = SSAValue::Constant(vec);
-    } else {
-        // Named value
-        outValue = SSAValue::Named(name, type);
     }
 
+    // Number constant (contains dot or scientific notation)
+    if (name.find('.') != std::string::npos || name.find('e') != std::string::npos || name.find('E') != std::string::npos) {
+        bool allDigitsOrDotOrSign = std::ranges::all_of(name, [](char c) {
+            return isdigit(c) || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E';
+        });
+        if (allDigitsOrDotOrSign) {
+            try {
+                Number val = std::stod(name);
+                outValue = SSAValue::Constant(val);
+                return true;
+            } catch (...) {
+                return false;
+            }
+        }
+    }
+
+    // String constant (quoted)
+    if (name.front() == '"' && name.back() == '"') {
+        std::string content = name.substr(1, name.size() - 2);
+        // TODO: unescape?
+        outValue = SSAValue::Constant(content);
+        return true;
+    }
+
+    // Tuple constant: [value1, value2, ...]
+    if (name.front() == '[' && name.back() == ']') {
+        if (!type.isTuple())
+            return false;
+
+        std::string inner = name.substr(1, name.size() - 2);
+        std::vector<std::string> parts = split(inner, ',');
+        if (parts.size() != type.size())
+            return false;
+
+        Tuple tuple = Tuple(new TupleVariant());
+        tuple->elements.reserve(parts.size());
+
+        for (size_t i = 0; i < parts.size(); ++i) {
+            const Type& compType = type.components()[i];
+            std::string elemStr = trim(parts[i]);
+
+            // Recursively parse each element
+            SSAValue elemVal;
+            if (!parseValue(elemStr + ":" + compType.toString(), elemVal))
+                return false;
+
+            tuple->elements.push_back(elemVal.rawValue());
+        }
+
+        outValue = SSAValue(true, type, tuple);
+        return true;
+    }
+
+    // Named value (not a constant)
+    outValue = SSAValue::Named(name, type);
     return true;
 }
 

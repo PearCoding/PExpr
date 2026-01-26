@@ -337,7 +337,7 @@ private:
         std::vector<Type> paramTypes;
         paramTypes.reserve(parameters.size());
         for (const auto& p : parameters)
-            paramTypes.push_back(p.Type);
+            paramTypes.push_back(p.ParamType);
 
         const std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
 
@@ -660,16 +660,32 @@ private:
         case TokenType::StringType:
             P.next();
             return Type(TypeKind::String);
-        case TokenType::OpenSquareBracket:
-            // Tuple: TODO
-            return Type(TypeKind::Error);
+        case TokenType::OpenSquareBracket: {
+            // Tuple type: [T1, T2, ...]
+            P.expect(TokenType::OpenSquareBracket);
+            std::vector<Type> components;
+            if (P.cur().Type != TokenType::ClosedSquareBracket) {
+                do {
+                    components.push_back(p_type());
+                } while (P.accept(TokenType::Comma));
+            }
+            P.expect(TokenType::ClosedSquareBracket);
+            if (components.empty()) {
+                P.signalError();
+                P.mReporter.errorf(P.cur().Location, "Tuple type must have at least one component");
+                return Type(TypeKind::Error);
+            }
+            return Type(std::move(components));
+        }
         default:
-            // if (P.cur().Type >= TokenType::Vec1Type) {
-            //     return (ElementaryType)((size_t)ElementaryType::Vec1 + P.cur().arraySize() - 1);
-            // } else {
-            P.error(std::to_array<TokenType>({ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType, TokenType::StringType }));
-            return Type(TypeKind::Error);
-            // }
+            if (P.cur().Type >= TokenType::Vec1Type) {
+                size_t vecSize = P.cur().arraySize();
+                P.next();
+                return Type::AsVector(vecSize);
+            } else {
+                P.error(std::to_array<TokenType>({ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType, TokenType::StringType, TokenType::OpenSquareBracket }));
+                return Type(TypeKind::Error);
+            }
         }
     }
 };

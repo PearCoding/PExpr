@@ -52,7 +52,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
                 std::vector<Type> newParamTypes;
                 newParamTypes.reserve(newParams.size());
                 for (const auto& p : newParams)
-                    newParamTypes.push_back(p.Type);
+                    newParamTypes.push_back(p.ParamType);
 
                 const std::string oldMangled = f->mangledName();
                 const std::string newMangled = makeMangledNameFromTypes(f->name(), newParamTypes, closure.get());
@@ -201,7 +201,7 @@ void UpliftPass::updateCallsInExpression(const Ptr<Expression>& expr, const Func
                     const std::string capName = fparams[i].Name;
                     const auto vexpr          = std::make_shared<VariableExpression>(c->location(), capName);
                     // Set the expression return type to the declared parameter type so downstream passes (SSA) see correct types
-                    vexpr->setReturnType(fparams[i].Type);
+                    vexpr->setReturnType(fparams[i].ParamType);
                     c->appendParameter(vexpr);
                 }
 

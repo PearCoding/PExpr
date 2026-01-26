@@ -157,7 +157,21 @@ inline bool isConvertible(const Type& from, const Type& to)
         return from.kind() == TypeKind::Integer && to.kind() == TypeKind::Number;
     }
 
-    // TODO: Tuple conversions? Possibly component-wise conversions?
+    // Tuple conversions: component-wise conversion
+    if (from.isTuple() && to.isTuple()) {
+        if (from.size() != to.size())
+            return false;
+        for (size_t i = 0; i < from.size(); ++i) {
+            if (!isConvertible(from.components()[i], to.components()[i]))
+                return false;
+        }
+        return true;
+    }
+
+    // Vector (homogeneous tuple of numbers) to vector conversion with same size
+    if (from.isVector() && to.isVector() && from.size() == to.size())
+        return true;
+
     return false;
 }
 
@@ -173,7 +187,21 @@ inline bool isExplicitConvertible(const Type& from, const Type& to)
         return from.kind() == TypeKind::Number && to.kind() == TypeKind::Integer;
     }
 
-    // TODO: Tuple casts? Possibly component-wise?
+    // Tuple casts: component-wise explicit conversion
+    if (from.isTuple() && to.isTuple()) {
+        if (from.size() != to.size())
+            return false;
+        for (size_t i = 0; i < from.size(); ++i) {
+            if (!isExplicitConvertible(from.components()[i], to.components()[i]))
+                return false;
+        }
+        return true;
+    }
+
+    // Vector to vector with same size (homogeneous tuple of numbers)
+    if (from.isVector() && to.isVector() && from.size() == to.size())
+        return true;
+
     return false;
 }
 

@@ -105,7 +105,7 @@ private:
         stream << statement->name() << "(";
         for (size_t i = 0; i < statement->parameters().size(); ++i) {
             const auto param = statement->parameters().at(i);
-            stream << param.Name << ":" << param.Type.toString();
+            stream << param.Name << ":" << param.ParamType.toString();
 
             if (i < statement->parameters().size() - 1)
                 stream << ", ";

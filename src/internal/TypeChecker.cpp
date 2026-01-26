@@ -130,7 +130,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         // Add parameters to the symbol table
         if (funcStmt->closure()) {
             for (const auto& p : funcStmt->parameters()) {
-                if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.Type, false))) //< TODO: Really non-mutable?
+                if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.ParamType, false))) //< TODO: Really non-mutable?
                     mReporter.errorf(funcStmt->location(), "Parameter '%s' already exists in the current scope", p.Name.c_str());
             }
 
@@ -423,7 +423,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpressi
         // (explicit=false) so downstream passes see an explicit cast node.
         const auto& pList = def.value().parameters();
         for (size_t i = 0; i < expr->parameters().size() && i < pList.size(); ++i) {
-            const auto desired = pList[i].Type;
+            const auto desired = pList[i].ParamType;
             const auto actual  = fromArgs[i];
             if (actual != desired) {
                 if (isConvertible(actual, desired)) {

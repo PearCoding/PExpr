@@ -13,7 +13,31 @@ std::string SSAValue::baseName() const
     return thisName;
 }
 
-// SSAValue hash implementation
+static size_t hashValueVariant(const Type& type, const ValueVariant& value)
+{
+    switch (type.kind()) {
+    case TypeKind::Boolean:
+        return std::hash<bool>{}(std::get<bool>(value));
+    case TypeKind::Integer:
+        return std::hash<Integer>{}(std::get<Integer>(value));
+    case TypeKind::Number:
+        return std::hash<Number>{}(std::get<Number>(value));
+    case TypeKind::String:
+        return std::hash<std::string>{}(std::get<std::string>(value));
+    case TypeKind::Tuple: {
+        const Tuple& tuple     = std::get<Tuple>(value);
+        size_t h               = 0;
+        const auto& components = type.components();
+        for (size_t i = 0; i < components.size(); ++i)
+            h = h * 31 + hashValueVariant(components[i], tuple->elements.at(i));
+        return h;
+    }
+    default:
+        PEXPR_ASSERT(false, "Non exhaustive type in hashValueVariant");
+        return 0;
+    }
+}
+
 size_t SSAValue::hash(bool includeName) const
 {
     size_t h = std::hash<int>{}(static_cast<bool>(isConstant()));
@@ -22,36 +46,7 @@ size_t SSAValue::hash(bool includeName) const
     h = h * 31 + type().hash();
 
     if (isConstant()) {
-        // Hash the constant value based on type
-        switch (type().kind()) {
-        case TypeKind::Boolean:
-            if (const bool* b = std::get_if<bool>(&mValue))
-                h = h * 31 + std::hash<bool>{}(*b);
-            break;
-        case TypeKind::Integer:
-            if (const Integer* i = std::get_if<Integer>(&mValue))
-                h = h * 31 + std::hash<Integer>{}(*i);
-            break;
-        case TypeKind::Number:
-            if (const Number* n = std::get_if<Number>(&mValue))
-                h = h * 31 + std::hash<Number>{}(*n);
-            break;
-        case TypeKind::String:
-            if (const std::string* s = std::get_if<std::string>(&mValue))
-                h = h * 31 + std::hash<std::string>{}(*s);
-            break;
-        case TypeKind::Tuple: {
-            // TODO
-            // if (const Tuple* v = std::get_if<Tuple>(&mValue)) {
-            //     for (Number n : (*v)->elements)
-            //         h = h * 31 + std::hash<Number>{}(n);
-            // }
-        } break;
-
-        default:
-            PEXPR_ASSERT(false, "Non exhaustive constant type check");
-            break;
-        }
+        h = h * 31 + hashValueVariant(type(), mValue);
     }
     return h;
 }
