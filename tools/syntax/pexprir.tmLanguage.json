@@ -83,7 +83,7 @@
             "patterns": [
                 {
                     "name": "storage.type.pexprir",
-                    "match": "\\b(bool|int|num|vec1|vec2|vec3|vec4|str)\\b"
+                    "match": "\\b(bool|int|num|vec2|vec3|vec4|str)\\b"
                 }
             ]
         },

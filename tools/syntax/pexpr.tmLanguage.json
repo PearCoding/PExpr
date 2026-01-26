@@ -45,7 +45,7 @@
                 },
                 {
                     "name": "keyword.declaration.pexpr",
-                    "match": "\\b(let|mut|fn|as)\\b"
+                    "match": "\\b(let|mut|fn|as|using)\\b"
                 },
                 {
                     "name": "keyword.attribute.pexpr",
