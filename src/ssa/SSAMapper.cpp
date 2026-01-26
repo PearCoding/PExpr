@@ -1,6 +1,7 @@
 #include "SSAMapper.h"
 #include "Enums.h"
 #include "Expression.h"
+#include "Pattern.h"
 #include "Statement.h"
 
 #include <algorithm>
@@ -125,6 +126,109 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
     case StatementType::TypeAlias:
         // Type aliases are compile-time only, nothing to map
         break;
+    case StatementType::DestructuringDeclaration: {
+        auto destr   = std::reinterpret_pointer_cast<DestructuringDeclarationStatement>(stmt);
+        SSAValue rhs = mapExpression(program, destr->expression());
+
+        // Helper function to recursively process pattern elements
+        std::function<void(const Pattern&, SSAValue, size_t&)> processPattern =
+            [&](const Pattern& pattern, SSAValue tupleValue, size_t& tupleOffset) -> void {
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                const auto& elem = pattern.elements()[i];
+
+                // Extract tuple element using Access operation
+                SSAValue index   = SSAValue::Constant((Integer)(tupleOffset + i));
+                SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), Type(TypeKind::Unspecified));
+                {
+                    SSAInstrAssign access;
+                    access.Target   = elemVal;
+                    access.Operator = SSAInstrAssign::OpKind::Access;
+                    access.Operands = { tupleValue, index };
+                    program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
+                }
+
+                if (elem.isSimpleBinding()) {
+                    const auto& binding = elem.simpleBinding();
+
+                    // Determine target type (use declared type if specified, otherwise inferred from element)
+                    Type targetType = binding.declaredType.kind() != TypeKind::Unspecified ? binding.declaredType : elemVal.type();
+
+                    // Cast if needed
+                    SSAValue finalVal = elemVal;
+                    if (elemVal.type() != targetType) {
+                        SSAValue casted = SSAValue::Named(mContext.fresh("%"), targetType);
+                        SSAInstrAssign cast;
+                        cast.Target   = casted;
+                        cast.Operator = SSAInstrAssign::OpKind::Cast;
+                        cast.Operands = { elemVal };
+                        program.Body.push_back(std::make_shared<SSAInstrAssign>(cast));
+                        finalVal = casted;
+                    }
+
+                    // Assign to variable (fresh name for declaration)
+                    SSAInstrAssign asg;
+                    SSAValue tgt = SSAValue::Named(mContext.fresh(binding.name, true), finalVal.type());
+                    asg.Target   = tgt;
+                    asg.Operator = SSAInstrAssign::OpKind::Assign;
+                    asg.Operands = { finalVal };
+                    program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+                } else {
+                    // Nested pattern - recurse
+                    processPattern(*elem.nestedPattern(), elemVal, tupleOffset);
+                }
+            }
+
+            tupleOffset += pattern.size();
+        };
+
+        const auto& pattern = destr->pattern();
+        size_t tupleOffset  = 0;
+        processPattern(*pattern, rhs, tupleOffset);
+    } break;
+    case StatementType::DestructuringAssignment: {
+        auto destr   = std::reinterpret_pointer_cast<DestructuringAssignmentStatement>(stmt);
+        SSAValue rhs = mapExpression(program, destr->expression());
+
+        // Helper function to recursively process pattern elements for assignment
+        std::function<void(const Pattern&, SSAValue, size_t&)> processPattern =
+            [&](const Pattern& pattern, SSAValue tupleValue, size_t& tupleOffset) -> void {
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                const auto& elem = pattern.elements()[i];
+
+                // Extract tuple element using Access operation
+                SSAValue index   = SSAValue::Constant((Integer)(tupleOffset + i));
+                SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), Type(TypeKind::Unspecified));
+                {
+                    SSAInstrAssign access;
+                    access.Target   = elemVal;
+                    access.Operator = SSAInstrAssign::OpKind::Access;
+                    access.Operands = { tupleValue, index };
+                    program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
+                }
+
+                if (elem.isSimpleBinding()) {
+                    const auto& binding = elem.simpleBinding();
+
+                    // Assign to variable (fresh version for assignment)
+                    SSAInstrAssign asg;
+                    SSAValue tgt = SSAValue::Named(mContext.fresh(binding.name, true), elemVal.type());
+                    asg.Target   = tgt;
+                    asg.Operator = SSAInstrAssign::OpKind::Assign;
+                    asg.Operands = { elemVal };
+                    program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+                } else {
+                    // Nested pattern - recurse
+                    processPattern(*elem.nestedPattern(), elemVal, tupleOffset);
+                }
+            }
+
+            tupleOffset += pattern.size();
+        };
+
+        const auto& pattern = destr->pattern();
+        size_t tupleOffset  = 0;
+        processPattern(*pattern, rhs, tupleOffset);
+    } break;
     default:
         PEXPR_ASSERT(false, "unsupported statement type");
         break;

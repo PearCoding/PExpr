@@ -1,0 +1,5 @@
+// Test swap with destructuring assignment
+let mut a1 = 1;
+let mut b1 = 2;
+*[b1, a1] = [a1, b1];
+a1 - b1  // Should be 1

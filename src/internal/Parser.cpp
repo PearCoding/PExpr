@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include "Mangler.h"
 #include "Parameter.h"
+#include "Pattern.h"
 #include "Statement.h"
 
 namespace PExpr::internal {
@@ -104,8 +105,10 @@ public:
     inline Ptr<Closure> parse()
     {
         auto closure = p_closure();
-        if (!P.hasError() && P.cur().Type != TokenType::Eof)
+        if (!P.hasError() && P.cur().Type != TokenType::Eof) {
+            P.signalError();
             P.mReporter.errorf(Location(0), "Parsing stopped before end of stream!");
+        }
 
         return closure;
     }
@@ -154,21 +157,26 @@ private:
             }
 
             if (P.accept(TokenType::Let)) {
-                // Variable declaration
-                closure->addStatement(p_variable_statement(true, attrs));
+                // Could be regular variable or destructuring declaration
+                if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
+                    // Destructuring declaration: let *[pattern] = expr;
+                    closure->addStatement(p_destructuring_statement(true, attrs));
+                } else {
+                    // Regular variable declaration
+                    closure->addStatement(p_variable_statement(true, attrs));
+                }
             } else if (P.accept(TokenType::Function)) {
                 // Function
                 closure->addStatement(p_function_statement(attrs));
             } else if (P.accept(TokenType::Using)) {
                 // Type alias
                 closure->addStatement(p_type_alias_statement(attrs));
-            } else if (P.cur(0).Type == TokenType::Identifier) {
-                if (P.cur(1).Type == TokenType::Assign) {
-                    // Variable assignment
-                    closure->addStatement(p_variable_statement(false, attrs));
-                } else {
-                    break;
-                }
+            } else if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
+                // Destructuring assignment: *[pattern] = expr;
+                closure->addStatement(p_destructuring_statement(false, attrs));
+            } else if (P.cur(0).Type == TokenType::Identifier && P.cur(1).Type == TokenType::Assign) {
+                // Regular variable assignment
+                closure->addStatement(p_variable_statement(false, attrs));
             } else {
                 break;
             }
@@ -192,7 +200,7 @@ private:
         return closure;
     }
 
-    // Statements
+    // Regular variable statement (single identifier)
     inline Ptr<Statement> p_variable_statement(bool is_declaration, const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
@@ -223,6 +231,33 @@ private:
             return std::make_shared<VariableAssignmentStatement>(loc, varName, std::move(expr));
     }
 
+    // Destructuring statement (pattern)
+    inline Ptr<Statement> p_destructuring_statement(bool is_declaration, const AttributeList& attrs)
+    {
+        PEXPR_UNUSED(attrs);
+
+        const auto loc = P.cur().Location;
+
+        // Patterns need a * before [
+        P.expect(TokenType::Mul);
+
+        // Parse pattern (allow mut/type annotations only for declarations)
+        auto pattern = p_pattern(is_declaration);
+        if (!pattern)
+            return nullptr;
+
+        P.expect(TokenType::Assign);
+
+        auto expr = p_expression();
+
+        P.expect(TokenType::Semicolon);
+
+        if (is_declaration)
+            return std::make_shared<DestructuringDeclarationStatement>(loc, pattern, std::move(expr));
+        else
+            return std::make_shared<DestructuringAssignmentStatement>(loc, pattern, std::move(expr));
+    }
+
     inline ParameterList p_parameter_def_list()
     {
         ParameterList list;
@@ -238,6 +273,63 @@ private:
         } while (P.accept(TokenType::Comma));
 
         return list;
+    }
+
+    inline Ptr<Pattern> p_pattern(bool for_declaration = true)
+    {
+        const auto loc = P.cur().Location;
+        P.expect(TokenType::OpenSquareBracket);
+
+        Pattern::ElementList elements;
+        if (P.cur().Type != TokenType::ClosedSquareBracket) {
+            do {
+                const auto elemLoc = P.cur().Location;
+
+                // Check if this is a nested pattern (starts with '[') or a simple binding
+                if (P.cur().Type == TokenType::OpenSquareBracket) {
+                    // Nested pattern
+                    auto nestedPattern = p_pattern(for_declaration);
+                    if (!nestedPattern)
+                        return nullptr;
+                    elements.push_back(PatternElement::makeNested(elemLoc, nestedPattern));
+                } else {
+                    // Simple binding
+
+                    // Check for 'mut' keyword (only allowed in declarations)
+                    bool isMutable = false;
+                    if (for_declaration && P.accept(TokenType::Mutable)) {
+                        isMutable = true;
+                    }
+
+                    // Expect identifier
+                    const std::string elemName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
+                    P.expect(TokenType::Identifier);
+
+                    // Optional type annotation (only allowed in declarations)
+                    Type declaredType = Type(TypeKind::Unspecified);
+                    if (P.accept(TokenType::Colon)) {
+                        if (for_declaration) {
+                            declaredType = p_type();
+                        } else {
+                            P.signalError();
+                            P.mReporter.errorf(P.cur().Location, "Type annotations are not allowed in destructuring assignments");
+                        }
+                    }
+
+                    elements.push_back(PatternElement::makeSimple(elemLoc, elemName, declaredType, isMutable));
+                }
+            } while (P.accept(TokenType::Comma));
+        }
+
+        P.expect(TokenType::ClosedSquareBracket);
+
+        if (elements.empty()) {
+            P.signalError();
+            P.mReporter.errorf(loc, "Pattern must have at least one element");
+            return nullptr;
+        }
+
+        return std::make_shared<Pattern>(loc, std::move(elements));
     }
 
     inline AttributeList p_attributes()

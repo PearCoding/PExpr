@@ -45,11 +45,13 @@ enum class ExpressionType {
 };
 
 enum class StatementType {
-    Error,               /// Internally used statement type.
-    VariableDeclaration, /// New declaration of a variable
-    VariableAssignment,  /// Update of a variable
-    FunctionDeclaration, /// New declaration of a function
-    TypeAlias,           /// Type alias declaration using 'using'
+    Error,                    /// Internally used statement type.
+    VariableDeclaration,      /// New declaration of a variable
+    VariableAssignment,       /// Update of a variable
+    FunctionDeclaration,      /// New declaration of a function
+    TypeAlias,                /// Type alias declaration using 'using'
+    DestructuringDeclaration, /// New declaration with destructuring pattern
+    DestructuringAssignment,  /// Assignment with destructuring pattern
 };
 
 /// Returns printable representation of the given operation.

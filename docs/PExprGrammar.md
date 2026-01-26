@@ -32,13 +32,37 @@ closure ::= { statement* } expression [ ';' (warning) ]
 
 statement
 ---------
-There are two kinds of statements handled inside a closure:
-- variable_statement (mutable or immutable)
+There are four kinds of statements handled inside a closure:
+- variable_statement (single identifier)
+- destructuring_statement (pattern matching)
 - function_statement (extern or intern, with attributes)
+- type_alias_statement
 
-statement ::= variable_statement | function_statement | type_alias_statement
+statement ::= variable_statement | destructuring_statement | function_statement | type_alias_statement
 
 type_alias_statement ::= 'using' Identifier '=' type ';'
+
+Destructuring Patterns
+----------------------
+Patterns allow destructuring tuples into multiple variables at once.
+
+destructuring_pattern ::= '[' pattern_element ( ',' pattern_element )* ']'
+
+pattern_element ::= destructuring_pattern | simple_binding
+
+simple_binding ::= [ 'mut' ] Identifier [ ':' type ]
+
+Note: Type annotations and `mut` qualifiers are only allowed in declaration patterns, not assignment patterns.
+
+Destructuring Statements
+------------------------
+destructuring_statement ::= declaration_destructuring | assignment_destructuring
+
+declaration_destructuring ::= 'let' '*' destructuring_pattern '=' expression ';'
+
+assignment_destructuring ::= '*' destructuring_pattern '=' expression ';'
+
+Note: Destructuring require a `*` prefix to distinguish them from tuple expressions.
 
 Attributes
 ----------
@@ -160,6 +184,7 @@ Additional parser behavior notes
 - The parser uses lookahead of at least one token (2-token buffer) in places:
   - Detect Identifier followed by Assign to distinguish variable assignment vs. other uses
   - Detect Identifier followed by OpenParentheses for call expressions
+  - Detect '*' followed by OpenSquareBracket for destructuring
 - Binary operator precedence is implemented with a precedence-climbing function p_binary_expression(max_prec)
 - Unary operators are prefix `+ - !`
 - Call expressions require the callee to be an Identifier immediately followed by '('
@@ -171,6 +196,9 @@ Additional parser behavior notes
   - Immutable: 'let name = expression;' or 'let name: type = expression;'
   - Mutable: 'let mut name = expression;' or 'let mut name: type = expression;'
   - Assignment (to previously declared mutable variable): 'name = expression;'
+- Destructuring declarations and assignments:
+  - Declaration: 'let *[pattern] = expression;' where pattern can include type annotations and 'mut' qualifiers
+  - Assignment: '*[pattern] = expression;' where pattern can only contain identifiers
 - Trailing semicolons after top-level expression within a closure are accepted but produce a warning
 - Comments are stripped by lexer and don't reach the parser
 
@@ -193,3 +221,14 @@ Examples
 5. Explicit cast:
    `x as int` // converts number x to integer
 
+6. Destructuring declarations:
+   `let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];`
+   `let *[[r, s], t] = [[7, 8], 9];`
+
+7. Destructuring assignments:
+   `let mut x = 1; let mut y = 2; *[x, y] = [3, 4];`
+   `let mut a = 1; let mut b = 2; let mut c = 3; *[[a, b], c] = [[10, 20], 30];`
+
+8. Function returning tuple with destructuring:
+   `fn foo() -> [int, int] = [5, 6];`
+   `let *[p, q] = foo();`

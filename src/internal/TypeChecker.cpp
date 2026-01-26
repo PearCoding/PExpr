@@ -169,6 +169,141 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
             mReporter.errorf(funcStmt->location(), "Cannot implicitly convert return value from '%s' to declared type '%s' for function '%s'", returnType.toString().c_str(), declared.toString().c_str(), funcStmt->name().c_str());
         }
     } break;
+    case StatementType::DestructuringDeclaration: {
+        const auto destrStmt = std::reinterpret_pointer_cast<DestructuringDeclarationStatement>(statement);
+
+        // Type-check the RHS expression
+        const auto rhsType = handleNode(closure, destrStmt->expression());
+        if (rhsType.kind() == TypeKind::Error)
+            return;
+
+        if (!rhsType.isTuple()) {
+            mReporter.errorf(destrStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
+            return;
+        }
+
+        // Helper function to recursively process pattern elements
+        std::function<bool(const Pattern&, const Type&, size_t&)> processPattern =
+            [&](const Pattern& pattern, const Type& type, size_t& tupleIndex) -> bool {
+            if (!type.isTuple()) {
+                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
+                return false;
+            }
+
+            const auto& components = type.components();
+            if (pattern.size() != components.size()) {
+                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
+                return false;
+            }
+
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                const auto& elem     = pattern.elements()[i];
+                const auto& elemType = components[i];
+
+                if (elem.isSimpleBinding()) {
+                    const auto& binding = elem.simpleBinding();
+
+                    // Check type compatibility if explicit type is provided
+                    if (binding.declaredType.kind() != TypeKind::Unspecified) {
+                        if (!isConvertible(elemType, binding.declaredType)) {
+                            mReporter.errorf(elem.location(), "Cannot convert tuple element %zu from '%s' to '%s'",
+                                             tupleIndex, elemType.toString().c_str(), binding.declaredType.toString().c_str());
+                            return false;
+                        }
+                    }
+
+                    // Register the variable
+                    const Type varType = (binding.declaredType.kind() != TypeKind::Unspecified) ? binding.declaredType : elemType;
+                    if (!closure->symbols().addVariable(VariableDef(binding.name, varType, binding.isMutable))) {
+                        mReporter.errorf(elem.location(), "Variable '%s' already exists in the current scope", binding.name.c_str());
+                        return false;
+                    }
+
+                    ++tupleIndex;
+                } else {
+                    // Nested pattern - recurse
+                    if (!processPattern(*elem.nestedPattern(), elemType, tupleIndex))
+                        return false;
+                }
+            }
+
+            return true;
+        };
+
+        const auto& pattern = destrStmt->pattern();
+        size_t tupleIndex   = 0;
+        processPattern(*pattern, rhsType, tupleIndex);
+    } break;
+    case StatementType::DestructuringAssignment: {
+        const auto destrStmt = std::reinterpret_pointer_cast<DestructuringAssignmentStatement>(statement);
+
+        // Type-check the RHS expression
+        const auto rhsType = handleNode(closure, destrStmt->expression());
+        if (rhsType.kind() == TypeKind::Error)
+            return;
+
+        if (!rhsType.isTuple()) {
+            mReporter.errorf(destrStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
+            return;
+        }
+
+        // Helper function to recursively process pattern elements for assignment
+        std::function<bool(const Pattern&, const Type&)> processPattern =
+            [&](const Pattern& pattern, const Type& type) -> bool {
+            if (!type.isTuple()) {
+                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
+                return false;
+            }
+
+            const auto& components = type.components();
+            if (pattern.size() != components.size()) {
+                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
+                return false;
+            }
+
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                const auto& elem     = pattern.elements()[i];
+                const auto& elemType = components[i];
+
+                if (elem.isSimpleBinding()) {
+                    const auto& binding = elem.simpleBinding();
+
+                    // Lookup the variable
+                    const SymbolTable* capturedTbl;
+                    const auto var = closure->symbols().lookupVariable(elem.location(), binding.name, &capturedTbl);
+                    if (!var.has_value()) {
+                        mReporter.errorf(elem.location(), "Unknown variable '%s' in destructuring assignment", binding.name.c_str());
+                        return false;
+                    }
+                    if (capturedTbl != &closure->symbols()) {
+                        mReporter.errorf(elem.location(), "Cannot assign to variable '%s' defined in a different scope", binding.name.c_str());
+                        return false;
+                    }
+                    if (!var->isMutable()) {
+                        mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
+                        return false;
+                    }
+
+                    // Check type compatibility
+                    const auto& varType = var->type();
+                    if (!isConvertible(elemType, varType)) {
+                        mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
+                                         elemType.toString().c_str(), varType.toString().c_str(), binding.name.c_str());
+                        return false;
+                    }
+                } else {
+                    // Nested pattern - recurse
+                    if (!processPattern(*elem.nestedPattern(), elemType))
+                        return false;
+                }
+            }
+
+            return true;
+        };
+
+        const auto& pattern = destrStmt->pattern();
+        processPattern(*pattern, rhsType);
+    } break;
     default:
         break;
     }

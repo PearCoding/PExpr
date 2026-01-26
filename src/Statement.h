@@ -3,6 +3,7 @@
 #include "Closure.h"
 #include "Expression.h"
 #include "Parameter.h"
+#include "Pattern.h"
 #include "Type.h"
 
 namespace PExpr {
@@ -114,4 +115,43 @@ public:
 private:
     const Type mAliasedType;
 };
+
+/// Declaration with destructuring pattern like "let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
+class DestructuringDeclarationStatement : public Statement {
+public:
+    DestructuringDeclarationStatement(const Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
+        : Statement(loc, "", StatementType::DestructuringDeclaration)
+        , mPattern(pattern)
+        , mExpression(expr)
+    {
+    }
+
+    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
+    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
+    inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
+
+private:
+    Ptr<Pattern> mPattern;
+    Ptr<Expression> mExpression;
+};
+
+/// Assignment with destructuring pattern like "*[c, d] = foo()"
+class DestructuringAssignmentStatement : public Statement {
+public:
+    DestructuringAssignmentStatement(const Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
+        : Statement(loc, "", StatementType::DestructuringAssignment)
+        , mPattern(pattern)
+        , mExpression(expr)
+    {
+    }
+
+    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
+    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
+    inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
+
+private:
+    Ptr<Pattern> mPattern;
+    Ptr<Expression> mExpression;
+};
+
 } // namespace PExpr

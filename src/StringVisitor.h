@@ -24,6 +24,10 @@ public:
             return dump(std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement));
         case StatementType::TypeAlias:
             return dump(std::reinterpret_pointer_cast<TypeAliasStatement>(statement));
+        case StatementType::DestructuringDeclaration:
+            return dump(std::reinterpret_pointer_cast<DestructuringDeclarationStatement>(statement));
+        case StatementType::DestructuringAssignment:
+            return dump(std::reinterpret_pointer_cast<DestructuringAssignmentStatement>(statement));
         default:
             return "ERROR";
         }
@@ -106,11 +110,10 @@ private:
 
         stream << statement->name() << "(";
         for (size_t i = 0; i < statement->parameters().size(); ++i) {
+            if (i)
+                stream << ", ";
             const auto param = statement->parameters().at(i);
             stream << param.Name << ":" << param.ParamType.toString();
-
-            if (i < statement->parameters().size() - 1)
-                stream << ", ";
         }
 
         stream << ") -> " << statement->returnType().toString();
@@ -190,9 +193,8 @@ private:
 
         stream << "if " << visit(expr->branches().front().Condition) << " { " << visit(expr->branches().front().Body) << " }";
 
-        for (size_t i = 1; i < expr->branches().size(); ++i) {
+        for (size_t i = 1; i < expr->branches().size(); ++i)
             stream << " elif " << visit(expr->branches().at(i).Condition) << " { " << visit(expr->branches().at(i).Body) << " }";
-        }
 
         stream << " else { " << visit(expr->elseClosure()) << " }";
         return stream.str();
@@ -204,9 +206,8 @@ private:
 
         stream << "[" << visit(expr->entries().front());
 
-        for (size_t i = 1; i < expr->entries().size(); ++i) {
+        for (size_t i = 1; i < expr->entries().size(); ++i)
             stream << ", " << visit(expr->entries().at(i));
-        }
 
         stream << "]";
         return stream.str();
@@ -216,6 +217,66 @@ private:
     {
         std::stringstream stream;
         stream << "using " << statement->name() << " = " << statement->aliasedType().toString() << ";";
+        return stream.str();
+    }
+
+    static std::string dump(const Ptr<DestructuringDeclarationStatement>& statement)
+    {
+        std::stringstream stream;
+        stream << "let *";
+        
+        // Helper function to recursively dump pattern elements
+        std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
+            stream << "[";
+            for (size_t i = 0; i < pattern.elements().size(); ++i) {
+                const auto& elem = pattern.elements()[i];
+                if (elem.isSimpleBinding()) {
+                    const auto& binding = elem.simpleBinding();
+                    if (binding.isMutable)
+                        stream << "mut ";
+                    stream << binding.name;
+                    if (binding.declaredType.kind() != TypeKind::Unspecified)
+                        stream << ":" << binding.declaredType.toString();
+                } else {
+                    // Nested pattern
+                    dumpPattern(*elem.nestedPattern());
+                }
+                if (i < pattern.elements().size() - 1)
+                    stream << ", ";
+            }
+            stream << "]";
+        };
+        
+        dumpPattern(*statement->pattern());
+        stream << " = " << visit(statement->expression()) << ";";
+        return stream.str();
+    }
+
+    static std::string dump(const Ptr<DestructuringAssignmentStatement>& statement)
+    {
+        std::stringstream stream;
+        stream << "*"; // Prefix for destructuring assignments
+        
+        // Helper function to recursively dump pattern elements
+        std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
+            stream << "[";
+            for (size_t i = 0; i < pattern.elements().size(); ++i) {
+                const auto& elem = pattern.elements()[i];
+                if (elem.isSimpleBinding()) {
+                    const auto& binding = elem.simpleBinding();
+                    stream << binding.name;
+                } else {
+                    // Nested pattern
+                    dumpPattern(*elem.nestedPattern());
+                }
+                if (i < pattern.elements().size() - 1)
+                    stream << ", ";
+            }
+            stream << "]";
+        };
+        
+        dumpPattern(*statement->pattern());
+        stream << " = " << visit(statement->expression()) << ";";
         return stream.str();
     }
 };
