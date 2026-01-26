@@ -27,3 +27,5 @@
 - [x] Add support for tuples
 - [x] Add support for type alias (needed for tuples)
 - [ ] To add more statement types the rule of mutability for closures must be rewritten. Extend lambda uplifting to work with mutable variables, by explicitly tracking them and updating them at the end of a SSA call.
+- [x] Add destructured bindings (assignment and declaration)
+- [ ] Simplify internal code by unifying VariableAssignment and DestructuralAssignment with a single pattern element being the same as a simple variable assignment. Same for declarations.
