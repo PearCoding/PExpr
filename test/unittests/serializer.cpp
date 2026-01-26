@@ -110,11 +110,11 @@ TEST_CASE("SSASerializer: round-trip with external function", "[serializer]")
     extFunc.External      = true;
     extFunc.HasSideEffect = true;
     extFunc.Parameters    = { "x" };
-    extFunc.ReturnType    = ElementaryType::Integer;
+    extFunc.ReturnType    = Type(TypeKind::Integer);
 
     // Add a call to the external function
     auto call                = std::make_shared<SSAInstrCall>();
-    call->Target             = SSAValue::Named("result.1", ElementaryType::Integer);
+    call->Target             = SSAValue::Named("result.1", Type(TypeKind::Integer));
     call->FunctionName       = "_Z8external_P_L5C0";
     call->PublicFunctionName = "external";
     call->Arguments.push_back(SSAValue::Constant(static_cast<Integer>(42)));
@@ -136,28 +136,28 @@ TEST_CASE("SSASerializer: round-trip with external function", "[serializer]")
 TEST_CASE("SSASerializer: parseType handles vector types", "[serializer]")
 {
     // Test basic types
-    REQUIRE(SSASerializer::parseType("bool") == ElementaryType::Boolean);
-    REQUIRE(SSASerializer::parseType("int") == ElementaryType::Integer);
-    REQUIRE(SSASerializer::parseType("num") == ElementaryType::Number);
-    REQUIRE(SSASerializer::parseType("str") == ElementaryType::String);
-    REQUIRE(SSASerializer::parseType("invalid") == ElementaryType::Unspecified);
+    REQUIRE(SSASerializer::parseType("bool").kind() == TypeKind::Boolean);
+    REQUIRE(SSASerializer::parseType("int").kind() == TypeKind::Integer);
+    REQUIRE(SSASerializer::parseType("num").kind() == TypeKind::Number);
+    REQUIRE(SSASerializer::parseType("str").kind() == TypeKind::String);
+    REQUIRE(SSASerializer::parseType("invalid").kind() == TypeKind::Unspecified);
 
     // Test vector types - they should be calculated relative to Vec1
-    ElementaryType vec1 = SSASerializer::parseType("vec1");
-    ElementaryType vec2 = SSASerializer::parseType("vec2");
-    ElementaryType vec3 = SSASerializer::parseType("vec3");
-    ElementaryType vec4 = SSASerializer::parseType("vec4");
+    const auto vec1 = SSASerializer::parseType("vec1");
+    const auto vec2 = SSASerializer::parseType("vec2");
+    const auto vec3 = SSASerializer::parseType("vec3");
+    const auto vec4 = SSASerializer::parseType("vec4");
 
-    REQUIRE(vec1 >= ElementaryType::Vec1);
-    REQUIRE(vec2 > vec1);
-    REQUIRE(vec3 > vec2);
-    REQUIRE(vec4 > vec3);
+    REQUIRE(vec1.isVector());
+    REQUIRE(vec2.isVector());
+    REQUIRE(vec3.isVector());
+    REQUIRE(vec4.isVector());
 
-    // Verify typeArraySize works correctly
-    REQUIRE(typeArraySize(vec1) == 1);
-    REQUIRE(typeArraySize(vec2) == 2);
-    REQUIRE(typeArraySize(vec3) == 3);
-    REQUIRE(typeArraySize(vec4) == 4);
+    // Verify size works correctly
+    REQUIRE(vec1.size() == 1);
+    REQUIRE(vec2.size() == 2);
+    REQUIRE(vec3.size() == 3);
+    REQUIRE(vec4.size() == 4);
 }
 
 TEST_CASE("SSASerializer: escapeString and unescapeString", "[serializer]")

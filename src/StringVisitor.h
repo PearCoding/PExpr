@@ -77,7 +77,7 @@ private:
             stream << "mut ";
         stream << statement->name();
         if (!statement->expression()->isUnspecified())
-            stream << ":" << toString(statement->expression()->returnType());
+            stream << ":" << statement->expression()->returnType().toString();
 
         stream << " = " << visit(statement->expression()) << ";";
         return stream.str();
@@ -105,17 +105,13 @@ private:
         stream << statement->name() << "(";
         for (size_t i = 0; i < statement->parameters().size(); ++i) {
             const auto param = statement->parameters().at(i);
-            stream << param.Name;
-            if (param.Type != ElementaryType::Unspecified)
-                stream << ":" << toString(param.Type);
+            stream << param.Name << ":" << param.Type.toString();
 
             if (i < statement->parameters().size() - 1)
                 stream << ", ";
         }
 
-        stream << ")";
-        if (statement->returnType() != ElementaryType::Unspecified)
-            stream << " -> " << toString(statement->returnType());
+        stream << ") -> " << statement->returnType().toString();
 
         if (!statement->isExtern())
             stream << " = { " << visit(statement->closure()) << " }";
@@ -130,13 +126,13 @@ private:
 
     static std::string dump(const Ptr<LiteralExpression>& expr)
     {
-        if (expr->returnType() == ElementaryType::Boolean)
+        if (expr->returnType().kind() == TypeKind::Boolean)
             return expr->getBool() ? "true" : "false";
-        if (expr->returnType() == ElementaryType::Integer)
+        if (expr->returnType().kind() == TypeKind::Integer)
             return std::to_string(expr->getInteger());
-        if (expr->returnType() == ElementaryType::Number)
+        if (expr->returnType().kind() == TypeKind::Number)
             return std::to_string(expr->getNumber());
-        if (expr->returnType() == ElementaryType::String)
+        if (expr->returnType().kind() == TypeKind::String)
             return "\"" + expr->getString() + "\"";
         return "UNKNOWN";
     }
@@ -177,7 +173,7 @@ private:
     static std::string dump(const Ptr<CastExpression>& expr)
     {
         std::stringstream stream;
-        stream << "(" << visit(expr->inner()) << " as " << toString(expr->toType()) << ")";
+        stream << "(" << visit(expr->inner()) << " as " << expr->toType().toString() << ")";
         return stream.str();
     }
 

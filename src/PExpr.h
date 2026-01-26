@@ -10,7 +10,6 @@
 #include "Logger.h"
 #include "Lookup.h"
 #include "StringVisitor.h"
-#include "TranspileVisitor.h"
 
 #include "ssa/SSAMapper.h"
 #include "ssa/SSAOptimizer.h"

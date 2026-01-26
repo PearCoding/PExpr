@@ -3,6 +3,7 @@
 #include "Enums.h"
 #include "Location.h"
 #include "Parameter.h"
+#include "Type.h"
 
 #include <vector>
 
@@ -12,18 +13,18 @@ namespace PExpr {
 class VariableDef {
 public:
     /// Construct a definition for a variable with a given name and type.
-    inline VariableDef(const std::string& name, ElementaryType type, bool isMutable)
+    inline VariableDef(const std::string& name, const Type& type, bool isMutable)
         : mName(name)
         , mType(type)
         , mIsMutable(isMutable)
     {
-        PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a valid type for a variable definition");
+        PEXPR_ASSERT(type.kind() != TypeKind::Unspecified, "Expected a valid type for a variable definition");
     }
 
     /// The identifier the variable is named with.
     [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The type of the variable.
-    [[nodiscard]] inline ElementaryType type() const { return mType; }
+    [[nodiscard]] inline const Type& type() const { return mType; }
 
     [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
 
@@ -31,7 +32,7 @@ public:
 
 private:
     std::string mName;
-    ElementaryType mType;
+    Type mType;
     bool mIsMutable;
 };
 
@@ -39,7 +40,7 @@ private:
 class FunctionDef {
 public:
     /// Construct a function definition with a given name and a ParameterList.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, ElementaryType retType, bool isExtern, bool hasSideEffects)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, const Type& retType, bool isExtern, bool hasSideEffects)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
@@ -47,12 +48,12 @@ public:
         , mIsExtern(isExtern)
         , mHasSideEffects(hasSideEffects)
     {
-        PEXPR_ASSERT(!isExtern || retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(!isExtern || retType.kind() != TypeKind::Unspecified, "Expected a specified type for an external definition");
         PEXPR_ASSERT(isExtern || !hasSideEffects, "Only external functions can be marked side-effect free");
     }
 
     /// Construct a function definition with a given name and a ParameterList (rvalue)
-    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, ElementaryType retType, bool isExtern, bool hasSideEffects)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, const Type& retType, bool isExtern, bool hasSideEffects)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
@@ -60,7 +61,7 @@ public:
         , mIsExtern(isExtern)
         , mHasSideEffects(hasSideEffects)
     {
-        PEXPR_ASSERT(!isExtern || retType != ElementaryType::Unspecified, "Expected a specified type for an external definition");
+        PEXPR_ASSERT(!isExtern || retType.kind() != TypeKind::Unspecified, "Expected a specified type for an external definition");
         PEXPR_ASSERT(isExtern || !hasSideEffects, "Only external functions can be marked side-effect free");
     }
 
@@ -70,7 +71,7 @@ public:
     [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
 
     /// The type of the return value.
-    [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
+    [[nodiscard]] inline const Type& returnType() const { return mReturnType; }
 
     /// List of parameters
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
@@ -81,7 +82,7 @@ public:
 private:
     std::string mName;
     std::string mMangledName;
-    ElementaryType mReturnType;
+    Type mReturnType;
     ParameterList mParameters;
     bool mIsExtern;
     bool mHasSideEffects;
@@ -96,7 +97,7 @@ public:
     std::size_t operator()(const PExpr::VariableDef& def) const
     {
         const auto h1 = std::hash<std::string>{}(def.name());
-        const auto h2 = std::hash<uint32_t>{}((uint32_t)def.type());
+        const auto h2 = def.type().hash();
         const auto h3 = std::hash<bool>{}(def.isMutable());
 
         return h1 ^ (h2 << 1) ^ (h3 << 2);

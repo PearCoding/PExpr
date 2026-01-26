@@ -75,7 +75,7 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
             continue;
         }
 
-        for (const auto hash : currentHashes) {
+        for (const auto& hash : currentHashes) {
             // Check if we've seen this expression before
             if (const auto itMap = mExpressionMap.find(hash); itMap != mExpressionMap.end()) {
                 // Found a duplicate expression! Replace with reference to previous result
@@ -143,8 +143,8 @@ SSCPCommonSubexpressionEliminator::hashInstruction(const SSAInstr* instr) const
 
     // For CSE, we don't want to include target names in the hash
     // because identical expressions with different target names should be eliminated
-    size_t hash         = instr->hash(false);
-    ElementaryType type = ElementaryType::Unspecified;
+    size_t hash = instr->hash(false);
+    Type type   = Type(TypeKind::Unspecified);
 
     // Get the result type from the instruction
     if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instr)) {

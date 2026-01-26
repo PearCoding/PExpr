@@ -144,17 +144,17 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         auto lit = std::reinterpret_pointer_cast<LiteralExpression>(expr);
         std::string sval;
         SSAValue v;
-        switch (lit->returnType()) {
-        case ElementaryType::Boolean:
+        switch (lit->returnType().kind()) {
+        case TypeKind::Boolean:
             v = SSAValue::Constant(lit->getBool());
             break;
-        case ElementaryType::Integer:
+        case TypeKind::Integer:
             v = SSAValue::Constant(lit->getInteger());
             break;
-        case ElementaryType::Number:
+        case TypeKind::Number:
             v = SSAValue::Constant(lit->getNumber());
             break;
-        case ElementaryType::String:
+        case TypeKind::String:
             v = SSAValue::Constant(lit->getString());
             break;
         default:
@@ -342,7 +342,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         program.Body.push_back(std::make_shared<SSAInstrLabel>(jlbl));
 
         // Use the BranchExpression's declared return type as the phi node type.
-        ElementaryType phiType = expr->returnType();
+        const auto phiType = expr->returnType();
 
         // create phi target with chosen type
         SSAValue tgt = SSAValue::Named(mContext.fresh("phi"), phiType);

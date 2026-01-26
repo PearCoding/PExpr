@@ -102,7 +102,7 @@ public:
 
     PExpr::Location Location;
     TokenType Type;
-    ValueVariant Value;
+    ElementaryValueVariant Value;
 
     [[nodiscard]] inline static size_t arraySize(TokenType t)
     {

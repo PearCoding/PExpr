@@ -39,7 +39,7 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
             h = h * 31 + op.hash(true);
         break;
     case OpKind::Cast:
-        h = h * 31 + std::hash<int>{}(static_cast<int>(Target.type()));
+        h = h * 31 + Target.type().hash();
         if (!Operands.empty())
             h = h * 31 + Operands[0].hash(true);
         break;

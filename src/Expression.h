@@ -2,6 +2,7 @@
 
 #include "Enums.h"
 #include "Location.h"
+#include "Type.h"
 
 namespace PExpr {
 namespace internal {
@@ -25,25 +26,25 @@ public:
     [[nodiscard]] inline ExpressionType type() const { return mType; }
 
     /// The type this expression evaluates to. If no type checking is performed yet, this defaults to 'unspecified'.
-    [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
+    [[nodiscard]] inline const Type& returnType() const { return mReturnType; }
 
     /// True if the type this expression evaluates to is yet 'unspecified'.
-    [[nodiscard]] inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
+    [[nodiscard]] inline bool isUnspecified() const { return mReturnType.kind() == TypeKind::Unspecified; }
 
 protected:
     inline Expression(const Location& loc, ExpressionType type)
         : mLocation(loc)
         , mType(type)
-        , mReturnType(ElementaryType::Unspecified)
+        , mReturnType(TypeKind::Unspecified)
     {
     }
 
-    inline void setReturnType(ElementaryType type) { mReturnType = type; }
+    inline void setReturnType(const Type& type) { mReturnType = type; }
 
 private:
     Location mLocation;
     ExpressionType mType;
-    ElementaryType mReturnType;
+    Type mReturnType;
 };
 
 namespace internal {
@@ -75,11 +76,11 @@ private:
 /// A simple access to a literal
 class LiteralExpression : public Expression {
 public:
-    inline LiteralExpression(const Location& loc, ElementaryType type, const ValueVariant& value)
+    inline LiteralExpression(const Location& loc, const Type& type, const ElementaryValueVariant& value)
         : Expression(loc, ExpressionType::Literal)
         , mValue(value)
     {
-        PEXPR_ASSERT(type != ElementaryType::Unspecified, "Expected a specified type as a constant");
+        PEXPR_ASSERT(type.kind() != TypeKind::Unspecified, "Expected a specified type as a constant");
         setReturnType(type);
     }
 
@@ -87,7 +88,7 @@ public:
     /// The type of this literal is given by returnType().
     [[nodiscard]] inline bool getBool() const
     {
-        PEXPR_ASSERT(returnType() == ElementaryType::Boolean, "Trying to get a constant which is not a boolean");
+        PEXPR_ASSERT(returnType().kind() == TypeKind::Boolean, "Trying to get a constant which is not a boolean");
         return std::get<bool>(mValue);
     }
 
@@ -95,7 +96,7 @@ public:
     /// The type of this literal is given by returnType().
     [[nodiscard]] inline Integer getInteger() const
     {
-        PEXPR_ASSERT(returnType() == ElementaryType::Integer, "Trying to get a constant which is not a integer");
+        PEXPR_ASSERT(returnType().kind() == TypeKind::Integer, "Trying to get a constant which is not a integer");
         return std::get<Integer>(mValue);
     }
 
@@ -103,7 +104,7 @@ public:
     /// The type of this literal is given by returnType().
     [[nodiscard]] inline Number getNumber() const
     {
-        PEXPR_ASSERT(returnType() == ElementaryType::Number, "Trying to get a constant which is not a number");
+        PEXPR_ASSERT(returnType().kind() == TypeKind::Number, "Trying to get a constant which is not a number");
         return std::get<Number>(mValue);
     }
 
@@ -111,18 +112,18 @@ public:
     /// The type of this literal is given by returnType().
     [[nodiscard]] inline std::string getString() const
     {
-        PEXPR_ASSERT(returnType() == ElementaryType::String, "Trying to get a constant which is not a string");
+        PEXPR_ASSERT(returnType().kind() == TypeKind::String, "Trying to get a constant which is not a string");
         return std::get<std::string>(mValue);
     }
 
 private:
-    ValueVariant mValue;
+    ElementaryValueVariant mValue;
 };
 
-/// Cast expression represents an explicit or implicit conversion to a target ElementaryType
+/// Cast expression represents an explicit or implicit conversion to a target Type
 class CastExpression : public Expression {
 public:
-    inline CastExpression(const Location& loc, ElementaryType toType, const Ptr<Expression>& inner, bool explicitCast = true)
+    inline CastExpression(const Location& loc, const Type& toType, const Ptr<Expression>& inner, bool explicitCast = true)
         : Expression(loc, ExpressionType::Cast)
         , mToType(toType)
         , mInner(inner)
@@ -132,12 +133,12 @@ public:
         setReturnType(mToType);
     }
 
-    [[nodiscard]] inline ElementaryType toType() const { return mToType; }
+    [[nodiscard]] inline const Type& toType() const { return mToType; }
     [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
     [[nodiscard]] inline bool isExplicit() const { return mExplicit; }
 
 private:
-    ElementaryType mToType;
+    Type mToType;
     Ptr<Expression> mInner;
     bool mExplicit;
 };

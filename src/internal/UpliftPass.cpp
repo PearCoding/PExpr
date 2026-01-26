@@ -49,7 +49,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
                 }
 
                 // Build new mangled name with new parameter types
-                std::vector<ElementaryType> newParamTypes;
+                std::vector<Type> newParamTypes;
                 newParamTypes.reserve(newParams.size());
                 for (const auto& p : newParams)
                     newParamTypes.push_back(p.Type);

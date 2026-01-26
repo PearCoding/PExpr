@@ -1,6 +1,6 @@
 # PExpr [![Build](https://github.com/PearCoding/PExpr/actions/workflows/build.yml/badge.svg)](https://github.com/PearCoding/PExpr/actions/workflows/build.yml)
 
-A fairly simple inline programming language to be transpiled to other languages or directly interpreted.
+A fairly simple programming language to be transpiled to other languages or directly interpreted.
 The intended field of application is computer graphics, hpc and other math frameworks.
 
 ## Why?

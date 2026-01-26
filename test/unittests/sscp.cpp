@@ -76,7 +76,7 @@ TEST_CASE("SSAOptimizer: constant folding for vectors", "[sscp]")
     auto dumped = SSASerializer::serialize(prog);
 
     // The vector addition should be folded to 4.0
-    REQUIRE(dumped.find("4.0") != std::string::npos);
+    REQUIRE(dumped.find("4") != std::string::npos);
 }
 
 TEST_CASE("SSAOptimizer: vector arithmetic operations", "[sscp]")

@@ -9,6 +9,8 @@
 
 namespace PExpr::ssa {
 
+using VecN = std::vector<Number>;
+
 bool SSCPConstantFolder::extractBool(const SSAValue& vv, bool& out)
 {
     if (const bool* b = vv.valueAsIf<bool>()) {
@@ -49,10 +51,17 @@ bool SSCPConstantFolder::extractString(const SSAValue& vv, std::string& out)
     return false;
 }
 
-bool SSCPConstantFolder::extractVecN(const SSAValue& vv, VecN& out)
+bool SSCPConstantFolder::extractVecN(const SSAValue& vv, std::vector<Number>& out)
 {
-    if (const VecN* n = vv.valueAsIf<VecN>()) {
-        out = static_cast<VecN>(*n);
+    if (const Tuple* n = vv.valueAsIf<Tuple>()) {
+        out.clear();
+        out.reserve((*n)->elements.size());
+        for (const auto& c : (*n)->elements) {
+            if (const Number* nc = std::get_if<Number>(&c))
+                out.push_back(*nc);
+            else
+                return false;
+        }
         return true;
     }
     return false;
@@ -183,7 +192,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
         }
 
         // Vector arithmetic folding
-        if (L.type() == R.type() && ::PExpr::isArray(L.type())) {
+        if (L.type() == R.type() && L.type().isVector()) {
             // Helper lambda to perform component-wise operation on arrays
             auto applyToArrays = [&](auto&& opFunc) -> std::optional<SSAValue> {
                 if (VecN lv; extractVecN(L, lv)) {
@@ -236,9 +245,9 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
 
         // Vector-scalar arithmetic folding (vector * scalar, vector / scalar, vector % scalar, vector ^ scalar)
         // Note: Add and Sub are not allowed between vectors and scalars
-        if (::PExpr::isArithmetic(L.type()) && ::PExpr::isArithmetic(R.type())) {
-            const bool LIsArray = ::PExpr::isArray(L.type());
-            const bool RIsArray = ::PExpr::isArray(R.type());
+        if (L.type().isArithmetic() && R.type().isArithmetic()) {
+            const bool LIsArray = L.type().isVector();
+            const bool RIsArray = R.type().isVector();
 
             if (LIsArray != RIsArray) { // One is vector, one is scalar
                 const SSAValue& vecOp    = LIsArray ? L : R;
@@ -428,19 +437,19 @@ std::optional<SSAValue> SSCPConstantFolder::foldVectorOp(const std::vector<SSAVa
         return SSAValue::Constant(values);
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, ElementaryType targetType)
+std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, const Type& targetType)
 {
     // Is it even useful?
     if (targetType == operand.type())
         return operand;
 
-    if (targetType == ElementaryType::Number) {
+    if (targetType.kind() == TypeKind::Number) {
         // int -> num (implicit or explicit)
         if (Integer i; extractInteger(operand, i))
             return SSAValue::Constant(static_cast<Number>(i));
     }
 
-    if (targetType == ElementaryType::Integer) {
+    if (targetType.kind() == TypeKind::Integer) {
         // num -> int (explicit)
         if (Number v; extractNumber(operand, v))
             return SSAValue::Constant(static_cast<Integer>(v));

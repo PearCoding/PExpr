@@ -7,27 +7,22 @@
 #include <sstream>
 
 namespace PExpr::internal {
-inline void typeError(Reporter& rep, const Ptr<UnaryExpression>& expr, ElementaryType type)
+inline void typeError(Reporter& rep, const Ptr<UnaryExpression>& expr, const Type& type)
 {
-    rep.errorf(expr->location(), "Can not use operator '%s' with type '%s'", toString(expr->op()).data(), toString(type).data());
+    rep.errorf(expr->location(), "Can not use operator '%s' with type '%s'", toString(expr->op()).data(), type.toString().c_str());
 }
 
-inline void typeError(Reporter& rep, const Ptr<BinaryExpression>& expr, ElementaryType left, ElementaryType right)
+inline void typeError(Reporter& rep, const Ptr<BinaryExpression>& expr, const Type& left, const Type& right)
 {
-    rep.errorf(expr->location(), "Can not use operator '%s' with types '%s' and '%s'", toString(expr->op()).data(), toString(left).data(), toString(right).data());
+    rep.errorf(expr->location(), "Can not use operator '%s' with types '%s' and '%s'", toString(expr->op()).data(), left.toString().c_str(), right.toString().c_str());
 }
 
-TypeChecker::TypeChecker(Reporter& reporter)
-    : mReporter(reporter)
-{
-}
-
-ElementaryType TypeChecker::handle(const Ptr<Closure>& closure)
+Type TypeChecker::handle(const Ptr<Closure>& closure)
 {
     return handleNode(closure);
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
     // Preregister functions in this closure
     for (const auto& statement : closure->statements()) {
@@ -44,7 +39,7 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure)
     for (const auto& statement : closure->statements())
         handleNode(closure, statement);
 
-    const ElementaryType type = handleNode(closure, closure->expression());
+    const Type type = handleNode(closure, closure->expression());
     closure->expression()->setReturnType(type);
     return type;
 }
@@ -57,17 +52,17 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
 
         // Type-check the initializer expression first.
         const auto type = handleNode(closure, varStmt->expression());
-        if (type == ElementaryType::Error)
+        if (type.kind() == TypeKind::Error)
             return; // Error was caught somewhere else
 
-        if (type == ElementaryType::Unspecified) {
+        if (type.kind() == TypeKind::Unspecified) {
             mReporter.errorf(varStmt->location(), "Can not determine type of variable '%s'", varStmt->name().c_str());
             return;
         }
 
         // If an explicit declared type is provided, validate / coerce the initializer.
         const auto declared = varStmt->declaredType();
-        if (declared != ElementaryType::Unspecified && type != declared) {
+        if (declared.kind() != TypeKind::Unspecified && type != declared) {
             if (isConvertible(type, declared)) {
                 // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
                 const auto orig     = varStmt->expression();
@@ -75,25 +70,25 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
 
                 ReportType rt = RT_WARNING_IMPLICIT_CAST;
                 // Special case: `int` literal for a `num` variable
-                if (declared == ElementaryType::Number && type == ElementaryType::Integer)
+                if (declared.kind() == TypeKind::Number && type.kind() == TypeKind::Integer)
                     rt = RT_WARNING_IMPLICIT_CAST_INT;
 
-                mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
+                mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
                 varStmt->replaceExpression(castExpr);
             } else {
-                mReporter.errorf(varStmt->location(), "Cannot implicitly convert initializer from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
+                mReporter.errorf(varStmt->location(), "Cannot implicitly convert initializer from '%s' to declared type '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
                 return;
             }
         }
 
         // Register the variable
-        if (!closure->symbols().addVariable(VariableDef(varStmt->name(), declared != ElementaryType::Unspecified ? declared : type, varStmt->isMutable())))
+        if (!closure->symbols().addVariable(VariableDef(varStmt->name(), declared.kind() != TypeKind::Unspecified ? declared : type, varStmt->isMutable())))
             mReporter.errorf(varStmt->location(), "New variable '%s' already exists in the current scope", varStmt->name().c_str());
     } break;
     case StatementType::VariableAssignment: {
         const auto varStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
         const auto type    = handleNode(closure, varStmt->expression());
-        if (type == ElementaryType::Error)
+        if (type.kind() == TypeKind::Error)
             return; // Error was caught somewhere else
 
         // Check if the variable exists and can be updated
@@ -120,13 +115,13 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
 
             ReportType rt = RT_WARNING_IMPLICIT_CAST;
             // Special case: `int` literal for a `num` variable
-            if (declared == ElementaryType::Number && type == ElementaryType::Integer)
+            if (declared.kind() == TypeKind::Number && type.kind() == TypeKind::Integer)
                 rt = RT_WARNING_IMPLICIT_CAST_INT;
 
-            mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
+            mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
             varStmt->replaceExpression(castExpr);
         } else if (type != declared) {
-            mReporter.errorf(varStmt->location(), "Cannot implicitly convert from '%s' to declared type '%s' for variable '%s'", toString(type).data(), toString(declared).data(), varStmt->name().c_str());
+            mReporter.errorf(varStmt->location(), "Cannot implicitly convert from '%s' to declared type '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
         }
     } break;
     case StatementType::FunctionDeclaration: {
@@ -146,7 +141,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->closure());
         funcStmt->setReturnType(returnType);
 
-        if (returnType == ElementaryType::Unspecified) {
+        if (returnType.kind() == TypeKind::Unspecified) {
             mReporter.errorf(funcStmt->location(), "Could not determine return type for function '%s'", funcStmt->name().c_str());
             return;
         }
@@ -161,15 +156,15 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
             const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
 
             // Special case: `int` literal for a `num` variable
-            if (funcStmt->closure()->expression()->type() == ExpressionType::Literal && declared == ElementaryType::Number && returnType == ElementaryType::Integer) {
+            if (funcStmt->closure()->expression()->type() == ExpressionType::Literal && declared.kind() == TypeKind::Number && returnType.kind() == TypeKind::Integer) {
                 // Ignore warning
             } else {
-                mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting return value from '%s' to '%s' for function '%s'", toString(returnType).data(), toString(declared).data(), funcStmt->name().c_str());
+                mReporter.warningf(RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting return value from '%s' to '%s' for function '%s'", returnType.toString().c_str(), declared.toString().c_str(), funcStmt->name().c_str());
             }
 
             funcStmt->closure()->replaceExpression(castExpr);
         } else if (returnType != declared) {
-            mReporter.errorf(funcStmt->location(), "Cannot implicitly convert return value from '%s' to declared type '%s' for function '%s'", toString(returnType).data(), toString(declared).data(), funcStmt->name().c_str());
+            mReporter.errorf(funcStmt->location(), "Cannot implicitly convert return value from '%s' to declared type '%s' for function '%s'", returnType.toString().c_str(), declared.toString().c_str(), funcStmt->name().c_str());
         }
     } break;
     default:
@@ -177,7 +172,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>& expr)
 {
     switch (expr->type()) {
     case ExpressionType::Variable:
@@ -204,40 +199,40 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ex
         return handleNode(closure, std::reinterpret_pointer_cast<BranchExpression>(expr));
     default:
         PEXPR_ASSERT(false, "Unhandled expression type");
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<ClosureExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<ClosureExpression>& expr)
 {
     PEXPR_UNUSED(closure);
     PEXPR_ASSERT(expr->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
 
-    ElementaryType type = handleNode(expr->closure());
+    Type type = handleNode(expr->closure());
     expr->setReturnType(type);
     return type;
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpression>& expr)
 {
-    ElementaryType returnType = handleNode(expr->elseClosure());
-    if (returnType == ElementaryType::Error) // Error handled somewhere else
-        return ElementaryType::Error;
+    Type returnType = handleNode(expr->elseClosure());
+    if (returnType.kind() == TypeKind::Error) // Error handled somewhere else
+        return returnType;
 
     for (const auto& branch : expr->branches()) {
-        const ElementaryType conditionType = handleNode(closure, branch.Condition);
-        if (isConvertible(conditionType, ElementaryType::Boolean)) {
-            branch.Condition->setReturnType(ElementaryType::Boolean);
+        const Type conditionType = handleNode(closure, branch.Condition);
+        if (isConvertible(conditionType, Type(TypeKind::Boolean))) {
+            branch.Condition->setReturnType(Type(TypeKind::Boolean));
         } else {
             mReporter.error(branch.Condition->location(), "Expected condition to evaluate to bool");
-            return ElementaryType::Error;
+            return Type(TypeKind::Error);
         }
 
-        const ElementaryType bodyType = handleNode(branch.Body);
-        if (bodyType == ElementaryType::Error) // Error handled somewhere else
-            return ElementaryType::Error;
+        const auto bodyType = handleNode(branch.Body);
+        if (bodyType.kind() == TypeKind::Error) // Error handled somewhere else
+            return bodyType;
 
-        if (returnType == ElementaryType::Unspecified) {
+        if (returnType.kind() == TypeKind::Unspecified) {
             returnType = bodyType;
         } else if (bodyType != returnType && isConvertible(bodyType, returnType)) {
             // Inject a CastExpression so the branch body expression has the desired return type.
@@ -249,15 +244,15 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Br
 
             ReportType rt = RT_WARNING_IMPLICIT_CAST;
             // Special case: `int` literal for a `num` branch
-            if (returnType == ElementaryType::Number && bodyType == ElementaryType::Integer)
+            if (returnType.kind() == TypeKind::Number && bodyType.kind() == TypeKind::Integer)
                 rt = RT_WARNING_IMPLICIT_CAST_INT;
 
-            mReporter.warningf(rt, origExpr->location(), "Implicitly converting from '%s' to '%s' for conditional branch", toString(bodyType).data(), toString(returnType).data());
+            mReporter.warningf(rt, origExpr->location(), "Implicitly converting from '%s' to '%s' for conditional branch", bodyType.toString().data(), returnType.toString().data());
         } else if (bodyType == returnType) {
             // matching type — nothing to do
         } else {
-            mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type '%s'", toString(returnType).data());
-            return ElementaryType::Error;
+            mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
+            return Type(TypeKind::Error);
         }
     }
 
@@ -265,40 +260,40 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Br
     return returnType;
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VariableExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VariableExpression>& expr)
 {
     if (const auto def = closure->symbols().lookupVariable(expr->location(), expr->name()); def.has_value()) {
         expr->setReturnType(def.value().type());
         return def.value().type();
     } else {
         mReporter.errorf(expr->location(), "Unknown identifier '%s' found", expr->name().c_str());
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<LiteralExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<LiteralExpression>& expr)
 {
     PEXPR_UNUSED(closure);
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpression>& expr)
 {
     auto innerType = handleNode(closure, expr->inner());
-    if (innerType == ElementaryType::Error)
-        return innerType; // Error was caught somewhere else
+    if (innerType.kind() == TypeKind::Error) // Error handled somewhere else
+        return innerType;
 
-    expr->setReturnType(ElementaryType::Unspecified);
+    expr->setReturnType(Type(TypeKind::Unspecified));
 
     switch (expr->op()) {
     case UnaryOperation::Pos:
     case UnaryOperation::Neg:
-        if (isArithmetic(innerType))
+        if (innerType.isArithmetic())
             expr->setReturnType(innerType);
         break;
     case UnaryOperation::Not:
-        if (isConvertible(innerType, ElementaryType::Boolean))
-            expr->setReturnType(ElementaryType::Boolean);
+        if (isConvertible(innerType, Type(TypeKind::Boolean)))
+            expr->setReturnType(Type(TypeKind::Boolean));
         break;
     default:
         break;
@@ -306,25 +301,25 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Un
 
     if (expr->isUnspecified()) {
         typeError(mReporter, expr, innerType);
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpression>& expr)
 {
     auto leftType  = handleNode(closure, expr->left());
     auto rightType = handleNode(closure, expr->right());
-    if (leftType == ElementaryType::Error || rightType == ElementaryType::Error)
-        return ElementaryType::Error; // Error was caught somewhere else
+    if (leftType.kind() == TypeKind::Error || rightType.kind() == TypeKind::Error)
+        return Type(TypeKind::Error); // Error was caught somewhere else
 
-    expr->setReturnType(ElementaryType::Unspecified);
+    expr->setReturnType(Type(TypeKind::Unspecified));
 
     switch (expr->op()) {
     case BinaryOperation::Add:
     case BinaryOperation::Sub:
-        if (isArithmetic(leftType) && isArithmetic(rightType)) {
+        if (leftType.isArithmetic() && rightType.isArithmetic()) {
             if (leftType == rightType)
                 expr->setReturnType(leftType);
             else if (isConvertible(leftType, rightType))
@@ -335,51 +330,51 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Bi
         break;
     case BinaryOperation::Mul:
     case BinaryOperation::Div:
-        if (isArithmetic(leftType) && isArithmetic(rightType)) {
+        if (leftType.isArithmetic() && rightType.isArithmetic()) {
             if (leftType == rightType)
                 expr->setReturnType(leftType);
             else if (isConvertible(leftType, rightType))
                 expr->setReturnType(rightType);
             else if (isConvertible(rightType, leftType))
                 expr->setReturnType(leftType);
-            else if (isArray(leftType) && isConvertible(rightType, ElementaryType::Number))
+            else if (leftType.isVector() && isConvertible(rightType, TypeKind::Number))
                 expr->setReturnType(leftType); // vec * f, vec / f
-            else if (expr->op() != BinaryOperation::Div && isArray(rightType) && isConvertible(leftType, ElementaryType::Number))
+            else if (expr->op() != BinaryOperation::Div && rightType.isVector() && isConvertible(leftType, TypeKind::Number))
                 expr->setReturnType(rightType); // f * vec
         }
         break;
     case BinaryOperation::Pow:
-        if (isArithmetic(leftType) && isArithmetic(rightType)) {
-            if (leftType == rightType && leftType == ElementaryType::Integer)
+        if (leftType.isArithmetic() && rightType.isArithmetic()) {
+            if (leftType == rightType && leftType.kind() == TypeKind::Integer)
                 expr->setReturnType(leftType); // i ^ i
-            else if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
-                expr->setReturnType(ElementaryType::Number); // f ^ f
-            else if (isArray(leftType) && isConvertible(rightType, ElementaryType::Number))
+            else if (isConvertible(leftType, TypeKind::Number) && isConvertible(rightType, TypeKind::Number))
+                expr->setReturnType(Type(TypeKind::Number)); // f ^ f
+            else if (leftType.isVector() && isConvertible(rightType, TypeKind::Number))
                 expr->setReturnType(leftType); // vec ^ f
         }
         break;
     case BinaryOperation::Mod:
-        if (isConvertible(leftType, ElementaryType::Integer) && isConvertible(rightType, ElementaryType::Integer))
-            expr->setReturnType(ElementaryType::Integer); // i % i
+        if (isConvertible(leftType, TypeKind::Integer) && isConvertible(rightType, TypeKind::Integer))
+            expr->setReturnType(Type(TypeKind::Integer)); // i % i
         break;
     case BinaryOperation::And:
     case BinaryOperation::Or:
-        if (isConvertible(leftType, ElementaryType::Boolean) && isConvertible(rightType, ElementaryType::Boolean))
-            expr->setReturnType(ElementaryType::Boolean);
+        if (isConvertible(leftType, Type(TypeKind::Boolean)) && isConvertible(rightType, Type(TypeKind::Boolean)))
+            expr->setReturnType(Type(TypeKind::Boolean));
         break;
     case BinaryOperation::Less:
     case BinaryOperation::Greater:
     case BinaryOperation::LessEqual:
     case BinaryOperation::GreaterEqual:
-        if (isConvertible(leftType, ElementaryType::Boolean) && isConvertible(rightType, ElementaryType::Boolean))
-            expr->setReturnType(ElementaryType::Boolean);
-        else if (isConvertible(leftType, ElementaryType::Number) && isConvertible(rightType, ElementaryType::Number))
-            expr->setReturnType(ElementaryType::Boolean);
+        if (isConvertible(leftType, TypeKind::Boolean) && isConvertible(rightType, TypeKind::Boolean))
+            expr->setReturnType(Type(TypeKind::Boolean));
+        else if (isConvertible(leftType, TypeKind::Number) && isConvertible(rightType, TypeKind::Number))
+            expr->setReturnType(Type(TypeKind::Boolean));
         break;
     case BinaryOperation::Equal:
     case BinaryOperation::NotEqual:
         if (isConvertible(leftType, rightType) || isConvertible(rightType, leftType))
-            expr->setReturnType(ElementaryType::Boolean);
+            expr->setReturnType(Type(TypeKind::Boolean));
         break;
     default:
         break;
@@ -387,18 +382,18 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Bi
 
     if (expr->isUnspecified()) {
         typeError(mReporter, expr, leftType, rightType);
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 
     return expr->returnType();
 }
 
-inline std::string printArgs(const std::vector<ElementaryType>& args)
+inline std::string printArgs(const std::vector<Type>& args)
 {
     std::stringstream stream;
 
     for (size_t i = 0; i < args.size(); ++i) {
-        stream << toString(args[i]);
+        stream << args[i].toString();
         if (i != args.size() - 1)
             stream << ", ";
     }
@@ -406,20 +401,20 @@ inline std::string printArgs(const std::vector<ElementaryType>& args)
     return stream.str();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpression>& expr)
 {
-    std::vector<ElementaryType> fromArgs;
+    std::vector<Type> fromArgs;
     fromArgs.reserve(expr->parameters().size());
 
     // First, type-check arguments to obtain their types.
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
         auto type = handleNode(closure, expr->parameters().at(i));
-        if (type == ElementaryType::Error)
-            return ElementaryType::Error; // Error was caught somewhere else
+        if (type.kind() == TypeKind::Error)
+            return type; // Error was caught somewhere else
         fromArgs.push_back(type);
     }
 
-    expr->setReturnType(ElementaryType::Unspecified);
+    expr->setReturnType(Type(TypeKind::Unspecified));
 
     // Lookup the function (this allows matching with implicit convertible args)
     if (const auto def = closure->symbols().lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value()) {
@@ -428,8 +423,8 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ca
         // (explicit=false) so downstream passes see an explicit cast node.
         const auto& pList = def.value().parameters();
         for (size_t i = 0; i < expr->parameters().size() && i < pList.size(); ++i) {
-            const ElementaryType desired = pList[i].Type;
-            const ElementaryType actual  = fromArgs[i];
+            const auto desired = pList[i].Type;
+            const auto actual  = fromArgs[i];
             if (actual != desired) {
                 if (isConvertible(actual, desired)) {
                     auto original = expr->parameters().at(i);
@@ -439,13 +434,13 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ca
 
                     ReportType rt = RT_WARNING_IMPLICIT_CAST;
                     // Special case: `int` literal for a `num` parameter
-                    if (desired == ElementaryType::Number && actual == ElementaryType::Integer)
+                    if (desired.kind() == TypeKind::Number && actual.kind() == TypeKind::Integer)
                         rt = RT_WARNING_IMPLICIT_CAST_INT;
 
-                    mReporter.warningf(rt, original->location(), "Implicitly converting from '%s' to '%s' for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
+                    mReporter.warningf(rt, original->location(), "Implicitly converting from '%s' to '%s' for function parameter %zu", actual.toString().data(), desired.toString().data(), i);
                 } else {
-                    mReporter.errorf(expr->parameters().at(i)->location(), "Cannot implicitly convert from '%s' to '%s' for function parameter %zu", toString(actual).data(), toString(desired).data(), i);
-                    return ElementaryType::Error;
+                    mReporter.errorf(expr->parameters().at(i)->location(), "Cannot implicitly convert from '%s' to '%s' for function parameter %zu", actual.toString().data(), desired.toString().data(), i);
+                    return Type(TypeKind::Error);
                 }
             }
         }
@@ -454,29 +449,29 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Ca
         expr->setMangledName(def->mangledName());
     } else {
         mReporter.errorf(expr->location(), "Function '%s(%s)' is unknown or ambiguous", expr->name().c_str(), printArgs(fromArgs).c_str());
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpression>& expr)
 {
     auto innerType = handleNode(closure, expr->inner());
-    if (innerType == ElementaryType::Error)
+    if (innerType.kind() == TypeKind::Error)
         return innerType; // Error was caught somewhere else
 
-    expr->setReturnType(ElementaryType::Unspecified);
+    expr->setReturnType(Type(TypeKind::Unspecified));
 
     // The access operator also allows expanding e.g., vec2.xyxy -> vec4 operations
-    if (isArray(innerType)) {
+    if (innerType.isVector()) {
         const auto& swizzle = expr->swizzle();
 
-        const size_t vec_size = typeArraySize(innerType);
+        const size_t vec_size = innerType.size();
 
         if (vec_size == 0 || vec_size > 4) {
             mReporter.errorf(expr->location(), "The access operator is only defined for vector types of 1-4, but got a vector of size %zu instead", vec_size);
-            return ElementaryType::Error;
+            return Type(TypeKind::Error);
         }
 
         bool isValid = true;
@@ -493,112 +488,132 @@ ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Sw
         PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
         if (!isValid) {
             mReporter.errorf(expr->location(), "Invalid swizzle components '%s' given", std::string(swizzle).c_str());
-            return ElementaryType::Error;
+            return Type(TypeKind::Error);
         } else {
             switch (swizzle.size()) {
             case 1:
-                expr->setReturnType(ElementaryType::Number);
+                expr->setReturnType(Type(TypeKind::Number));
                 break;
             case 2:
+                expr->setReturnType(Type({ Type(TypeKind::Number), Type(TypeKind::Number) }));
+                break;
             case 3:
+                expr->setReturnType(Type({ Type(TypeKind::Number), Type(TypeKind::Number), Type(TypeKind::Number) }));
+                break;
             case 4:
-                expr->setReturnType((ElementaryType)((size_t)ElementaryType::Vec1 + swizzle.size() - 1));
+                expr->setReturnType(Type({ Type(TypeKind::Number), Type(TypeKind::Number), Type(TypeKind::Number), Type(TypeKind::Number) }));
                 break;
             default:
                 mReporter.errorf(expr->location(), "Expected a maximum of 4 components but got %zu", swizzle.size());
-                return ElementaryType::Error;
+                return Type(TypeKind::Error);
             }
         }
     } else {
         mReporter.errorf(expr->location(), "Swizzle operator is only defined for vector types");
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpression>& expr)
 {
     auto innerType = handleNode(closure, expr->inner());
-    if (innerType == ElementaryType::Error)
+    if (innerType.kind() == TypeKind::Error)
         return innerType; // Error was caught somewhere else
 
-    expr->setReturnType(ElementaryType::Unspecified);
+    expr->setReturnType(Type(TypeKind::Unspecified));
 
-    if (isArray(innerType)) {
-        const size_t vec_size = typeArraySize(innerType);
+    if (innerType.kind() == TypeKind::Tuple) {
+        const size_t vec_size = innerType.size();
 
         if (vec_size < expr->index()) {
-            mReporter.errorf(expr->location(), "Out of bounds access with %zu on vector of size %zu", expr->index(), vec_size);
-            return ElementaryType::Error;
+            mReporter.errorf(expr->location(), "Out of bounds access with %zu on tuple of size %zu", expr->index(), vec_size);
+            return Type(TypeKind::Error);
         }
     } else {
         mReporter.errorf(expr->location(), "Access operator is only defined for vector types");
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 
-    expr->setReturnType(ElementaryType::Number);
+    expr->setReturnType(innerType.components().at(expr->index()));
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VectorExpression>& expr)
 {
     if (expr->entries().size() == 0) {
         mReporter.errorf(expr->location(), "Can not create an empty vector");
-        return ElementaryType::Error;
+        return Type(TypeKind::Error);
     }
 
     // Ensure each entry is type-checked and, if necessary, inject an implicit
     // CastExpression to Number so downstream passes (SSA) see explicit casts.
+    std::vector<Type> innerTypes;
     for (size_t i = 0; i < expr->entries().size(); ++i) {
         auto orig        = expr->entries().at(i);
         const auto pType = handleNode(closure, orig);
-        if (pType == ElementaryType::Error)
-            return ElementaryType::Error; // Error handled somewhere else
+        if (pType.kind() == TypeKind::Error)
+            return pType; // Error handled somewhere else
 
-        if (pType == ElementaryType::Number)
-            continue;
-
-        // Allow implicit conversion to Number (e.g. Integer -> Number) by injecting a cast.
-        if (isConvertible(pType, ElementaryType::Number)) {
-            ReportType rt = RT_WARNING_IMPLICIT_CAST;
-            // Special case: `int` literal for a `num` parameter
-            if (pType == ElementaryType::Integer)
-                rt = RT_WARNING_IMPLICIT_CAST_INT;
-
-            mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for vector parameter %zu", toString(pType).data(), toString(ElementaryType::Number).data(), i);
-
-            auto castExpr = std::make_shared<CastExpression>(orig->location(), ElementaryType::Number, orig, false);
-            expr->replaceEntry(i, castExpr);
-            // We don't need to update pType variable; CastExpression will report Number when type-checked later.
-            continue;
-        }
-
-        mReporter.errorf(orig->location(), "Expected vector values to be convertible to '%s'", toString(ElementaryType::Number).data());
-        return ElementaryType::Error;
+        innerTypes.push_back(pType);
     }
 
-    expr->setReturnType((ElementaryType)((size_t)ElementaryType::Vec1 + expr->entries().size() - 1));
+    bool convertibleToVector = true;
+    for (const auto& type : innerTypes) {
+        if (!isConvertible(type, TypeKind::Number)) {
+            convertibleToVector = false;
+            break;
+        }
+    }
+
+    if (convertibleToVector) {
+        for (size_t i = 0; i < expr->entries().size(); ++i) {
+            auto orig        = expr->entries().at(i);
+            const auto pType = innerTypes.at(i);
+
+            // Allow implicit conversion to Number (e.g. Integer -> Number) by injecting a cast.
+            if (isConvertible(pType, TypeKind::Number)) {
+                ReportType rt = RT_WARNING_IMPLICIT_CAST;
+                // Special case: `int` literal for a `num` parameter
+                if (pType.kind() == TypeKind::Integer)
+                    rt = RT_WARNING_IMPLICIT_CAST_INT;
+
+                mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for vector parameter %zu", pType.toString().data(), Type(TypeKind::Number).toString().data(), i);
+
+                auto castExpr = std::make_shared<CastExpression>(orig->location(), Type(TypeKind::Number), orig, false);
+                expr->replaceEntry(i, castExpr);
+
+                innerTypes[i] = Type(TypeKind::Number);
+                continue;
+            }
+
+            mReporter.errorf(orig->location(), "Expected vector values to be convertible to '%s'", Type(TypeKind::Number).toString().data());
+            return Type(TypeKind::Error);
+        }
+    }
+
+    expr->setReturnType(Type(innerTypes));
     return expr->returnType();
 }
 
-ElementaryType TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CastExpression>& expr)
+Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CastExpression>& expr)
 {
     // Type-check inner expression first
-    const ElementaryType innerType = handleNode(closure, expr->inner());
-    if (innerType == ElementaryType::Error)
+    const auto innerType = handleNode(closure, expr->inner());
+    if (innerType.kind() == TypeKind::Error)
         return innerType; // Error was reported deeper
 
     // Validate allowed conversion depending on whether the cast is explicit or implicit
     if (expr->isExplicit()) {
         if (!isExplicitConvertible(innerType, expr->toType())) {
-            mReporter.errorf(expr->location(), "Cannot cast from '%s' to '%s'", toString(innerType).data(), toString(expr->toType()).data());
-            return ElementaryType::Error;
+            mReporter.errorf(expr->location(), "Cannot cast from '%s' to '%s'", innerType.toString().data(), expr->toType().toString().data());
+            return Type(TypeKind::Error);
         }
     } else {
         if (!isConvertible(innerType, expr->toType())) {
-            mReporter.errorf(expr->location(), "Implicit conversion from '%s' to '%s' is not allowed", toString(innerType).data(), toString(expr->toType()).data());
-            return ElementaryType::Error;
+            mReporter.errorf(expr->location(), "Implicit conversion from '%s' to '%s' is not allowed", innerType.toString().data(), expr->toType().toString().data());
+            return Type(TypeKind::Error);
         }
     }
 

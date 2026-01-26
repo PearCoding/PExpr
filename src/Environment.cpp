@@ -18,12 +18,12 @@ Environment::~Environment()
 {
 }
 
-void Environment::registerVariable(const std::string& name, ElementaryType type)
+void Environment::registerVariable(const std::string& name, const Type& type)
 {
     mGlobals.addVariable(VariableDef(name, type, false));
 }
 
-void Environment::registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType, bool hasSideEffect)
+void Environment::registerFunction(const std::string& name, const std::vector<Type>& parameterTypes, const Type& returnType, bool hasSideEffect)
 {
     // Build a ParameterList using default parameter names p0, p1, ...
     ParameterList params;
@@ -68,7 +68,7 @@ bool Environment::doTypeChecking(const Ptr<Closure>& closure)
 {
     internal::TypeChecker checker(mReporter);
     const auto retType = checker.handle(closure);
-    if (retType == ElementaryType::Unspecified || retType == ElementaryType::Error)
+    if (retType.kind() == TypeKind::Unspecified || retType.kind() == TypeKind::Error)
         return false;
     return true;
 }

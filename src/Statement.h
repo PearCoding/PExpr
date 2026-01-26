@@ -3,6 +3,7 @@
 #include "Closure.h"
 #include "Expression.h"
 #include "Parameter.h"
+#include "Type.h"
 
 namespace PExpr {
 
@@ -34,8 +35,8 @@ private:
 
 class VariableDeclarationStatement : public Statement {
 public:
-    // declaredType may be ElementaryType::Unspecified when no explicit type is given.
-    VariableDeclarationStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expr, ElementaryType declaredType = ElementaryType::Unspecified)
+    // declaredType may be TypeKind::Unspecified when no explicit type is given.
+    VariableDeclarationStatement(bool mutable_, const Location& loc, const std::string& name, const Ptr<Expression>& expr, const Type& declaredType = Type(TypeKind::Unspecified))
         : Statement(loc, name, StatementType::VariableDeclaration)
         , mIsMutable(mutable_)
         , mDeclaredType(declaredType)
@@ -44,13 +45,13 @@ public:
     }
 
     [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
-    [[nodiscard]] inline ElementaryType declaredType() const { return mDeclaredType; }
+    [[nodiscard]] inline const Type& declaredType() const { return mDeclaredType; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
 
 private:
     const bool mIsMutable;
-    const ElementaryType mDeclaredType;
+    const Type mDeclaredType;
     Ptr<Expression> mExpression;
 };
 
@@ -71,7 +72,7 @@ private:
 
 class FunctionDeclarationStatement : public Statement {
 public:
-    FunctionDeclarationStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Closure>& closure, ElementaryType returnType, const std::string& mangledName, bool hasSideEffects)
+    FunctionDeclarationStatement(const Location& loc, const std::string& name, const ParameterList& parameters, const Ptr<Closure>& closure, const Type& returnType, const std::string& mangledName, bool hasSideEffects)
         : Statement(loc, name, StatementType::FunctionDeclaration)
         , mParameters(parameters)
         , mReturnType(returnType)
@@ -88,13 +89,13 @@ public:
     [[nodiscard]] inline bool hasSideEffects() const { return mHasSideEffects; }
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
 
-    [[nodiscard]] inline ElementaryType returnType() const { return mReturnType; }
-    inline void setReturnType(ElementaryType type) { mReturnType = type; }
-    [[nodiscard]] inline bool isUnspecified() const { return mReturnType == ElementaryType::Unspecified; }
+    [[nodiscard]] inline const Type& returnType() const { return mReturnType; }
+    inline void setReturnType(const Type& type) { mReturnType = type; }
+    [[nodiscard]] inline bool isUnspecified() const { return mReturnType.kind() == TypeKind::Unspecified; }
 
 private:
     const ParameterList mParameters;
-    ElementaryType mReturnType;
+    Type mReturnType;
     const std::string mMangledName;
     const Ptr<Closure> mClosure;
     const bool mHasSideEffects;

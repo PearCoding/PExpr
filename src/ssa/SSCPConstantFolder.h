@@ -24,7 +24,7 @@ private:
     [[nodiscard]] std::optional<SSAValue> foldSwizzleOp(const SSAValue& operand, const std::string& swizzle);
     [[nodiscard]] std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const SSAValue& index);
     [[nodiscard]] std::optional<SSAValue> foldVectorOp(const std::vector<SSAValue>& operands);
-    [[nodiscard]] std::optional<SSAValue> foldCastOp(const SSAValue& operand, ElementaryType targetType);
+    [[nodiscard]] std::optional<SSAValue> foldCastOp(const SSAValue& operand, const Type& targetType);
 
     std::unordered_map<std::string, SSAValue> mConstants;
 
@@ -32,7 +32,7 @@ private:
     [[nodiscard]] static bool extractInteger(const SSAValue& vv, Integer& out);
     [[nodiscard]] static bool extractNumber(const SSAValue& vv, Number& out);
     [[nodiscard]] static bool extractString(const SSAValue& vv, std::string& out);
-    [[nodiscard]] static bool extractVecN(const SSAValue& vv, VecN& out);
+    [[nodiscard]] static bool extractVecN(const SSAValue& vv, std::vector<Number>& out);
 };
 
 } // namespace PExpr::ssa

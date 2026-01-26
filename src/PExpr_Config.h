@@ -115,27 +115,6 @@
 #define PEXPR_ASSERT(cond, msg) ((void)0)
 #endif
 
-#define PEXPR_CLASS_NON_MOVEABLE(C) \
-private:                            \
-    C(C&&)     = delete;            \
-    C& operator=(C&&) = delete
-
-#define PEXPR_CLASS_NON_COPYABLE(C) \
-private:                            \
-    C(const C&) = delete;           \
-    C& operator=(const C&) = delete
-
-#define PEXPR_CLASS_NON_CONSTRUCTABLE(C) \
-private:                                 \
-    C() = delete
-
-#define PEXPR_CLASS_STACK_ONLY(C)                  \
-private:                                           \
-    static void* operator new(size_t)    = delete; \
-    static void* operator new[](size_t)  = delete; \
-    static void operator delete(void*)   = delete; \
-    static void operator delete[](void*) = delete
-
 #if defined(PEXPR_CC_GNU) || defined(PEXPR_CC_CLANG)
 #define PEXPR_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
 #define PEXPR_NO_SANITIZE_THREAD __attribute__((no_sanitize_thread))
@@ -201,12 +180,20 @@ static_assert(sizeof(uint32) == 4, "Invalid bytesize configuration");
 static_assert(sizeof(int64) == 8, "Invalid bytesize configuration");
 static_assert(sizeof(uint64) == 8, "Invalid bytesize configuration");
 
-using ValueVariant = std::variant<bool, Integer, Number, std::string>;
+using ElementaryValueVariant = std::variant<bool, Integer, Number, std::string>;
 
 template <typename T>
 using Ptr = std::shared_ptr<T>;
 
-using VecN = std::vector<Number>;
+// Forward declaration for recursive variant
+struct TupleVariant;
 
-using ExtendedValueVariant = std::variant<bool, Integer, Number, std::string, VecN>;
+using Tuple        = Ptr<TupleVariant>;
+using ValueVariant = std::variant<bool, Integer, Number, std::string, Tuple>;
+
+struct TupleVariant {
+    std::vector<ValueVariant> elements;
+    bool operator==(const TupleVariant& other) const { return elements == other.elements; }
+};
+
 } // namespace PExpr

@@ -3,7 +3,6 @@
 #include "Closure.h"
 #include "Lookup.h"
 #include "Reporter.h"
-#include "internal/Transpiler.h"
 
 namespace PExpr {
 /// Main class for parsing and transpiling.
@@ -15,10 +14,10 @@ public:
     ~Environment();
 
     /// Register an inmutable variable with a specific type.
-    void registerVariable(const std::string& name, ElementaryType type);
+    void registerVariable(const std::string& name, const Type& type);
 
     /// Register an external function.
-    void registerFunction(const std::string& name, const std::vector<ElementaryType>& parameterTypes, ElementaryType returnType, bool hasSideEffect = true);
+    void registerFunction(const std::string& name, const std::vector<Type>& parameterTypes, const Type& returnType, bool hasSideEffect = true);
 
     /// Parse the stream until eof and return the corresponding AST tree.
     /// If an error was detected, a nullptr will be returned instead.
@@ -27,15 +26,6 @@ public:
     /// Parse the given string and return the corresponding AST tree.
     /// If an error was detected, a nullptr will be returned instead.
     Ptr<Closure> parse(std::string_view str);
-
-    /// Transpile over the AST.
-    /// The template payload has to be defined by the user.
-    template <typename Payload>
-    inline Payload transpile(const Ptr<Closure>& closure, TranspileVisitor<Payload>* visitor) const
-    {
-        internal::Transpiler<Payload> transpiler(mGlobals, visitor);
-        return transpiler.handle(closure);
-    }
 
     [[nodiscard]] inline const Reporter& reporter() const { return mReporter; }
     [[nodiscard]] inline Reporter& reporter() { return mReporter; }

@@ -63,50 +63,46 @@ static inline std::string_view toInstructionString(BinaryOperation op)
 }
 
 // Helper function to write value to stream
+void SSASerializer::write(std::ostream& os, const Type& type, const ValueVariant& value, bool withTypeSuffix)
+{
+    if (const auto* b = std::get_if<bool>(&value)) {
+        PEXPR_ASSERT(type.kind() == TypeKind::Boolean, "Expected variant to have a bool value");
+        os << (*b ? "true" : "false");
+    } else if (const auto* i = std::get_if<Integer>(&value)) {
+        PEXPR_ASSERT(type.kind() == TypeKind::Integer, "Expected variant to have a Integer value");
+        os << *i;
+    } else if (const auto* n = std::get_if<Number>(&value)) {
+        PEXPR_ASSERT(type.kind() == TypeKind::Number, "Expected variant to have a Number value");
+        os << *n;
+    } else if (const auto* s = std::get_if<std::string>(&value)) {
+        PEXPR_ASSERT(type.kind() == TypeKind::String, "Expected variant to have a string value");
+        os << "\"" << *s << "\"";
+    } else if (const auto* tp = std::get_if<Tuple>(&value)) {
+        PEXPR_ASSERT(type.kind() == TypeKind::Tuple, "Expected variant to have a Tuple value");
+        const auto& t = *tp;
+
+        os << "[";
+        for (size_t i = 0; i < t->elements.size(); ++i) {
+            if (i)
+                os << ", ";
+            write(os, type.components().at(i), t->elements[i], withTypeSuffix);
+        }
+        os << "]";
+    } else {
+        PEXPR_ASSERT(false, "Non exhaustive SSASerializer vor ValueVariant");
+    }
+
+    if (withTypeSuffix)
+        os << ":" << type.toString();
+}
+
+// Helper function to write value to stream
 void SSASerializer::write(std::ostream& os, const SSAValue& value)
 {
-    std::string prefix;
-    if (value.isConstant()) {
-        switch (value.type()) {
-        case ElementaryType::Boolean:
-            prefix = value.valueAs<bool>() ? "true" : "false";
-            break;
-        case ElementaryType::Integer:
-            prefix = std::to_string(value.valueAs<Integer>());
-            break;
-        case ElementaryType::Number:
-            prefix = std::to_string(value.valueAs<Number>());
-            break;
-        case ElementaryType::String:
-            prefix = "\"" + escapeString(value.valueAs<std::string>()) + "\"";
-            break;
-        default:
-            if (value.type() >= ElementaryType::Vec1) {
-                const auto v = value.valueAs<VecN>();
-                PEXPR_ASSERT(v.size() == typeArraySize(value.type()), "Vector data and vector type mismatch");
-
-                if (v.empty()) {
-                    prefix = "[]";
-                } else {
-                    prefix = "[" + std::to_string(v[0]);
-                    for (size_t i = 1; i < v.size(); ++i)
-                        prefix += "," + std::to_string(v[i]);
-                    prefix += "]";
-                }
-            } else {
-                PEXPR_ASSERT(false, "Expected specified type for SSAValue constants");
-            }
-        }
-    } else {
-        prefix = value.name();
-    }
-
-    if (prefix.empty()) {
-        os << "_";
-        return;
-    }
-
-    os << prefix << ":" << std::string(PExpr::toString(value.type()));
+    if (value.isConstant())
+        write(os, value.type(), value.rawValue(), true);
+    else
+        os << value.name() << ":" << value.type().toString();
 }
 
 void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
@@ -240,12 +236,8 @@ void SSASerializer::write(std::ostream& os, const SSAFunction& func)
             os << ", ";
         os << func.Parameters[i];
     }
-    os << ")";
+    os << ") : " << func.ReturnType.toString() << std::endl;
 
-    if (func.ReturnType != ElementaryType::Unspecified)
-        os << ":" << PExpr::toString(func.ReturnType);
-
-    os << std::endl;
     if (!func.Body.empty()) {
         for (const auto& instr : func.Body) {
             os << "  ";
@@ -334,43 +326,44 @@ static std::vector<std::string> split(const std::string& str, char delimiter)
     return tokens;
 }
 
-ElementaryType SSASerializer::parseType(const std::string& typeStr)
+Type SSASerializer::parseType(const std::string& typeStr)
 {
     if (typeStr == "bool") {
-        return ElementaryType::Boolean;
+        return Type(TypeKind::Boolean);
     } else if (typeStr == "int") {
-        return ElementaryType::Integer;
+        return Type(TypeKind::Integer);
     } else if (typeStr == "num") {
-        return ElementaryType::Number;
+        return Type(TypeKind::Number);
     } else if (typeStr == "str") {
-        return ElementaryType::String;
+        return Type(TypeKind::String);
     } else if (typeStr.rfind("vec", 0) == 0) {
         // Vector type like vec1, vec2, vec3, vec4, ...
         try {
             size_t num = std::stoul(typeStr.substr(3));
             if (num >= 1)
-                return static_cast<ElementaryType>(static_cast<int>(ElementaryType::Vec1) + num - 1);
+                return Type::AsVector(num);
         } catch (...) {
             // fall through
         }
-        return ElementaryType::Unspecified;
+        return Type(TypeKind::Unspecified);
     } else {
-        return ElementaryType::Unspecified;
+        // TODO Tuple!
+        return Type(TypeKind::Unspecified);
     }
 }
 
 bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
 {
     // Format: name:type or constant:type
-    size_t colon = str.find(':');
+    size_t colon = str.find(':'); // Last of?
     if (colon == std::string::npos)
         return false;
 
     std::string name    = str.substr(0, colon);
     std::string typeStr = str.substr(colon + 1);
 
-    ElementaryType type = SSASerializer::parseType(typeStr);
-    if (type == ElementaryType::Unspecified)
+    const auto type = SSASerializer::parseType(typeStr);
+    if (type.kind() == TypeKind::Unspecified)
         return false;
 
     // Check if it's a constant
@@ -382,7 +375,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
                })) {
         // Number constant
         try {
-            double val = std::stod(name);
+            Number val = std::stod(name);
             outValue   = SSAValue::Constant(val);
         } catch (...) {
             return false;
@@ -390,19 +383,23 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
     } else if (name.find_first_not_of("0123456789") == std::string::npos) {
         // Integer constant
         try {
-            int64_t val = std::stoll(name);
-            outValue    = SSAValue::Constant(val);
+            Integer val = std::stoll(name);
+            if (type.kind() == TypeKind::Number)
+                outValue = SSAValue::Constant(static_cast<Number>(val));
+            else
+                outValue = SSAValue::Constant(val);
         } catch (...) {
             return false;
         }
     } else if (name.front() == '[' && name.back() == ']') {
+        // TODO: Other stuff
         // Vector constant: [1.0,2.0,3.0]
-        if (type < ElementaryType::Vec1)
+        if (!type.isVector())
             return false;
 
         std::string inner              = name.substr(1, name.size() - 2);
         std::vector<std::string> parts = split(inner, ',');
-        VecN vec;
+        std::vector<Number> vec;
         try {
             for (const auto& part : parts)
                 vec.push_back(std::stod(trim(part)));
@@ -411,7 +408,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
         }
 
         // Verify vector size matches type
-        if (vec.size() != typeArraySize(type))
+        if (vec.size() != type.size())
             return false;
 
         outValue = SSAValue::Constant(vec);

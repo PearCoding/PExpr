@@ -8,16 +8,16 @@ void setupIntrinsics(SSCPFunctionInliner& inliner)
 {
     const auto addP1N = [&](const std::string& name, std::function<Number(Number)> callback) {
         inliner.addIntrinsic(FunctionDef(name,
-                                         internal::makeMangledNameFromTypes(name, std::to_array({ ElementaryType::Number }), nullptr),
-                                         { Parameter{ "p0", ElementaryType::Number } }, ElementaryType::Number, true, false),
-                             [callback](const std::vector<ExtendedValueVariant>& args) -> ExtendedValueVariant { return callback(std::get<Number>(args.at(0))); });
+                                         internal::makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number) }), nullptr),
+                                         { Parameter{ "p0", Type(TypeKind::Number) } }, Type(TypeKind::Number), true, false),
+                             [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0))); });
     };
 
     const auto addP2N = [&](const std::string& name, std::function<Number(Number, Number)> callback) {
         inliner.addIntrinsic(FunctionDef(name,
-                                         internal::makeMangledNameFromTypes(name, std::to_array({ ElementaryType::Number, ElementaryType::Number }), nullptr),
-                                         { Parameter{ "p0", ElementaryType::Number }, Parameter{ "p1", ElementaryType::Number } }, ElementaryType::Number, true, false),
-                             [callback](const std::vector<ExtendedValueVariant>& args) -> ExtendedValueVariant { return callback(std::get<Number>(args.at(0)), std::get<Number>(args.at(1))); });
+                                         internal::makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number), Type(TypeKind::Number) }), nullptr),
+                                         { Parameter{ "p0", Type(TypeKind::Number) }, Parameter{ "p1", Type(TypeKind::Number) } }, Type(TypeKind::Number), true, false),
+                             [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0)), std::get<Number>(args.at(1))); });
     };
 
     addP1N("sin", [](Number a) { return std::sin(a); });   // [[extern, pure]] fn sin(a:num) -> num;

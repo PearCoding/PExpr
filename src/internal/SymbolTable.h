@@ -86,7 +86,7 @@ public:
         return false;
     }
 
-    [[nodiscard]] inline std::optional<FunctionDef> lookupFunction(const Location& loc, const std::string& name, const std::vector<ElementaryType>& parameterTypes, bool strict = false) const
+    [[nodiscard]] inline std::optional<FunctionDef> lookupFunction(const Location& loc, const std::string& name, const std::vector<Type>& parameterTypes, bool strict = false) const
     {
         // Check for correct parameters (be strict!)
         if (const auto it = checkFunctionExists(name, parameterTypes, true); it != mFunctions.end())
@@ -120,20 +120,20 @@ public:
 #endif
 
 private:
-    [[nodiscard]] inline std::unordered_multimap<std::string, FunctionDef>::const_iterator checkFunctionExists(const std::string& name, std::span<const ElementaryType> parameterTypes, bool strict) const
+    [[nodiscard]] inline std::unordered_multimap<std::string, FunctionDef>::const_iterator checkFunctionExists(const std::string& name, std::span<const Type> parameterTypes, bool strict) const
     {
         const auto range = mFunctions.equal_range(name);
         if (strict) {
             for (auto it = range.first; it != range.second; ++it) {
                 if (parameterTypes.size() == it->second.parameters().size()) {
-                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](ElementaryType aType, const Parameter& b) { return aType == b.Type; }))
+                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](const Type& aType, const Parameter& b) { return aType == b.Type; }))
                         return it;
                 }
             }
         } else {
             for (auto it = range.first; it != range.second; ++it) {
                 if (parameterTypes.size() == it->second.parameters().size()) {
-                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](ElementaryType aType, const Parameter& b) { return isConvertible(aType, b.Type); }))
+                    if (parameterTypes.size() == 0 || std::equal(parameterTypes.begin(), parameterTypes.end(), it->second.parameters().begin(), [](const Type& aType, const Parameter& b) { return isConvertible(aType, b.Type); }))
                         return it;
                 }
             }

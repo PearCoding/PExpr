@@ -5,27 +5,31 @@
 
 namespace PExpr::internal {
 /// Encode elementary types into compact characters for mangling.
-inline std::string encodeElemType(ElementaryType t)
+inline std::string encodeElemType(const Type& t)
 {
-    switch (t) {
-    case ElementaryType::Boolean:
+    switch (t.kind()) {
+    case TypeKind::Boolean:
         return "b";
-    case ElementaryType::Integer:
+    case TypeKind::Integer:
         return "i";
-    case ElementaryType::Number:
+    case TypeKind::Number:
         return "n";
-    case ElementaryType::String:
+    case TypeKind::String:
         return "s";
+    case TypeKind::Tuple: {
+        std::stringstream stream;
+        stream << "T" << t.size();
+        for (const auto& c : t.components())
+            stream << encodeElemType(c);
+        return stream.str();
+    }
     default:
-        if (isArray(t))
-            return std::string("v") + std::to_string(typeArraySize(t));
-        else
-            return "u"; // unspecified / unknown
+        return "u"; // unspecified / unknown
     }
 }
 
 /// Build mangled name from declared parameter types (no return type).
-inline std::string makeMangledNameFromTypes(const std::string& name, std::span<const ElementaryType> params, const Closure* currentClosure)
+inline std::string makeMangledNameFromTypes(const std::string& name, std::span<const Type> params, const Closure* currentClosure)
 {
     std::string mangled = "_Z";
     mangled += std::to_string(name.size()) + name;

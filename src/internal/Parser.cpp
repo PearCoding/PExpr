@@ -204,9 +204,9 @@ private:
         P.expect(TokenType::Identifier);
 
         // Optional explicit type annotation for declarations: ': TYPE'
-        ElementaryType declaredType = ElementaryType::Unspecified;
+        Type declaredType = Type(TypeKind::Unspecified);
         if (is_declaration && P.accept(TokenType::Colon))
-            declaredType = p_elementary_type();
+            declaredType = p_type();
 
         P.expect(TokenType::Assign);
 
@@ -230,7 +230,7 @@ private:
             const std::string paramName = std::get<std::string>(P.cur().Value);
             P.expect(TokenType::Identifier);
             P.expect(TokenType::Colon);
-            const ElementaryType type = p_elementary_type();
+            const auto type = p_type();
             list.push_back(Parameter{ paramName, type });
         } while (P.accept(TokenType::Comma));
 
@@ -329,12 +329,12 @@ private:
 
         P.expect(TokenType::ClosedParentheses);
 
-        ElementaryType returnType = ElementaryType::Unspecified;
+        Type returnType = Type(TypeKind::Unspecified);
         if (P.accept(TokenType::ArrowRight))
-            returnType = p_elementary_type();
+            returnType = p_type();
 
         // Build mangled name from declared parameter types (do NOT include return type).
-        std::vector<ElementaryType> paramTypes;
+        std::vector<Type> paramTypes;
         paramTypes.reserve(parameters.size());
         for (const auto& p : parameters)
             paramTypes.push_back(p.Type);
@@ -360,7 +360,7 @@ private:
 
             return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled, false);
         } else {
-            if (returnType == ElementaryType::Unspecified) {
+            if (returnType.kind() == TypeKind::Unspecified) {
                 P.signalError();
                 P.mReporter.errorf(P.cur().Location, "Expected an explicit return type for the given function");
             }
@@ -463,8 +463,8 @@ private:
         // explicit cast syntax: "<expr> as <type>"
         if (P.accept(TokenType::As)) {
             // Use the expression's original location for the cast node
-            const auto loc              = expr->location();
-            const ElementaryType toType = p_elementary_type();
+            const auto loc    = expr->location();
+            const auto toType = p_type();
             return std::make_shared<CastExpression>(loc, toType, expr);
         }
 
@@ -604,16 +604,16 @@ private:
     {
         const auto value = P.cur();
         if (P.accept(TokenType::BooleanLiteral))
-            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Boolean, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, Type(TypeKind::Boolean), value.Value);
 
         if (P.accept(TokenType::NumberLiteral))
-            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Number, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, Type(TypeKind::Number), value.Value);
 
         if (P.accept(TokenType::IntegerLiteral))
-            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::Integer, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, Type(TypeKind::Integer), value.Value);
 
         if (P.accept(TokenType::StringLiteral))
-            return std::make_shared<LiteralExpression>(value.Location, ElementaryType::String, value.Value);
+            return std::make_shared<LiteralExpression>(value.Location, Type(TypeKind::String), value.Value);
 
         if (P.accept(TokenType::Identifier))
             return std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));
@@ -645,28 +645,31 @@ private:
             return {};
     }
 
-    inline ElementaryType p_elementary_type()
+    inline Type p_type()
     {
         switch (P.cur().Type) {
         case TokenType::BooleanType:
             P.next();
-            return ElementaryType::Boolean;
+            return Type(TypeKind::Boolean);
         case TokenType::IntegerType:
             P.next();
-            return ElementaryType::Integer;
+            return Type(TypeKind::Integer);
         case TokenType::NumberType:
             P.next();
-            return ElementaryType::Number;
+            return Type(TypeKind::Number);
         case TokenType::StringType:
             P.next();
-            return ElementaryType::String;
+            return Type(TypeKind::String);
+        case TokenType::OpenSquareBracket:
+            // Tuple: TODO
+            return Type(TypeKind::Error);
         default:
-            if (P.cur().Type >= TokenType::Vec1Type) {
-                return (ElementaryType)((size_t)ElementaryType::Vec1 + P.cur().arraySize() - 1);
-            } else {
-                P.error(std::to_array<TokenType>({ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType, TokenType::StringType }));
-                return ElementaryType::Error;
-            }
+            // if (P.cur().Type >= TokenType::Vec1Type) {
+            //     return (ElementaryType)((size_t)ElementaryType::Vec1 + P.cur().arraySize() - 1);
+            // } else {
+            P.error(std::to_array<TokenType>({ TokenType::BooleanType, TokenType::IntegerType, TokenType::NumberType, TokenType::StringType }));
+            return Type(TypeKind::Error);
+            // }
         }
     }
 };

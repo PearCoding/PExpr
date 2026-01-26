@@ -15,7 +15,7 @@ TEST_CASE("TypeChecker: integer arithmetic", "[typechecker]")
     auto ast = env.parse(stream);
     auto t   = ast->expression()->returnType();
 
-    REQUIRE(t == ElementaryType::Integer);
+    REQUIRE(t.kind() == TypeKind::Integer);
 }
 
 TEST_CASE("TypeChecker: number arithmetic", "[typechecker]")
@@ -25,7 +25,7 @@ TEST_CASE("TypeChecker: number arithmetic", "[typechecker]")
     auto ast = env.parse(stream);
     auto t   = ast->expression()->returnType();
 
-    REQUIRE(t == ElementaryType::Number);
+    REQUIRE(t.kind() == TypeKind::Number);
 }
 
 TEST_CASE("TypeChecker: mixed int and number yields number", "[typechecker]")
@@ -35,7 +35,7 @@ TEST_CASE("TypeChecker: mixed int and number yields number", "[typechecker]")
     auto ast = env.parse(stream);
     auto t   = ast->expression()->returnType();
 
-    REQUIRE(t == ElementaryType::Number);
+    REQUIRE(t.kind() == TypeKind::Number);
 }
 
 TEST_CASE("TypeChecker: variable declaration registers variable and used in expression", "[typechecker]")
@@ -45,7 +45,7 @@ TEST_CASE("TypeChecker: variable declaration registers variable and used in expr
     auto ast = env.parse(stream);
     auto t   = ast->expression()->returnType();
 
-    REQUIRE(t == ElementaryType::Integer);
+    REQUIRE(t.kind() == TypeKind::Integer);
 }
 
 TEST_CASE("TypeChecker: string literal", "[typechecker]")
@@ -55,5 +55,5 @@ TEST_CASE("TypeChecker: string literal", "[typechecker]")
     auto ast = env.parse(stream);
     auto t   = ast->expression()->returnType();
 
-    REQUIRE(t == ElementaryType::String);
+    REQUIRE(t.kind() == TypeKind::String);
 }

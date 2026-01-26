@@ -11,7 +11,7 @@
 - [ ] Collapse branches to select operations if possible
 - [x] External pure functions
 - [x] Constant folding of intrinsic functions
-- [ ] SSCPIdentityOptimizer needs to inject intrinsics. Overhaul the intrinsics handling for checks and injections.
+- [x] SSCPIdentityOptimizer needs to inject intrinsics. Overhaul the intrinsics handling for checks and injections.
 - [x] Common subexpression elimination (CSE)
 - [ ] Algebraic simplification & strength reduction
 - [ ] Value range propagation
@@ -24,3 +24,6 @@
 - [ ] Add if statements
 - [x] Refactor code to use std::ranges if applicable
 - [x] Add SSA IR serialization with write and read functionality
+- [ ] Add support for tuples
+- [ ] Add support for type alias (needed for tuples)
+- [ ] To add more statement types the rule of mutability for closures must be rewritten. Extend lambda uplifting to work with mutable variables, by explicitly tracking them and updating them at the end of a SSA call.

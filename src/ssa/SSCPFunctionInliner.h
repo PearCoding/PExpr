@@ -8,7 +8,7 @@
 
 namespace PExpr::ssa {
 
-using SSAIntrinsicInlineCallback = std::function<std::optional<ExtendedValueVariant>(const std::vector<ExtendedValueVariant>& args)>;
+using SSAIntrinsicInlineCallback = std::function<std::optional<ValueVariant>(const std::vector<ValueVariant>& args)>;
 
 class SSCPFunctionInliner {
 public:

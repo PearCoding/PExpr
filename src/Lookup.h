@@ -28,7 +28,7 @@ using VariableLookupFunction = std::function<std::optional<VariableDef>(const Va
 
 class FunctionLookup {
 public:
-    inline FunctionLookup(const Location& location, const std::string& name, const std::vector<ElementaryType>& params)
+    inline FunctionLookup(const Location& location, const std::string& name, const std::vector<Type>& params)
         : mName(name)
         , mLocation(location)
         , mParameters(params)
@@ -42,10 +42,10 @@ public:
     inline const Location& location() const { return mLocation; }
 
     /// The all parameter types the function has to be called with.
-    inline const std::vector<ElementaryType>& parameters() const { return mParameters; }
+    inline const std::vector<Type>& parameters() const { return mParameters; }
 
     /// Return true if given set of parameters is compatible with the parameters in the lookup.
-    inline bool matchParameter(const std::vector<ElementaryType>& params, bool exactOnly = false) const
+    inline bool matchParameter(const std::vector<Type>& params, bool exactOnly = false) const
     {
         // Do the number of parameters even match?
         if (mParameters.size() != params.size())
@@ -59,14 +59,13 @@ public:
             return false;
 
         // Second check (if failed) with conversions
-        return std::equal(mParameters.begin(), mParameters.end(), params.begin(),
-                          isConvertible);
+        return std::equal(mParameters.begin(), mParameters.end(), params.begin(), [](const Type& from, const Type& to) { return isConvertible(from, to); });
     }
 
 private:
     std::string mName;
     Location mLocation;
-    std::vector<ElementaryType> mParameters;
+    std::vector<Type> mParameters;
 };
 /// Callback returning definition of function if exact match is found
 using FunctionLookupFunction = std::function<std::optional<FunctionDef>(const FunctionLookup&)>;
