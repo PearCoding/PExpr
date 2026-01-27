@@ -190,7 +190,7 @@ private:
             return closure;
         }
 
-        closure->setExpression(p_expression());
+        closure->expressionMut() = p_expression();
 
         // Check for a trailing semicolon
         const auto semicolonLoc = P.cur().Location;
@@ -213,7 +213,7 @@ private:
         if (is_declaration)
             is_mutable = P.accept(TokenType::Mutable);
 
-        const auto idLoc = P.cur().Location;
+        const auto idLoc          = P.cur().Location;
         const std::string varName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
         P.expect(TokenType::Identifier);
 
@@ -273,11 +273,12 @@ private:
         if (P.cur().Type == TokenType::ClosedParentheses)
             return list; // Empty parameter list
         do {
-            const std::string paramName = std::get<std::string>(P.cur().Value);
+            bool isMutable = P.accept(TokenType::Mutable);
+            const std::string paramName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "__unknown__";
             P.expect(TokenType::Identifier);
             P.expect(TokenType::Colon);
             const auto type = p_type();
-            list.push_back(Parameter{ paramName, type });
+            list.push_back(Parameter{ paramName, type, isMutable });
         } while (P.accept(TokenType::Comma));
 
         return list;
@@ -449,8 +450,8 @@ private:
             mCurrentClosure = closure.get();
 
             P.expect(TokenType::Assign);
-            Ptr<Expression> expr = p_expression();
-            closure->setExpression(expr);
+            Ptr<Expression> expr     = p_expression();
+            closure->expressionMut() = expr;
             P.expect(TokenType::Semicolon);
 
             mCurrentClosure = closure->parent();

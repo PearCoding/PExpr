@@ -116,6 +116,7 @@ public:
 
     [[nodiscard]] inline const type::Type& toType() const { return mToType; }
     [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mInner; }
     [[nodiscard]] inline bool isExplicit() const { return mExplicit; }
 
 private:
@@ -139,6 +140,7 @@ public:
     [[nodiscard]] inline UnaryOperation op() const { return mOperation; }
     /// The inner expression the unary operation is applied to.
     [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mExpr; }
 
 private:
     UnaryOperation mOperation;
@@ -161,8 +163,10 @@ public:
     [[nodiscard]] inline BinaryOperation op() const { return mOperation; }
     /// The left expression the binary operation is applied to.
     [[nodiscard]] inline Ptr<Expression> left() const { return mLeft; }
+    [[nodiscard]] inline Ptr<Expression>& leftMut() & { return mLeft; }
     /// The right expression the binary operation is applied to.
     [[nodiscard]] inline Ptr<Expression> right() const { return mRight; }
+    [[nodiscard]] inline Ptr<Expression>& rightMut() & { return mRight; }
 
 private:
     BinaryOperation mOperation;
@@ -193,6 +197,7 @@ public:
     [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The parameters of the given function.
     [[nodiscard]] inline const ParameterList& parameters() const { return mParameters; }
+    [[nodiscard]] inline ParameterList& parameters() { return mParameters; }
 
     /// Replace a parameter expression (used by the typechecker to inject implicit casts).
     inline void replaceParameter(size_t idx, const Ptr<Expression>& expr)
@@ -232,6 +237,7 @@ public:
 
     /// The inner expression the access operation is applied to.
     [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mExpr; }
     /// A character coded swizzle. E.g., xzy will return a 'vec3' with [x, z, y].
     [[nodiscard]] inline const std::string& swizzle() const { return mSwizzle; }
 
@@ -253,6 +259,7 @@ public:
 
     /// The inner expression the access operation is applied to.
     [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mExpr; }
 
     /// The index of the vector.
     [[nodiscard]] inline size_t index() const { return mIndex; }
@@ -274,6 +281,7 @@ public:
     }
 
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
+    [[nodiscard]] inline Ptr<Closure>& closureMut() & { return mClosure; }
 
 private:
     Ptr<Closure> mClosure;
@@ -298,8 +306,10 @@ public:
 
     /// The actual unary operation of this expression.
     [[nodiscard]] inline const ClosureList& branches() const { return mBranches; }
+    [[nodiscard]] inline ClosureList& branches() { return mBranches; }
     /// The else expression
     [[nodiscard]] inline Ptr<Closure> elseClosure() const { return mElseClosure; }
+    [[nodiscard]] inline Ptr<Closure>& elseClosureMut() & { return mElseClosure; }
 
 private:
     ClosureList mBranches;
@@ -323,14 +333,7 @@ public:
     }
 
     [[nodiscard]] inline const std::vector<Ptr<Expression>> entries() const { return mEntries; }
-
-    /// Replace a vector entry expression (used by the TypeChecker to inject implicit casts).
-    inline void replaceEntry(size_t idx, const Ptr<Expression>& expr)
-    {
-        PEXPR_ASSERT(idx < mEntries.size(), "Entry index out of range");
-        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
-        mEntries[idx] = expr;
-    }
+    [[nodiscard]] inline std::vector<Ptr<Expression>>& entries() { return mEntries; }
 
 private:
     std::vector<Ptr<Expression>> mEntries;

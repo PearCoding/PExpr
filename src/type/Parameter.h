@@ -11,6 +11,7 @@ namespace PExpr::type {
 struct Parameter {
     std::string Name;
     Type ParamType;
+    bool IsMutable;
 };
 
 using ParameterList = std::vector<Parameter>;

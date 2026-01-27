@@ -14,20 +14,17 @@ public:
 
     /// The location this statement is associated with.
     [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
-    [[nodiscard]] inline const std::string& name() const { return mName; }
     [[nodiscard]] inline StatementType type() const { return mType; }
 
 protected:
-    Statement(const parser::Location& loc, const std::string& name, StatementType type)
+    Statement(const parser::Location& loc, StatementType type)
         : mLocation(loc)
-        , mName(name)
         , mType(type)
     {
     }
 
 private:
     const parser::Location mLocation;
-    const std::string mName;
     const StatementType mType;
 };
 
@@ -36,7 +33,7 @@ private:
 class VariableDeclarationStatement : public Statement {
 public:
     VariableDeclarationStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Statement(loc, "", StatementType::VariableDeclaration)
+        : Statement(loc, StatementType::VariableDeclaration)
         , mPattern(pattern)
         , mExpression(expr)
     {
@@ -44,7 +41,7 @@ public:
 
     [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
-    inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
+    [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 
 private:
     Ptr<Pattern> mPattern;
@@ -56,7 +53,7 @@ private:
 class VariableAssignmentStatement : public Statement {
 public:
     VariableAssignmentStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Statement(loc, "", StatementType::VariableAssignment)
+        : Statement(loc, StatementType::VariableAssignment)
         , mPattern(pattern)
         , mExpression(expr)
     {
@@ -64,7 +61,7 @@ public:
 
     [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
-    inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
+    [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 
 private:
     Ptr<Pattern> mPattern;
@@ -74,15 +71,17 @@ private:
 class FunctionDeclarationStatement : public Statement {
 public:
     FunctionDeclarationStatement(const parser::Location& loc, const std::string& name, const type::ParameterList& parameters, const Ptr<Closure>& closure, const type::Type& returnType, const std::string& mangledName, bool hasSideEffects)
-        : Statement(loc, name, StatementType::FunctionDeclaration)
+        : Statement(loc, StatementType::FunctionDeclaration)
         , mParameters(parameters)
         , mReturnType(returnType)
+        , mName(name)
         , mMangledName(mangledName)
         , mClosure(closure)
         , mHasSideEffects(hasSideEffects)
     {
     }
 
+    [[nodiscard]] inline const std::string& name() const { return mName; }
     [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
 
     [[nodiscard]] inline const type::ParameterList& parameters() const { return mParameters; }
@@ -97,6 +96,7 @@ public:
 private:
     const type::ParameterList mParameters;
     type::Type mReturnType;
+    const std::string mName;
     const std::string mMangledName;
     const Ptr<Closure> mClosure;
     const bool mHasSideEffects;
@@ -105,14 +105,17 @@ private:
 class TypeAliasStatement : public Statement {
 public:
     TypeAliasStatement(const parser::Location& loc, const std::string& name, const type::Type& aliasedType)
-        : Statement(loc, name, StatementType::TypeAlias)
+        : Statement(loc, StatementType::TypeAlias)
+        , mName(name)
         , mAliasedType(aliasedType)
     {
     }
 
+    [[nodiscard]] inline const std::string& name() const { return mName; }
     [[nodiscard]] inline const type::Type& aliasedType() const { return mAliasedType; }
 
 private:
+    const std::string mName;
     const type::Type mAliasedType;
 };
 

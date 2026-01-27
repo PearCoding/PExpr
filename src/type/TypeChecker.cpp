@@ -153,10 +153,6 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
                 mReporter.errorf(assignStmt->location(), "Unknown variable '%s' in assignment", binding.name.c_str());
                 return;
             }
-            if (capturedTbl != &closure->symbols()) {
-                mReporter.errorf(assignStmt->location(), "Cannot assign to variable '%s' defined in a different scope", binding.name.c_str());
-                return;
-            }
             if (!var->isMutable()) {
                 mReporter.errorf(assignStmt->location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
                 return;
@@ -207,10 +203,6 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
                             mReporter.errorf(elem.location(), "Unknown variable '%s' in destructuring assignment", binding.name.c_str());
                             return false;
                         }
-                        if (capturedTbl != &closure->symbols()) {
-                            mReporter.errorf(elem.location(), "Cannot assign to variable '%s' defined in a different scope", binding.name.c_str());
-                            return false;
-                        }
                         if (!var->isMutable()) {
                             mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
                             return false;
@@ -245,7 +237,7 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         // Add parameters to the symbol table
         if (funcStmt->closure()) {
             for (const auto& p : funcStmt->parameters()) {
-                if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.ParamType, false))) //< TODO: Really non-mutable?
+                if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.ParamType, p.IsMutable)))
                     mReporter.errorf(funcStmt->location(), "Parameter '%s' already exists in the current scope", p.Name.c_str());
             }
 
@@ -340,9 +332,9 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
             // Inject a CastExpression so the branch body expression has the desired return type.
             // This ensures later stages (SSA mapper) see an explicit cast node rather than relying
             // on the mapper to insert SSA-level casts.
-            auto origExpr = branch.Body->expression();
-            auto castExpr = std::make_shared<CastExpression>(origExpr->location(), returnType, origExpr);
-            branch.Body->replaceExpression(castExpr);
+            auto origExpr                = branch.Body->expression();
+            auto castExpr                = std::make_shared<CastExpression>(origExpr->location(), returnType, origExpr);
+            branch.Body->expressionMut() = castExpr;
 
             utils::ReportType rt = utils::RT_WARNING_IMPLICIT_CAST;
             // Special case: `int` literal for a `num` branch
@@ -628,13 +620,12 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpres
 
     if (innerType.kind() == TypeKind::Tuple) {
         const size_t vec_size = innerType.size();
-
         if (vec_size < expr->index()) {
             mReporter.errorf(expr->location(), "Out of bounds access with %zu on tuple of size %zu", expr->index(), vec_size);
             return Type(TypeKind::Error);
         }
     } else {
-        mReporter.errorf(expr->location(), "Access operator is only defined for vector types");
+        mReporter.errorf(expr->location(), "Access operator is only defined for tuple/vector types");
         return Type(TypeKind::Error);
     }
 
@@ -645,7 +636,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpres
 Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<TupleExpression>& expr)
 {
     if (expr->entries().size() == 0) {
-        mReporter.errorf(expr->location(), "Can not create an empty vector");
+        mReporter.errorf(expr->location(), "Can not create an empty tuple");
         return Type(TypeKind::Error);
     }
 

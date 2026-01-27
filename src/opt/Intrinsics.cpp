@@ -11,14 +11,14 @@ void setupIntrinsics(SSCPFunctionInliner& inliner)
     const auto addP1N = [&](const std::string& name, std::function<Number(Number)> callback) {
         inliner.addIntrinsic(FunctionDef(name,
                                          makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number) }), nullptr),
-                                         { Parameter{ "p0", Type(TypeKind::Number) } }, Type(TypeKind::Number), true, false),
+                                         { Parameter{ "p0", Type(TypeKind::Number), false } }, Type(TypeKind::Number), true, false),
                              [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0))); });
     };
 
     const auto addP2N = [&](const std::string& name, std::function<Number(Number, Number)> callback) {
         inliner.addIntrinsic(FunctionDef(name,
                                          makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number), Type(TypeKind::Number) }), nullptr),
-                                         { Parameter{ "p0", Type(TypeKind::Number) }, Parameter{ "p1", Type(TypeKind::Number) } }, Type(TypeKind::Number), true, false),
+                                         { Parameter{ "p0", Type(TypeKind::Number), false }, Parameter{ "p1", Type(TypeKind::Number), false } }, Type(TypeKind::Number), true, false),
                              [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0)), std::get<Number>(args.at(1))); });
     };
 

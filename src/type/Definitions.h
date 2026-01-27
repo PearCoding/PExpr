@@ -10,6 +10,8 @@ namespace PExpr::type {
 /// A general purpose variable. The actual value is defined externally.
 class VariableDef {
 public:
+    VariableDef() = default;
+
     /// Construct a definition for a variable with a given name and type.
     inline VariableDef(const std::string& name, const Type& type, bool isMutable)
         : mName(name)
@@ -29,9 +31,9 @@ public:
     [[nodiscard]] auto operator<=>(const VariableDef&) const = default;
 
 private:
-    std::string mName;
+    std::string mName = "";
     Type mType;
-    bool mIsMutable;
+    bool mIsMutable = false;
 };
 
 /// A general purpose function definition with a fixed signature.

@@ -28,27 +28,14 @@ public:
     }
 
     [[nodiscard]] inline const StatementList& statements() const { return mStatement; }
+    [[nodiscard]] inline StatementList& statements() { return mStatement; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
+    [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 
     inline void addStatement(const Ptr<Statement>& statement)
     {
         PEXPR_ASSERT(statement != nullptr, "Expected valid statement");
         mStatement.push_back(statement);
-    }
-
-    inline void setExpression(const Ptr<Expression>& expr)
-    {
-        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
-        PEXPR_ASSERT(mExpression == nullptr, "Expected closure expression to be set once");
-        mExpression = expr;
-    }
-
-    /// Replace the existing expression inside the closure. This is used by the
-    /// TypeChecker to inject CastExpression wrappers for implicit conversions.
-    inline void replaceExpression(const Ptr<Expression>& expr)
-    {
-        PEXPR_ASSERT(expr != nullptr, "Expected valid expression");
-        mExpression = expr;
     }
 
     inline void replaceStatement(const Ptr<Statement>& oldStmt, const Ptr<Statement>& newStmt)
