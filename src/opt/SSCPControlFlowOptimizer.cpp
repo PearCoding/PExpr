@@ -1,10 +1,11 @@
 #include "SSCPControlFlowOptimizer.h"
-#include "SSAMapper.h"
+#include "ssa/SSAInstruction.h"
 
 #include <algorithm>
 #include <ranges>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
 bool SSCPControlFlowOptimizer::removeEmptyBranches(InstructionList& instructions)
 {
@@ -175,4 +176,4 @@ bool SSCPControlFlowOptimizer::collapsePhiNodes(InstructionList& instructions)
     return changed;
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

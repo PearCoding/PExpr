@@ -1,27 +1,36 @@
 #pragma once
 
-#include "SSAMapper.h"
-#include "SSAOptions.h"
+#include "OptimizerOptions.h"
+#include "type/Definitions.h"
 
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace PExpr::ssa {
+class SSAContext;
+class SSAInstr;
+class SSAInstrCall;
+class SSAFunction;
+class SSAProgram;
+} // namespace PExpr::ssa
+
+namespace PExpr::opt {
 
 using SSAIntrinsicInlineCallback = std::function<std::optional<ValueVariant>(const std::vector<ValueVariant>& args)>;
 
 class SSCPFunctionInliner {
 public:
-    using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
+    using InstructionList = std::vector<std::shared_ptr<ssa::SSAInstr>>;
 
-    inline explicit SSCPFunctionInliner(const SSAOptions& opts)
+    inline explicit SSCPFunctionInliner(const OptimizerOptions& opts)
         : mOptions(opts)
     {
     }
 
-    void analyzeCallGraph(const SSAProgram& program);
-    [[nodiscard]] bool attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func);
-    [[nodiscard]] bool removeUnusedFunctions(SSAProgram& program);
+    void analyzeCallGraph(const ssa::SSAProgram& program);
+    [[nodiscard]] bool attempFunctionInlining(ssa::SSAContext* ctx, ssa::SSAProgram& program, ssa::SSAFunction& func);
+    [[nodiscard]] bool removeUnusedFunctions(ssa::SSAProgram& program);
 
     inline void addIntrinsic(const type::FunctionDef& func, SSAIntrinsicInlineCallback callback)
     {
@@ -35,18 +44,18 @@ private:
     /// @param call The call instruction
     /// @param outInlinedBody Output parameter for the cloned and mapped instructions
     /// @param runOptimization Apply optimization on this block only
-    void cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunction& func, const SSAInstrCall* call,
+    void cloneAndMapFunctionBody(ssa::SSAContext* ctx, const ssa::SSAFunction& func, const ssa::SSAInstrCall* call,
                                  InstructionList& outInlinedBody,
                                  bool runOptimization);
 
-    [[nodiscard]] bool inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    [[nodiscard]] bool shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func);
-    [[nodiscard]] bool attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool inlineFunctionCall(ssa::SSAContext* ctx, ssa::SSAInstrCall* call, ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool shouldInlineFunctionCall(ssa::SSAInstrCall* call, ssa::SSAFunction& func);
+    [[nodiscard]] bool attemptAdvancedInlining(ssa::SSAContext* ctx, ssa::SSAInstrCall* call, ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
     [[nodiscard]] bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
 
-    [[nodiscard]] bool tryInlineIntrinsic(SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool tryInlineIntrinsic(ssa::SSAInstrCall* call, const ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
 
-    const SSAOptions mOptions;
+    const OptimizerOptions mOptions;
     std::unordered_map<std::string, int> mCallCounts;
 
     struct FunctionInlinePair {
@@ -65,4 +74,4 @@ private:
     static constexpr int MAX_INLINE_ATTEMPTS = 16;
 };
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

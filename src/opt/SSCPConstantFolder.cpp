@@ -1,13 +1,15 @@
 #include "SSCPConstantFolder.h"
-#include "SSAMapper.h"
+#include "ssa/SSAInstruction.h"
+#include "ssa/SSAValue.h"
 
 #include <algorithm>
 #include <cmath>
 #include <ranges>
 #include <sstream>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
 using namespace ast;
+using namespace ssa;
 using VecN = std::vector<Number>;
 
 bool SSCPConstantFolder::extractBool(const SSAValue& vv, bool& out)
@@ -558,4 +560,4 @@ bool SSCPConstantFolder::foldToConstants(bool foldNumber, InstructionList& body)
     return changed;
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

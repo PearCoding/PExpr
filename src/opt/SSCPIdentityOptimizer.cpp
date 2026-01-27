@@ -1,12 +1,13 @@
 #include "SSCPIdentityOptimizer.h"
-#include "SSAMapper.h"
+#include "ssa/SSAContext.h"
 
 #include <cmath>
 #include <ranges>
 #include <sstream>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
 using namespace ast;
+using namespace ssa;
 
 bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& instructions)
 {
@@ -419,4 +420,4 @@ const SSAInstr* SSCPIdentityOptimizer::getDefinition(const SSAValue& val) const
 
     return nullptr;
 }
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

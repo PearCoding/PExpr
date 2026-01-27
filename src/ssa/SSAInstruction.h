@@ -8,7 +8,8 @@
 #include <vector>
 
 namespace PExpr::ssa {
-struct SSAInstr {
+class SSAInstr {
+public:
     virtual ~SSAInstr() = default;
 
     /// Compute a hash for this instruction
@@ -41,7 +42,8 @@ struct SSAInstr {
     virtual void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const { PEXPR_UNUSED(visitor); };
 };
 
-struct SSAInstrAssign : public SSAInstr {
+class SSAInstrAssign : public SSAInstr {
+public:
     enum class OpKind { Assign,
                         Unary,
                         Binary,
@@ -67,7 +69,8 @@ struct SSAInstrAssign : public SSAInstr {
     void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
-struct SSAInstrCall : public SSAInstr {
+class SSAInstrCall : public SSAInstr {
+public:
     SSAValue Target;
     std::string FunctionName;       ///< Mangled unique name
     std::string PublicFunctionName; ///< User given name
@@ -81,7 +84,8 @@ struct SSAInstrCall : public SSAInstr {
     void forEachTarget(const std::function<void(const SSAValue&)>& visitor) const override;
 };
 
-struct SSAInstrReturn : public SSAInstr {
+class SSAInstrReturn : public SSAInstr {
+public:
     SSAValue Value;
     [[nodiscard]] size_t hash(bool includeTargetName = true) const override
     {
@@ -101,7 +105,8 @@ struct SSAInstrReturn : public SSAInstr {
 // Label instruction to mark basic blocks in the SSA body. Labels are useful
 // for representing control-flow boundaries (e.g., branch entry points) and
 // are emitted when inlining branch/closure bodies.
-struct SSAInstrLabel : public SSAInstr {
+class SSAInstrLabel : public SSAInstr {
+public:
     std::string Name;
     [[nodiscard]] size_t hash(bool includeTargetName = true) const override
     {
@@ -117,7 +122,8 @@ struct SSAInstrLabel : public SSAInstr {
 };
 
 // Conditional branch instruction: if Condition is true jump to TargetLabel.
-struct SSAInstrBranch : public SSAInstr {
+class SSAInstrBranch : public SSAInstr {
+public:
     SSAValue Condition;
     std::string TargetLabel;
     [[nodiscard]] size_t hash(bool includeTargetName = true) const override
@@ -138,7 +144,8 @@ struct SSAInstrBranch : public SSAInstr {
 };
 
 // Unconditional jump to a label.
-struct SSAInstrGoto : public SSAInstr {
+class SSAInstrGoto : public SSAInstr {
+public:
     std::string TargetLabel;
     [[nodiscard]] size_t hash(bool includeTargetName = true) const override
     {
@@ -153,7 +160,8 @@ struct SSAInstrGoto : public SSAInstr {
     }
 };
 
-struct SSAInstrPhi : public SSAInstr {
+class SSAInstrPhi : public SSAInstr {
+public:
     SSAValue Target;
     std::vector<SSAValue> Conditions;
     std::vector<SSAValue> Branches; // One more than Conditions due to 'else' case

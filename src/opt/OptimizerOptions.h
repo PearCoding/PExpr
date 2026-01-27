@@ -1,9 +1,9 @@
 #pragma once
 
-#include "SSAMapper.h"
+#include "PExpr.h"
 
-namespace PExpr::ssa {
-struct SSAOptions {
+namespace PExpr::opt {
+struct OptimizerOptions {
     bool EnableConstantFolding         = true;
     bool EnableConstantFoldingNumber   = true;
     bool RemoveDeadCode                = true;
@@ -13,9 +13,9 @@ struct SSAOptions {
     bool EliminateCommonSubexpressions = true; // < Common subexpression elimination (CSE)
     bool EliminatePartialRedundancies  = true; // < Partial redundancy elimination (PRE)
 
-    [[nodiscard]] inline static SSAOptions None()
+    [[nodiscard]] inline static OptimizerOptions None()
     {
-        return SSAOptions{
+        return OptimizerOptions{
             .EnableConstantFolding         = false,
             .EnableConstantFoldingNumber   = false,
             .RemoveDeadCode                = false,
@@ -27,7 +27,7 @@ struct SSAOptions {
         };
     }
 
-    [[nodiscard]] inline static SSAOptions Low()
+    [[nodiscard]] inline static OptimizerOptions Low()
     {
         auto opts                          = None();
         opts.EnableConstantFolding         = true;
@@ -36,7 +36,7 @@ struct SSAOptions {
         return opts;
     }
 
-    [[nodiscard]] inline static SSAOptions Medium()
+    [[nodiscard]] inline static OptimizerOptions Medium()
     {
         auto opts                         = Low();
         opts.InlineFunctions              = true;
@@ -44,7 +44,7 @@ struct SSAOptions {
         return opts;
     }
 
-    [[nodiscard]] inline static SSAOptions High()
+    [[nodiscard]] inline static OptimizerOptions High()
     {
         auto opts                         = Medium();
         opts.EnableConstantFoldingNumber  = true;

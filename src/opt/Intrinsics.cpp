@@ -3,7 +3,7 @@
 
 #include <array>
 
-namespace PExpr::ssa::intrinsics {
+namespace PExpr::opt::intrinsics {
 using namespace type;
 
 void setupIntrinsics(SSCPFunctionInliner& inliner)
@@ -40,4 +40,4 @@ void setupIntrinsics(SSCPFunctionInliner& inliner)
     addP2N("pow", [](Number a, Number b) { return std::pow(a, b); });     // [[extern, pure]] fn pow(a:num, b:num) -> num;
     addP2N("atan2", [](Number a, Number b) { return std::atan2(a, b); }); // [[extern, pure]] fn atan2(a:num, b:num) -> num;
 }
-} // namespace PExpr::ssa::intrinsics
+} // namespace PExpr::opt::intrinsics

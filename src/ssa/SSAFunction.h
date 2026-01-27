@@ -5,7 +5,8 @@
 #include <memory>
 
 namespace PExpr::ssa {
-struct SSAFunction {
+class SSAFunction {
+public:
     std::string Name;
     std::vector<std::string> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
@@ -17,7 +18,8 @@ struct SSAFunction {
     bool HasSideEffect = false;
 };
 
-struct SSAProgram {
+class SSAProgram {
+public:
     std::vector<std::shared_ptr<SSAInstr>> Body;
     std::vector<SSAFunction> Functions;
 };

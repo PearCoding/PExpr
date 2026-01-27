@@ -1,7 +1,6 @@
 #pragma once
 
-#include "SSAMapper.h"
-#include "SSAOptions.h"
+#include "SSAContext.h"
 
 #include <memory>
 #include <unordered_map>

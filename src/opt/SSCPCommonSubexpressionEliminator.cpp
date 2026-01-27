@@ -1,12 +1,12 @@
 #include "SSCPCommonSubexpressionEliminator.h"
-#include "SSAMapper.h"
 
 #include <cstdint>
 #include <functional>
 #include <ranges>
 #include <sstream>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
 bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, InstructionList::iterator begin, InstructionList::iterator end, const std::unordered_set<std::string>& sideEffectedFunctions)
 {
@@ -161,4 +161,4 @@ SSCPCommonSubexpressionEliminator::hashInstruction(const SSAInstr* instr) const
     return ExpressionHash{ hash, type };
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

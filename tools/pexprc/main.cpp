@@ -5,8 +5,8 @@
 #include <CLI/CLI.hpp>
 
 #include "Environment.h"
+#include "opt/Optimizer.h"
 #include "ssa/SSAMapper.h"
-#include "ssa/SSAOptimizer.h"
 #include "ssa/SSASerializer.h"
 #include "ssa/SSAValidator.h"
 #include "utils/StringVisitor.h"
@@ -86,16 +86,16 @@ int main(int argc, char** argv)
     app.add_option_function<std::string>("-W,--warning", handleWarningCmd, "Set warnings");
     app.add_flag_callback("--no-warnings", [&]() { warningFlags = 0; }, "Disable all warnings");
 
-    ssa::SSAOptions optimizationOptions = ssa::SSAOptions::None();
+    opt::OptimizerOptions optimizationOptions = opt::OptimizerOptions::None();
     app.add_option_function<int>("-O", [&](int opt) { 
         if (opt == 0)
-            optimizationOptions = ssa::SSAOptions::None();
+            optimizationOptions = opt::OptimizerOptions::None();
         else if (opt == 1)
-            optimizationOptions = ssa::SSAOptions::Low();
+            optimizationOptions = opt::OptimizerOptions::Low();
         else if (opt == 2)
-            optimizationOptions = ssa::SSAOptions::Medium();
+            optimizationOptions = opt::OptimizerOptions::Medium();
        else 
-            optimizationOptions = ssa::SSAOptions::High(); }, "Set optimization level");
+            optimizationOptions = opt::OptimizerOptions::High(); }, "Set optimization level");
 
     app.add_flag("--opt-constant-folding,!--no-opt-constant-folding", optimizationOptions.EnableConstantFolding, "Enable constant folding");
     app.add_flag("--opt-math-folding,!--no-opt-math-folding", optimizationOptions.EnableConstantFoldingNumber, "Enable constant folding on numbers");
@@ -199,7 +199,7 @@ int main(int argc, char** argv)
     }
 
     // Optimize
-    ssa::SSAOptimizer::Run(optimizationOptions, program);
+    opt::Optimizer::Run(optimizationOptions, program);
     dumpOutput(ssa::SSASerializer::serialize(program));
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {

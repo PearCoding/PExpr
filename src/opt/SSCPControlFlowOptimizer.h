@@ -1,16 +1,20 @@
 #pragma once
 
-#include "SSAMapper.h"
+#include "PExpr.h"
 
 namespace PExpr::ssa {
+class SSAInstr;
+}
+
+namespace PExpr::opt {
 
 class SSCPControlFlowOptimizer {
 public:
-    using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
+    using InstructionList = std::vector<std::shared_ptr<ssa::SSAInstr>>;
 
     bool removeEmptyBranches(InstructionList& instructions);
     bool removeObsoleteLabels(InstructionList& instructions);
     bool collapsePhiNodes(InstructionList& instructions);
 };
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

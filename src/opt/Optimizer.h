@@ -1,43 +1,48 @@
 #pragma once
 
-#include "SSAContext.h"
-#include "SSAOptions.h"
-#include "SSCPConstantFolder.h"
-#include "SSCPControlFlowOptimizer.h"
-#include "SSCPDeadCodeOptimizer.h"
-#include "SSCPFunctionInliner.h"
-#include "SSCPIdentityOptimizer.h"
-#include "SSCPSideEffectAnalyzer.h"
-#include "SSCPCommonSubexpressionEliminator.h"
-#include "SSCPPreOptimizer.h"
+#include "OptimizerOptions.h"
 
 #include <memory>
 
 namespace PExpr::ssa {
+class SSAInstr;
+class SSAContext;
+class SSAProgram;
+} // namespace PExpr::ssa
+
+namespace PExpr::opt {
+class SSCPConstantFolder;
+class SSCPControlFlowOptimizer;
+class SSCPDeadCodeOptimizer;
+class SSCPFunctionInliner;
+class SSCPIdentityOptimizer;
+class SSCPSideEffectAnalyzer;
+class SSCPCommonSubexpressionEliminator;
+class SSCPPreOptimizer;
 
 /// Sparse Conditional Constant Propagation (SSCP) pass for the SSA IR.
-class SSAOptimizer {
+class Optimizer {
 public:
-    using InstructionList = std::vector<std::shared_ptr<SSAInstr>>;
+    using InstructionList = std::vector<std::shared_ptr<ssa::SSAInstr>>;
 
     /// Run the passes on a program. Modifies the program in-place.
-    static void Run(const SSAOptions& opts, SSAProgram& program);
+    static void Run(const OptimizerOptions& opts, ssa::SSAProgram& program);
 
     /// Run the passes on a subset of instructions. Modifies the instructions in-place. This prevents function inlining
-    static void Run(const SSAOptions& opts, InstructionList& body);
+    static void Run(const OptimizerOptions& opts, InstructionList& body);
 
 private:
-    SSAOptimizer(const SSAOptions& opts);
-    ~SSAOptimizer();
+    Optimizer(const OptimizerOptions& opts);
+    ~Optimizer();
 
     /// Run the pass on a program. Modifies the program in-place.
-    void runProgram(SSAProgram& program);
+    void runProgram(ssa::SSAProgram& program);
     bool processBody(InstructionList& body);
 
-    const SSAOptions mOptions;
+    const OptimizerOptions mOptions;
 
     // SSA Context for variable name generation
-    std::unique_ptr<SSAContext> mContext;
+    std::unique_ptr<ssa::SSAContext> mContext;
 
     // Components
     std::unique_ptr<SSCPConstantFolder> mConstantFolder;
@@ -50,4 +55,4 @@ private:
     std::unique_ptr<SSCPPreOptimizer> mPreOptimizer;
 };
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

@@ -1,12 +1,12 @@
 #include "SSCPPreOptimizer.h"
-#include "SSAMapper.h"
 #include "SSCPSideEffectAnalyzer.h"
 
 #include <algorithm>
 #include <queue>
 #include <ranges>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
 bool SSCPPreOptimizer::applyPRE(SSAContext* ctx, InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions)
 {

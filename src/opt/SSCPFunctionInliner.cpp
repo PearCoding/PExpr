@@ -1,10 +1,11 @@
 #include "SSCPFunctionInliner.h"
-#include "SSAMapper.h"
-#include "SSAOptimizer.h"
+#include "Optimizer.h"
+#include "ssa/SSAContext.h"
 
 #include <ranges>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
 void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
 {
@@ -156,7 +157,7 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
 
     // Apply all the optimization possible on instructions
     if (runOptimization)
-        SSAOptimizer::Run(mOptions, outInlinedBody);
+        Optimizer::Run(mOptions, outInlinedBody);
 
     PEXPR_ASSERT(dynamic_cast<const SSAInstrReturn*>(outInlinedBody.back().get()) != nullptr, "Expected the last entry to be a return statement");
 
@@ -324,4 +325,4 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
 
     return false;
 }
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

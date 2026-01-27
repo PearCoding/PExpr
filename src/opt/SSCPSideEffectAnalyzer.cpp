@@ -1,7 +1,7 @@
 #include "SSCPSideEffectAnalyzer.h"
-#include "SSAMapper.h"
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
 void SSCPSideEffectAnalyzer::propagateSideEffects(const SSAProgram& program)
 {

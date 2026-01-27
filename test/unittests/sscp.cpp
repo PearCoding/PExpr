@@ -3,8 +3,8 @@
 #include <string>
 
 #include "Environment.h"
+#include "opt/Optimizer.h"
 #include "ssa/SSAMapper.h"
-#include "ssa/SSAOptimizer.h"
 #include "ssa/SSASerializer.h"
 
 using namespace PExpr;
@@ -12,14 +12,14 @@ using namespace PExpr::ssa;
 
 [[nodiscard]] inline static auto MakeConstantFoldingOptimizer()
 {
-    auto opts                        = SSAOptions::None();
+    auto opts                        = opt::OptimizerOptions::None();
     opts.EnableConstantFolding       = true;
     opts.EnableConstantFoldingNumber = true;
     opts.RemoveDeadCode              = true;
     return opts;
 }
 
-TEST_CASE("SSAOptimizer: constant folding of binary ops", "[sscp]")
+TEST_CASE("Optimizer: constant folding of binary ops", "[sscp]")
 {
     std::stringstream stream("let mut a = 2; let mut b = 3; let mut c = a + b; c");
     Environment env;
@@ -29,7 +29,7 @@ TEST_CASE("SSAOptimizer: constant folding of binary ops", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
+    opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -37,7 +37,7 @@ TEST_CASE("SSAOptimizer: constant folding of binary ops", "[sscp]")
     REQUIRE(dumped.find("5") != std::string::npos);
 }
 
-TEST_CASE("SSAOptimizer: dead code elimination removes unused assigns", "[sscp]")
+TEST_CASE("Optimizer: dead code elimination removes unused assigns", "[sscp]")
 {
     std::stringstream stream("let x = 1; let y = 2; x");
     Environment env;
@@ -50,7 +50,7 @@ TEST_CASE("SSAOptimizer: dead code elimination removes unused assigns", "[sscp]"
     auto before = SSASerializer::serialize(prog);
     REQUIRE((before.find("y.") != std::string::npos || before.find("y:") != std::string::npos));
 
-    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
+    opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -60,7 +60,7 @@ TEST_CASE("SSAOptimizer: dead code elimination removes unused assigns", "[sscp]"
     REQUIRE(after.find("return ") != std::string::npos);
 }
 
-TEST_CASE("SSAOptimizer: constant folding for vectors", "[sscp]")
+TEST_CASE("Optimizer: constant folding for vectors", "[sscp]")
 {
     std::stringstream stream("let v1 = [1.0, 2.0]; let v2 = [3.0, 4.0]; let v3 = v1 + v2; v3.x");
     Environment env;
@@ -70,7 +70,7 @@ TEST_CASE("SSAOptimizer: constant folding for vectors", "[sscp]")
     auto prog = mapper.map(ast);
 
     // run SSCP pass
-    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
+    opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -78,7 +78,7 @@ TEST_CASE("SSAOptimizer: constant folding for vectors", "[sscp]")
     REQUIRE(dumped.find("4") != std::string::npos);
 }
 
-TEST_CASE("SSAOptimizer: vector arithmetic operations", "[sscp]")
+TEST_CASE("Optimizer: vector arithmetic operations", "[sscp]")
 {
     // Test various vector operations: add, sub, mul, div
     std::stringstream stream("let v1 = [1.0, 2.0, 3.0]; let v2 = [2.0, 3.0, 4.0]; let add = v1 + v2; let sub = v1 - v2; let mul = v1 * v2; let div = v1 / v2; add.x + sub.y + mul.z + div.x");
@@ -88,7 +88,7 @@ TEST_CASE("SSAOptimizer: vector arithmetic operations", "[sscp]")
     SSAMapper mapper;
     auto prog = mapper.map(ast);
 
-    SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
+    opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 

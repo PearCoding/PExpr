@@ -1,10 +1,11 @@
 #include "SSCPDeadCodeOptimizer.h"
-#include "SSAMapper.h"
+#include "ssa/SSAInstruction.h"
 
 #include <algorithm>
 #include <ranges>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
 void SSCPDeadCodeOptimizer::resetAndCountUses(const InstructionList& instructions)
 {
@@ -65,4 +66,4 @@ bool SSCPDeadCodeOptimizer::instrHasSideEffects(const SSAInstr* instr, const std
     return false;
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

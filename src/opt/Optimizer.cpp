@@ -1,14 +1,23 @@
-#include "SSAOptimizer.h"
+#include "Optimizer.h"
 
-namespace PExpr::ssa {
+#include "SSCPCommonSubexpressionEliminator.h"
+#include "SSCPConstantFolder.h"
+#include "SSCPControlFlowOptimizer.h"
+#include "SSCPDeadCodeOptimizer.h"
+#include "SSCPFunctionInliner.h"
+#include "SSCPIdentityOptimizer.h"
+#include "SSCPPreOptimizer.h"
+#include "SSCPSideEffectAnalyzer.h"
+
+namespace PExpr::opt {
 
 namespace intrinsics {
 extern void setupIntrinsics(SSCPFunctionInliner& inliner);
 }
 
-SSAOptimizer::SSAOptimizer(const SSAOptions& opts)
+Optimizer::Optimizer(const OptimizerOptions& opts)
     : mOptions(opts)
-    , mContext(std::make_unique<SSAContext>())
+    , mContext(std::make_unique<ssa::SSAContext>())
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
     , mControlFlowOptimizer(std::make_unique<SSCPControlFlowOptimizer>())
     , mDeadCodeOptimizer(std::make_unique<SSCPDeadCodeOptimizer>())
@@ -21,11 +30,11 @@ SSAOptimizer::SSAOptimizer(const SSAOptions& opts)
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
 
-SSAOptimizer::~SSAOptimizer() = default;
+Optimizer::~Optimizer() = default;
 
-void SSAOptimizer::Run(const SSAOptions& opts, SSAProgram& program)
+void Optimizer::Run(const OptimizerOptions& opts, ssa::SSAProgram& program)
 {
-    SSAOptimizer sscp(opts);
+    Optimizer sscp(opts);
 
     // 0) Analyze body to update SSA context with current variable counters
     sscp.mContext->reset();
@@ -34,9 +43,9 @@ void SSAOptimizer::Run(const SSAOptions& opts, SSAProgram& program)
     sscp.runProgram(program);
 }
 
-void SSAOptimizer::Run(const SSAOptions& opts, InstructionList& body)
+void Optimizer::Run(const OptimizerOptions& opts, InstructionList& body)
 {
-    SSAOptimizer sscp(opts);
+    Optimizer sscp(opts);
 
     // 0) Analyze body to update SSA context with current variable counters
     sscp.mContext->reset();
@@ -48,7 +57,7 @@ void SSAOptimizer::Run(const SSAOptions& opts, InstructionList& body)
         changed = sscp.processBody(body);
 }
 
-void SSAOptimizer::runProgram(SSAProgram& program)
+void Optimizer::runProgram(ssa::SSAProgram& program)
 {
     mSideEffectAnalyzer->propagateSideEffects(program);
 
@@ -85,7 +94,7 @@ void SSAOptimizer::runProgram(SSAProgram& program)
     }
 }
 
-bool SSAOptimizer::processBody(InstructionList& body)
+bool Optimizer::processBody(InstructionList& body)
 {
     if (body.empty())
         return false;
@@ -141,4 +150,4 @@ bool SSAOptimizer::processBody(InstructionList& body)
     return changed;
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt
