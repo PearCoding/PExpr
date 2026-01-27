@@ -1,0 +1,38 @@
+// Simple mutable capture with assignment
+let mut x = 5;
+fn increment() = { x = x + 1; x };
+let k = increment();
+x
+
+// After uplift should become:
+// let mut x:int = 5;
+// fn increment(mut x:int) -> [int, int] = {
+//   x = (x)+(1);
+//   [x, x]
+// };
+// let k:int = {
+//   let *[__result:int, x__new:int] = increment(x);
+//   x = x__new;
+//   __result
+// };
+// x
+
+// TODO: This produces invalid SSA IR
+//------------
+// fn _Z9increment_Pi(x) : [int, int]
+//   %.1:int = add(x.1:int, 1:int)
+//   x.2:int = assign(%.1:int)
+//   %.2:[int, int] = tuple[2](x.2:int, x.2:int)
+//   return %.2:[int, int]
+// endfn
+
+// x.1:int = assign(5:int)
+// increment.1:[int, int] = call[_Z9increment_Pi](x.1:int)
+// %.3:int = access(increment.1:[int, int], 0:int)
+// __result.1:int = assign(%.3:int)
+// %.4:int = access(increment.1:[int, int], 1:int)
+// x__new.1:int = assign(%.4:int)
+// x.3:int = assign(x__new.1:int)
+// %.5:int = assign(__result.1:int)
+// k.1:int = assign(%.5:int)
+// return x.1:int //<<<<<< This should be x.3:int

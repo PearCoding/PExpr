@@ -1,0 +1,20 @@
+// Nested closures with mutable capture
+let mut x = 1;
+fn outer() = {
+    fn inner() = { x = x + 1; x };
+    inner()
+};
+outer()
+
+// After uplift should become:
+// fn inner(x:int) -> (int, int) = { x = x + 1; (x, x) };
+// fn outer(x:int) -> (int, int) = {
+//     let (inner_result, x_new) = inner(x);
+//     x = x_new;
+//     (inner_result, x)
+// };
+// let (result, x_new) = outer(x);
+// x = x_new;
+// result
+
+// TODO: This does not work

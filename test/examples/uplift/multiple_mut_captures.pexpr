@@ -1,0 +1,17 @@
+// Multiple mutable captures
+let mut a = 1;
+let mut b = 2;
+fn swap() = { let temp = a; a = b; b = temp; 0 };
+swap()
+
+// After uplift should become:
+// fn swap(a:int, b:int) -> (int, int, int) = { 
+//     let temp = a; 
+//     a = b; 
+//     b = temp; 
+//     (0, a, b) 
+// };
+// let (result, a_new, b_new) = swap(a, b);
+// a = a_new;
+// b = b_new;
+// result
