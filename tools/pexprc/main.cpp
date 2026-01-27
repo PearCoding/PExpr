@@ -189,6 +189,7 @@ int main(int argc, char** argv)
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
         std::cerr << "The SSA will be invalid due to unspecified typing!" << std::endl;
+        dumpOutput(ssa::SSASerializer::serialize(program));
         return env.reporter().errorCount() + 1;
     }
 

@@ -141,7 +141,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
                     const Type& elemType = components.at(i);
 
                     // Extract tuple element using Access operation
-                    SSAValue index   = SSAValue::Constant((Integer)( i));
+                    SSAValue index   = SSAValue::Constant((Integer)(i));
                     SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
                     {
                         SSAInstrAssign access;
@@ -200,12 +200,15 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
             // Helper function to recursively process pattern elements for assignment
             std::function<void(const Pattern&, SSAValue)> processPattern =
                 [&](const Pattern& pattern, SSAValue tupleValue) -> void {
+                PEXPR_ASSERT(tupleValue.type().isTuple(), "Expected tuple type for destructuring");
+                const auto& components = tupleValue.type().components();
                 for (size_t i = 0; i < pattern.size(); ++i) {
-                    const auto& elem = pattern.elements()[i];
+                    const auto& elem     = pattern.elements()[i];
+                    const Type& elemType = components.at(i);
 
                     // Extract tuple element using Access operation
                     SSAValue index   = SSAValue::Constant((Integer)i);
-                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), Type(TypeKind::Unspecified));
+                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
                     {
                         SSAInstrAssign access;
                         access.Target   = elemVal;
