@@ -254,6 +254,8 @@ void UpliftPass::updateCallsInExpression(Ptr<Expression>& expr, const FunctionDe
 
                 // update mangled name to the new one (function may have been replaced)
                 c->setMangledName(newDef.mangledName());
+                // update return type to the new one (function may have captured mutables)
+                c->setReturnType(newDef.returnType());
             }
 
             // If the function returns a tuple due to mutable captures, we need to wrap the call

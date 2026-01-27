@@ -34,7 +34,7 @@ void Environment::registerFunction(const std::string& name, const std::vector<Ty
     ParameterList params;
     params.reserve(parameterTypes.size());
     for (size_t i = 0; i < parameterTypes.size(); ++i)
-        params.push_back(Parameter{ "p" + std::to_string(i), parameterTypes[i] });
+        params.push_back(Parameter{ "p" + std::to_string(i), parameterTypes[i], false });
 
     const std::string mangledName = makeMangledNameFromTypes(name, parameterTypes, nullptr);
     mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true, hasSideEffect));
@@ -50,6 +50,7 @@ Ptr<Closure> Environment::parse(std::istream& stream)
     if (!expr || parser.hasError())
         return nullptr;
 
+    // Do type checking to set all the types inside the AST correctly
     if (!doTypeChecking(expr))
         return nullptr;
 
