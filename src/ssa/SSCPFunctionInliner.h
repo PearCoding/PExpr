@@ -23,7 +23,7 @@ public:
     [[nodiscard]] bool attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func);
     [[nodiscard]] bool removeUnusedFunctions(SSAProgram& program);
 
-    inline void addIntrinsic(const FunctionDef& func, SSAIntrinsicInlineCallback callback)
+    inline void addIntrinsic(const type::FunctionDef& func, SSAIntrinsicInlineCallback callback)
     {
         mIntrinsics.insert({ func.mangledName(), FunctionInlinePair{ func, callback } });
     }
@@ -50,7 +50,7 @@ private:
     std::unordered_map<std::string, int> mCallCounts;
 
     struct FunctionInlinePair {
-        FunctionDef Definition;
+        type::FunctionDef Definition;
         SSAIntrinsicInlineCallback Callback;
     };
     std::unordered_multimap<std::string, FunctionInlinePair> mIntrinsics;

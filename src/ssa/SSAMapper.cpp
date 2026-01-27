@@ -1,14 +1,16 @@
 #include "SSAMapper.h"
-#include "Enums.h"
-#include "Expression.h"
-#include "Pattern.h"
-#include "Statement.h"
+#include "ast/Expression.h"
+#include "ast/Pattern.h"
+#include "ast/Statement.h"
 
 #include <algorithm>
 #include <ranges>
 #include <sstream>
 
 namespace PExpr::ssa {
+using namespace ast;
+using namespace type;
+
 SSAMapper::SSAMapper() = default;
 
 SSAProgram SSAMapper::map(const Ptr<Closure>& closure)

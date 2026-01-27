@@ -9,7 +9,7 @@ struct SSAFunction {
     std::string Name;
     std::vector<std::string> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
-    Type ReturnType = Type(TypeKind::Unspecified);
+    type::Type ReturnType = type::Type(type::TypeKind::Unspecified);
 
     // Mark whether this function is external (declared but not defined).
     bool External = false;

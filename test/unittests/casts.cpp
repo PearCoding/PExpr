@@ -8,7 +8,6 @@
 
 using namespace PExpr;
 using namespace PExpr::ssa;
-using namespace PExpr::internal;
 
 TEST_CASE("Casts: implicit int->num in call injects SSA cast", "[casts]")
 {

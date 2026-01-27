@@ -13,18 +13,18 @@ std::string SSAValue::baseName() const
     return thisName;
 }
 
-static size_t hashValueVariant(const Type& type, const ValueVariant& value)
+static size_t hashValueVariant(const type::Type& type, const ValueVariant& value)
 {
     switch (type.kind()) {
-    case TypeKind::Boolean:
+    case type::TypeKind::Boolean:
         return std::hash<bool>{}(std::get<bool>(value));
-    case TypeKind::Integer:
+    case type::TypeKind::Integer:
         return std::hash<Integer>{}(std::get<Integer>(value));
-    case TypeKind::Number:
+    case type::TypeKind::Number:
         return std::hash<Number>{}(std::get<Number>(value));
-    case TypeKind::String:
+    case type::TypeKind::String:
         return std::hash<std::string>{}(std::get<std::string>(value));
-    case TypeKind::Tuple: {
+    case type::TypeKind::Tuple: {
         const Tuple& tuple     = std::get<Tuple>(value);
         size_t h               = 0;
         const auto& components = type.components();

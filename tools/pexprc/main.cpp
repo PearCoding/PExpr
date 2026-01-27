@@ -4,9 +4,15 @@
 
 #include <CLI/CLI.hpp>
 
-#include "PExpr.h"
+#include "Environment.h"
+#include "ssa/SSAMapper.h"
+#include "ssa/SSAOptimizer.h"
+#include "ssa/SSASerializer.h"
+#include "ssa/SSAValidator.h"
+#include "utils/StringVisitor.h"
 
 using namespace PExpr;
+using namespace PExpr::utils;
 
 static void handleListCLIOptions(const CLI::App& app)
 {

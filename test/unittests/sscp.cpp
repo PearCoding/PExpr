@@ -9,7 +9,6 @@
 
 using namespace PExpr;
 using namespace PExpr::ssa;
-using namespace PExpr::internal;
 
 [[nodiscard]] inline static auto MakeConstantFoldingOptimizer()
 {

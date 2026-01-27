@@ -45,12 +45,12 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
 
                 // Check for commutativity stuff
                 if (asg->Operator == SSAInstrAssign::OpKind::Binary) {
-                    if (asg->BinaryOp == BinaryOperation::Add
-                        || asg->BinaryOp == BinaryOperation::Mul
-                        || asg->BinaryOp == BinaryOperation::And
-                        || asg->BinaryOp == BinaryOperation::Or
-                        || asg->BinaryOp == BinaryOperation::Equal
-                        || asg->BinaryOp == BinaryOperation::NotEqual) {
+                    if (asg->BinaryOp == ast::BinaryOperation::Add
+                        || asg->BinaryOp == ast::BinaryOperation::Mul
+                        || asg->BinaryOp == ast::BinaryOperation::And
+                        || asg->BinaryOp == ast::BinaryOperation::Or
+                        || asg->BinaryOp == ast::BinaryOperation::Equal
+                        || asg->BinaryOp == ast::BinaryOperation::NotEqual) {
                         SSAInstrAssign copy = *asg;
                         std::swap(copy.Operands[0], copy.Operands[1]);
                         const auto cumHash = hashInstruction(&copy);
@@ -143,8 +143,8 @@ SSCPCommonSubexpressionEliminator::hashInstruction(const SSAInstr* instr) const
 
     // For CSE, we don't want to include target names in the hash
     // because identical expressions with different target names should be eliminated
-    size_t hash = instr->hash(false);
-    Type type   = Type(TypeKind::Unspecified);
+    size_t hash     = instr->hash(false);
+    type::Type type = type::Type(type::TypeKind::Unspecified);
 
     // Get the result type from the instruction
     if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instr)) {

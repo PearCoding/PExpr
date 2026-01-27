@@ -8,7 +8,7 @@
 
 using namespace PExpr;
 using namespace PExpr::ssa;
-using namespace PExpr::internal;
+using namespace PExpr::type;
 
 TEST_CASE("SSASerializer: round-trip serialization of simple program", "[serializer]")
 {

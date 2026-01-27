@@ -306,7 +306,7 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
 
         // Check if the expected return type and the type inside the variant match
         const auto expectedType = it->second.Definition.returnType();
-        const auto valueType    = Type::FromVariant(*constant);
+        const auto valueType    = type::Type::FromVariant(*constant);
         if (expectedType != valueType) // Maybe implicit compatible?
             continue;
 

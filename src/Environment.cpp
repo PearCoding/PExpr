@@ -1,13 +1,16 @@
 #include "Environment.h"
-#include "Expression.h"
-#include "Parameter.h"
-#include "internal/Mangler.h"
-#include "internal/Parser.h"
-#include "internal/SymbolTable.h"
-#include "internal/TypeChecker.h"
-#include "internal/UpliftPass.h"
+#include "ast/Expression.h"
+#include "parser/Parser.h"
+#include "type/Mangler.h"
+#include "type/Parameter.h"
+#include "type/SymbolTable.h"
+#include "type/TypeChecker.h"
+#include "type/UpliftPass.h"
 
 namespace PExpr {
+using namespace ast;
+using namespace type;
+
 Environment::Environment()
     : mGlobals()
     , mReporter()
@@ -32,14 +35,14 @@ void Environment::registerFunction(const std::string& name, const std::vector<Ty
     for (size_t i = 0; i < parameterTypes.size(); ++i)
         params.push_back(Parameter{ "p" + std::to_string(i), parameterTypes[i] });
 
-    const std::string mangledName = internal::makeMangledNameFromTypes(name, parameterTypes, nullptr);
+    const std::string mangledName = makeMangledNameFromTypes(name, parameterTypes, nullptr);
     mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true, hasSideEffect));
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream)
 {
-    internal::Lexer lexer(stream, mReporter);
-    internal::Parser parser(lexer, mReporter);
+    parser::Lexer lexer(stream, mReporter);
+    parser::Parser parser(lexer, mReporter);
 
     auto expr = parser.parse(&mGlobals);
 
@@ -53,7 +56,7 @@ Ptr<Closure> Environment::parse(std::istream& stream)
         return nullptr;
 
     // run uplift pass to transform captured variables into parameters
-    internal::UpliftPass uplift(mReporter);
+    UpliftPass uplift(mReporter);
     uplift.handle(expr);
 
     return expr;
@@ -67,7 +70,7 @@ Ptr<Closure> Environment::parse(std::string_view str)
 
 bool Environment::doTypeChecking(const Ptr<Closure>& closure)
 {
-    internal::TypeChecker checker(mReporter);
+    TypeChecker checker(mReporter);
     const auto retType = checker.handle(closure);
     if (retType.kind() == TypeKind::Unspecified || retType.kind() == TypeKind::Error)
         return false;

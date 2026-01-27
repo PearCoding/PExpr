@@ -2,22 +2,24 @@
 #include <sstream>
 #include <string>
 
-#include "StringVisitor.h"
-#include "Type.h"
-#include "internal/Lexer.h"
-#include "internal/Parser.h"
+#include "parser/Lexer.h"
+#include "parser/Parser.h"
+#include "type/Type.h"
+#include "utils/StringVisitor.h"
 
 using namespace PExpr;
-using namespace PExpr::internal;
+using namespace PExpr::parser;
+using namespace PExpr::type;
+using namespace PExpr::utils;
 
 inline static auto parseOnly(std::string_view str, bool shouldPass = true)
 {
-    Reporter reporter;
+    utils::Reporter reporter;
     reporter.setQuiet(true);
     auto stream = std::istringstream(str.data());
-    internal::Lexer lexer(stream, reporter);
-    internal::Parser parser(lexer, reporter);
-    internal::SymbolTable globals;
+    Lexer lexer(stream, reporter);
+    Parser parser(lexer, reporter);
+    SymbolTable globals;
     globals.addDefaultTypeAliases();
     auto ast = parser.parse(&globals);
 

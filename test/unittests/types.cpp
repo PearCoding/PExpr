@@ -3,13 +3,14 @@
 #include <string>
 #include <vector>
 
-#include "Closure.h"
 #include "Environment.h"
-#include "Expression.h"
-#include "Type.h"
+#include "ast/Closure.h"
+#include "ast/Expression.h"
 #include "ssa/SSAValue.h"
+#include "type/Type.h"
 
 using namespace PExpr;
+using namespace PExpr::type;
 
 TEST_CASE("Type: basic construction and equality", "[type]")
 {

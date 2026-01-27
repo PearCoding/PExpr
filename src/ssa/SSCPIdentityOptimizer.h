@@ -54,7 +54,7 @@ private:
     [[nodiscard]] const SSAInstr* findDefinition(const std::string& name) const;
 
     /// Helper to check if a value is a binary operation with specific operator
-    [[nodiscard]] bool isBinaryOp(const SSAValue& val, BinaryOperation op, SSAValue& left, SSAValue& right) const;
+    [[nodiscard]] bool isBinaryOp(const SSAValue& val, ast::BinaryOperation op, SSAValue& left, SSAValue& right) const;
 
     /// Helper to check if a value is a power operation
     [[nodiscard]] bool isPowerOp(const SSAValue& val, SSAValue& base, SSAValue& exponent) const;

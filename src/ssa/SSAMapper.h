@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Closure.h"
 #include "SSAContext.h"
 #include "SSAStructs.h"
+#include "ast/Closure.h"
 
 namespace PExpr::ssa {
 
@@ -20,12 +20,12 @@ public:
     SSAMapper();
 
     /// Map a closure to an SSAProgram.
-    [[nodiscard]] SSAProgram map(const Ptr<Closure>& closure);
+    [[nodiscard]] SSAProgram map(const Ptr<ast::Closure>& closure);
 
 private:
-    [[nodiscard]] SSAProgram mapClosure(const Ptr<Closure>& closure);
-    void mapStatement(SSAProgram& program, const Ptr<Statement>& stmt);
-    [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<Expression>& expr);
+    [[nodiscard]] SSAProgram mapClosure(const Ptr<ast::Closure>& closure);
+    void mapStatement(SSAProgram& program, const Ptr<ast::Statement>& stmt);
+    [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<ast::Expression>& expr);
 
     // Inline a mapped closure body into the current program by replacing any
     // SSAInstrReturn instructions with assignments to a fresh temporary variable.

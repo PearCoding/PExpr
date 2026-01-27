@@ -1,5 +1,5 @@
 #include "SSASerializer.h"
-#include "Enums.h"
+#include "ast/Enums.h"
 
 #include <algorithm>
 #include <cctype>
@@ -8,8 +8,9 @@
 #include <string_view>
 
 namespace PExpr::ssa {
+using namespace ast;
+using namespace type;
 
-// Helper functions from SSAStructs.cpp
 static inline std::string_view toInstructionString(UnaryOperation op)
 {
     switch (op) {
@@ -410,7 +411,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
         if (allDigitsOrDotOrSign) {
             try {
                 Number val = std::stod(name);
-                outValue = SSAValue::Constant(val);
+                outValue   = SSAValue::Constant(val);
                 return true;
             } catch (...) {
                 return false;
@@ -431,7 +432,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
         if (!type.isTuple())
             return false;
 
-        std::string inner = name.substr(1, name.size() - 2);
+        std::string inner              = name.substr(1, name.size() - 2);
         std::vector<std::string> parts = split(inner, ',');
         if (parts.size() != type.size())
             return false;
@@ -441,7 +442,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
 
         for (size_t i = 0; i < parts.size(); ++i) {
             const Type& compType = type.components()[i];
-            std::string elemStr = trim(parts[i]);
+            std::string elemStr  = trim(parts[i]);
 
             // Recursively parse each element
             SSAValue elemVal;

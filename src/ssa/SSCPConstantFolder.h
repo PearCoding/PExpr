@@ -19,12 +19,12 @@ private:
     [[nodiscard]] bool replaceOperandIfConst(SSAValue& op);
 
     [[nodiscard]] std::optional<SSAValue> foldAssign(bool foldNumber, const SSAInstrAssign* asg);
-    [[nodiscard]] std::optional<SSAValue> foldUnaryOp(const SSAValue& operand, UnaryOperation unaryOp);
-    [[nodiscard]] std::optional<SSAValue> foldBinaryOp(bool foldNumber, const SSAValue& L, const SSAValue& R, BinaryOperation binaryOp);
+    [[nodiscard]] std::optional<SSAValue> foldUnaryOp(const SSAValue& operand, ast::UnaryOperation unaryOp);
+    [[nodiscard]] std::optional<SSAValue> foldBinaryOp(bool foldNumber, const SSAValue& L, const SSAValue& R, ast::BinaryOperation binaryOp);
     [[nodiscard]] std::optional<SSAValue> foldSwizzleOp(const SSAValue& operand, const std::string& swizzle);
     [[nodiscard]] std::optional<SSAValue> foldAccessOp(const SSAValue& operand, const SSAValue& index);
     [[nodiscard]] std::optional<SSAValue> foldVectorOp(const std::vector<SSAValue>& operands);
-    [[nodiscard]] std::optional<SSAValue> foldCastOp(const SSAValue& operand, const Type& targetType);
+    [[nodiscard]] std::optional<SSAValue> foldCastOp(const SSAValue& operand, const type::Type& targetType);
 
     std::unordered_map<std::string, SSAValue> mConstants;
 

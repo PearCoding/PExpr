@@ -1,21 +1,23 @@
 #include "SSCPFunctionInliner.h"
-#include "internal/Mangler.h"
+#include "type/Mangler.h"
 
 #include <array>
 
 namespace PExpr::ssa::intrinsics {
+using namespace type;
+
 void setupIntrinsics(SSCPFunctionInliner& inliner)
 {
     const auto addP1N = [&](const std::string& name, std::function<Number(Number)> callback) {
         inliner.addIntrinsic(FunctionDef(name,
-                                         internal::makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number) }), nullptr),
+                                         makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number) }), nullptr),
                                          { Parameter{ "p0", Type(TypeKind::Number) } }, Type(TypeKind::Number), true, false),
                              [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0))); });
     };
 
     const auto addP2N = [&](const std::string& name, std::function<Number(Number, Number)> callback) {
         inliner.addIntrinsic(FunctionDef(name,
-                                         internal::makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number), Type(TypeKind::Number) }), nullptr),
+                                         makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number), Type(TypeKind::Number) }), nullptr),
                                          { Parameter{ "p0", Type(TypeKind::Number) }, Parameter{ "p1", Type(TypeKind::Number) } }, Type(TypeKind::Number), true, false),
                              [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0)), std::get<Number>(args.at(1))); });
     };

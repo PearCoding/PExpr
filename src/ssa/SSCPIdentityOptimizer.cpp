@@ -1,5 +1,4 @@
 #include "SSCPIdentityOptimizer.h"
-#include "Enums.h"
 #include "SSAMapper.h"
 
 #include <cmath>
@@ -7,6 +6,7 @@
 #include <sstream>
 
 namespace PExpr::ssa {
+using namespace ast;
 
 bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& instructions)
 {

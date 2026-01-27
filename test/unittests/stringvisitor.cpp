@@ -1,19 +1,20 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "StringVisitor.h"
-#include "internal/Parser.h"
-#include "internal/SymbolTable.h"
+#include "parser/Parser.h"
+#include "type/SymbolTable.h"
+#include "utils/StringVisitor.h"
 
 using namespace PExpr;
+using namespace PExpr::utils;
 
 inline static auto parseOnly(std::string_view str)
 {
     Reporter reporter;
     reporter.setQuiet(true);
     auto stream = std::istringstream(str.data());
-    internal::Lexer lexer(stream, reporter);
-    internal::Parser parser(lexer, reporter);
-    internal::SymbolTable globals;
+    parser::Lexer lexer(stream, reporter);
+    parser::Parser parser(lexer, reporter);
+    type::SymbolTable globals;
     return parser.parse(&globals);
 }
 

@@ -130,7 +130,7 @@ bool SSCPControlFlowOptimizer::collapsePhiNodes(InstructionList& instructions)
             std::vector<size_t> removableBranches;
             for (size_t i = 0; i < phi->Conditions.size(); ++i) {
                 const auto& cond = phi->Conditions[i];
-                if (cond.isConstant() && cond.type().kind() == TypeKind::Boolean) {
+                if (cond.isConstant() && cond.type().kind() == type::TypeKind::Boolean) {
                     const bool condVal = cond.valueAs<bool>();
                     if (!condVal)
                         removableBranches.push_back(i);
@@ -159,7 +159,7 @@ bool SSCPControlFlowOptimizer::collapsePhiNodes(InstructionList& instructions)
 
             // Check if the first entry is truely 'true' -> remove phi and use that one
             const auto& firstCond = phi->Conditions.at(0);
-            if (firstCond.isConstant() && firstCond.type().kind() == TypeKind::Boolean) {
+            if (firstCond.isConstant() && firstCond.type().kind() == type::TypeKind::Boolean) {
                 const bool condVal = firstCond.valueAs<bool>();
                 PEXPR_ASSERT(condVal, "Expected a 'true' phi condition as all 'false' ones should be erased");
                 SSAInstrAssign asg;

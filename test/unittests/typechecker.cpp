@@ -3,10 +3,10 @@
 #include <string>
 
 #include "Environment.h"
-#include "internal/TypeChecker.h"
+#include "type/TypeChecker.h"
 
 using namespace PExpr;
-using namespace PExpr::internal;
+using namespace PExpr::type;
 
 TEST_CASE("TypeChecker: integer arithmetic", "[typechecker]")
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SSAValue.h"
+#include "ast/Enums.h"
 
 #include <functional>
 #include <memory>
@@ -53,8 +54,8 @@ struct SSAInstrAssign : public SSAInstr {
     OpKind Operator;
 
     // OpKind specific data
-    UnaryOperation UnaryOp   = UnaryOperation::Pos;
-    BinaryOperation BinaryOp = BinaryOperation::Add;
+    ast::UnaryOperation UnaryOp   = ast::UnaryOperation::Pos;
+    ast::BinaryOperation BinaryOp = ast::BinaryOperation::Add;
     std::string Swizzle;
     std::vector<SSAValue> Operands;
 

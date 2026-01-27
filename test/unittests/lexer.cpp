@@ -3,14 +3,14 @@
 #include <string>
 #include <vector>
 
-#include "internal/Lexer.h"
+#include "parser/Lexer.h"
 
 using namespace PExpr;
-using namespace PExpr::internal;
+using namespace PExpr::parser;
 
 static bool check_sequence(const std::string& input, const std::vector<TokenType>& expected)
 {
-    Reporter reporter;
+    utils::Reporter reporter;
     reporter.setQuiet(true);
 
     std::stringstream stream(input);

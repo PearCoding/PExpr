@@ -8,7 +8,6 @@
 
 using namespace PExpr;
 using namespace PExpr::ssa;
-using namespace PExpr::internal;
 
 TEST_CASE("SSAMapper: simple variable and expression", "[ssamapper]")
 {

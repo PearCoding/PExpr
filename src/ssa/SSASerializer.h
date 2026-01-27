@@ -26,7 +26,7 @@ public:
     static void write(std::ostream& os, const SSAValue& value);
 
     /// Write an SSAValue to a stream in human-readable format
-    static void write(std::ostream& os, const Type& type, const ValueVariant& value, bool withTypeSuffix);
+    static void write(std::ostream& os, const type::Type& type, const ValueVariant& value, bool withTypeSuffix);
 
     /// Read an SSAProgram from a stream (deserialize)
     static SSAProgram read(std::istream& is);
@@ -44,7 +44,7 @@ public:
     static std::string unescapeString(const std::string& str);
 
     /// Parse a type string to Type (useful for testing)
-    static Type parseType(const std::string& typeStr);
+    static type::Type parseType(const std::string& typeStr);
 
 private:
     // Internal helper functions for writing specific instruction types

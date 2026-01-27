@@ -38,7 +38,7 @@ private:
         };
 
         size_t hash;
-        Type type;
+        type::Type type;
 
         inline bool operator==(const ExpressionHash& other) const { return hash == other.hash && type == other.type; }
     };

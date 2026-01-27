@@ -1,5 +1,4 @@
 #include "SSCPConstantFolder.h"
-#include "Enums.h"
 #include "SSAMapper.h"
 
 #include <algorithm>
@@ -8,7 +7,7 @@
 #include <sstream>
 
 namespace PExpr::ssa {
-
+using namespace ast;
 using VecN = std::vector<Number>;
 
 bool SSCPConstantFolder::extractBool(const SSAValue& vv, bool& out)
@@ -437,19 +436,19 @@ std::optional<SSAValue> SSCPConstantFolder::foldVectorOp(const std::vector<SSAVa
         return SSAValue::Constant(values);
 }
 
-std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, const Type& targetType)
+std::optional<SSAValue> SSCPConstantFolder::foldCastOp(const SSAValue& operand, const type::Type& targetType)
 {
     // Is it even useful?
     if (targetType == operand.type())
         return operand;
 
-    if (targetType.kind() == TypeKind::Number) {
+    if (targetType.kind() == type::TypeKind::Number) {
         // int -> num (implicit or explicit)
         if (Integer i; extractInteger(operand, i))
             return SSAValue::Constant(static_cast<Number>(i));
     }
 
-    if (targetType.kind() == TypeKind::Integer) {
+    if (targetType.kind() == type::TypeKind::Integer) {
         // num -> int (explicit)
         if (Number v; extractNumber(operand, v))
             return SSAValue::Constant(static_cast<Integer>(v));
