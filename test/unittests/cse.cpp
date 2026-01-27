@@ -25,8 +25,7 @@ TEST_CASE("Optimizer: common subexpression elimination basic", "[sscp][cse]")
     Environment env;
     auto ast = env.parse(stream);
 
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto prog = env.map(ast);
 
     // Count occurrences of "a * b" before optimization
     auto before             = SSASerializer::serialize(prog);
@@ -62,8 +61,7 @@ TEST_CASE("Optimizer: common subexpression elimination with constants", "[sscp][
     Environment env;
     auto ast = env.parse(stream);
 
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto prog = env.map(ast);
 
     auto before = SSASerializer::serialize(prog);
 
@@ -121,8 +119,7 @@ TEST_CASE("Optimizer: common subexpression elimination with different names", "[
     Environment env;
     auto ast = env.parse("let a = 2.0; let b = 3.0; let c = 4.0; let x = a + b; let y = b + c; let z = a + b; x + y + z");
 
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto prog = env.map(ast);
 
     auto before             = SSASerializer::serialize(prog);
     size_t add_count_before = 0;
@@ -158,8 +155,7 @@ TEST_CASE("Optimizer: common subexpression elimination preserves side effects", 
         x + y
     )");
 
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto prog = env.map(ast);
 
     auto before                     = SSASerializer::serialize(prog);
     size_t side_effect_count_before = 0;
@@ -197,8 +193,7 @@ TEST_CASE("Optimizer: common subexpression elimination complex pattern", "[sscp]
         x + y + z
     )");
 
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto prog = env.map(ast);
 
     auto before             = SSASerializer::serialize(prog);
     size_t add_count_before = 0, mul_count_before = 0;

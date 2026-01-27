@@ -1,6 +1,7 @@
 #include "Environment.h"
 #include "ast/Expression.h"
 #include "parser/Parser.h"
+#include "ssa/SSAMapper.h"
 #include "type/Mangler.h"
 #include "type/Parameter.h"
 #include "type/SymbolTable.h"
@@ -75,5 +76,14 @@ bool Environment::doTypeChecking(const Ptr<Closure>& closure)
     if (retType.kind() == TypeKind::Unspecified || retType.kind() == TypeKind::Error)
         return false;
     return true;
+}
+
+ssa::SSAProgram Environment::map(const Ptr<ast::Closure>& closure)
+{
+    if (!closure)
+        return ssa::SSAProgram{};
+
+    ssa::SSAMapper mapper(mReporter);
+    return mapper.map(closure);
 }
 } // namespace PExpr

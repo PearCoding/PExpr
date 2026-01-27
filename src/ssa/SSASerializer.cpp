@@ -127,8 +127,8 @@ void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
     case SSAInstrAssign::OpKind::Access:
         os << "access";
         break;
-    case SSAInstrAssign::OpKind::Vector:
-        os << "vec[" << instr.Operands.size() << "]";
+    case SSAInstrAssign::OpKind::Tuple:
+        os << "tuple[" << instr.Operands.size() << "]";
         break;
     case SSAInstrAssign::OpKind::Cast:
         os << "cast";
@@ -700,8 +700,8 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
             size_t end       = op.find(']');
             if (end != std::string::npos)
                 assign->Swizzle = op.substr(start, end - start);
-        } else if (op.find("vec[") == 0) {
-            assign->Operator = SSAInstrAssign::OpKind::Vector;
+        } else if (op.find("tuple[") == 0) {
+            assign->Operator = SSAInstrAssign::OpKind::Tuple;
         } else if (op == "access") {
             assign->Operator = SSAInstrAssign::OpKind::Access;
         } else {

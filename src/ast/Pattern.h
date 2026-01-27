@@ -45,7 +45,9 @@ public:
     [[nodiscard]] inline bool isNestedPattern() const { return std::holds_alternative<std::shared_ptr<Pattern>>(mVariant); }
 
     [[nodiscard]] inline const SimpleBinding& simpleBinding() const { return std::get<SimpleBinding>(mVariant); }
+    [[nodiscard]] inline SimpleBinding& simpleBinding() { return std::get<SimpleBinding>(mVariant); }
     [[nodiscard]] inline const std::shared_ptr<Pattern>& nestedPattern() const { return std::get<std::shared_ptr<Pattern>>(mVariant); }
+    [[nodiscard]] inline std::shared_ptr<Pattern>& nestedPattern() { return std::get<std::shared_ptr<Pattern>>(mVariant); }
 
     /// Helper to create a simple binding element
     static inline PatternElement makeSimple(const parser::Location& loc, const std::string& name, const type::Type& type = type::Type(type::TypeKind::Unspecified), bool isMutable = false)
@@ -83,6 +85,7 @@ public:
 
     [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
     [[nodiscard]] inline const ElementList& elements() const { return mElements; }
+    [[nodiscard]] inline ElementList& elements() { return mElements; }
     [[nodiscard]] inline size_t size() const { return mElements.size(); }
 
     /// Count total number of simple bindings in this pattern (recursively)

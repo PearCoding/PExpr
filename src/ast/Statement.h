@@ -31,40 +31,43 @@ private:
     const StatementType mType;
 };
 
+/// Unified declaration statement for both single variable and destructuring patterns
+/// Example: "let a:num = 5;" or "let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
 class VariableDeclarationStatement : public Statement {
 public:
-    // declaredType may be TypeKind::Unspecified when no explicit type is given.
-    VariableDeclarationStatement(bool mutable_, const parser::Location& loc, const std::string& name, const Ptr<Expression>& expr, const type::Type& declaredType = type::Type(type::TypeKind::Unspecified))
-        : Statement(loc, name, StatementType::VariableDeclaration)
-        , mIsMutable(mutable_)
-        , mDeclaredType(declaredType)
+    VariableDeclarationStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
+        : Statement(loc, "", StatementType::VariableDeclaration)
+        , mPattern(pattern)
         , mExpression(expr)
     {
     }
 
-    [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
-    [[nodiscard]] inline const type::Type& declaredType() const { return mDeclaredType; }
+    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
 
 private:
-    const bool mIsMutable;
-    const type::Type mDeclaredType;
+    Ptr<Pattern> mPattern;
     Ptr<Expression> mExpression;
 };
 
+/// Unified assignment statement for both single variable and destructuring patterns
+/// Example: "a = 5;" or "*[c, d] = foo();"
 class VariableAssignmentStatement : public Statement {
 public:
-    VariableAssignmentStatement(const parser::Location& loc, const std::string& name, const Ptr<Expression>& expr)
-        : Statement(loc, name, StatementType::VariableAssignment)
+    VariableAssignmentStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
+        : Statement(loc, "", StatementType::VariableAssignment)
+        , mPattern(pattern)
         , mExpression(expr)
     {
     }
 
+    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
 
 private:
+    Ptr<Pattern> mPattern;
     Ptr<Expression> mExpression;
 };
 
@@ -111,44 +114,6 @@ public:
 
 private:
     const type::Type mAliasedType;
-};
-
-/// Declaration with destructuring pattern like "let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
-class DestructuringDeclarationStatement : public Statement {
-public:
-    DestructuringDeclarationStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Statement(loc, "", StatementType::DestructuringDeclaration)
-        , mPattern(pattern)
-        , mExpression(expr)
-    {
-    }
-
-    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
-    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
-    inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
-
-private:
-    Ptr<Pattern> mPattern;
-    Ptr<Expression> mExpression;
-};
-
-/// Assignment with destructuring pattern like "*[c, d] = foo()"
-class DestructuringAssignmentStatement : public Statement {
-public:
-    DestructuringAssignmentStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Statement(loc, "", StatementType::DestructuringAssignment)
-        , mPattern(pattern)
-        , mExpression(expr)
-    {
-    }
-
-    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
-    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
-    inline void replaceExpression(const Ptr<Expression>& expr) { mExpression = expr; }
-
-private:
-    Ptr<Pattern> mPattern;
-    Ptr<Expression> mExpression;
 };
 
 } // namespace PExpr::ast

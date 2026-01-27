@@ -33,8 +33,6 @@ private:
     static std::string dump(const Ptr<ast::BranchExpression>& expr);
     static std::string dump(const Ptr<ast::TupleExpression>& expr);
     static std::string dump(const Ptr<ast::TypeAliasStatement>& statement);
-    static std::string dump(const Ptr<ast::DestructuringDeclarationStatement>& statement);
-    static std::string dump(const Ptr<ast::DestructuringAssignmentStatement>& statement);
 };
 
 } // namespace PExpr::utils

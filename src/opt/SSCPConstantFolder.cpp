@@ -495,7 +495,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
         return foldAccessOp(ops.at(0), ops.at(1));
 
     // Vector [x,y,z,w]
-    if (asg->Operator == SSAInstrAssign::OpKind::Vector)
+    if (asg->Operator == SSAInstrAssign::OpKind::Tuple)
         return foldVectorOp(ops);
 
     // Cast

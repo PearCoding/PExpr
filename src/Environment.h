@@ -4,6 +4,10 @@
 #include "utils/Reporter.h"
 
 namespace PExpr {
+namespace ssa {
+class SSAProgram;
+}
+
 /// Main class for parsing and transpiling.
 class Environment {
 public:
@@ -25,6 +29,8 @@ public:
     /// Parse the given string and return the corresponding AST tree.
     /// If an error was detected, a nullptr will be returned instead.
     Ptr<ast::Closure> parse(std::string_view str);
+
+    [[nodiscard]] ssa::SSAProgram map(const Ptr<ast::Closure>& closure);
 
     [[nodiscard]] inline const utils::Reporter& reporter() const { return mReporter; }
     [[nodiscard]] inline utils::Reporter& reporter() { return mReporter; }

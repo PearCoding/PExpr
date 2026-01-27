@@ -48,7 +48,7 @@ TEST_CASE("Parser: closure with variable and expression", "[parser]")
     auto ast = parseOnly("let mut x = 1; x+2");
 
     const std::string out = StringVisitor::visit(ast);
-    REQUIRE(out.find("mut x:int = 1;") != std::string::npos);
+    REQUIRE(out.find("mut x = 1;") != std::string::npos);
     REQUIRE(out.find("(x)+(2)") != std::string::npos);
 }
 
@@ -156,7 +156,7 @@ TEST_CASE("Parser: attributes on variable declarations", "[parser]")
         // Note: optimize attribute does not exist
         auto ast              = parseOnly("[[optimize]] let mut y = 10; y");
         const std::string out = StringVisitor::visit(ast);
-        REQUIRE(out.find("mut y:int = 10;") != std::string::npos);
+        REQUIRE(out.find("mut y = 10;") != std::string::npos);
     }
 }
 

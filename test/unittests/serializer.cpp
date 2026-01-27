@@ -13,10 +13,8 @@ using namespace PExpr::type;
 TEST_CASE("SSASerializer: round-trip serialization of simple program", "[serializer]")
 {
     Environment env;
-    auto ast = env.parse("let mut x = 1; x + 2");
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse("let mut x = 1; x + 2");
+    auto prog = env.map(ast);
 
     // Serialize to string
     std::string serialized = SSASerializer::serialize(prog);
@@ -33,10 +31,8 @@ TEST_CASE("SSASerializer: round-trip serialization of simple program", "[seriali
 TEST_CASE("SSASerializer: round-trip with function", "[serializer]")
 {
     Environment env;
-    auto ast = env.parse("fn add(a:int, b:int) -> int = a + b; add(1, 2)");
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse("fn add(a:int, b:int) -> int = a + b; add(1, 2)");
+    auto prog = env.map(ast);
 
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());
@@ -50,10 +46,8 @@ TEST_CASE("SSASerializer: round-trip with function", "[serializer]")
 TEST_CASE("SSASerializer: round-trip with branch and phi", "[serializer]")
 {
     Environment env;
-    auto ast = env.parse("if true { 1 } else { 2 }");
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse("if true { 1 } else { 2 }");
+    auto prog = env.map(ast);
 
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());
@@ -68,10 +62,8 @@ TEST_CASE("SSASerializer: round-trip with branch and phi", "[serializer]")
 TEST_CASE("SSASerializer: round-trip with vector types", "[serializer]")
 {
     Environment env;
-    auto ast = env.parse("[1.0, 2.0, 3.0]");
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse("[1.0, 2.0, 3.0]");
+    auto prog = env.map(ast);
 
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());
@@ -86,10 +78,8 @@ TEST_CASE("SSASerializer: round-trip with vector types", "[serializer]")
 TEST_CASE("SSASerializer: round-trip with call instruction", "[serializer]")
 {
     Environment env;
-    auto ast = env.parse("fn square(x:int) -> int = x * x; square(5)");
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse("fn square(x:int) -> int = x * x; square(5)");
+    auto prog = env.map(ast);
 
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());
@@ -185,10 +175,8 @@ TEST_CASE("SSASerializer: handles empty program", "[serializer]")
 TEST_CASE("SSASerializer: round-trip with multiple instructions", "[serializer]")
 {
     Environment env;
-    auto ast = env.parse("let mut a = 1; let mut b = 2; a + b");
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse("let mut a = 1; let mut b = 2; a + b");
+    auto prog = env.map(ast);
 
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());

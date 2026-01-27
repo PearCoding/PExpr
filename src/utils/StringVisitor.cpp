@@ -16,10 +16,6 @@ std::string StringVisitor::visit(const Ptr<Statement>& statement)
         return dump(std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement));
     case StatementType::TypeAlias:
         return dump(std::reinterpret_pointer_cast<TypeAliasStatement>(statement));
-    case StatementType::DestructuringDeclaration:
-        return dump(std::reinterpret_pointer_cast<DestructuringDeclarationStatement>(statement));
-    case StatementType::DestructuringAssignment:
-        return dump(std::reinterpret_pointer_cast<DestructuringAssignmentStatement>(statement));
     default:
         return "ERROR";
     }
@@ -68,22 +64,95 @@ std::string StringVisitor::dump(const Ptr<Closure>& closure)
 
 std::string StringVisitor::dump(const Ptr<VariableDeclarationStatement>& statement)
 {
+    const auto& pattern = statement->pattern();
+
+    // Check if pattern is a single simple binding (i.e., "let a = ...")
+    if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+        const auto& binding = pattern->elements()[0].simpleBinding();
+        std::stringstream stream;
+        stream << "let ";
+        if (binding.isMutable)
+            stream << "mut ";
+        stream << binding.name;
+        if (binding.declaredType.kind() != type::TypeKind::Unspecified)
+            stream << ":" << binding.declaredType.toString();
+        stream << " = " << visit(statement->expression()) << ";";
+        return stream.str();
+    }
+
+    // Otherwise, treat as destructuring pattern
     std::stringstream stream;
     stream << "let ";
-    if (statement->isMutable())
-        stream << "mut ";
-    stream << statement->name();
-    if (!statement->expression()->isUnspecified())
-        stream << ":" << statement->expression()->returnType().toString();
 
+    // Helper function to recursively dump pattern elements
+    std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
+        stream << "[";
+        for (size_t i = 0; i < pattern.elements().size(); ++i) {
+            const auto& elem = pattern.elements()[i];
+            if (elem.isSimpleBinding()) {
+                const auto& binding = elem.simpleBinding();
+                if (binding.isMutable)
+                    stream << "mut ";
+                stream << binding.name;
+                if (binding.declaredType.kind() != type::TypeKind::Unspecified)
+                    stream << ":" << binding.declaredType.toString();
+            } else {
+                // Nested pattern
+                dumpPattern(*elem.nestedPattern());
+            }
+            if (i < pattern.elements().size() - 1)
+                stream << ", ";
+        }
+        stream << "]";
+    };
+
+    stream << "*";
+    dumpPattern(*pattern);
     stream << " = " << visit(statement->expression()) << ";";
     return stream.str();
 }
 
 std::string StringVisitor::dump(const Ptr<VariableAssignmentStatement>& statement)
 {
+    const auto& pattern = statement->pattern();
+
+    // Check if pattern is a single simple binding (i.e., "a = ...")
+    if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+        const auto& binding = pattern->elements()[0].simpleBinding();
+        std::stringstream stream;
+        stream << binding.name;
+        if (binding.declaredType.kind() != type::TypeKind::Unspecified)
+            stream << ":" << binding.declaredType.toString();
+        stream << " = " << visit(statement->expression()) << ";";
+        return stream.str();
+    }
+
+    // Otherwise, treat as destructuring pattern
     std::stringstream stream;
-    stream << statement->name() << " = " << visit(statement->expression()) << ";";
+
+    // Helper function to recursively dump pattern elements
+    std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
+        stream << "[";
+        for (size_t i = 0; i < pattern.elements().size(); ++i) {
+            const auto& elem = pattern.elements()[i];
+            if (elem.isSimpleBinding()) {
+                const auto& binding = elem.simpleBinding();
+                stream << binding.name;
+                /*if (binding.declaredType.kind() != type::TypeKind::Unspecified)
+                    stream << ":" << binding.declaredType.toString();*/
+            } else {
+                // Nested pattern
+                dumpPattern(*elem.nestedPattern());
+            }
+            if (i < pattern.elements().size() - 1)
+                stream << ", ";
+        }
+        stream << "]";
+    };
+
+    stream << "*";
+    dumpPattern(*pattern);
+    stream << " = " << visit(statement->expression()) << ";";
     return stream.str();
 }
 
@@ -211,63 +280,4 @@ std::string StringVisitor::dump(const Ptr<TypeAliasStatement>& statement)
     return stream.str();
 }
 
-std::string StringVisitor::dump(const Ptr<DestructuringDeclarationStatement>& statement)
-{
-    std::stringstream stream;
-    stream << "let *";
-
-    // Helper function to recursively dump pattern elements
-    std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
-        stream << "[";
-        for (size_t i = 0; i < pattern.elements().size(); ++i) {
-            const auto& elem = pattern.elements()[i];
-            if (elem.isSimpleBinding()) {
-                const auto& binding = elem.simpleBinding();
-                if (binding.isMutable)
-                    stream << "mut ";
-                stream << binding.name;
-                if (binding.declaredType.kind() != type::TypeKind::Unspecified)
-                    stream << ":" << binding.declaredType.toString();
-            } else {
-                // Nested pattern
-                dumpPattern(*elem.nestedPattern());
-            }
-            if (i < pattern.elements().size() - 1)
-                stream << ", ";
-        }
-        stream << "]";
-    };
-
-    dumpPattern(*statement->pattern());
-    stream << " = " << visit(statement->expression()) << ";";
-    return stream.str();
-}
-
-std::string StringVisitor::dump(const Ptr<DestructuringAssignmentStatement>& statement)
-{
-    std::stringstream stream;
-    stream << "*"; // Prefix for destructuring assignments
-
-    // Helper function to recursively dump pattern elements
-    std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
-        stream << "[";
-        for (size_t i = 0; i < pattern.elements().size(); ++i) {
-            const auto& elem = pattern.elements()[i];
-            if (elem.isSimpleBinding()) {
-                const auto& binding = elem.simpleBinding();
-                stream << binding.name;
-            } else {
-                // Nested pattern
-                dumpPattern(*elem.nestedPattern());
-            }
-            if (i < pattern.elements().size() - 1)
-                stream << ", ";
-        }
-        stream << "]";
-    };
-
-    dumpPattern(*statement->pattern());
-    stream << " = " << visit(statement->expression()) << ";";
-    return stream.str();
-}
 } // namespace PExpr::utils

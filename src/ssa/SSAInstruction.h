@@ -49,7 +49,7 @@ public:
                         Binary,
                         Swizzle,
                         Access,
-                        Vector,
+                        Tuple,
                         Cast };
 
     SSAValue Target;

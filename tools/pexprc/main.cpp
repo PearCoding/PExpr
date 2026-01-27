@@ -182,8 +182,7 @@ int main(int argc, char** argv)
         }
 
         // Map to IR
-        ssa::SSAMapper mapper;
-        program = mapper.map(ast);
+        program = env.map(ast);
     } else {
         program = ssa::SSASerializer::read(sourceFile);
     }

@@ -53,80 +53,190 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
 {
     switch (statement->type()) {
     case StatementType::VariableDeclaration: {
-        const auto varStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
+        const auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
+        const auto& pattern = declStmt->pattern();
 
-        // Type-check the initializer expression first.
-        const auto type = handleNode(closure, varStmt->expression());
-        if (type.kind() == TypeKind::Error)
-            return; // Error was caught somewhere else
-
-        if (type.kind() == TypeKind::Unspecified) {
-            mReporter.errorf(varStmt->location(), "Can not determine type of variable '%s'", varStmt->name().c_str());
+        // Type-check the RHS expression
+        const auto rhsType = handleNode(closure, declStmt->expression());
+        if (rhsType.kind() == TypeKind::Error)
             return;
-        }
 
-        // If an explicit declared type is provided, validate / coerce the initializer.
-        const auto declared = varStmt->declaredType();
-        if (declared.kind() != TypeKind::Unspecified && type != declared) {
-            if (isConvertible(type, declared)) {
-                // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
-                const auto orig     = varStmt->expression();
-                const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
+        // Check if pattern is a single simple binding (i.e., regular variable declaration)
+        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+            auto& binding = pattern->elements()[0].simpleBinding();
 
-                utils::ReportType rt = utils::RT_WARNING_IMPLICIT_CAST;
-                // Special case: `int` literal for a `num` variable
-                if (declared.kind() == TypeKind::Number && type.kind() == TypeKind::Integer)
-                    rt = utils::RT_WARNING_IMPLICIT_CAST_INT;
+            // Check type compatibility if explicit type is provided
+            if (binding.declaredType.kind() != TypeKind::Unspecified) {
+                if (!isConvertible(rhsType, binding.declaredType)) {
+                    mReporter.errorf(declStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
+                                     rhsType.toString().c_str(), binding.declaredType.toString().c_str(), binding.name.c_str());
+                    return;
+                }
+            }
 
-                mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
-                varStmt->replaceExpression(castExpr);
-            } else {
-                mReporter.errorf(varStmt->location(), "Cannot implicitly convert initializer from '%s' to declared type '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
+            // Register the variable
+            const Type varType = (binding.declaredType.kind() != TypeKind::Unspecified) ? binding.declaredType : rhsType;
+            if (!closure->symbols().addVariable(VariableDef(binding.name, varType, binding.isMutable))) {
+                mReporter.errorf(declStmt->location(), "Variable '%s' already exists in the current scope", binding.name.c_str());
                 return;
             }
-        }
 
-        // Register the variable
-        if (!closure->symbols().addVariable(VariableDef(varStmt->name(), declared.kind() != TypeKind::Unspecified ? declared : type, varStmt->isMutable())))
-            mReporter.errorf(varStmt->location(), "New variable '%s' already exists in the current scope", varStmt->name().c_str());
+            // Infer type if necessary
+            binding.declaredType = varType;
+        } else {
+            // Destructuring pattern: RHS must return a tuple
+            if (!rhsType.isTuple()) {
+                mReporter.errorf(declStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
+                return;
+            }
+
+            // Register variables using the original rhsType
+            std::function<bool(Pattern&, const Type&)> registerVariables =
+                [&](Pattern& pattern, const Type& type) -> bool {
+                if (!type.isTuple()) {
+                    mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
+                    return false;
+                }
+
+                const auto& components = type.components();
+                if (pattern.size() != components.size()) {
+                    mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
+                    return false;
+                }
+
+                for (size_t i = 0; i < pattern.size(); ++i) {
+                    auto& elem           = pattern.elements()[i];
+                    const auto& elemType = components.at(i);
+
+                    if (elem.isSimpleBinding()) {
+                        auto& binding = elem.simpleBinding();
+
+                        // Determine target type (use declared type if specified, otherwise inferred from element)
+                        const Type varType = (binding.declaredType.kind() != TypeKind::Unspecified) ? binding.declaredType : elemType;
+                        if (!closure->symbols().addVariable(VariableDef(binding.name, varType, binding.isMutable))) {
+                            mReporter.errorf(elem.location(), "Variable '%s' already exists in the current scope", binding.name.c_str());
+                            return false;
+                        }
+
+                        // Infer type if necessary
+                        binding.declaredType = varType;
+                    } else {
+                        // Nested pattern - recurse
+                        if (!registerVariables(*elem.nestedPattern(), elemType))
+                            return false;
+                    }
+                }
+
+                return true;
+            };
+
+            registerVariables(*pattern, rhsType);
+        }
     } break;
     case StatementType::VariableAssignment: {
-        const auto varStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
-        const auto type    = handleNode(closure, varStmt->expression());
-        if (type.kind() == TypeKind::Error)
-            return; // Error was caught somewhere else
+        const auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
+        auto& pattern         = assignStmt->pattern();
 
-        // Check if the variable exists and can be updated
-        const SymbolTable* capturedTbl;
-        const auto var = closure->symbols().lookupVariable(varStmt->location(), varStmt->name(), &capturedTbl);
-        if (!var.has_value()) {
-            mReporter.errorf(varStmt->location(), "Trying to assign a value to unknown variable '%s'", varStmt->name().c_str());
+        // Type-check the RHS expression
+        const auto rhsType = handleNode(closure, assignStmt->expression());
+        if (rhsType.kind() == TypeKind::Error)
             return;
-        }
-        if (capturedTbl != &closure->symbols()) {
-            mReporter.errorf(varStmt->location(), "Trying to reassign a value to variable '%s' defined in a different scope", varStmt->name().c_str());
-            return;
-        }
-        if (!var->isMutable()) {
-            mReporter.errorf(varStmt->location(), "Trying to reassign a value to constant variable '%s'", varStmt->name().c_str());
-            return;
-        }
 
-        const auto declared = var->type();
-        if (isConvertible(type, declared) && type != declared) {
-            // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
-            const auto orig     = varStmt->expression();
-            const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
+        // Check if pattern is a single simple binding (i.e., regular variable assignment)
+        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+            auto& binding = pattern->elements()[0].simpleBinding();
 
-            utils::ReportType rt = utils::RT_WARNING_IMPLICIT_CAST;
-            // Special case: `int` literal for a `num` variable
-            if (declared.kind() == TypeKind::Number && type.kind() == TypeKind::Integer)
-                rt = utils::RT_WARNING_IMPLICIT_CAST_INT;
+            // Lookup the variable
+            const SymbolTable* capturedTbl;
+            const auto var = closure->symbols().lookupVariable(assignStmt->location(), binding.name, &capturedTbl);
+            if (!var.has_value()) {
+                mReporter.errorf(assignStmt->location(), "Unknown variable '%s' in assignment", binding.name.c_str());
+                return;
+            }
+            if (capturedTbl != &closure->symbols()) {
+                mReporter.errorf(assignStmt->location(), "Cannot assign to variable '%s' defined in a different scope", binding.name.c_str());
+                return;
+            }
+            if (!var->isMutable()) {
+                mReporter.errorf(assignStmt->location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
+                return;
+            }
 
-            mReporter.warningf(rt, orig->location(), "Implicitly converting from '%s' to '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
-            varStmt->replaceExpression(castExpr);
-        } else if (type != declared) {
-            mReporter.errorf(varStmt->location(), "Cannot implicitly convert from '%s' to declared type '%s' for variable '%s'", type.toString().c_str(), declared.toString().c_str(), varStmt->name().c_str());
+            // Check type compatibility
+            const auto& varType = var->type();
+            if (!isConvertible(rhsType, varType)) {
+                mReporter.errorf(assignStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s'",
+                                 rhsType.toString().c_str(), varType.toString().c_str(), binding.name.c_str());
+                return;
+            }
+
+            // Ensure this is up-to-date
+            binding.declaredType = varType;
+        } else {
+            // Destructuring pattern: RHS must be a tuple
+            if (!rhsType.isTuple()) {
+                mReporter.errorf(assignStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
+                return;
+            }
+
+            // Helper function to recursively process pattern elements for assignment
+            std::function<bool(Pattern&, const Type&)> processPattern =
+                [&](Pattern& pattern, const Type& type) -> bool {
+                if (!type.isTuple()) {
+                    mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
+                    return false;
+                }
+
+                const auto& components = type.components();
+                if (pattern.size() != components.size()) {
+                    mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
+                    return false;
+                }
+
+                for (size_t i = 0; i < pattern.size(); ++i) {
+                    auto& elem           = pattern.elements()[i];
+                    const auto& elemType = components.at(i);
+
+                    if (elem.isSimpleBinding()) {
+                        auto& binding = elem.simpleBinding();
+
+                        // Lookup the variable
+                        const SymbolTable* capturedTbl;
+                        const auto var = closure->symbols().lookupVariable(elem.location(), binding.name, &capturedTbl);
+                        if (!var.has_value()) {
+                            mReporter.errorf(elem.location(), "Unknown variable '%s' in destructuring assignment", binding.name.c_str());
+                            return false;
+                        }
+                        if (capturedTbl != &closure->symbols()) {
+                            mReporter.errorf(elem.location(), "Cannot assign to variable '%s' defined in a different scope", binding.name.c_str());
+                            return false;
+                        }
+                        if (!var->isMutable()) {
+                            mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
+                            return false;
+                        }
+
+                        // Check type compatibility
+                        const auto& varType = var->type();
+                        if (!isConvertible(elemType, varType)) {
+                            mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
+                                             elemType.toString().c_str(), varType.toString().c_str(), binding.name.c_str());
+                            return false;
+                        }
+
+                        // Ensure this is up-to-date
+                        binding.declaredType = varType;
+                    } else {
+                        // Nested pattern - recurse
+                        if (!processPattern(*elem.nestedPattern(), elemType))
+                            return false;
+                    }
+                }
+
+                return true;
+            };
+
+            processPattern(*pattern, rhsType);
         }
     } break;
     case StatementType::FunctionDeclaration: {
@@ -155,157 +265,9 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
             closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern(), funcStmt->hasSideEffects()));
 
         const auto declared = funcStmt->returnType();
-        if (isConvertible(returnType, declared) && returnType != declared) {
-            // Insert an implicit (non-explicit) cast so downstream passes see an explicit cast node.
-            const auto orig     = funcStmt->closure()->expression();
-            const auto castExpr = std::make_shared<CastExpression>(orig->location(), declared, orig, false);
-
-            // Special case: `int` literal for a `num` variable
-            if (funcStmt->closure()->expression()->type() == ExpressionType::Literal && declared.kind() == TypeKind::Number && returnType.kind() == TypeKind::Integer) {
-                // Ignore warning
-            } else {
-                mReporter.warningf(utils::RT_WARNING_IMPLICIT_CAST, orig->location(), "Implicitly converting return value from '%s' to '%s' for function '%s'", returnType.toString().c_str(), declared.toString().c_str(), funcStmt->name().c_str());
-            }
-
-            funcStmt->closure()->replaceExpression(castExpr);
-        } else if (returnType != declared) {
+        if (returnType != declared && !isConvertible(returnType, declared)) {
             mReporter.errorf(funcStmt->location(), "Cannot implicitly convert return value from '%s' to declared type '%s' for function '%s'", returnType.toString().c_str(), declared.toString().c_str(), funcStmt->name().c_str());
         }
-    } break;
-    case StatementType::DestructuringDeclaration: {
-        const auto destrStmt = std::reinterpret_pointer_cast<DestructuringDeclarationStatement>(statement);
-
-        // Type-check the RHS expression
-        const auto rhsType = handleNode(closure, destrStmt->expression());
-        if (rhsType.kind() == TypeKind::Error)
-            return;
-
-        if (!rhsType.isTuple()) {
-            mReporter.errorf(destrStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
-            return;
-        }
-
-        // Helper function to recursively process pattern elements
-        std::function<bool(const Pattern&, const Type&, size_t&)> processPattern =
-            [&](const Pattern& pattern, const Type& type, size_t& tupleIndex) -> bool {
-            if (!type.isTuple()) {
-                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
-                return false;
-            }
-
-            const auto& components = type.components();
-            if (pattern.size() != components.size()) {
-                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
-                return false;
-            }
-
-            for (size_t i = 0; i < pattern.size(); ++i) {
-                const auto& elem     = pattern.elements()[i];
-                const auto& elemType = components[i];
-
-                if (elem.isSimpleBinding()) {
-                    const auto& binding = elem.simpleBinding();
-
-                    // Check type compatibility if explicit type is provided
-                    if (binding.declaredType.kind() != TypeKind::Unspecified) {
-                        if (!isConvertible(elemType, binding.declaredType)) {
-                            mReporter.errorf(elem.location(), "Cannot convert tuple element %zu from '%s' to '%s'",
-                                             tupleIndex, elemType.toString().c_str(), binding.declaredType.toString().c_str());
-                            return false;
-                        }
-                    }
-
-                    // Register the variable
-                    const Type varType = (binding.declaredType.kind() != TypeKind::Unspecified) ? binding.declaredType : elemType;
-                    if (!closure->symbols().addVariable(VariableDef(binding.name, varType, binding.isMutable))) {
-                        mReporter.errorf(elem.location(), "Variable '%s' already exists in the current scope", binding.name.c_str());
-                        return false;
-                    }
-
-                    ++tupleIndex;
-                } else {
-                    // Nested pattern - recurse
-                    if (!processPattern(*elem.nestedPattern(), elemType, tupleIndex))
-                        return false;
-                }
-            }
-
-            return true;
-        };
-
-        const auto& pattern = destrStmt->pattern();
-        size_t tupleIndex   = 0;
-        processPattern(*pattern, rhsType, tupleIndex);
-    } break;
-    case StatementType::DestructuringAssignment: {
-        const auto destrStmt = std::reinterpret_pointer_cast<DestructuringAssignmentStatement>(statement);
-
-        // Type-check the RHS expression
-        const auto rhsType = handleNode(closure, destrStmt->expression());
-        if (rhsType.kind() == TypeKind::Error)
-            return;
-
-        if (!rhsType.isTuple()) {
-            mReporter.errorf(destrStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
-            return;
-        }
-
-        // Helper function to recursively process pattern elements for assignment
-        std::function<bool(const Pattern&, const Type&)> processPattern =
-            [&](const Pattern& pattern, const Type& type) -> bool {
-            if (!type.isTuple()) {
-                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
-                return false;
-            }
-
-            const auto& components = type.components();
-            if (pattern.size() != components.size()) {
-                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
-                return false;
-            }
-
-            for (size_t i = 0; i < pattern.size(); ++i) {
-                const auto& elem     = pattern.elements()[i];
-                const auto& elemType = components[i];
-
-                if (elem.isSimpleBinding()) {
-                    const auto& binding = elem.simpleBinding();
-
-                    // Lookup the variable
-                    const SymbolTable* capturedTbl;
-                    const auto var = closure->symbols().lookupVariable(elem.location(), binding.name, &capturedTbl);
-                    if (!var.has_value()) {
-                        mReporter.errorf(elem.location(), "Unknown variable '%s' in destructuring assignment", binding.name.c_str());
-                        return false;
-                    }
-                    if (capturedTbl != &closure->symbols()) {
-                        mReporter.errorf(elem.location(), "Cannot assign to variable '%s' defined in a different scope", binding.name.c_str());
-                        return false;
-                    }
-                    if (!var->isMutable()) {
-                        mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
-                        return false;
-                    }
-
-                    // Check type compatibility
-                    const auto& varType = var->type();
-                    if (!isConvertible(elemType, varType)) {
-                        mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
-                                         elemType.toString().c_str(), varType.toString().c_str(), binding.name.c_str());
-                        return false;
-                    }
-                } else {
-                    // Nested pattern - recurse
-                    if (!processPattern(*elem.nestedPattern(), elemType))
-                        return false;
-                }
-            }
-
-            return true;
-        };
-
-        const auto& pattern = destrStmt->pattern();
-        processPattern(*pattern, rhsType);
     } break;
     default:
         break;

@@ -16,8 +16,7 @@ TEST_CASE("DeclaredTypes: implicit int->num declaration injects SSA cast", "[dec
     auto ast = env.parse(stream);
     REQUIRE(ast != nullptr); // parsing & typechecking must succeed
 
-    SSAMapper mapper;
-    auto prog   = mapper.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     // Expect a cast instruction inserted by lowering the injected CastExpression
@@ -31,8 +30,7 @@ TEST_CASE("DeclaredTypes: explicit num->int declaration using 'as' is accepted a
     auto ast = env.parse(stream);
     REQUIRE(ast != nullptr); // explicit cast must be accepted by typechecker
 
-    SSAMapper mapper;
-    auto prog   = mapper.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     REQUIRE(dumped.find("cast(") != std::string::npos);

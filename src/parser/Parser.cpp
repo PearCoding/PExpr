@@ -202,7 +202,7 @@ private:
         return closure;
     }
 
-    // Regular variable statement (single identifier)
+    // Unified variable statement (single identifier or pattern)
     inline Ptr<Statement> p_variable_statement(bool is_declaration, const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
@@ -213,6 +213,7 @@ private:
         if (is_declaration)
             is_mutable = P.accept(TokenType::Mutable);
 
+        const auto idLoc = P.cur().Location;
         const std::string varName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
         P.expect(TokenType::Identifier);
 
@@ -227,10 +228,15 @@ private:
 
         P.expect(TokenType::Semicolon);
 
+        // Create a pattern with a single simple binding
+        Pattern::ElementList elements;
+        elements.push_back(PatternElement::makeSimple(idLoc, varName, declaredType, is_mutable));
+        auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
+
         if (is_declaration)
-            return std::make_shared<VariableDeclarationStatement>(is_mutable, loc, varName, std::move(expr), declaredType);
+            return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(expr));
         else
-            return std::make_shared<VariableAssignmentStatement>(loc, varName, std::move(expr));
+            return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
     }
 
     // Destructuring statement (pattern)
@@ -255,9 +261,9 @@ private:
         P.expect(TokenType::Semicolon);
 
         if (is_declaration)
-            return std::make_shared<DestructuringDeclarationStatement>(loc, pattern, std::move(expr));
+            return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(expr));
         else
-            return std::make_shared<DestructuringAssignmentStatement>(loc, pattern, std::move(expr));
+            return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
     }
 
     inline ParameterList p_parameter_def_list()

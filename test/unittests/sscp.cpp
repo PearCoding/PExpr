@@ -23,10 +23,8 @@ TEST_CASE("Optimizer: constant folding of binary ops", "[sscp]")
 {
     std::stringstream stream("let mut a = 2; let mut b = 3; let mut c = a + b; c");
     Environment env;
-    auto ast = env.parse(stream);
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse(stream);
+    auto prog = env.map(ast);
 
     // run SSCP pass
     opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
@@ -41,10 +39,8 @@ TEST_CASE("Optimizer: dead code elimination removes unused assigns", "[sscp]")
 {
     std::stringstream stream("let x = 1; let y = 2; x");
     Environment env;
-    auto ast = env.parse(stream);
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse(stream);
+    auto prog = env.map(ast);
 
     // Ensure y assign exists before pass (sanity)
     auto before = SSASerializer::serialize(prog);
@@ -64,10 +60,8 @@ TEST_CASE("Optimizer: constant folding for vectors", "[sscp]")
 {
     std::stringstream stream("let v1 = [1.0, 2.0]; let v2 = [3.0, 4.0]; let v3 = v1 + v2; v3.x");
     Environment env;
-    auto ast = env.parse(stream);
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse(stream);
+    auto prog = env.map(ast);
 
     // run SSCP pass
     opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
@@ -83,10 +77,8 @@ TEST_CASE("Optimizer: vector arithmetic operations", "[sscp]")
     // Test various vector operations: add, sub, mul, div
     std::stringstream stream("let v1 = [1.0, 2.0, 3.0]; let v2 = [2.0, 3.0, 4.0]; let add = v1 + v2; let sub = v1 - v2; let mul = v1 * v2; let div = v1 / v2; add.x + sub.y + mul.z + div.x");
     Environment env;
-    auto ast = env.parse(stream);
-
-    SSAMapper mapper;
-    auto prog = mapper.map(ast);
+    auto ast  = env.parse(stream);
+    auto prog = env.map(ast);
 
     opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
 

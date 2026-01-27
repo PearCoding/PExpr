@@ -33,7 +33,7 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
             h = h * 31 + Operands[1].hash(true);
         }
         break;
-    case OpKind::Vector:
+    case OpKind::Tuple:
         h = h * 31 + std::hash<size_t>{}(Operands.size());
         for (const auto& op : Operands)
             h = h * 31 + op.hash(true);

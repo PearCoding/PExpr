@@ -3,6 +3,7 @@
 #include "SSAContext.h"
 #include "SSAStructs.h"
 #include "ast/Closure.h"
+#include "utils/Reporter.h"
 
 namespace PExpr::ssa {
 
@@ -17,7 +18,7 @@ namespace PExpr::ssa {
 /// objects which can later be serialized to text or binary.
 class SSAMapper {
 public:
-    SSAMapper();
+    SSAMapper(utils::Reporter& reporter);
 
     /// Map a closure to an SSAProgram.
     [[nodiscard]] SSAProgram map(const Ptr<ast::Closure>& closure);
@@ -27,12 +28,15 @@ private:
     void mapStatement(SSAProgram& program, const Ptr<ast::Statement>& stmt);
     [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<ast::Expression>& expr);
 
+    [[nodiscard]] SSAValue castIfNeeded(SSAProgram& program, const parser::Location& loc, const SSAValue& fromValue, const type::Type& toType);
+
     // Inline a mapped closure body into the current program by replacing any
     // SSAInstrReturn instructions with assignments to a fresh temporary variable.
     // Returns the SSAValue representing the last returned value (or a nil constant).
     SSAValue inlineClosureBody(SSAProgram& program, const std::vector<std::shared_ptr<SSAInstr>>& body);
 
     // Internal helpers
+    utils::Reporter& mReporter;
     SSAContext mContext; // SSA context for variable name generation
     std::unordered_map<const void*, SSAValue> mExprValues;
 };
