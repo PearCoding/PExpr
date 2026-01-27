@@ -8,31 +8,43 @@ namespace PExpr::utils {
 /// Simple visitor which will construct a parsable representation of the given AST.
 class StringVisitor {
 public:
-    static std::string visit(const Ptr<ast::Closure>& closure)
+    [[nodiscard]] inline static std::string visit(const Ptr<ast::Closure>& closure)
     {
-        return dump(closure);
+        return dump(0, closure);
     }
 
-    static std::string visit(const Ptr<ast::Statement>& statement);
-    static std::string visit(const Ptr<ast::Expression>& expr);
+    [[nodiscard]] inline static std::string visit(const Ptr<ast::Statement>& statement)
+    {
+        return visit(0, statement);
+    }
+
+    [[nodiscard]] inline static std::string visit(const Ptr<ast::Expression>& expr)
+    {
+        return visit(0, expr);
+    }
 
 private:
-    static std::string dump(const Ptr<ast::Closure>& closure);
-    static std::string dump(const Ptr<ast::VariableDeclarationStatement>& statement);
-    static std::string dump(const Ptr<ast::VariableAssignmentStatement>& statement);
-    static std::string dump(const Ptr<ast::FunctionDeclarationStatement>& statement);
-    static std::string dump(const Ptr<ast::VariableExpression>& expr);
-    static std::string dump(const Ptr<ast::LiteralExpression>& expr);
-    static std::string dump(const Ptr<ast::UnaryExpression>& expr);
-    static std::string dump(const Ptr<ast::BinaryExpression>& expr);
-    static std::string dump(const Ptr<ast::CallExpression>& expr);
-    static std::string dump(const Ptr<ast::SwizzleExpression>& expr);
-    static std::string dump(const Ptr<ast::AccessExpression>& expr);
-    static std::string dump(const Ptr<ast::CastExpression>& expr);
-    static std::string dump(const Ptr<ast::ClosureExpression>& expr);
-    static std::string dump(const Ptr<ast::BranchExpression>& expr);
-    static std::string dump(const Ptr<ast::TupleExpression>& expr);
-    static std::string dump(const Ptr<ast::TypeAliasStatement>& statement);
+    [[nodiscard]] static std::string visit(size_t level, const Ptr<ast::Statement>& statement);
+    [[nodiscard]] static std::string visit(size_t level, const Ptr<ast::Expression>& expr);
+
+    [[nodiscard]] static std::string pad(size_t level);
+
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::Closure>& closure);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::VariableDeclarationStatement>& statement);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::VariableAssignmentStatement>& statement);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::FunctionDeclarationStatement>& statement);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::VariableExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::LiteralExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::UnaryExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::BinaryExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::CallExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::SwizzleExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::AccessExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::CastExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::ClosureExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::BranchExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::TupleExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::TypeAliasStatement>& statement);
 };
 
 } // namespace PExpr::utils
