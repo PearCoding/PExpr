@@ -4,7 +4,8 @@
 let mut x:num = 0;
 let branch_phi = if getInput() < 0.5 {
     x = 12;
-    10
+    let x = 10; //< TODO: This should at least trigger a warning!
+    x
 } else {
     x = 42;
     20
@@ -12,4 +13,6 @@ let branch_phi = if getInput() < 0.5 {
 
 // This should produces two phi nodes
 // -> one for branch_phi and one for x
+// In the case of true it would return 22, else 62
+// TODO: Currently this does not work!
 branch_phi + x
