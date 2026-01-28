@@ -263,7 +263,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
                             VecN result;
                             result.reserve(vec.size());
                             for (size_t i = 0; i < vec.size(); ++i)
-                                result[i] = opFunc(vec[i], scalarVal);
+                                result.push_back(opFunc(vec[i], scalarVal));
                             return SSAValue::Constant(result);
                         }
                         return std::nullopt;
@@ -276,17 +276,15 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
                     case BinaryOperation::Div:
                         // Only vector / scalar is allowed, not scalar / vector
                         if (LIsArray) { // vector / scalar
-                            if (scalarVal != Number(0.0)) {
+                            if (scalarVal != Number(0.0))
                                 return applyScalarToVector([](Number a, Number b) { return a / b; });
-                            }
                         }
                         break;
                     case BinaryOperation::Mod:
                         // Only vector % scalar is allowed, not scalar % vector
                         if (LIsArray) { // vector % scalar
-                            if (scalarVal != Number(0.0)) {
+                            if (scalarVal != Number(0.0))
                                 return applyScalarToVector([](Number a, Number b) { return std::fmod(a, b); });
-                            }
                         }
                         break;
                     case BinaryOperation::Pow:
