@@ -2,3 +2,5 @@
 let vec_const = [1, 2, 3] + [4, 5, 6]; // should fold to [5, 7, 9]
 let vec_swizzle_const = vec_const.yx;  // should fold to [7, 5]
 vec_swizzle_const
+
+// TODO: Missing implicit casts from mixed tuple (with int etc) to vector.

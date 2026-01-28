@@ -17,7 +17,7 @@
 - [ ] Value range propagation
 - [ ] Tail call optimization
 - [ ] Memory/register allocation optimizations
-- [ ] Most optimization ignore code blocks. Fix that by extracting basic blocks and applying on them. Only some passes should be applied to all blocks. 
+- [x] Most optimization ignore code blocks. Fix that by extracting basic blocks and applying on them. Only some passes should be applied to all blocks. 
 - [x] Allow attributes for every statement. Give intrinsics special names. 
 - [ ] Add loop expression (like https://zig.guide/language-basics/loops-as-expressions/)
 - [ ] Add loop statements
@@ -26,6 +26,7 @@
 - [x] Add SSA IR serialization with write and read functionality
 - [x] Add support for tuples
 - [x] Add support for type alias (needed for tuples)
-- [ ] To add more statement types the rule of mutability for closures must be rewritten. Extend lambda uplifting to work with mutable variables, by explicitly tracking them and updating them at the end of a SSA call.
+- [x] To add more statement types the rule of mutability for closures must be rewritten. Extend lambda uplifting to work with mutable variables, by explicitly tracking them and updating them at the end of a SSA call.
 - [x] Add destructured bindings (assignment and declaration)
-- [ ] Simplify internal code by unifying VariableAssignment and DestructuralAssignment with a single pattern element being the same as a simple variable assignment. Same for declarations.
+- [x] Simplify internal code by unifying VariableAssignment and DestructuralAssignment with a single pattern element being the same as a simple variable assignment. Same for declarations.
+- [ ] Handle implicit casts better. Maybe as a separate pass or similar?

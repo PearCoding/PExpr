@@ -2,4 +2,4 @@
 [[extern, pure]] fn sin(a:num) -> num;
 [[extern, pure]] fn cos(a:num) -> num;
 
-sin(2)^2 + cos(2)^2
+sin(2)^2 + cos(2)^2 // should optimize to 1 if identity optimization is enabled
