@@ -30,3 +30,4 @@
 - [x] Add destructured bindings (assignment and declaration)
 - [x] Simplify internal code by unifying VariableAssignment and DestructuralAssignment with a single pattern element being the same as a simple variable assignment. Same for declarations.
 - [ ] Handle implicit casts better. Maybe as a separate pass or similar?
+- [ ] Add modules (per file)

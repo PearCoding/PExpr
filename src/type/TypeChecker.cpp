@@ -20,6 +20,34 @@ inline void typeError(utils::Reporter& rep, const Ptr<BinaryExpression>& expr, c
     rep.errorf(expr->location(), "Can not use operator '%s' with types '%s' and '%s'", toString(expr->op()).data(), left.toString().c_str(), right.toString().c_str());
 }
 
+Ptr<ast::Expression> TypeChecker::injectCastIfNeeded(const Ptr<ast::Expression>& origExpr, const Type& toType, bool* hadError)
+{
+    const auto origType = origExpr->returnType();
+    PEXPR_ASSERT(origType.kind() != TypeKind::Unspecified, "Expected a valid type");
+
+    if (origType == toType)
+        return origExpr;
+
+    if (isConvertible(origType, toType)) {
+        auto castExpr = std::make_shared<CastExpression>(origExpr->location(), toType, origExpr);
+
+        utils::ReportType rt = utils::RT_WARNING_IMPLICIT_CAST;
+
+        // Special case: `int` literal for a `num` branch
+        if (toType.kind() == TypeKind::Number && origType.kind() == TypeKind::Integer)
+            rt = utils::RT_WARNING_IMPLICIT_CAST_INT;
+
+        mReporter.warningf(rt, origExpr->location(), "Implicitly converting from '%s' to '%s'", origType.toString().data(), toType.toString().data());
+
+        return castExpr;
+    } else {
+        if (hadError)
+            *hadError = true;
+        mReporter.errorf(origExpr->location(), "Can not convert '%s' to '%s'", origType.toString().data(), toType.toString().data());
+        return origExpr;
+    }
+}
+
 Type TypeChecker::handle(const Ptr<Closure>& closure)
 {
     return handleNode(closure);
@@ -309,48 +337,49 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<ClosureExpre
 
 Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpression>& expr)
 {
+    // Setup conditionals
+    bool hadCastError = false;
+    for (auto& branch : expr->branches()) {
+        handleNode(closure, branch.Condition);
+        branch.Condition = injectCastIfNeeded(branch.Condition, Type(TypeKind::Boolean), &hadCastError);
+
+        if (hadCastError)
+            return Type(TypeKind::Error);
+    }
+
+    // Determine the type of the expression
     Type returnType = handleNode(expr->elseClosure());
     if (returnType.kind() == TypeKind::Error) // Error handled somewhere else
         return returnType;
 
     for (const auto& branch : expr->branches()) {
-        const Type conditionType = handleNode(closure, branch.Condition);
-        if (isConvertible(conditionType, Type(TypeKind::Boolean))) {
-            branch.Condition->setReturnType(Type(TypeKind::Boolean));
-        } else {
-            mReporter.error(branch.Condition->location(), "Expected condition to evaluate to bool");
-            return Type(TypeKind::Error);
-        }
-
         const auto bodyType = handleNode(branch.Body);
         if (bodyType.kind() == TypeKind::Error) // Error handled somewhere else
             return bodyType;
 
         if (returnType.kind() == TypeKind::Unspecified) {
             returnType = bodyType;
-        } else if (bodyType != returnType && isConvertible(bodyType, returnType)) {
-            // Inject a CastExpression so the branch body expression has the desired return type.
-            // This ensures later stages (SSA mapper) see an explicit cast node rather than relying
-            // on the mapper to insert SSA-level casts.
-            auto origExpr                = branch.Body->expression();
-            auto castExpr                = std::make_shared<CastExpression>(origExpr->location(), returnType, origExpr);
-            branch.Body->expressionMut() = castExpr;
-
-            utils::ReportType rt = utils::RT_WARNING_IMPLICIT_CAST;
-            // Special case: `int` literal for a `num` branch
-            if (returnType.kind() == TypeKind::Number && bodyType.kind() == TypeKind::Integer)
-                rt = utils::RT_WARNING_IMPLICIT_CAST_INT;
-
-            mReporter.warningf(rt, origExpr->location(), "Implicitly converting from '%s' to '%s' for conditional branch", bodyType.toString().data(), returnType.toString().data());
-        } else if (bodyType == returnType) {
-            // matching type — nothing to do
-        } else {
-            mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
-            return Type(TypeKind::Error);
+        } else if (bodyType != returnType) {
+            if (isConvertible(bodyType, returnType)) {
+                // Ok
+            } else if (isConvertible(returnType, bodyType)) {
+                returnType = bodyType;
+            } else {
+                mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
+                return Type(TypeKind::Error);
+            }
         }
     }
 
-    expr->setReturnType(returnType);
+    // Inject casts if necessary
+    expr->elseClosure()->expressionMut() = injectCastIfNeeded(expr->elseClosure()->expression(), returnType, &hadCastError);
+    for (auto& branch : expr->branches())
+        branch.Body->expressionMut() = injectCastIfNeeded(branch.Body->expression(), returnType, &hadCastError);
+
+    if (!hadCastError)
+        expr->setReturnType(returnType);
+    else
+        expr->setReturnType(Type(TypeKind::Error));
     return returnType;
 }
 
@@ -385,10 +414,12 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpress
         if (innerType.isArithmetic())
             expr->setReturnType(innerType);
         break;
-    case UnaryOperation::Not:
-        if (isConvertible(innerType, Type(TypeKind::Boolean)))
+    case UnaryOperation::Not: {
+        bool hadCastError = false;
+        expr->innerMut()  = injectCastIfNeeded(expr->inner(), Type(TypeKind::Boolean), &hadCastError);
+        if (!hadCastError)
             expr->setReturnType(Type(TypeKind::Boolean));
-        break;
+    } break;
     default:
         break;
     }
@@ -410,66 +441,102 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
 
     expr->setReturnType(Type(TypeKind::Unspecified));
 
+    bool hadCastError = false;
     switch (expr->op()) {
     case BinaryOperation::Add:
     case BinaryOperation::Sub:
-        if (leftType.isArithmetic() && rightType.isArithmetic()) {
-            if (leftType == rightType)
-                expr->setReturnType(leftType);
-            else if (isConvertible(leftType, rightType))
+        if (leftType.isArithmetic() && leftType == rightType) {
+            expr->setReturnType(leftType);
+        } else if (isConvertible(leftType, rightType)) {
+            expr->leftMut() = injectCastIfNeeded(expr->left(), rightType, &hadCastError);
+            if (!hadCastError)
                 expr->setReturnType(rightType);
-            else if (isConvertible(rightType, leftType))
+        } else if (isConvertible(rightType, leftType)) {
+            expr->rightMut() = injectCastIfNeeded(expr->left(), leftType, &hadCastError);
+            if (!hadCastError)
                 expr->setReturnType(leftType);
         }
         break;
     case BinaryOperation::Mul:
     case BinaryOperation::Div:
-        if (leftType.isArithmetic() && rightType.isArithmetic()) {
-            if (leftType == rightType)
-                expr->setReturnType(leftType);
-            else if (isConvertible(leftType, rightType))
+        if (leftType.isArithmetic() && leftType == rightType) { // < i * i, f * f, v * v
+            expr->setReturnType(leftType);
+        } else if (rightType.isArithmetic() && isConvertible(leftType, rightType)) { // < i * f
+            expr->leftMut() = injectCastIfNeeded(expr->left(), rightType, &hadCastError);
+            if (!hadCastError)
                 expr->setReturnType(rightType);
-            else if (isConvertible(rightType, leftType))
+        } else if (leftType.isArithmetic() && isConvertible(rightType, leftType)) { // < f * i
+            expr->rightMut() = injectCastIfNeeded(expr->left(), leftType, &hadCastError);
+            if (!hadCastError)
                 expr->setReturnType(leftType);
-            else if (leftType.isVector() && isConvertible(rightType, TypeKind::Number))
-                expr->setReturnType(leftType); // vec * f, vec / f
-            else if (expr->op() != BinaryOperation::Div && rightType.isVector() && isConvertible(leftType, TypeKind::Number))
-                expr->setReturnType(rightType); // f * vec
+        } else if (leftType.isTuple() && isConvertible(leftType, Type::AsVector(leftType.size())) && isConvertible(rightType, TypeKind::Number)) { // < v * f, v * i
+            expr->leftMut()  = injectCastIfNeeded(expr->left(), Type::AsVector(leftType.size()), &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), Type(TypeKind::Number), &hadCastError);
+            if (!hadCastError)
+                expr->setReturnType(expr->left()->returnType());
+        } else if (expr->op() != BinaryOperation::Div && rightType.isTuple() && isConvertible(rightType, Type::AsVector(rightType.size())) && isConvertible(leftType, TypeKind::Number)) { // < f * v,  i * v
+            expr->leftMut()  = injectCastIfNeeded(expr->left(), Type(TypeKind::Number), &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), Type::AsVector(leftType.size()), &hadCastError);
+            if (!hadCastError)
+                expr->setReturnType(expr->left()->returnType());
         }
         break;
     case BinaryOperation::Pow:
-        if (leftType.isArithmetic() && rightType.isArithmetic()) {
-            if (leftType == rightType && leftType.kind() == TypeKind::Integer)
-                expr->setReturnType(leftType); // i ^ i
-            else if (isConvertible(leftType, TypeKind::Number) && isConvertible(rightType, TypeKind::Number))
+        if (leftType == rightType && leftType.kind() == TypeKind::Integer) {
+            expr->setReturnType(leftType); // i ^ i
+        } else if (isConvertible(leftType, TypeKind::Number) && isConvertible(rightType, TypeKind::Number)) {
+            expr->leftMut()  = injectCastIfNeeded(expr->left(), Type(TypeKind::Number), &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), Type(TypeKind::Number), &hadCastError);
+            if (!hadCastError)
                 expr->setReturnType(Type(TypeKind::Number)); // f ^ f
-            else if (leftType.isVector() && isConvertible(rightType, TypeKind::Number))
-                expr->setReturnType(leftType); // vec ^ f
+        } else if (leftType.isTuple() && isConvertible(leftType, Type::AsVector(leftType.size())) && isConvertible(rightType, TypeKind::Number)) {
+            expr->leftMut()  = injectCastIfNeeded(expr->left(), Type::AsVector(leftType.size()), &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), Type(TypeKind::Number), &hadCastError);
+            if (!hadCastError)
+                expr->setReturnType(expr->left()->returnType()); // vec ^ f
         }
         break;
-    case BinaryOperation::Mod:
-        if (isConvertible(leftType, TypeKind::Integer) && isConvertible(rightType, TypeKind::Integer))
-            expr->setReturnType(Type(TypeKind::Integer)); // i % i
-        break;
+    case BinaryOperation::Mod: {
+        expr->leftMut()  = injectCastIfNeeded(expr->left(), Type(TypeKind::Integer), &hadCastError);
+        expr->rightMut() = injectCastIfNeeded(expr->right(), Type(TypeKind::Integer), &hadCastError);
+        if (!hadCastError)
+            expr->setReturnType(Type(TypeKind::Integer));
+    } break;
     case BinaryOperation::And:
-    case BinaryOperation::Or:
-        if (isConvertible(leftType, Type(TypeKind::Boolean)) && isConvertible(rightType, Type(TypeKind::Boolean)))
+    case BinaryOperation::Or: {
+        expr->leftMut()  = injectCastIfNeeded(expr->left(), Type(TypeKind::Boolean), &hadCastError);
+        expr->rightMut() = injectCastIfNeeded(expr->right(), Type(TypeKind::Boolean), &hadCastError);
+        if (!hadCastError)
             expr->setReturnType(Type(TypeKind::Boolean));
-        break;
+    } break;
     case BinaryOperation::Less:
     case BinaryOperation::Greater:
     case BinaryOperation::LessEqual:
-    case BinaryOperation::GreaterEqual:
-        if (isConvertible(leftType, TypeKind::Boolean) && isConvertible(rightType, TypeKind::Boolean))
+    case BinaryOperation::GreaterEqual: {
+        auto sameType = leftType;
+        if (isConvertible(leftType, rightType))
+            sameType = rightType;
+
+        // We only support `int` and `num`
+        if (sameType.kind() != TypeKind::Integer)
+            sameType = Type(TypeKind::Number);
+
+        expr->leftMut()  = injectCastIfNeeded(expr->left(), sameType, &hadCastError);
+        expr->rightMut() = injectCastIfNeeded(expr->right(), sameType, &hadCastError);
+        if (!hadCastError)
             expr->setReturnType(Type(TypeKind::Boolean));
-        else if (isConvertible(leftType, TypeKind::Number) && isConvertible(rightType, TypeKind::Number))
-            expr->setReturnType(Type(TypeKind::Boolean));
-        break;
+    } break;
     case BinaryOperation::Equal:
-    case BinaryOperation::NotEqual:
-        if (isConvertible(leftType, rightType) || isConvertible(rightType, leftType))
+    case BinaryOperation::NotEqual: {
+        auto sameType = leftType;
+        if (isConvertible(leftType, rightType))
+            sameType = rightType;
+
+        expr->leftMut()  = injectCastIfNeeded(expr->left(), sameType, &hadCastError);
+        expr->rightMut() = injectCastIfNeeded(expr->right(), sameType, &hadCastError);
+        if (!hadCastError)
             expr->setReturnType(Type(TypeKind::Boolean));
-        break;
+    } break;
     default:
         break;
     }
@@ -515,31 +582,19 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpressi
         // For any parameter where the actual type differs from the parameter type
         // and an implicit conversion exists, inject an implicit CastExpression
         // (explicit=false) so downstream passes see an explicit cast node.
+        bool hadCastError = false;
         const auto& pList = def.value().parameters();
         for (size_t i = 0; i < expr->parameters().size() && i < pList.size(); ++i) {
             const auto desired = pList[i].ParamType;
-            const auto actual  = fromArgs[i];
-            if (actual != desired) {
-                if (isConvertible(actual, desired)) {
-                    auto original = expr->parameters().at(i);
-                    auto castExpr = std::make_shared<CastExpression>(original->location(), desired, original, false);
-                    expr->replaceParameter(i, castExpr);
-                    fromArgs[i] = desired;
-
-                    utils::ReportType rt = utils::RT_WARNING_IMPLICIT_CAST;
-                    // Special case: `int` literal for a `num` parameter
-                    if (desired.kind() == TypeKind::Number && actual.kind() == TypeKind::Integer)
-                        rt = utils::RT_WARNING_IMPLICIT_CAST_INT;
-
-                    mReporter.warningf(rt, original->location(), "Implicitly converting from '%s' to '%s' for function parameter %zu", actual.toString().data(), desired.toString().data(), i);
-                } else {
-                    mReporter.errorf(expr->parameters().at(i)->location(), "Cannot implicitly convert from '%s' to '%s' for function parameter %zu", actual.toString().data(), desired.toString().data(), i);
-                    return Type(TypeKind::Error);
-                }
-            }
+            auto castExpr      = injectCastIfNeeded(expr->parameters().at(i), desired, &hadCastError);
+            fromArgs[i]        = castExpr->returnType();
+            expr->replaceParameter(i, castExpr);
         }
 
-        expr->setReturnType(def.value().returnType());
+        if (!hadCastError)
+            expr->setReturnType(def.value().returnType());
+        else
+            expr->setReturnType(Type(TypeKind::Error));
         expr->setMangledName(def->mangledName());
     } else {
         mReporter.errorf(expr->location(), "Function '%s(%s)' is unknown or ambiguous", expr->name().c_str(), printArgs(fromArgs).c_str());
@@ -556,6 +611,14 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpre
         return innerType; // Error was caught somewhere else
 
     expr->setReturnType(Type(TypeKind::Unspecified));
+
+    if (innerType.isTuple()) {
+        bool hadCastError = false;
+        expr->innerMut()  = injectCastIfNeeded(expr->inner(), Type::AsVector(innerType.size()), &hadCastError);
+        if (hadCastError)
+            return Type(TypeKind::Error);
+        innerType = expr->inner()->returnType();
+    }
 
     // The access operator also allows expanding e.g., vec2.xyxy -> vec4 operations
     if (innerType.isVector()) {
