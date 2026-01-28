@@ -120,6 +120,22 @@ void SSAContext::reset()
     mScopeStack.clear();
 }
 
+void SSAContext::updateFromName(const std::string& name)
+{
+    std::string base;
+    int version;
+    if (parseVariableName(name, base, version)) {
+        // Update the counter if this version is higher than current
+        auto& counter = mCounters[base];
+        if (version > counter)
+            counter = version;
+
+        // Also update the current scope if we're in a scope
+        if (!mScopeStack.empty())
+            currentScope()[base] = version;
+    }
+}
+
 std::unordered_map<std::string, int>& SSAContext::currentScope()
 {
     PEXPR_ASSERT(!mScopeStack.empty(), "No scope active");

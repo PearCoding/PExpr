@@ -48,6 +48,10 @@ public:
     /// Reset all counters and clear all scopes
     void reset();
 
+    /// Update context from a variable name (e.g., "x.3")
+    /// This updates both global counters and current scope
+    void updateFromName(const std::string& name);
+
 private:
     /// Analyze a single SSA value and update counters
     void analyzeValue(const SSAValue& val);

@@ -69,6 +69,13 @@ SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std
         } else {
             // non-return instructions are appended as-is
             program.Body.push_back(instr);
+
+            // Update context with variable names from the inlined instruction
+            // This ensures that subsequent variable references use the correct version
+            instr->forEachValue([this](const SSAValue& val) {
+                if (!val.isConstant())
+                    mContext.updateFromName(val.name());
+            });
         }
     }
 
