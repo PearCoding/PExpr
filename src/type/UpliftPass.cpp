@@ -48,6 +48,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
             }
 
             // For each captured variable, add a new parameter at the end of the function's parameter list
+            Ptr<Closure> newFuncClosure = f->closure();
             if (!captured.empty()) {
                 // We need to create a new parameter list combining existing parameters + captured
                 ParameterList newParams = f->parameters();
@@ -84,8 +85,6 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
                 closure->symbols().removeFunction(oldDef);
                 closure->symbols().replaceFunction(FunctionDef(newDef));
 
-                // Create new function closure with modified return expression if needed
-                Ptr<Closure> newFuncClosure = f->closure();
                 if (!mutableCaptures.empty()) {
                     // Create new closure with modified return expression
                     auto newClosure = std::make_shared<Closure>(f->closure()->location(), f->closure()->parent());
@@ -117,8 +116,8 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
                 updateCallsInClosure(closure, oldDef, newDef, mutableCaptures);
             }
 
-            // Recurse into nested closure body (use the original closure for recursion)
-            processClosure(f->closure());
+            // Recurse into nested closure body
+            processClosure(newFuncClosure);
         }
     }
 

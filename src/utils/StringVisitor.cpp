@@ -187,7 +187,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<FunctionDeclarationState
     if (!statement->isExtern()) {
         stream << " = {" << std::endl
                << dump(level + 1, statement->closure()) << std::endl
-               << "}";
+               << pad(level) << "}";
     }
 
     stream << ";";
@@ -254,7 +254,11 @@ std::string StringVisitor::dump(size_t level, const Ptr<CastExpression>& expr)
 
 std::string StringVisitor::dump(size_t level, const Ptr<ClosureExpression>& expr)
 {
-    return "{\n" + dump(level + 1, expr->closure()) + "\n}";
+    std::stringstream stream;
+    stream << "{" << std::endl
+           << dump(level + 1, expr->closure()) << std::endl
+           << pad(level) << "}";
+    return stream.str();
 }
 
 std::string StringVisitor::dump(size_t level, const Ptr<BranchExpression>& expr)
@@ -263,17 +267,17 @@ std::string StringVisitor::dump(size_t level, const Ptr<BranchExpression>& expr)
 
     stream << "if " << visit(level, expr->branches().front().Condition) << " {" << std::endl
            << dump(level + 1, expr->branches().front().Body) << std::endl
-           << " }";
+           << pad(level) << "}";
 
     for (size_t i = 1; i < expr->branches().size(); ++i) {
         stream << " elif " << visit(level, expr->branches().at(i).Condition) << " {" << std::endl
                << dump(level + 1, expr->branches().at(i).Body) << std::endl
-               << "}";
+               << pad(level) << "}";
     }
 
     stream << " else {" << std::endl
            << dump(level + 1, expr->elseClosure()) << std::endl
-           << "}";
+           << pad(level) << "}";
     return stream.str();
 }
 
