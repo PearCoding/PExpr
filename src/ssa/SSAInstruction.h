@@ -47,7 +47,6 @@ public:
     enum class OpKind { Assign,
                         Unary,
                         Binary,
-                        Swizzle,
                         Access,
                         Tuple,
                         Cast };

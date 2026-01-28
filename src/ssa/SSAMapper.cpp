@@ -385,16 +385,65 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         result = tgt;
     } break;
     case ExpressionType::Swizzle: {
-        auto a       = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
-        SSAValue in  = mapExpression(program, a->inner());
-        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
-        SSAInstrAssign asg;
-        asg.Target   = tgt;
-        asg.Operator = SSAInstrAssign::OpKind::Swizzle;
-        asg.Swizzle  = a->swizzle();
-        asg.Operands = { in };
-        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-        result = tgt;
+        auto a                     = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
+        SSAValue in                = mapExpression(program, a->inner());
+        const std::string& swizzle = a->swizzle();
+
+        // Helper to map swizzle character to index
+        auto charToIndex = [](char c) -> size_t {
+            switch (c) {
+            case 'x':
+            case 'r':
+                return 0;
+            case 'y':
+            case 'g':
+                return 1;
+            case 'z':
+            case 'b':
+                return 2;
+            case 'w':
+            case 'a':
+                return 3;
+            default:
+                PEXPR_ASSERT(false, "Invalid swizzle character");
+                return 0;
+            }
+        };
+
+        if (swizzle.size() == 1) {
+            // Single component access -> returns a number
+            size_t idx        = charToIndex(swizzle[0]);
+            SSAValue indexVal = SSAValue::Constant((Integer)idx);
+            SSAValue tgt      = SSAValue::Named(mContext.fresh("%"), a->returnType());
+            SSAInstrAssign access;
+            access.Target   = tgt;
+            access.Operator = SSAInstrAssign::OpKind::Access;
+            access.Operands = { in, indexVal };
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
+            result = tgt;
+        } else {
+            // Multiple components -> create accesses then tuple
+            std::vector<SSAValue> accessedValues;
+            accessedValues.reserve(swizzle.size());
+            for (char c : swizzle) {
+                size_t idx        = charToIndex(c);
+                SSAValue indexVal = SSAValue::Constant((Integer)idx);
+                SSAValue elem     = SSAValue::Named(mContext.fresh("%"), Type(TypeKind::Number));
+                SSAInstrAssign access;
+                access.Target   = elem;
+                access.Operator = SSAInstrAssign::OpKind::Access;
+                access.Operands = { in, indexVal };
+                program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
+                accessedValues.push_back(elem);
+            }
+            SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
+            SSAInstrAssign tuple;
+            tuple.Target   = tgt;
+            tuple.Operator = SSAInstrAssign::OpKind::Tuple;
+            tuple.Operands = std::move(accessedValues);
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(tuple));
+            result = tgt;
+        }
     } break;
     case ExpressionType::Access: {
         auto a       = std::reinterpret_pointer_cast<AccessExpression>(expr);

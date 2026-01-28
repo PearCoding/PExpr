@@ -121,9 +121,6 @@ void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
     case SSAInstrAssign::OpKind::Binary:
         os << toInstructionString(instr.BinaryOp);
         break;
-    case SSAInstrAssign::OpKind::Swizzle:
-        os << "swizzle[" << instr.Swizzle << "]";
-        break;
     case SSAInstrAssign::OpKind::Access:
         os << "access";
         break;
@@ -694,12 +691,6 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
             assign->UnaryOp  = UnaryOperation::Not;
         } else if (op == "cast") {
             assign->Operator = SSAInstrAssign::OpKind::Cast;
-        } else if (op.find("swizzle[") == 0) {
-            assign->Operator = SSAInstrAssign::OpKind::Swizzle;
-            size_t start     = op.find('[') + 1;
-            size_t end       = op.find(']');
-            if (end != std::string::npos)
-                assign->Swizzle = op.substr(start, end - start);
         } else if (op.find("tuple[") == 0) {
             assign->Operator = SSAInstrAssign::OpKind::Tuple;
         } else if (op == "access") {

@@ -22,11 +22,6 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
             h = h * 31 + Operands[1].hash(true);
         }
         break;
-    case OpKind::Swizzle:
-        h = h * 31 + std::hash<std::string>{}(Swizzle);
-        if (!Operands.empty())
-            h = h * 31 + Operands[0].hash(true);
-        break;
     case OpKind::Access:
         if (Operands.size() >= 2) {
             h = h * 31 + Operands[0].hash(true);
@@ -70,10 +65,6 @@ bool SSAInstrAssign::isEquivalent(const SSAInstr* other) const
             break;
         case OpKind::Binary:
             if (BinaryOp != otherAsg->BinaryOp)
-                return false;
-            break;
-        case OpKind::Swizzle:
-            if (Swizzle != otherAsg->Swizzle)
                 return false;
             break;
         case OpKind::Cast:

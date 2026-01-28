@@ -486,10 +486,6 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
 
     // -- This section is only reached when all operands are constant!
 
-    // Swizzle xyzw
-    if (asg->Operator == SSAInstrAssign::OpKind::Swizzle && ops.size() == 1)
-        return foldSwizzleOp(ops.front(), asg->Swizzle);
-
     // Access [i]
     if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 2)
         return foldAccessOp(ops.at(0), ops.at(1));
