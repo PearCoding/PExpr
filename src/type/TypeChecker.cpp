@@ -262,31 +262,33 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
     case StatementType::FunctionDeclaration: {
         const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
 
-        // Add parameters to the symbol table
-        if (funcStmt->closure()) {
+        if (funcStmt->isExtern() || !funcStmt->closure()) {
+            // Do nothing
+        } else {
+            // Add parameters to the symbol table
             for (const auto& p : funcStmt->parameters()) {
                 if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.ParamType, p.IsMutable)))
                     mReporter.errorf(funcStmt->location(), "Parameter '%s' already exists in the current scope", p.Name.c_str());
             }
 
             PEXPR_ASSERT(funcStmt->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
-        }
 
-        // Type-check the function body to determine the return type
-        const auto returnType = funcStmt->isExtern() ? funcStmt->returnType() : handleNode(funcStmt->closure());
-        funcStmt->setReturnType(returnType);
+            // Type-check the function body to determine the return type and process it
+            const auto returnType = handleNode(funcStmt->closure());
 
-        if (returnType.kind() == TypeKind::Unspecified) {
-            mReporter.errorf(funcStmt->location(), "Could not determine return type for function '%s'", funcStmt->name().c_str());
-            return;
-        }
+            // The declared return type (potentially unspecified)
+            const auto declaredReturnType = funcStmt->returnType();
 
-        if (!funcStmt->isExtern())
-            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), returnType, funcStmt->isExtern(), funcStmt->hasSideEffects()));
+            if (declaredReturnType.kind() == TypeKind::Unspecified || declaredReturnType.kind() == TypeKind::Error)
+                funcStmt->setReturnType(returnType);
 
-        const auto declared = funcStmt->returnType();
-        if (returnType != declared && !isConvertible(returnType, declared)) {
-            mReporter.errorf(funcStmt->location(), "Cannot implicitly convert return value from '%s' to declared type '%s' for function '%s'", returnType.toString().c_str(), declared.toString().c_str(), funcStmt->name().c_str());
+            if (returnType.kind() == TypeKind::Unspecified) {
+                mReporter.errorf(funcStmt->location(), "Could not determine return type for function '%s'", funcStmt->name().c_str());
+                return;
+            }
+
+            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern(), funcStmt->hasSideEffects()));
+            funcStmt->closure()->expressionMut() = injectCastIfNeeded(funcStmt->closure()->expression(), funcStmt->returnType(), nullptr);
         }
     } break;
     default:
