@@ -273,7 +273,7 @@ private:
         if (P.cur().Type == TokenType::ClosedParentheses)
             return list; // Empty parameter list
         do {
-            bool isMutable = P.accept(TokenType::Mutable);
+            bool isMutable              = P.accept(TokenType::Mutable);
             const std::string paramName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "__unknown__";
             P.expect(TokenType::Identifier);
             P.expect(TokenType::Colon);
@@ -661,6 +661,10 @@ private:
         P.expect(TokenType::OpenBraces);
         const auto elseClosure = p_closure();
         P.expect(TokenType::ClosedBraces);
+
+        // Check if we even have a correct if expression
+        if (branches.empty() || !elseClosure)
+            return nullptr;
 
         return std::make_shared<BranchExpression>(loc, branches, elseClosure);
     }
