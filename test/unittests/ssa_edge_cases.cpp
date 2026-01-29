@@ -38,8 +38,8 @@ TEST_CASE("SSAMapper: complex nested closures with mutable captures", "[ssamappe
     // Should have uplifted functions with mutable parameters
     REQUIRE(dumped.find("fn") != std::string::npos);
     // Should have proper version tracking for x and y
-    REQUIRE(dumped.find("x.") != std::string::npos);
-    REQUIRE(dumped.find("y.") != std::string::npos);
+    REQUIRE(dumped.find("x_L2C16.") != std::string::npos);
+    REQUIRE(dumped.find("y_L3C16.") != std::string::npos);
 }
 
 TEST_CASE("SSAMapper: mutual recursion with type checking", "[ssamapper][recursion]")

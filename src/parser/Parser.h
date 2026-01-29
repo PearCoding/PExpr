@@ -15,9 +15,7 @@ public:
 
     [[nodiscard]] Ptr<ast::Closure> parse(const type::SymbolTable* globals);
 
-    [[nodiscard]] inline bool hasError() const { return mHasError; }
-
-    inline void signalError() { mHasError = true; }
+    [[nodiscard]] inline bool hasError() const { return mReporter.errorCount() > 0; }
 
 protected:
     bool expect(TokenType type);
@@ -31,6 +29,5 @@ protected:
     Lexer& mLexer;
     utils::Reporter& mReporter;
     std::array<Token, 2> mCurrentToken;
-    bool mHasError;
 };
 } // namespace PExpr::parser

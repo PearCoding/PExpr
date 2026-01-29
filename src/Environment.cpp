@@ -3,7 +3,6 @@
 #include "parser/Parser.h"
 #include "ssa/SSAMapper.h"
 #include "type/Mangler.h"
-#include "type/Parameter.h"
 #include "type/SymbolTable.h"
 #include "type/TypeChecker.h"
 #include "type/UpliftPass.h"
@@ -25,7 +24,7 @@ Environment::~Environment()
 
 void Environment::registerVariable(const std::string& name, const Type& type)
 {
-    mGlobals.addVariable(VariableDef(name, type, false));
+    mGlobals.addVariable(std::make_shared<VariableDef>(name, type, false, parser::Location(0)));
 }
 
 void Environment::registerFunction(const std::string& name, const std::vector<Type>& parameterTypes, const Type& returnType, bool hasSideEffect)
@@ -34,7 +33,7 @@ void Environment::registerFunction(const std::string& name, const std::vector<Ty
     ParameterList params;
     params.reserve(parameterTypes.size());
     for (size_t i = 0; i < parameterTypes.size(); ++i)
-        params.push_back(Parameter{ "p" + std::to_string(i), parameterTypes[i], false });
+        params.push_back(std::make_shared<VariableDef>("p" + std::to_string(i), parameterTypes[i], false, parser::Location(0)));
 
     const std::string mangledName = makeMangledNameFromTypes(name, parameterTypes, nullptr);
     mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true, hasSideEffect));

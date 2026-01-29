@@ -290,7 +290,7 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
         // Check if the parameter types match
         bool isEqual = true;
         for (size_t i = 0; i < params.size(); ++i) {
-            if (params[i].ParamType != call->Arguments[i].type()) {
+            if (params[i]->type() != call->Arguments[i].type()) {
                 isEqual = false;
                 break;
             }

@@ -15,15 +15,6 @@ using namespace PExpr::ssa;
     return opt::OptimizerOptions::High();
 }
 
-[[nodiscard]] inline static auto MakeConstantFoldingOnly()
-{
-    auto opts                        = opt::OptimizerOptions::None();
-    opts.EnableConstantFolding       = true;
-    opts.EnableConstantFoldingNumber = true;
-    opts.RemoveDeadCode              = true;
-    return opts;
-}
-
 TEST_CASE("Optimizer: constant propagation through branches", "[sscp][constantprop]")
 {
     Environment env;

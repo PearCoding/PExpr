@@ -39,19 +39,30 @@ private:
     type::Type mReturnType;
 };
 
+/// Internal statement created when an unrecoverable error occured
+class ErrorExpression : public Expression {
+public:
+    inline ErrorExpression(const parser::Location& loc)
+        : Expression(loc, ExpressionType::Error)
+    {
+    }
+};
+
 /// A simple access to a variable
 class VariableExpression : public Expression {
 public:
-    inline VariableExpression(const parser::Location& loc, const std::string& name)
+    inline VariableExpression(const parser::Location& loc, const Ptr<type::VariableDef>& variable)
         : Expression(loc, ExpressionType::Variable)
-        , mName(name)
+        , mVariable(variable)
     {
+        PEXPR_ASSERT(variable, "Expected a valid variable for the expression");
     }
 
-    [[nodiscard]] inline const std::string& name() const { return mName; }
+    [[nodiscard]] inline Ptr<type::VariableDef> variable() const { return mVariable; }
+    inline void setVariable(const Ptr<type::VariableDef>& var) { mVariable = var; }
 
 private:
-    std::string mName;
+    Ptr<type::VariableDef> mVariable;
 };
 
 /// A simple access to a literal

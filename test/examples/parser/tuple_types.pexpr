@@ -27,17 +27,17 @@ let innerFirst = nestedTuple[1][0];
 let innerSecond = nestedTuple[1][1];
 
 // Type annotations with complex types
-fn tupleParam(p: [bool, int]) -> num {
+fn tupleParam(p: [bool, int]) -> num = {
     if p[0] {
         p[1] as num
     } else {
         0.0
     }
-}
+};
 
-fn returnTuple() -> [int, num] {
+fn returnTuple() -> [int, num] = {
     [42, 3.14]
-}
+};
 
 // Test calling with tuple
 let result = tupleParam([true, 5]);
@@ -65,3 +65,5 @@ let tupleConversion: [num, num] = [1, 2]; // implicit conversion of ints to nums
 // Explicit casts
 let explicitCast = (5 as num);
 let tupleCast = ([1, 2] as [num, num]);
+
+0

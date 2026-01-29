@@ -29,16 +29,22 @@ inline static auto parseOnly(std::string_view str, bool shouldPass = true)
 
 TEST_CASE("Parser: simple arithmetic", "[parser]")
 {
-    auto ast = parseOnly("a+1");
-    REQUIRE(StringVisitor::visit(ast) == "(a)+(1)");
+    auto ast = parseOnly("let a = 111; a+1");
+    REQUIRE(StringVisitor::visit(ast) == "let a = 111;\n(a)+(1)");
 }
 
 TEST_CASE("Parser: complex expression parsing", "[parser]")
 {
-    auto ast = parseOnly("abc(231*22.231*2.42e-3).xyz*Pi-123*(K.x+sin(22^4, 1-2%2, --1))");
+    auto ast = parseOnly(R"(
+        [[extern]] fn foo(a:num) -> vec3;
+        [[extern]] fn bar(a:num, b:num, c:num) -> num;
+        let Pi = 3.141592;
+        let K = [111, 222];
+        foo(231*22.231*2.42e-3).xyz*Pi-123*(K.x+bar(22^4, 1-2%2, --1))
+    )");
 
     const std::string out = StringVisitor::visit(ast);
-    REQUIRE(out.find("sin(") != std::string::npos);
+    REQUIRE(out.find("bar(") != std::string::npos);
     REQUIRE(out.find("Pi") != std::string::npos);
     REQUIRE(out.find("K") != std::string::npos);
 }

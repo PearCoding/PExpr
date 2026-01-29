@@ -76,14 +76,14 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableDeclarationState
 
     // Check if pattern is a single simple binding (i.e., "let a = ...")
     if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-        const auto& binding = pattern->elements()[0].simpleBinding();
+        const auto varDef = pattern->elements()[0].simpleBinding();
         std::stringstream stream;
         stream << "let ";
-        if (binding.isMutable)
+        if (varDef->isMutable())
             stream << "mut ";
-        stream << binding.name;
-        if (binding.declaredType.kind() != type::TypeKind::Unspecified)
-            stream << ":" << binding.declaredType.toString();
+        stream << varDef->name();
+        if (varDef->type().kind() != type::TypeKind::Unspecified)
+            stream << ":" << varDef->type().toString();
         stream << " = " << visit(level, statement->expression()) << ";";
         return stream.str();
     }
@@ -98,12 +98,12 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableDeclarationState
         for (size_t i = 0; i < pattern.elements().size(); ++i) {
             const auto& elem = pattern.elements()[i];
             if (elem.isSimpleBinding()) {
-                const auto& binding = elem.simpleBinding();
-                if (binding.isMutable)
+                const auto varDef = elem.simpleBinding();
+                if (varDef->isMutable())
                     stream << "mut ";
-                stream << binding.name;
-                if (binding.declaredType.kind() != type::TypeKind::Unspecified)
-                    stream << ":" << binding.declaredType.toString();
+                stream << varDef->name();
+                if (varDef->type().kind() != type::TypeKind::Unspecified)
+                    stream << ":" << varDef->type().toString();
             } else {
                 // Nested pattern
                 dumpPattern(*elem.nestedPattern());
@@ -126,9 +126,9 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableAssignmentStatem
 
     // Check if pattern is a single simple binding (i.e., "a = ...")
     if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-        const auto& binding = pattern->elements()[0].simpleBinding();
+        const auto varDef = pattern->elements()[0].simpleBinding();
         std::stringstream stream;
-        stream << binding.name;
+        stream << varDef->name();
         stream << " = " << visit(level, statement->expression()) << ";";
         return stream.str();
     }
@@ -142,8 +142,8 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableAssignmentStatem
         for (size_t i = 0; i < pattern.elements().size(); ++i) {
             const auto& elem = pattern.elements()[i];
             if (elem.isSimpleBinding()) {
-                const auto& binding = elem.simpleBinding();
-                stream << binding.name;
+                const auto varDef = elem.simpleBinding();
+                stream << varDef->name();
             } else {
                 // Nested pattern
                 dumpPattern(*elem.nestedPattern());
@@ -177,9 +177,9 @@ std::string StringVisitor::dump(size_t level, const Ptr<FunctionDeclarationState
         if (i)
             stream << ", ";
         const auto param = statement->parameters().at(i);
-        if (param.IsMutable)
+        if (param->isMutable())
             stream << "mut ";
-        stream << param.Name << ":" << param.ParamType.toString();
+        stream << param->name() << ":" << param->type().toString();
     }
 
     stream << ") -> " << statement->returnType().toString();
@@ -196,7 +196,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<FunctionDeclarationState
 
 std::string StringVisitor::dump(size_t, const Ptr<VariableExpression>& expr)
 {
-    return expr->name();
+    return expr->variable()->name();
 }
 
 std::string StringVisitor::dump(size_t, const Ptr<LiteralExpression>& expr)

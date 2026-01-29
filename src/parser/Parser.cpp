@@ -3,7 +3,6 @@
 #include "ast/Pattern.h"
 #include "ast/Statement.h"
 #include "type/Mangler.h"
-#include "type/Parameter.h"
 
 namespace PExpr::parser {
 using namespace ast;
@@ -13,20 +12,16 @@ Parser::Parser(Lexer& lexer, utils::Reporter& reporter)
     : mLexer(lexer)
     , mReporter(reporter)
     , mCurrentToken()
-    , mHasError(false)
 {
 }
 
 Ptr<Closure> parse_translation_unit(Parser& parser, const SymbolTable* globals);
 Ptr<Closure> Parser::parse(const SymbolTable* globals)
 {
-    mHasError = false;
     for (size_t i = 0; i < mCurrentToken.size(); ++i) {
         mCurrentToken[i] = mLexer.next();
-        if (mCurrentToken[i].Type == TokenType::Error) {
-            mHasError = true;
+        if (mCurrentToken[i].Type == TokenType::Error)
             return nullptr;
-        }
     }
 
     return parse_translation_unit(*this, globals);
@@ -40,7 +35,6 @@ bool Parser::expect(TokenType type)
             mReporter.errorf(cur().Location, "Expected '%s' but input terminated early", Token::toString(type).data());
         else
             mReporter.errorf(cur().Location, "Expected '%s' but got '%s'", Token::toString(type).data(), Token::toString(cur().Type).data());
-        mHasError = true;
     }
 
     next();
@@ -50,8 +44,6 @@ bool Parser::expect(TokenType type)
 template <size_t N>
 void Parser::error(const std::array<TokenType, N>& types)
 {
-    mHasError = true;
-
     std::string expectation;
     for (size_t i = 0; i < types.size(); ++i) {
         expectation += Token::toString(types[i]);
@@ -88,9 +80,6 @@ void Parser::next()
 
     const auto nextToken                    = mLexer.next();
     mCurrentToken[mCurrentToken.size() - 1] = nextToken;
-
-    if (nextToken.Type == TokenType::Error)
-        mHasError = true;
 }
 
 // --------------------------------------- Grammar
@@ -107,10 +96,8 @@ public:
     inline Ptr<Closure> parse()
     {
         auto closure = p_closure();
-        if (!P.hasError() && P.cur().Type != TokenType::Eof) {
-            P.signalError();
+        if (!P.hasError() && P.cur().Type != TokenType::Eof)
             P.mReporter.errorf(Location(0), "Parsing stopped before end of stream!");
-        }
 
         return closure;
     }
@@ -185,7 +172,6 @@ private:
         }
 
         if (P.cur().Type == TokenType::ClosedBraces) {
-            P.signalError();
             P.mReporter.errorf(P.cur().Location, "Expected an expression at the end of a closure but got '%s' instead", Token::toString(TokenType::ClosedBraces).data());
             return closure;
         }
@@ -229,14 +215,28 @@ private:
         P.expect(TokenType::Semicolon);
 
         // Create a pattern with a single simple binding
-        Pattern::ElementList elements;
-        elements.push_back(PatternElement::makeSimple(idLoc, varName, declaredType, is_mutable));
-        auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
+        if (is_declaration) {
+            auto variableDef = std::make_shared<type::VariableDef>(varName, declaredType, is_mutable, idLoc);
 
-        if (is_declaration)
+            if (!mCurrentClosure->symbols().addVariable(variableDef))
+                P.mReporter.errorf(idLoc, "Variable '%s' already exists in the current scope", variableDef->name().c_str());
+
+            Pattern::ElementList elements;
+            elements.push_back(PatternElement::makeSimple(idLoc, variableDef));
+            auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
+
             return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(expr));
-        else
-            return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
+        } else {
+            if (auto lkp = mCurrentClosure->symbols().lookupVariable(idLoc, varName)) {
+                Pattern::ElementList elements;
+                elements.push_back(PatternElement::makeSimple(idLoc, lkp));
+                auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
+                return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
+            } else {
+                P.mReporter.errorf(idLoc, "Unknown variable '%s' in the current scope", varName.c_str());
+                return std::make_shared<ErrorStatement>(loc);
+            }
+        }
     }
 
     // Destructuring statement (pattern)
@@ -252,7 +252,7 @@ private:
         // Parse pattern (allow mut/type annotations only for declarations)
         auto pattern = p_pattern(is_declaration);
         if (!pattern)
-            return nullptr;
+            return std::make_shared<ErrorStatement>(loc);
 
         P.expect(TokenType::Assign);
 
@@ -275,16 +275,17 @@ private:
         do {
             bool isMutable              = P.accept(TokenType::Mutable);
             const std::string paramName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "__unknown__";
+            const auto loc              = P.cur().Location;
             P.expect(TokenType::Identifier);
             P.expect(TokenType::Colon);
             const auto type = p_type();
-            list.push_back(Parameter{ paramName, type, isMutable });
+            list.push_back(std::make_shared<VariableDef>(paramName, type, isMutable, loc));
         } while (P.accept(TokenType::Comma));
 
         return list;
     }
 
-    inline Ptr<Pattern> p_pattern(bool for_declaration = true)
+    inline Ptr<Pattern> p_pattern(bool is_declaration)
     {
         const auto loc = P.cur().Location;
         P.expect(TokenType::OpenSquareBracket);
@@ -297,7 +298,7 @@ private:
                 // Check if this is a nested pattern (starts with '[') or a simple binding
                 if (P.cur().Type == TokenType::OpenSquareBracket) {
                     // Nested pattern
-                    auto nestedPattern = p_pattern(for_declaration);
+                    auto nestedPattern = p_pattern(is_declaration);
                     if (!nestedPattern)
                         return nullptr;
                     elements.push_back(PatternElement::makeNested(elemLoc, nestedPattern));
@@ -306,9 +307,8 @@ private:
 
                     // Check for 'mut' keyword (only allowed in declarations)
                     bool isMutable = false;
-                    if (for_declaration && P.accept(TokenType::Mutable)) {
+                    if (is_declaration && P.accept(TokenType::Mutable))
                         isMutable = true;
-                    }
 
                     // Expect identifier
                     const std::string elemName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
@@ -317,15 +317,25 @@ private:
                     // Optional type annotation (only allowed in declarations)
                     Type declaredType = Type(TypeKind::Unspecified);
                     if (P.accept(TokenType::Colon)) {
-                        if (for_declaration) {
+                        if (is_declaration)
                             declaredType = p_type();
-                        } else {
-                            P.signalError();
+                        else
                             P.mReporter.errorf(P.cur().Location, "Type annotations are not allowed in destructuring assignments");
-                        }
                     }
 
-                    elements.push_back(PatternElement::makeSimple(elemLoc, elemName, declaredType, isMutable));
+                    if (is_declaration) {
+                        auto variableDef = std::make_shared<type::VariableDef>(elemName, declaredType, isMutable, elemLoc);
+
+                        if (!mCurrentClosure->symbols().addVariable(variableDef))
+                            P.mReporter.errorf(elemLoc, "Variable '%s' already exists in the current scope", variableDef->name().c_str());
+
+                        elements.push_back(PatternElement::makeSimple(elemLoc, variableDef));
+                    } else {
+                        if (auto lkp = mCurrentClosure->symbols().lookupVariable(elemLoc, elemName))
+                            elements.push_back(PatternElement::makeSimple(elemLoc, lkp));
+                        else
+                            P.mReporter.errorf(elemLoc, "Unknown variable '%s' in the current scope", elemName.c_str());
+                    }
                 }
             } while (P.accept(TokenType::Comma));
         }
@@ -333,7 +343,6 @@ private:
         P.expect(TokenType::ClosedSquareBracket);
 
         if (elements.empty()) {
-            P.signalError();
             P.mReporter.errorf(loc, "Pattern must have at least one element");
             return nullptr;
         }
@@ -374,7 +383,6 @@ private:
                     attr.value = std::get<std::string>(P.cur().Value);
                     P.expect(TokenType::StringLiteral);
                 } else {
-                    P.signalError();
                     P.mReporter.errorf(P.cur().Location, "Expected boolean, integer, number, or string literal for attribute value");
                 }
             } else {
@@ -437,17 +445,17 @@ private:
         if (P.accept(TokenType::ArrowRight))
             returnType = p_type();
 
-        // Build mangled name from declared parameter types (do NOT include return type).
-        std::vector<Type> paramTypes;
-        paramTypes.reserve(parameters.size());
-        for (const auto& p : parameters)
-            paramTypes.push_back(p.ParamType);
-
-        const std::string mangled = makeMangledNameFromTypes(funcName, paramTypes, mCurrentClosure);
+        const std::string mangled = makeMangledNameFromTypes(funcName, parameters, mCurrentClosure);
 
         if (!attr.Extern) {
             auto closure    = std::make_shared<Closure>(loc, mCurrentClosure);
             mCurrentClosure = closure.get();
+
+            // Add parameters to the symbol table
+            for (const auto& p : parameters) {
+                if (!mCurrentClosure->symbols().addVariable(p))
+                    P.mReporter.errorf(p->location(), "Parameter '%s' with the same name already exists", p->name().c_str());
+            }
 
             P.expect(TokenType::Assign);
             Ptr<Expression> expr     = p_expression();
@@ -457,17 +465,35 @@ private:
             mCurrentClosure = closure->parent();
 
             if (expr->type() == ExpressionType::Closure) {
-                // Remove the previous closure to directly use this one.
-                closure = std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure();
-                closure->setParent(mCurrentClosure);
+                // Try to remove the previous closure to directly use this one.
+                auto innerClosure = std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure();
+
+                bool shadowedParameters = false;
+                for (const auto& p : parameters) {
+                    const SymbolTable* tbl = nullptr;
+                    if (const auto def = innerClosure->symbols().lookupVariable(p->location(), p->name(), &tbl); def && tbl == &innerClosure->symbols()) {
+                        P.mReporter.warningf(utils::RT_WARNING_SHADOWED_PARAMETER, p->location(), "Parameter '%s' is shadowed by the ", p->name().c_str());
+                        shadowedParameters = true;
+                    }
+                }
+
+                if (!shadowedParameters) {
+                    // Remove the previous closure to directly use this one.
+                    closure = innerClosure;
+                    closure->setParent(mCurrentClosure);
+
+                    // Readd the parameters for the later passes as the previous one got removed
+                    for (const auto& p : parameters) {
+                        if (!closure->symbols().addVariable(p))
+                            P.mReporter.errorf(p->location(), "Parameter '%s' with the same name already exists", p->name().c_str()); //< This should never happen, but better be safe
+                    }
+                }
             }
 
             return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, closure, returnType, mangled, false);
         } else {
-            if (returnType.kind() == TypeKind::Unspecified) {
-                P.signalError();
+            if (returnType.kind() == TypeKind::Unspecified)
                 P.mReporter.errorf(P.cur().Location, "Expected an explicit return type for the given function");
-            }
             P.expect(TokenType::Semicolon);
             return std::make_shared<FunctionDeclarationStatement>(loc, funcName, parameters, nullptr, returnType, mangled, attr.HasSideEffect);
         }
@@ -559,10 +585,8 @@ private:
                 const auto loc = P.cur().Location;
                 auto swizzle   = p_swizzle();
 
-                if (!checkSwizzle(swizzle)) {
-                    P.signalError();
+                if (!checkSwizzle(swizzle))
                     P.mReporter.errorf(loc, "Given access '%s' is invalid", std::string(swizzle).c_str());
-                }
 
                 expr = std::make_shared<SwizzleExpression>(loc, expr, swizzle);
                 continue;
@@ -583,12 +607,10 @@ private:
                 const auto token = P.cur();
                 P.accept(TokenType::IntegerLiteral);
                 const Integer i = std::get<Integer>(token.Value);
-                if (i < 0) {
-                    P.signalError();
+                if (i < 0)
                     P.mReporter.errorf(token.Location, "Negative index given for vector lookup");
-                } else {
+                else
                     index = (size_t)i;
-                }
                 P.expect(TokenType::ClosedSquareBracket);
 
                 expr = std::make_shared<AccessExpression>(token.Location, expr, index);
@@ -664,7 +686,7 @@ private:
 
         // Check if we even have a correct if expression
         if (branches.empty() || !elseClosure)
-            return nullptr;
+            return std::make_shared<ErrorExpression>(loc);
 
         return std::make_shared<BranchExpression>(loc, branches, elseClosure);
     }
@@ -710,10 +732,8 @@ private:
             vector.push_back(expr);
         } while (P.accept(TokenType::Comma));
 
-        if (vector.size() == 0) {
-            P.signalError();
+        if (vector.size() == 0)
             P.mReporter.errorf(loc, "Invalid empty tuple given");
-        }
 
         return std::make_shared<TupleExpression>(loc, std::move(vector));
     }
@@ -733,13 +753,20 @@ private:
         if (P.accept(TokenType::StringLiteral))
             return std::make_shared<LiteralExpression>(value.Location, Type(TypeKind::String), value.Value);
 
-        if (P.accept(TokenType::Identifier))
-            return std::make_shared<VariableExpression>(value.Location, std::get<std::string>(value.Value));
+        if (P.accept(TokenType::Identifier)) {
+            const auto varName = std::get<std::string>(value.Value);
+            if (const auto variable = mCurrentClosure->symbols().lookupVariable(value.Location, varName)) {
+                return std::make_shared<VariableExpression>(value.Location, variable);
+            } else {
+                P.mReporter.errorf(value.Location, "Unknown variable '%s' in the current scope", varName.c_str());
+                return std::make_shared<ErrorExpression>(value.Location);
+            }
+        }
 
         // Only print error if error was not introduced by lexer
         if (P.cur().Type != TokenType::Error)
             P.error(std::array<TokenType, 8>{ TokenType::OpenParentheses, TokenType::OpenBraces, TokenType::If, TokenType::BooleanLiteral, TokenType::NumberLiteral, TokenType::IntegerLiteral, TokenType::StringLiteral, TokenType::Identifier });
-        return std::make_shared<VariableExpression>(value.Location, "__error__");
+        return std::make_shared<ErrorExpression>(value.Location);
     }
 
     inline bool checkSwizzle(std::string_view swizzle)
@@ -776,10 +803,8 @@ private:
 
         // Register the type alias in the current symbol table
         if (mCurrentClosure) {
-            if (!mCurrentClosure->symbols().addTypeAlias(aliasName, aliasedType)) {
-                P.signalError();
+            if (!mCurrentClosure->symbols().addTypeAlias(aliasName, aliasedType))
                 P.mReporter.errorf(loc, "Type alias '%s' already defined in the current scope", aliasName.c_str());
-            }
         }
 
         return std::make_shared<TypeAliasStatement>(loc, aliasName, aliasedType);
@@ -812,7 +837,6 @@ private:
             }
             P.expect(TokenType::ClosedSquareBracket);
             if (components.empty()) {
-                P.signalError();
                 P.mReporter.errorf(P.cur().Location, "Tuple type must have at least one component");
                 return Type(TypeKind::Error);
             }

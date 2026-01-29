@@ -115,18 +115,19 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs        = mapExpression(program, declStmt->expression());
         const auto& pattern = declStmt->pattern();
 
+        // TODO: Rework this
         // Check if pattern is a single simple binding (i.e., regular variable declaration)
         if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            const auto& binding = pattern->elements()[0].simpleBinding();
+            const auto varDef = pattern->elements()[0].simpleBinding();
 
-            PEXPR_ASSERT(binding.declaredType.kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
+            PEXPR_ASSERT(varDef->type().kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
 
             // Cast if needed
-            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, binding.declaredType);
+            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
 
             // Assign to variable (fresh name for declaration)
             SSAInstrAssign asg;
-            SSAValue tgt = SSAValue::Named(mContext.fresh(binding.name, true), finalVal.type());
+            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { finalVal };
@@ -159,16 +160,16 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
                     }
 
                     if (elem.isSimpleBinding()) {
-                        const auto& binding = elem.simpleBinding();
+                        const auto varDef = elem.simpleBinding();
 
-                        PEXPR_ASSERT(binding.declaredType.kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
+                        PEXPR_ASSERT(varDef->type().kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
 
                         // Cast if needed (can't be really handled in the TypeChecker)
-                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, binding.declaredType);
+                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
 
                         // Assign to variable (fresh name for declaration)
                         SSAInstrAssign asg;
-                        SSAValue tgt = SSAValue::Named(mContext.fresh(binding.name, true), finalVal.type());
+                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
                         asg.Target   = tgt;
                         asg.Operator = SSAInstrAssign::OpKind::Assign;
                         asg.Operands = { finalVal };
@@ -188,16 +189,17 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         SSAValue rhs        = mapExpression(program, assignStmt->expression());
         const auto& pattern = assignStmt->pattern();
 
+        // TODO: Rework this
         // Check if pattern is a single simple binding (i.e., regular variable assignment)
         if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            const auto& binding = pattern->elements()[0].simpleBinding();
+            const auto varDef = pattern->elements()[0].simpleBinding();
 
             // Cast if needed
-            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, binding.declaredType);
+            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
 
             // Assign to variable (fresh version for assignment)
             SSAInstrAssign asg;
-            SSAValue tgt = SSAValue::Named(mContext.fresh(binding.name, true), finalVal.type());
+            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { finalVal };
@@ -225,14 +227,14 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
                     }
 
                     if (elem.isSimpleBinding()) {
-                        const auto& binding = elem.simpleBinding();
+                        const auto varDef = elem.simpleBinding();
 
                         // Cast if needed (can't be really handled in the TypeChecker)
-                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, binding.declaredType);
+                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
 
                         // Assign to variable (fresh version for assignment)
                         SSAInstrAssign asg;
-                        SSAValue tgt = SSAValue::Named(mContext.fresh(binding.name, true), finalVal.type());
+                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
                         asg.Target   = tgt;
                         asg.Operator = SSAInstrAssign::OpKind::Assign;
                         asg.Operands = { finalVal };
@@ -256,7 +258,7 @@ void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
         func.Name = f->mangledName();
         func.Parameters.reserve(f->parameters().size());
         for (const auto& p : f->parameters())
-            func.Parameters.push_back(p.Name);
+            func.Parameters.push_back(p->uniqueName());
         func.ReturnType    = f->returnType();
         func.External      = f->isExtern();
         func.HasSideEffect = f->hasSideEffects();
@@ -317,14 +319,15 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         result = v;
     } break;
     case ExpressionType::Variable: {
-        auto v      = std::reinterpret_pointer_cast<VariableExpression>(expr);
-        int version = mContext.getCurrentVersion(v->name());
+        auto v          = std::reinterpret_pointer_cast<VariableExpression>(expr);
+        const auto name = v->variable()->uniqueName();
+        int version     = mContext.getCurrentVersion(name);
         if (version > 0) {
             std::stringstream ss;
-            ss << v->name() << "." << version;
+            ss << name << "." << version;
             result = SSAValue::Named(ss.str(), v->returnType());
         } else {
-            result = SSAValue::Named(v->name(), v->returnType());
+            result = SSAValue::Named(name, v->returnType());
         }
     } break;
     case ExpressionType::Tuple: {

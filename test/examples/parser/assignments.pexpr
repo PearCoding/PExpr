@@ -4,4 +4,4 @@ m = m + 1;
 m = m * 2;
 m = m - 1;
 
-m
+m // Should be 1

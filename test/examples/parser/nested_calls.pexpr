@@ -1,5 +1,5 @@
 // Test nested function calls
-extern fn max(a:num, b:num) -> num;
-extern fn min(a:num, b:num) -> num;
+[[extern]] fn max(a:num, b:num) -> num;
+[[extern]] fn min(a:num, b:num) -> num;
 let nested_calls = max(min(1, 2), min(3, 4));
 nested_calls

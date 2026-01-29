@@ -29,5 +29,6 @@
 - [x] To add more statement types the rule of mutability for closures must be rewritten. Extend lambda uplifting to work with mutable variables, by explicitly tracking them and updating them at the end of a SSA call.
 - [x] Add destructured bindings (assignment and declaration)
 - [x] Simplify internal code by unifying VariableAssignment and DestructuralAssignment with a single pattern element being the same as a simple variable assignment. Same for declarations.
-- [ ] Handle implicit casts better. Maybe as a separate pass or similar?
+- [x] Handle implicit casts better. Maybe as a separate pass or similar?
 - [ ] Add modules (per file)
+- [x] Redo variables. Keep track where a variable was declared. Use, similar to mangledName of functions a unique name for variables. This extremely simplifies SSA and many other stages.

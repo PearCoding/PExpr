@@ -3,7 +3,6 @@
 #include "Closure.h"
 #include "Expression.h"
 #include "Pattern.h"
-#include "type/Parameter.h"
 #include "type/Type.h"
 
 namespace PExpr::ast {
@@ -28,6 +27,15 @@ private:
     const StatementType mType;
 };
 
+/// Internal statement created when an unrecoverable error occured
+class ErrorStatement : public Statement {
+public:
+    ErrorStatement(const parser::Location& loc)
+        : Statement(loc, StatementType::Error)
+    {
+    }
+};
+
 /// Unified declaration statement for both single variable and destructuring patterns
 /// Example: "let a:num = 5;" or "let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
 class VariableDeclarationStatement : public Statement {
@@ -39,7 +47,7 @@ public:
     {
     }
 
-    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
+    [[nodiscard]] inline Ptr<Pattern> pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 
@@ -59,7 +67,7 @@ public:
     {
     }
 
-    [[nodiscard]] inline const Ptr<Pattern>& pattern() const { return mPattern; }
+    [[nodiscard]] inline Ptr<Pattern> pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 

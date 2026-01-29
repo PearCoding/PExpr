@@ -51,8 +51,29 @@ public:
         return os;
     }
 
+    [[nodiscard]] inline friend std::strong_ordering operator<=>(const Location& a, const Location& b)
+    {
+        if (const auto cmp = a.line() <=> b.line(); cmp != std::strong_ordering::equal)
+            return cmp;
+
+        return a.column() <=> b.column();
+    }
+
 private:
     size_t mColumn;
     size_t mLine;
 };
-} // namespace PExpr
+} // namespace PExpr::parser
+
+namespace std {
+template <>
+class hash<PExpr::parser::Location> {
+public:
+    std::size_t operator()(const PExpr::parser::Location& loc) const
+    {
+        const auto h1 = std::hash<size_t>{}(loc.line());
+        const auto h2 = std::hash<size_t>{}(loc.column());
+        return h1 ^ (h2 << 1);
+    }
+};
+} // namespace std

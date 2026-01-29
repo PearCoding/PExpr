@@ -44,14 +44,14 @@ TEST_CASE("Optimizer: dead code elimination removes unused assigns", "[sscp]")
 
     // Ensure y assign exists before pass (sanity)
     auto before = SSASerializer::serialize(prog);
-    REQUIRE((before.find("y.") != std::string::npos || before.find("y:") != std::string::npos));
+    REQUIRE((before.find("y_L1C16.") != std::string::npos));
 
     opt::Optimizer::Run(MakeConstantFoldingOptimizer(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
     // After pass, 'y' assignment should be removed (dead)
-    REQUIRE(after.find("y.") == std::string::npos);
+    REQUIRE(after.find("y_L1C16.") == std::string::npos);
     // x's return should still be present
     REQUIRE(after.find("return ") != std::string::npos);
 }

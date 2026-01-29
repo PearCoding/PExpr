@@ -4,6 +4,7 @@
 #include <span>
 
 namespace PExpr::type {
+namespace internal {
 /// Encode elementary types into compact characters for mangling.
 inline std::string encodeElemType(const Type& t)
 {
@@ -28,6 +29,23 @@ inline std::string encodeElemType(const Type& t)
     }
 }
 
+inline std::string appendClosure(const ast::Closure* currentClosure)
+{
+    std::string suffix;
+    std::vector<std::string> parts;
+    for (const auto* c = currentClosure; c->parent() != nullptr /* Stop at the global closure */; c = c->parent()) {
+        const auto& l = c->location();
+        std::stringstream ss;
+        ss << "L" << l.line() << "C" << l.column();
+        parts.push_back(ss.str());
+    }
+    for (auto it = parts.rbegin(); it != parts.rend(); ++it)
+        suffix += "_" + *it;
+    return suffix;
+}
+
+} // namespace internal
+
 /// Build mangled name from declared parameter types (no return type).
 inline std::string makeMangledNameFromTypes(const std::string& name, std::span<const Type> params, const ast::Closure* currentClosure)
 {
@@ -37,21 +55,29 @@ inline std::string makeMangledNameFromTypes(const std::string& name, std::span<c
     // parameter encoding prefix
     mangled += "_P";
     for (auto t : params)
-        mangled += encodeElemType(t);
+        mangled += internal::encodeElemType(t);
 
     // include closure chain locations (outermost first)
     // but skip the global closure (which is identified by having no parent)
-    if (currentClosure) {
-        std::vector<std::string> parts;
-        for (const auto* c = currentClosure; c->parent() != nullptr /* Stop at the global closure */; c = c->parent()) {
-            const auto& l = c->location();
-            std::stringstream ss;
-            ss << "L" << l.line() << "C" << l.column();
-            parts.push_back(ss.str());
-        }
-        for (auto it = parts.rbegin(); it != parts.rend(); ++it)
-            mangled += "_" + *it;
-    }
+    if (currentClosure)
+        mangled += internal::appendClosure(currentClosure);
+    return mangled;
+}
+
+inline std::string makeMangledNameFromTypes(const std::string& name, std::span<const Ptr<VariableDef>> params, const ast::Closure* currentClosure)
+{
+    std::string mangled = "_Z";
+    mangled += std::to_string(name.size()) + name;
+
+    // parameter encoding prefix
+    mangled += "_P";
+    for (auto p : params)
+        mangled += internal::encodeElemType(p->type());
+
+    // include closure chain locations (outermost first)
+    // but skip the global closure (which is identified by having no parent)
+    if (currentClosure)
+        mangled += internal::appendClosure(currentClosure);
     return mangled;
 }
 } // namespace PExpr::type

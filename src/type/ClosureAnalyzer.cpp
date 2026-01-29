@@ -13,15 +13,15 @@ ClosureAnalyzer::ClosureAnalyzer(utils::Reporter& reporter, bool captureUsage, b
 }
 
 void ClosureAnalyzer::analyzeClosure(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
-                                     std::map<std::string, VariableDef>& outCapturedUsage,
-                                     std::map<std::string, VariableDef>& outCapturedMutable)
+                                     std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                     std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
     collectCapturesFromClosureBody(focusedClosure, currentClosure, outCapturedUsage, outCapturedMutable);
 }
 
 void ClosureAnalyzer::collectCapturesFromClosureBody(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
-                                                     std::map<std::string, VariableDef>& outCapturedUsage,
-                                                     std::map<std::string, VariableDef>& outCapturedMutable)
+                                                     std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                                     std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
     // Now traverse statements expressions
     for (const auto& stmt : currentClosure->statements()) {
@@ -48,8 +48,8 @@ void ClosureAnalyzer::collectCapturesFromClosureBody(const Ptr<Closure>& focused
 
 void ClosureAnalyzer::collectCapturesFromExpression(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
                                                     const Ptr<Expression>& expr,
-                                                    std::map<std::string, VariableDef>& outCapturedUsage,
-                                                    std::map<std::string, VariableDef>& outCapturedMutable)
+                                                    std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                                    std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
     if (!expr)
         return;
@@ -58,18 +58,17 @@ void ClosureAnalyzer::collectCapturesFromExpression(const Ptr<Closure>& focusedC
     case ExpressionType::Variable: {
         const auto v           = std::reinterpret_pointer_cast<VariableExpression>(expr);
         const SymbolTable* tbl = nullptr;
-        if (auto def = currentClosure->symbols().lookupVariable(v->location(), v->name(), &tbl); def.has_value()) {
-
+        if (auto def = currentClosure->symbols().lookupVariable(v->location(), v->variable()->name(), &tbl)) {
             // Go up the ladder until we find the top focusedClosure or end up in global
             while (tbl && tbl != &focusedClosure->symbols())
                 tbl = tbl->parent();
 
             if (!tbl) { //< captured (above the focusedClosure)
                 if (mCaptureUsage)
-                    outCapturedUsage.emplace(def->name(), def.value());
+                    outCapturedUsage.emplace(def->name(), def);
             }
         } else {
-            mReporter.errorf(v->location(), "Unknown identifier '%s' found during uplift", v->name().c_str());
+            mReporter.errorf(v->location(), "Unknown identifier '%s' found during analysis", v->variable()->name().c_str());
         }
     } break;
     case ExpressionType::Literal:
@@ -125,29 +124,29 @@ void ClosureAnalyzer::collectCapturesFromExpression(const Ptr<Closure>& focusedC
 
 void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
                                                            const Ptr<Pattern>& pattern,
-                                                           std::map<std::string, VariableDef>& outCapturedUsage,
-                                                           std::map<std::string, VariableDef>& outCapturedMutable)
+                                                           std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                                           std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
     if (!pattern)
         return;
 
     for (const auto& elem : pattern->elements()) {
         if (elem.isSimpleBinding()) {
-            const auto& binding    = elem.simpleBinding();
+            const auto binding     = elem.simpleBinding();
             const SymbolTable* tbl = nullptr;
-            if (auto def = currentClosure->symbols().lookupVariable(elem.location(), binding.name, &tbl); def.has_value() && def->isMutable()) {
+            if (auto def = currentClosure->symbols().lookupVariable(elem.location(), binding->name(), &tbl); def && def->isMutable()) {
                 // Go up the ladder until we find the top focusedClosure or end up in global
                 while (tbl && tbl != &focusedClosure->symbols())
                     tbl = tbl->parent();
 
                 if (!tbl) { //< captured (above the focusedClosure)
                     if (mCaptureUsage)
-                        outCapturedUsage.emplace(def->name(), def.value());
+                        outCapturedUsage.emplace(binding->name(), binding);
                     if (mCaptureModification)
-                        outCapturedMutable.emplace(def->name(), def.value());
+                        outCapturedMutable.emplace(binding->name(), binding);
                 }
             } else {
-                mReporter.errorf(elem.location(), "Unknown variable '%s' found during currentClosure analyzis", binding.name.c_str());
+                mReporter.errorf(elem.location(), "Unknown variable '%s' found during currentClosure analyzis", binding->name().c_str());
             }
         } else {
             // Recursively traverse nested patterns

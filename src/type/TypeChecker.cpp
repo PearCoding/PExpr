@@ -89,28 +89,22 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         if (rhsType.kind() == TypeKind::Error)
             return;
 
+        // TODO: Rework this
         // Check if pattern is a single simple binding (i.e., regular variable declaration)
         if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            auto& binding = pattern->elements()[0].simpleBinding();
+            auto binding = pattern->elements()[0].simpleBinding();
 
             // Check type compatibility if explicit type is provided
-            if (binding.declaredType.kind() != TypeKind::Unspecified) {
-                if (!isConvertible(rhsType, binding.declaredType)) {
+            if (binding->type().kind() != TypeKind::Unspecified) {
+                if (!isConvertible(rhsType, binding->type())) {
                     mReporter.errorf(declStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
-                                     rhsType.toString().c_str(), binding.declaredType.toString().c_str(), binding.name.c_str());
+                                     rhsType.toString().c_str(), binding->type().toString().c_str(), binding->name().c_str());
                     return;
                 }
+            } else {
+                // If the variable was unspecified before, replace it
+                binding->setType(rhsType);
             }
-
-            // Register the variable
-            const Type varType = (binding.declaredType.kind() != TypeKind::Unspecified) ? binding.declaredType : rhsType;
-            if (!closure->symbols().addVariable(VariableDef(binding.name, varType, binding.isMutable))) {
-                mReporter.errorf(declStmt->location(), "Variable '%s' already exists in the current scope", binding.name.c_str());
-                return;
-            }
-
-            // Infer type if necessary
-            binding.declaredType = varType;
         } else {
             // Destructuring pattern: RHS must return a tuple
             if (!rhsType.isTuple()) {
@@ -137,17 +131,18 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
                     const auto& elemType = components.at(i);
 
                     if (elem.isSimpleBinding()) {
-                        auto& binding = elem.simpleBinding();
+                        auto binding = elem.simpleBinding();
 
-                        // Determine target type (use declared type if specified, otherwise inferred from element)
-                        const Type varType = (binding.declaredType.kind() != TypeKind::Unspecified) ? binding.declaredType : elemType;
-                        if (!closure->symbols().addVariable(VariableDef(binding.name, varType, binding.isMutable))) {
-                            mReporter.errorf(elem.location(), "Variable '%s' already exists in the current scope", binding.name.c_str());
-                            return false;
+                        // Check type compatibility if explicit type is provided
+                        if (binding->type().kind() != TypeKind::Unspecified) {
+                            if (!isConvertible(elemType, binding->type())) {
+                                mReporter.errorf(declStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
+                                                 elemType.toString().c_str(), binding->type().toString().c_str(), binding->name().c_str());
+                                return false;
+                            }
+                        } else {
+                            binding->setType(elemType);
                         }
-
-                        // Infer type if necessary
-                        binding.declaredType = varType;
                     } else {
                         // Nested pattern - recurse
                         if (!registerVariables(*elem.nestedPattern(), elemType))
@@ -163,39 +158,30 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
     } break;
     case StatementType::VariableAssignment: {
         const auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
-        auto& pattern         = assignStmt->pattern();
+        auto pattern          = assignStmt->pattern();
 
         // Type-check the RHS expression
         const auto rhsType = handleNode(closure, assignStmt->expression());
         if (rhsType.kind() == TypeKind::Error)
             return;
 
+        // TODO: Rework this
         // Check if pattern is a single simple binding (i.e., regular variable assignment)
         if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            auto& binding = pattern->elements()[0].simpleBinding();
+            auto binding = pattern->elements()[0].simpleBinding();
 
-            // Lookup the variable
-            const SymbolTable* capturedTbl;
-            const auto var = closure->symbols().lookupVariable(assignStmt->location(), binding.name, &capturedTbl);
-            if (!var.has_value()) {
-                mReporter.errorf(assignStmt->location(), "Unknown variable '%s' in assignment", binding.name.c_str());
-                return;
-            }
-            if (!var->isMutable()) {
-                mReporter.errorf(assignStmt->location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
+            if (!binding->isMutable()) {
+                mReporter.errorf(assignStmt->location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
                 return;
             }
 
             // Check type compatibility
-            const auto& varType = var->type();
+            const auto& varType = binding->type();
             if (!isConvertible(rhsType, varType)) {
                 mReporter.errorf(assignStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s'",
-                                 rhsType.toString().c_str(), varType.toString().c_str(), binding.name.c_str());
+                                 rhsType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
                 return;
             }
-
-            // Ensure this is up-to-date
-            binding.declaredType = varType;
         } else {
             // Destructuring pattern: RHS must be a tuple
             if (!rhsType.isTuple()) {
@@ -222,30 +208,20 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
                     const auto& elemType = components.at(i);
 
                     if (elem.isSimpleBinding()) {
-                        auto& binding = elem.simpleBinding();
+                        auto binding = elem.simpleBinding();
 
-                        // Lookup the variable
-                        const SymbolTable* capturedTbl;
-                        const auto var = closure->symbols().lookupVariable(elem.location(), binding.name, &capturedTbl);
-                        if (!var.has_value()) {
-                            mReporter.errorf(elem.location(), "Unknown variable '%s' in destructuring assignment", binding.name.c_str());
-                            return false;
-                        }
-                        if (!var->isMutable()) {
-                            mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding.name.c_str());
+                        if (!binding->isMutable()) {
+                            mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
                             return false;
                         }
 
                         // Check type compatibility
-                        const auto& varType = var->type();
+                        const auto& varType = binding->type();
                         if (!isConvertible(elemType, varType)) {
                             mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
-                                             elemType.toString().c_str(), varType.toString().c_str(), binding.name.c_str());
+                                             elemType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
                             return false;
                         }
-
-                        // Ensure this is up-to-date
-                        binding.declaredType = varType;
                     } else {
                         // Nested pattern - recurse
                         if (!processPattern(*elem.nestedPattern(), elemType))
@@ -265,14 +241,6 @@ void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& 
         if (funcStmt->isExtern() || !funcStmt->closure()) {
             // Do nothing
         } else {
-            // Add parameters to the symbol table
-            for (const auto& p : funcStmt->parameters()) {
-                if (!funcStmt->closure()->symbols().addVariable(VariableDef(p.Name, p.ParamType, p.IsMutable)))
-                    mReporter.errorf(funcStmt->location(), "Parameter '%s' already exists in the current scope", p.Name.c_str());
-            }
-
-            PEXPR_ASSERT(funcStmt->closure()->symbols().parent() == &closure->symbols(), "Invalid parent relationship");
-
             // Type-check the function body to determine the return type and process it
             const auto returnType = handleNode(funcStmt->closure());
 
@@ -387,13 +355,9 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
 
 Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VariableExpression>& expr)
 {
-    if (const auto def = closure->symbols().lookupVariable(expr->location(), expr->name()); def.has_value()) {
-        expr->setReturnType(def.value().type());
-        return def.value().type();
-    } else {
-        mReporter.errorf(expr->location(), "Unknown identifier '%s' found", expr->name().c_str());
-        return Type(TypeKind::Error);
-    }
+    PEXPR_UNUSED(closure);
+    expr->setReturnType(expr->variable()->type());
+    return expr->returnType();
 }
 
 Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<LiteralExpression>& expr)
@@ -587,7 +551,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpressi
         bool hadCastError = false;
         const auto& pList = def.value().parameters();
         for (size_t i = 0; i < expr->parameters().size() && i < pList.size(); ++i) {
-            const auto desired = pList[i].ParamType;
+            const auto desired = pList[i]->type();
             auto castExpr      = injectCastIfNeeded(expr->parameters().at(i), desired, &hadCastError);
             fromArgs[i]        = castExpr->returnType();
             expr->replaceParameter(i, castExpr);

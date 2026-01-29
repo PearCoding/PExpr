@@ -29,16 +29,24 @@ private:
 
     // Traverse and update call expressions to append additional arguments when
     // the target function signature expects more parameters (e.g. uplifted captures).
-    void updateCallsInExpression(Ptr<ast::Expression>& expr, const FunctionDef& oldDef, const FunctionDef& newDef,
-                                 const std::map<std::string, VariableDef>& mutableCaptures);
-    void updateCallsInClosure(const Ptr<ast::Closure>& closure, const FunctionDef& oldDef, const FunctionDef& newDef,
-                              const std::map<std::string, VariableDef>& mutableCaptures);
+    void updateCallsInExpression(const Ptr<ast::Closure>& currentClosure, Ptr<ast::Expression>& expr,
+                                 const FunctionDef& oldDef, const FunctionDef& newDef,
+                                 const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
+                                 const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
+    void updateCallsInClosure(const Ptr<ast::Closure>& closure,
+                              const FunctionDef& oldDef, const FunctionDef& newDef,
+                              const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
+                              const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
+
+    void updateVariablesInExpression(const Ptr<ast::Expression>& expr, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
+
+    void updateVariablesInClosure(const Ptr<ast::Closure>& closure, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
 
     // Create a tuple expression for the return value that includes original return
     // plus updated mutable captured variables.
     Ptr<ast::Expression> createReturnTuple(const Ptr<ast::Closure>& funcClosure,
                                            const Ptr<ast::Expression>& originalReturnExpr,
-                                           const std::map<std::string, VariableDef>& mutableCaptures);
+                                           const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
 };
 
 } // namespace PExpr::type

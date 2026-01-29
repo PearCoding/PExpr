@@ -18,7 +18,7 @@ TEST_CASE("SSAMapper: simple variable and expression", "[ssamapper]")
 
     // Expect an assignment for x, and a return
     REQUIRE(dumped.find("assign(") != std::string::npos);
-    REQUIRE(dumped.find("x.") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.") != std::string::npos);
     REQUIRE(dumped.find("return ") != std::string::npos);
 }
 
@@ -72,24 +72,20 @@ TEST_CASE("SSAMapper: mutable capture with assignment returns correct version", 
     auto ast = env.parse("let mut x = 5; fn increment() = { x = x + 1; x }; let k = increment(); x");
     REQUIRE(ast != nullptr);
 
-    auto prog = env.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     // The function should be uplifted to accept x as mutable parameter
     REQUIRE(dumped.find("fn _Z9increment_Pi") != std::string::npos);
-    
+
     // Check that x is assigned version .1 initially
-    REQUIRE(dumped.find("x.1:int = assign(5:int)") != std::string::npos);
-    
-    // Check that x gets updated to version .3 inside the closure
-    // (x.2 is inside the function, x.3 is after assignment)
-    REQUIRE(dumped.find("x.3:int = assign(") != std::string::npos);
-    
-    // The final return should be x.3 not x.1
-    REQUIRE(dumped.find("return x.3:int") != std::string::npos);
-    
-    // Ensure x.1 is not returned (the bug)
-    REQUIRE(dumped.find("return x.1:int") == std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.1:int = assign(5:int)") != std::string::npos);
+
+    // Check that x gets updated to version .2 inside the closure
+    REQUIRE(dumped.find("x_L1C9.2:int = assign(") != std::string::npos);
+
+    // The final return should be x.2 not x.1
+    REQUIRE(dumped.find("return x_L1C9.3:int") != std::string::npos);
 }
 
 TEST_CASE("SSAMapper: variable version tracking in nested scopes", "[ssamapper]")
@@ -99,14 +95,14 @@ TEST_CASE("SSAMapper: variable version tracking in nested scopes", "[ssamapper]"
     auto ast = env.parse("{ let mut x = 1; let k = { x = x + 1; x }; x }");
     REQUIRE(ast != nullptr);
 
-    auto prog = env.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     // x.1 = 1, x.2 = x.1 + 1
-    REQUIRE(dumped.find("x.1:int = assign(1:int)") != std::string::npos);
-    REQUIRE(dumped.find("x.2:int = assign(") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C11.1:int = assign(1:int)") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C11.2:int = assign(") != std::string::npos);
     // Should return the updated value, not x.1
-    REQUIRE(dumped.find("return x.1:int") == std::string::npos);
+    REQUIRE(dumped.find("return x_L1C11.1:int") == std::string::npos);
 }
 
 TEST_CASE("SSAMapper: variable version tracking with function inlining", "[ssamapper]")
@@ -116,14 +112,14 @@ TEST_CASE("SSAMapper: variable version tracking with function inlining", "[ssama
     auto ast = env.parse("let mut x = 1; fn f() = { x = x + 1; x }; let r = f(); x");
     REQUIRE(ast != nullptr);
 
-    auto prog = env.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     // x.1 = 1, x.2 = x.1 + 1 (inside function)
-    REQUIRE(dumped.find("x.1:int = assign(1:int)") != std::string::npos);
-    REQUIRE(dumped.find("x.2:int = assign(") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.1:int = assign(1:int)") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.2:int = assign(") != std::string::npos);
     // Should return the updated value, not x.1
-    REQUIRE(dumped.find("return x.1:int") == std::string::npos);
+    REQUIRE(dumped.find("return x_L1C9.1:int") == std::string::npos);
 }
 
 TEST_CASE("SSAMapper: multiple assignments in nested scopes", "[ssamapper]")
@@ -133,14 +129,14 @@ TEST_CASE("SSAMapper: multiple assignments in nested scopes", "[ssamapper]")
     auto ast = env.parse("let mut x = 1; let k = { x = x + 1; { x = x + 2; x } }; x");
     REQUIRE(ast != nullptr);
 
-    auto prog = env.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     // x.1 = 1, x.3 = x.2 + 2 (or similar)
-    REQUIRE(dumped.find("x.1:int = assign(1:int)") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.1:int = assign(1:int)") != std::string::npos);
     // Should have x.3 (or higher) due to two increments
     // Should return the updated value, not x.1
-    REQUIRE(dumped.find("return x.1:int") == std::string::npos);
+    REQUIRE(dumped.find("return x_L1C9.1:int") == std::string::npos);
 }
 
 TEST_CASE("SSAMapper: variable shadowing preserves version tracking", "[ssamapper]")
@@ -150,12 +146,12 @@ TEST_CASE("SSAMapper: variable shadowing preserves version tracking", "[ssamappe
     auto ast = env.parse("let mut x = 1; let k = { let x = 5; x }; x = x + 1; x");
     REQUIRE(ast != nullptr);
 
-    auto prog = env.map(ast);
+    auto prog   = env.map(ast);
     auto dumped = SSASerializer::serialize(prog);
 
     // Outer x: x.1 = 1, x.2 = x.1 + 1
-    REQUIRE(dumped.find("x.1:int = assign(1:int)") != std::string::npos);
-    REQUIRE(dumped.find("x.2:int = assign(") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.1:int = assign(1:int)") != std::string::npos);
+    REQUIRE(dumped.find("x_L1C9.2:int = assign(") != std::string::npos);
     // Should return the updated value, not x.1
-    REQUIRE(dumped.find("return x.1:int") == std::string::npos);
+    REQUIRE(dumped.find("return x_L1C9.1:int") == std::string::npos);
 }

@@ -4,7 +4,7 @@
 let mut x:num = 0;
 let branch_phi = if getInput() < 0.5 {
     x = 12;
-    let x = 10; //< TODO: This should at least trigger a warning!
+    let x = 10; //< TODO: This should be an error or at least a warning!
     x
 } else {
     x = 42;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Parameter.h"
 #include "Type.h"
+#include "parser/Location.h"
 
 #include <vector>
 
@@ -13,28 +13,44 @@ public:
     VariableDef() = default;
 
     /// Construct a definition for a variable with a given name and type.
-    inline VariableDef(const std::string& name, const Type& type, bool isMutable)
+    inline VariableDef(const std::string& name, const Type& type, bool isMutable, const parser::Location& loc)
         : mName(name)
         , mType(type)
         , mIsMutable(isMutable)
+        , mLocation(loc)
     {
-        PEXPR_ASSERT(type.kind() != TypeKind::Unspecified, "Expected a valid type for a variable definition");
     }
 
     /// The identifier the variable is named with.
     [[nodiscard]] inline const std::string& name() const { return mName; }
     /// The type of the variable.
     [[nodiscard]] inline const Type& type() const { return mType; }
+    inline void setType(const Type& type) { mType = type; }
 
     [[nodiscard]] inline bool isMutable() const { return mIsMutable; }
+
+    /// Get the location where this variable was declared.
+    [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
+
+    /// Returns a name which is unique in a translation unit
+    [[nodiscard]] inline std::string uniqueName() const
+    {
+        std::stringstream stream;
+        stream << name() << "_L" << mLocation.line() << "C" << mLocation.column();
+        return stream.str();
+    }
 
     [[nodiscard]] auto operator<=>(const VariableDef&) const = default;
 
 private:
     std::string mName = "";
     Type mType;
-    bool mIsMutable = false;
+    bool mIsMutable            = false;
+    parser::Location mLocation = parser::Location(0);
 };
+
+/// Simple list of variable definitions
+using ParameterList = std::vector<Ptr<VariableDef>>;
 
 /// A general purpose function definition with a fixed signature.
 class FunctionDef {
@@ -99,8 +115,9 @@ public:
         const auto h1 = std::hash<std::string>{}(def.name());
         const auto h2 = def.type().hash();
         const auto h3 = std::hash<bool>{}(def.isMutable());
+        const auto h4 = std::hash<PExpr::parser::Location>{}(def.location());
 
-        return h1 ^ (h2 << 1) ^ (h3 << 2);
+        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
     }
 };
 } // namespace std

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "parser/Location.h"
+#include "type/Definitions.h"
 #include "type/Type.h"
 
 #include <memory>
@@ -18,21 +19,7 @@ class Pattern;
 /// 2. A nested pattern: "[x, y]"
 class PatternElement {
 public:
-    /// Variant holding either a simple binding or a nested pattern
-    struct SimpleBinding {
-        std::string name;
-        type::Type declaredType; // TypeKind::Unspecified if no explicit type
-        bool isMutable;
-
-        SimpleBinding(const std::string& n, const type::Type& type = type::Type(type::TypeKind::Unspecified), bool mutable_ = false)
-            : name(n)
-            , declaredType(type)
-            , isMutable(mutable_)
-        {
-        }
-    };
-
-    using Variant = std::variant<SimpleBinding, std::shared_ptr<Pattern>>;
+    using Variant = std::variant<Ptr<type::VariableDef>, Ptr<Pattern>>;
 
     inline PatternElement(const parser::Location& loc, Variant&& var)
         : mLocation(loc)
@@ -41,25 +28,28 @@ public:
     }
 
     [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
-    [[nodiscard]] inline bool isSimpleBinding() const { return std::holds_alternative<SimpleBinding>(mVariant); }
-    [[nodiscard]] inline bool isNestedPattern() const { return std::holds_alternative<std::shared_ptr<Pattern>>(mVariant); }
+    [[nodiscard]] inline bool isSimpleBinding() const { return std::holds_alternative<Ptr<type::VariableDef>>(mVariant); }
+    [[nodiscard]] inline bool isNestedPattern() const { return std::holds_alternative<Ptr<Pattern>>(mVariant); }
 
-    [[nodiscard]] inline const SimpleBinding& simpleBinding() const { return std::get<SimpleBinding>(mVariant); }
-    [[nodiscard]] inline SimpleBinding& simpleBinding() { return std::get<SimpleBinding>(mVariant); }
-    [[nodiscard]] inline const std::shared_ptr<Pattern>& nestedPattern() const { return std::get<std::shared_ptr<Pattern>>(mVariant); }
-    [[nodiscard]] inline std::shared_ptr<Pattern>& nestedPattern() { return std::get<std::shared_ptr<Pattern>>(mVariant); }
+    [[nodiscard]] inline Ptr<type::VariableDef> simpleBinding() const { return std::get<Ptr<type::VariableDef>>(mVariant); }
+    [[nodiscard]] inline Ptr<Pattern> nestedPattern() const { return std::get<Ptr<Pattern>>(mVariant); }
 
     /// Helper to create a simple binding element
-    static inline PatternElement makeSimple(const parser::Location& loc, const std::string& name, const type::Type& type = type::Type(type::TypeKind::Unspecified), bool isMutable = false)
+    static inline PatternElement makeSimple(const parser::Location& loc, const Ptr<type::VariableDef>& variable)
     {
-        return PatternElement(loc, Variant(SimpleBinding(name, type, isMutable)));
+        PEXPR_ASSERT(variable, "Expected a valid variable def pointer for pattern");
+        return PatternElement(loc, Variant(variable));
     }
 
     /// Helper to create a nested pattern element
-    static inline PatternElement makeNested(const parser::Location& loc, const std::shared_ptr<Pattern>& pattern)
+    static inline PatternElement makeNested(const parser::Location& loc, const Ptr<Pattern>& pattern)
     {
+        PEXPR_ASSERT(pattern, "Expected a valid nested pattern pointer for pattern");
         return PatternElement(loc, Variant(pattern));
     }
+
+    inline void setAsSimpleBinding(const Ptr<type::VariableDef>& var) { mVariant = Variant(var); }
+    inline void setAsNestedPattern(const Ptr<Pattern>& pat) { mVariant = Variant(pat); }
 
 private:
     parser::Location mLocation;

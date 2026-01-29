@@ -24,8 +24,8 @@ public:
     /// @param[out] outCapturedUsage Map of captured variables used in the closure (includes modification)
     /// @param[out] outCapturedMutable Map of captured variables modified in the closure
     void analyzeClosure(const Ptr<ast::Closure>& focusedClosure, const Ptr<ast::Closure>& currentClosure,
-                        std::map<std::string, VariableDef>& outCapturedUsage,
-                        std::map<std::string, VariableDef>& outCapturedMutable);
+                        std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                        std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
 
 private:
     utils::Reporter& mReporter;
@@ -35,17 +35,17 @@ private:
     /// considered captured and inserted into outCapturedUsage map and if modified outCapturedMutable as well.
     void collectCapturesFromExpression(const Ptr<ast::Closure>& focusedClosure, const Ptr<ast::Closure>& currentClosure,
                                        const Ptr<ast::Expression>& expr,
-                                       std::map<std::string, VariableDef>& outCapturedUsage,
-                                       std::map<std::string, VariableDef>& outCapturedMutable);
+                                       std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                       std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
     void collectCapturesFromClosureBody(const Ptr<ast::Closure>& focusedClosure, const Ptr<ast::Closure>& currentClosure,
-                                        std::map<std::string, VariableDef>& outCapturedUsage,
-                                        std::map<std::string, VariableDef>& outCapturedMutable);
+                                        std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                        std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
 
     /// Collect mutable assignments from a pattern (for variable assignment statements)
     void collectMutableAssignmentsFromPattern(const Ptr<ast::Closure>& focusedClosure, const Ptr<ast::Closure>& currentClosure,
                                               const Ptr<ast::Pattern>& pattern,
-                                              std::map<std::string, VariableDef>& outCapturedUsage,
-                                              std::map<std::string, VariableDef>& outCapturedMutable);
+                                              std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                              std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
 
     const bool mCaptureUsage;
     const bool mCaptureModification;
