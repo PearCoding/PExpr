@@ -20,26 +20,14 @@ public:
 
     /// Analyze a closure to detect variables captured from parent scopes.
     /// @param focusedClosure All captured variables must be above this closure
-    /// @param currentClosure The closure to analyze
     /// @param[out] outCapturedUsage Map of captured variables used in the closure (includes modification)
     /// @param[out] outCapturedMutable Map of captured variables modified in the closure
-    void analyzeClosure(const ast::Closure* focusedClosure, const ast::Closure* currentClosure,
+    void analyzeClosure(const ast::Closure* focusedClosure,
                         std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
                         std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
 
 private:
     utils::Reporter& mReporter;
-
-    /// Collect captured variable names used inside 'expr' relative to the given
-    /// "focused" closure. Any variable resolved to a symbol table above this is
-    /// considered captured and inserted into outCapturedUsage map and if modified outCapturedMutable as well.
-    void collectCapturesFromExpression(const ast::Closure* focusedClosure, const ast::Closure* currentClosure,
-                                       const Ptr<ast::Expression>& expr,
-                                       std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
-                                       std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
-    void collectCapturesFromClosureBody(const ast::Closure* focusedClosure, const ast::Closure* currentClosure,
-                                        std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
-                                        std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
 
     /// Collect mutable assignments from a pattern (for variable assignment statements)
     void collectMutableAssignmentsFromPattern(const ast::Closure* focusedClosure, const ast::Closure* currentClosure,

@@ -85,7 +85,7 @@ TEST_CASE("SSAMapper: mutable capture with assignment returns correct version", 
     REQUIRE(dumped.find("x_L1C9.2:int = assign(") != std::string::npos);
 
     // The final return should be x.2 not x.1
-    REQUIRE(dumped.find("return x_L1C9.3:int") != std::string::npos);
+    REQUIRE(dumped.find("return x_L1C9.2:int") != std::string::npos);
 }
 
 TEST_CASE("SSAMapper: variable version tracking in nested scopes", "[ssamapper]")

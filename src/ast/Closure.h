@@ -29,22 +29,22 @@ public:
         mSymbols.setParent(p ? &p->symbols() : nullptr);
     }
 
-    [[nodiscard]] inline const StatementList& statements() const { return mStatement; }
-    [[nodiscard]] inline StatementList& statements() { return mStatement; }
+    [[nodiscard]] inline const StatementList& statements() const { return mStatements; }
+    [[nodiscard]] inline StatementList& statements() { return mStatements; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 
     inline void addStatement(const Ptr<Statement>& statement)
     {
         PEXPR_ASSERT(statement != nullptr, "Expected valid statement");
-        mStatement.push_back(statement);
+        mStatements.push_back(statement);
     }
 
     inline void replaceStatement(const Ptr<Statement>& oldStmt, const Ptr<Statement>& newStmt)
     {
         PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
         PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
-        for (auto& st : mStatement) {
+        for (auto& st : mStatements) {
             if (st == oldStmt) {
                 st = newStmt;
                 break;
@@ -56,10 +56,9 @@ public:
     {
         PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
         PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
-        for (auto& st : mStatement) {
-            if (st == oldStmt) {
+        for (auto& st : mStatements) {
+            if (st == oldStmt)
                 st = std::move(newStmt);
-            }
         }
     }
 
@@ -67,16 +66,12 @@ public:
     [[nodiscard]] inline const type::SymbolTable& symbols() const { return mSymbols; }
     [[nodiscard]] inline type::SymbolTable& symbols() { return mSymbols; }
 
-    /// Visit all expressions used in this expression
-    /// @param visitor A function that will be called for each expression
-    void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const;
-
 private:
     Closure* mParent;
     type::SymbolTable mSymbols;
 
     parser::Location mLocation;
-    StatementList mStatement;
+    StatementList mStatements;
     Ptr<Expression> mExpression;
 };
 } // namespace PExpr::ast

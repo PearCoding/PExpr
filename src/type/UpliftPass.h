@@ -34,13 +34,11 @@ private:
                                  const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
                                  const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
     void updateCallsInClosure(const Ptr<ast::Closure>& closure,
-                              const FunctionDef& oldDef, const FunctionDef& newDef,
-                              const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
-                              const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
+                     const FunctionDef& oldDef, const FunctionDef& newDef,
+                     const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
+                     const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
 
-    void updateVariablesInExpression(const Ptr<ast::Expression>& expr, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
-
-    void updateVariablesInClosure(const Ptr<ast::Closure>& closure, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
+    void updateVariables(const Ptr<ast::Closure>& closure, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
 
     // Create a tuple expression for the return value that includes original return
     // plus updated mutable captured variables.

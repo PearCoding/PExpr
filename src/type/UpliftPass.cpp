@@ -2,6 +2,7 @@
 #include "ClosureAnalyzer.h"
 #include "ast/Expression.h"
 #include "ast/Statement.h"
+#include "ast/Visitor.h"
 #include "type/Mangler.h"
 
 #include <algorithm>
@@ -35,92 +36,92 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
         if (f->isExtern())
             continue;
 
+        PEXPR_ASSERT(f->closure(), "A non-external function needs a body");
+
+        // Recurse into nested closure body first (from the bottom up first)
+        processClosure(f->closure());
+
         // collect captures from function body
         std::map<std::string, Ptr<VariableDef>> capturedUsage;
         std::map<std::string, Ptr<VariableDef>> capturedMutable;
 
-        if (f->closure()) {
-            ClosureAnalyzer analyzer(mReporter, true, true);
-            analyzer.analyzeClosure(f->closure().get(), f->closure().get(), capturedUsage, capturedMutable);
+        ClosureAnalyzer analyzer(mReporter, true, true);
+        analyzer.analyzeClosure(f->closure().get(), capturedUsage, capturedMutable);
 
-            // For each captured variable, add a new parameter at the end of the function's parameter list
-            Ptr<Closure> newFuncClosure = f->closure();
-            if (!capturedUsage.empty()) {
-                std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>> capturedToParameter;
-                std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>> parameterToCaptured;
+        // For each captured variable, add a new parameter at the end of the function's parameter list
+        Ptr<Closure> newFuncClosure = f->closure();
+        if (!capturedUsage.empty()) {
+            std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>> capturedToParameter;
+            std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>> parameterToCaptured;
 
-                // We need to create a new parameter list combining existing parameters + captured
-                ParameterList newParams = f->parameters();
-                for (const auto& kv : capturedUsage) {
-                    auto v  = kv.second;
-                    auto pv = std::make_shared<VariableDef>(v->name(), v->type(), capturedMutable.contains(kv.first), f->location());
+            // We need to create a new parameter list combining existing parameters + captured
+            ParameterList newParams = f->parameters();
+            for (const auto& kv : capturedUsage) {
+                auto v  = kv.second;
+                auto pv = std::make_shared<VariableDef>(v->name(), v->type(), capturedMutable.contains(kv.first), f->location());
 
-                    capturedToParameter[v]  = pv;
-                    parameterToCaptured[pv] = v;
+                capturedToParameter[v]  = pv;
+                parameterToCaptured[pv] = v;
 
-                    newParams.push_back(pv);
-                    if (!f->closure()->symbols().addVariable(pv))
-                        mReporter.errorf(f->location(), "Parameter '%s' for uplifted variable already exists in the current scope", pv->name().c_str());
-                }
-
-                // Update all captured variables such that the parameters are used instead
-                updateVariablesInClosure(f->closure(), capturedToParameter);
-
-                // Determine new return type
-                Type newReturnType = f->returnType();
-                if (!capturedMutable.empty()) {
-                    // Create tuple type: (original_return_type, mutable_var1_type, mutable_var2_type, ...)
-                    std::vector<Type> tupleComponents;
-                    tupleComponents.push_back(f->returnType());
-                    for (const auto& mutVar : capturedMutable)
-                        tupleComponents.push_back(mutVar.second->type());
-                    newReturnType = Type(std::move(tupleComponents));
-                }
-
-                // Build new mangled name with new parameter types
-                const std::string oldMangled = f->mangledName();
-                const std::string newMangled = makeMangledNameFromTypes(f->name(), newParams, closure.get());
-
-                // Update local symbol table: replace function entry
-                const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern(), f->hasSideEffects());
-                const auto newDef = FunctionDef(f->name(), newMangled, newParams, newReturnType, f->isExtern(), f->hasSideEffects());
-
-                closure->symbols().removeFunction(oldDef);
-                closure->symbols().replaceFunction(FunctionDef(newDef));
-
-                if (!capturedMutable.empty()) {
-                    // Create new closure with modified return expression
-                    auto newClosure = std::make_shared<Closure>(f->closure()->location(), f->closure()->parent());
-                    // Copy statements
-                    for (const auto& s : f->closure()->statements())
-                        newClosure->addStatement(s);
-
-                    // Replace the final expression with a tuple that includes mutable captures
-                    if (f->closure()->expression())
-                        newClosure->expressionMut() = createReturnTuple(f->closure(),
-                                                                        f->closure()->expression(),
-                                                                        capturedMutable);
-
-                    // Copy symbol table
-                    newClosure->symbols() = f->closure()->symbols();
-                    newFuncClosure        = newClosure;
-                }
-
-                // Replace the function declaration by constructing a new one and replacing in the closure
-                auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, newFuncClosure, newReturnType, newMangled, f->hasSideEffects());
-
-                PEXPR_ASSERT(newFunc->name() == f->name(), "Name of function should stay the same after uplift");
-
-                // Replace in closure statements:
-                closure->replaceStatement(stmt, std::move(newFunc));
-
-                // Now update all calls in this closure's scope to pass the captured variables
-                // We'll append arguments corresponding to the captured variables in the same order they were added.
-                updateCallsInClosure(closure, oldDef, newDef, parameterToCaptured, capturedMutable);
+                newParams.push_back(pv);
+                if (!f->closure()->symbols().addVariable(pv))
+                    mReporter.errorf(f->location(), "Parameter '%s' for uplifted variable already exists in the current scope", pv->name().c_str());
             }
 
-            // Recurse into nested closure body
-            processClosure(newFuncClosure);
+            // Update all captured variables such that the parameters are used instead
+            updateVariables(f->closure(), capturedToParameter);
+
+            // Determine new return type
+            Type newReturnType = f->returnType();
+            if (!capturedMutable.empty()) {
+                // Create tuple type: (original_return_type, mutable_var1_type, mutable_var2_type, ...)
+                std::vector<Type> tupleComponents;
+                tupleComponents.push_back(f->returnType());
+                for (const auto& mutVar : capturedMutable)
+                    tupleComponents.push_back(mutVar.second->type());
+                newReturnType = Type(std::move(tupleComponents));
+            }
+
+            // Build new mangled name with new parameter types
+            const std::string oldMangled = f->mangledName();
+            const std::string newMangled = makeMangledNameFromTypes(f->name(), newParams, closure.get());
+
+            // Update local symbol table: replace function entry
+            const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern(), f->hasSideEffects());
+            const auto newDef = FunctionDef(f->name(), newMangled, newParams, newReturnType, f->isExtern(), f->hasSideEffects());
+
+            closure->symbols().removeFunction(oldDef);
+            closure->symbols().replaceFunction(FunctionDef(newDef));
+
+            if (!capturedMutable.empty()) {
+                // Create new closure with modified return expression
+                auto newClosure = std::make_shared<Closure>(f->closure()->location(), f->closure()->parent());
+                // Copy statements
+                for (const auto& s : f->closure()->statements())
+                    newClosure->addStatement(s);
+
+                // Replace the final expression with a tuple that includes mutable captures
+                if (f->closure()->expression())
+                    newClosure->expressionMut() = createReturnTuple(f->closure(),
+                                                                    f->closure()->expression(),
+                                                                    capturedMutable);
+
+                // Copy symbol table
+                newClosure->symbols() = f->closure()->symbols();
+                newFuncClosure        = newClosure;
+            }
+
+            // Replace the function declaration by constructing a new one and replacing in the closure
+            auto newFunc = std::make_shared<FunctionDeclarationStatement>(f->location(), f->name(), newParams, newFuncClosure, newReturnType, newMangled, f->hasSideEffects());
+
+            PEXPR_ASSERT(newFunc->name() == f->name(), "Name of function should stay the same after uplift");
+
+            // Replace in closure statements:
+            closure->replaceStatement(stmt, std::move(newFunc));
+
+            // Now update all calls in this closure's scope to pass the captured variables
+            // We'll append arguments corresponding to the captured variables in the same order they were added.
+            updateCallsInClosure(closure, oldDef, newDef, parameterToCaptured, capturedMutable);
         }
     }
 
@@ -347,82 +348,19 @@ Ptr<ast::Expression> UpliftPass::createReturnTuple(const Ptr<ast::Closure>& func
 
 //-------------------------------------------------------------------------------------
 
-void UpliftPass::updateVariablesInExpression(const Ptr<ast::Expression>& expr,
-                                             const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter)
-{
-    if (!expr)
-        return;
-
-    switch (expr->type()) {
-    case ExpressionType::Call: {
-        auto c = std::reinterpret_pointer_cast<CallExpression>(expr);
-        for (auto& p : c->parameters())
-            updateVariablesInExpression(p, capturedToParameter);
-
-    } break;
-    case ExpressionType::Unary: {
-        const auto u = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        updateVariablesInExpression(u->inner(), capturedToParameter);
-    } break;
-    case ExpressionType::Binary: {
-        const auto b = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        updateVariablesInExpression(b->left(), capturedToParameter);
-        updateVariablesInExpression(b->right(), capturedToParameter);
-    } break;
-    case ExpressionType::Swizzle: {
-        const auto a = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
-        updateVariablesInExpression(a->inner(), capturedToParameter);
-    } break;
-    case ExpressionType::Access: {
-        const auto a = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        updateVariablesInExpression(a->inner(), capturedToParameter);
-    } break;
-    case ExpressionType::Cast: {
-        const auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
-        updateVariablesInExpression(c->inner(), capturedToParameter);
-    } break;
-    case ExpressionType::Tuple: {
-        const auto v = std::reinterpret_pointer_cast<TupleExpression>(expr);
-        for (auto& e : v->entries())
-            updateVariablesInExpression(e, capturedToParameter);
-    } break;
-    case ExpressionType::Closure: {
-        const auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        updateVariablesInClosure(c->closure(), capturedToParameter);
-    } break;
-    case ExpressionType::Branch: {
-        const auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        updateVariablesInClosure(br->elseClosure(), capturedToParameter);
-        for (auto& b : br->branches()) {
-            updateVariablesInExpression(b.Condition, capturedToParameter);
-            updateVariablesInClosure(b.Body, capturedToParameter);
-        }
-    } break;
-    case ExpressionType::Literal:
-        // Ignore
-        break;
-    case ExpressionType::Variable: {
-        auto v = std::reinterpret_pointer_cast<VariableExpression>(expr);
-        if (capturedToParameter.contains(v->variable()))
-            v->setVariable(capturedToParameter.at(v->variable()));
-    } break;
-    default:
-        PEXPR_ASSERT(false, "Non exhaustive ExpressionType check in UpliftPass");
-        break;
-    }
-}
-
-void UpliftPass::updateVariablesInClosure(const Ptr<ast::Closure>& closure,
-                                          const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter)
+void UpliftPass::updateVariables(const Ptr<ast::Closure>& closure,
+                                 const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter)
 {
     // Update variables inside statements
-    for (const auto& stmt : closure->statements()) {
-        // For variable decl/assign and function decl bodies, inspect expressions
-        if (stmt->type() == StatementType::VariableDeclaration) {
-            auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
-            updateVariablesInExpression(declStmt->expression(), capturedToParameter);
-        } else if (stmt->type() == StatementType::VariableAssignment) {
-            auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
+    Visitor::forEachStatement(
+        closure.get(),
+        [&](const Closure* currentClosure, const Statement* stmt) {
+            PEXPR_UNUSED(currentClosure);
+
+            if (stmt->type() != StatementType::VariableAssignment)
+                return;
+
+            auto assignStmt = dynamic_cast<const VariableAssignmentStatement*>(stmt);
 
             // Update the assignment if it is on a captured one
             std::function<void(Pattern&)> processPattern =
@@ -441,26 +379,19 @@ void UpliftPass::updateVariablesInClosure(const Ptr<ast::Closure>& closure,
             };
 
             processPattern(*assignStmt->pattern());
+        });
 
-            updateVariablesInExpression(assignStmt->expression(), capturedToParameter);
-        } else if (stmt->type() == StatementType::FunctionDeclaration) {
-            const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            if (!f->isExtern())
-                updateVariablesInClosure(f->closure(), capturedToParameter);
-        } else if (stmt->type() == StatementType::TypeAlias) {
-            // Nothing to do
-        } else {
-            PEXPR_ASSERT(false, "Non exhaustive StatementType check in UpliftPass");
-        }
-    }
+    // Update variables in expressions
+    Visitor::forEachExpression(
+        closure.get(),
+        [&](const Closure* currentClosure, const Expression* expr) {
+            PEXPR_UNUSED(currentClosure);
+            if (expr->type() != ExpressionType::Variable)
+                return;
 
-    // Update final expression
-    if (closure->expression()) {
-        auto expr = closure->expression();
-        if (expr->type() == ExpressionType::Closure)
-            updateVariablesInClosure(std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure(), capturedToParameter);
-        else
-            updateVariablesInExpression(closure->expression(), capturedToParameter);
-    }
+            auto v = const_cast<VariableExpression*>(dynamic_cast<const VariableExpression*>(expr));
+            if (capturedToParameter.contains(v->variable()))
+                v->setVariable(capturedToParameter.at(v->variable()));
+        });
 }
 } // namespace PExpr::type

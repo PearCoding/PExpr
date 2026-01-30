@@ -1,6 +1,7 @@
 #include "ClosureAnalyzer.h"
 #include "ast/Expression.h"
 #include "ast/Statement.h"
+#include "ast/Visitor.h"
 
 namespace PExpr::type {
 using namespace ast;
@@ -12,114 +13,38 @@ ClosureAnalyzer::ClosureAnalyzer(utils::Reporter& reporter, bool captureUsage, b
 {
 }
 
-void ClosureAnalyzer::analyzeClosure(const Closure* focusedClosure, const Closure* currentClosure,
+void ClosureAnalyzer::analyzeClosure(const Closure* focusedClosure,
                                      std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
                                      std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
-    collectCapturesFromClosureBody(focusedClosure, currentClosure, outCapturedUsage, outCapturedMutable);
-}
+    auto captureUsage = [&](const Closure* closure, const Expression* expr) {
+        if (expr->type() != ExpressionType::Variable)
+            return;
 
-void ClosureAnalyzer::collectCapturesFromClosureBody(const Closure* focusedClosure, const Closure* currentClosure,
-                                                     std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
-                                                     std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
-{
-    // Now traverse statements expressions
-    for (const auto& stmt : currentClosure->statements()) {
-        // For variable decl/assign and function decl bodies, inspect expressions
-        if (stmt->type() == StatementType::VariableDeclaration) {
-            collectCapturesFromExpression(focusedClosure, currentClosure, std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt)->expression(), outCapturedUsage, outCapturedMutable);
-        } else if (stmt->type() == StatementType::VariableAssignment) {
-            const auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
-            // Traverse the pattern to find all variables being assigned
-            if (mCaptureModification)
-                collectMutableAssignmentsFromPattern(focusedClosure, currentClosure, assignStmt->pattern(), outCapturedUsage, outCapturedMutable);
-            collectCapturesFromExpression(focusedClosure, currentClosure, assignStmt->expression(), outCapturedUsage, outCapturedMutable);
-        } else if (stmt->type() == StatementType::FunctionDeclaration) {
-            const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            if (!f->isExtern())
-                collectCapturesFromClosureBody(focusedClosure, f->closure().get(), outCapturedUsage, outCapturedMutable);
-        }
-    }
-
-    // Finally check the final expression
-    if (currentClosure->expression())
-        collectCapturesFromExpression(focusedClosure, currentClosure, currentClosure->expression(), outCapturedUsage, outCapturedMutable);
-}
-
-void ClosureAnalyzer::collectCapturesFromExpression(const Closure* focusedClosure, const Closure* currentClosure,
-                                                    const Ptr<Expression>& expr,
-                                                    std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
-                                                    std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
-{
-    if (!expr)
-        return;
-
-    switch (expr->type()) {
-    case ExpressionType::Variable: {
-        const auto v           = std::reinterpret_pointer_cast<VariableExpression>(expr);
+        const auto v           = dynamic_cast<const VariableExpression*>(expr);
         const SymbolTable* tbl = nullptr;
-        if (auto def = currentClosure->symbols().lookupVariable(v->location(), v->variable()->name(), &tbl)) {
+        if (auto def = closure->symbols().lookupVariable(v->location(), v->variable()->name(), &tbl)) {
             // Go up the ladder until we find the top focusedClosure or end up in global
             while (tbl && tbl != &focusedClosure->symbols())
                 tbl = tbl->parent();
 
-            if (!tbl) { //< captured (above the focusedClosure)
-                if (mCaptureUsage)
-                    outCapturedUsage.emplace(def->name(), def);
-            }
+            if (!tbl) //< captured (above the focusedClosure)
+                outCapturedUsage.emplace(def->name(), def);
         } else {
-            mReporter.errorf(v->location(), "Unknown identifier '%s' found during analysis", v->variable()->name().c_str());
+            mReporter.errorf(v->location(), "Unknown identifier '%s' found during capture usage detection", v->variable()->name().c_str());
         }
-    } break;
-    case ExpressionType::Literal:
-        break;
-    case ExpressionType::Unary: {
-        const auto u = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, currentClosure, u->inner(), outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Binary: {
-        const auto b = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, currentClosure, b->left(), outCapturedUsage, outCapturedMutable);
-        collectCapturesFromExpression(focusedClosure, currentClosure, b->right(), outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Call: {
-        const auto c = std::reinterpret_pointer_cast<CallExpression>(expr);
-        for (const auto& p : c->parameters())
-            collectCapturesFromExpression(focusedClosure, currentClosure, p, outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Swizzle: {
-        const auto a = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, currentClosure, a->inner(), outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Access: {
-        const auto a = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, currentClosure, a->inner(), outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Cast: {
-        const auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, currentClosure, c->inner(), outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Tuple: {
-        const auto v = std::reinterpret_pointer_cast<TupleExpression>(expr);
-        for (const auto& e : v->entries())
-            collectCapturesFromExpression(focusedClosure, currentClosure, e, outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Closure: {
-        const auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        collectCapturesFromClosureBody(focusedClosure, c->closure().get(), outCapturedUsage, outCapturedMutable);
-    } break;
-    case ExpressionType::Branch: {
-        const auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, br->elseClosure().get(), br->elseClosure()->expression(), outCapturedUsage, outCapturedMutable);
-        for (const auto& b : br->branches()) {
-            collectCapturesFromExpression(focusedClosure, currentClosure, b.Condition, outCapturedUsage, outCapturedMutable);
-            collectCapturesFromClosureBody(focusedClosure, b.Body.get(), outCapturedUsage, outCapturedMutable);
+    };
+    if (mCaptureUsage)
+        Visitor::forEachExpression(focusedClosure, captureUsage);
+
+    auto captureMutable = [&](const Closure* closure, const Statement* stmt) {
+        if (stmt->type() == StatementType::VariableAssignment) {
+            const auto assignStmt = dynamic_cast<const VariableAssignmentStatement*>(stmt);
+            collectMutableAssignmentsFromPattern(focusedClosure, closure, assignStmt->pattern(), outCapturedUsage, outCapturedMutable);
         }
-    } break;
-    default:
-        PEXPR_ASSERT(false, "Non exhaustive ExpressionType check in ClosureAnalyzer");
-        break;
-    }
+    };
+    if (mCaptureModification)
+        Visitor::forEachStatement(focusedClosure, captureMutable);
 }
 
 void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Closure* focusedClosure, const Closure* currentClosure,
@@ -146,7 +71,7 @@ void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Closure* focuse
                         outCapturedMutable.emplace(binding->name(), binding);
                 }
             } else {
-                mReporter.errorf(elem.location(), "Unknown variable '%s' found during currentClosure analyzis", binding->name().c_str());
+                mReporter.errorf(elem.location(), "Unknown variable '%s' found during capture mutable detection", binding->name().c_str());
             }
         } else {
             // Recursively traverse nested patterns
