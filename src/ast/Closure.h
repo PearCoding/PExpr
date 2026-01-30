@@ -2,6 +2,8 @@
 
 #include "type/SymbolTable.h"
 
+#include <functional>
+
 namespace PExpr::ast {
 class Expression;
 class Statement;
@@ -62,7 +64,12 @@ public:
     }
 
     // Internal usage
+    [[nodiscard]] inline const type::SymbolTable& symbols() const { return mSymbols; }
     [[nodiscard]] inline type::SymbolTable& symbols() { return mSymbols; }
+
+    /// Visit all expressions used in this expression
+    /// @param visitor A function that will be called for each expression
+    void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const;
 
 private:
     Closure* mParent;

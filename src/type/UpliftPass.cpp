@@ -41,7 +41,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
 
         if (f->closure()) {
             ClosureAnalyzer analyzer(mReporter, true, true);
-            analyzer.analyzeClosure(f->closure(), f->closure(), capturedUsage, capturedMutable);
+            analyzer.analyzeClosure(f->closure().get(), f->closure().get(), capturedUsage, capturedMutable);
 
             // For each captured variable, add a new parameter at the end of the function's parameter list
             Ptr<Closure> newFuncClosure = f->closure();

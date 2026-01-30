@@ -59,7 +59,13 @@
 #define PEXPR_PRAGMA(x) _Pragma(#x)
 
 // clang-format off
-#define PEXPR_UNUSED(expr) do { (void)(expr); } while (false)
+namespace PExpr {
+    template<typename T>
+    inline void pexpr_noop(const T&) { }
+    template<typename T, typename... Args>
+    inline void pexpr_noop(const T&, const Args&... args) { pexpr_noop(args...); }
+}
+#define PEXPR_UNUSED(...) PExpr::pexpr_noop(__VA_ARGS__)
 #define PEXPR_NOOP do {} while(false)
 // clang-format on
 

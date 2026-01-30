@@ -1,14 +1,16 @@
 #pragma once
 
 #include "Enums.h"
-#include "parser/Location.h"
-#include "type/Type.h"
+#include "type/Definitions.h"
+
+#include <functional>
 
 namespace PExpr::ast {
 /// Abstract expression. Can not be created directly.
 class Expression {
 public:
     Expression() = delete;
+    virtual ~Expression() = default;
 
     /// The location this expression is associated with.
     [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
@@ -24,6 +26,10 @@ public:
 
     /// True if the type this expression evaluates to is yet 'unspecified'.
     [[nodiscard]] inline bool isUnspecified() const { return mReturnType.kind() == type::TypeKind::Unspecified; }
+
+    /// Visit all expressions used in this expression
+    /// @param visitor A function that will be called for each expression
+    virtual void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const { PEXPR_UNUSED(visitor, recursive); };
 
 protected:
     inline Expression(const parser::Location& loc, ExpressionType type)
@@ -130,6 +136,13 @@ public:
     [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mInner; }
     [[nodiscard]] inline bool isExplicit() const { return mExplicit; }
 
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mInner.get());
+        if (recursive)
+            mInner->forEachExpression(visitor, recursive);
+    };
+
 private:
     type::Type mToType;
     Ptr<Expression> mInner;
@@ -142,7 +155,7 @@ public:
     inline UnaryExpression(const parser::Location& loc, UnaryOperation op, const Ptr<Expression>& expr)
         : Expression(loc, ExpressionType::Unary)
         , mOperation(op)
-        , mExpr(expr)
+        , mInner(expr)
     {
         PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in unary expression");
     }
@@ -150,12 +163,19 @@ public:
     /// The actual unary operation of this expression.
     [[nodiscard]] inline UnaryOperation op() const { return mOperation; }
     /// The inner expression the unary operation is applied to.
-    [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
-    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mInner; }
+
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mInner.get());
+        if (recursive)
+            mInner->forEachExpression(visitor, recursive);
+    };
 
 private:
     UnaryOperation mOperation;
-    Ptr<Expression> mExpr;
+    Ptr<Expression> mInner;
 };
 
 /// Call to a binary operation, like a+b, a*b, a^b, etc.
@@ -178,6 +198,16 @@ public:
     /// The right expression the binary operation is applied to.
     [[nodiscard]] inline Ptr<Expression> right() const { return mRight; }
     [[nodiscard]] inline Ptr<Expression>& rightMut() & { return mRight; }
+
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mLeft.get());
+        visitor(mRight.get());
+        if (recursive) {
+            mLeft->forEachExpression(visitor, recursive);
+            mRight->forEachExpression(visitor, recursive);
+        }
+    };
 
 private:
     BinaryOperation mOperation;
@@ -228,6 +258,16 @@ public:
     [[nodiscard]] inline const std::string& mangledName() const { return mMangledName; }
     inline void setMangledName(const std::string& name) { mMangledName = name; }
 
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        for (const auto& p : mParameters)
+            visitor(p.get());
+        if (recursive) {
+            for (const auto& p : mParameters)
+                p->forEachExpression(visitor, recursive);
+        }
+    };
+
 private:
     std::string mName;
     std::string mMangledName;
@@ -239,7 +279,7 @@ class SwizzleExpression : public Expression {
 public:
     inline SwizzleExpression(const parser::Location& loc, const Ptr<Expression>& expr, const std::string& swizzle)
         : Expression(loc, ExpressionType::Swizzle)
-        , mExpr(expr)
+        , mInner(expr)
         , mSwizzle(swizzle)
     {
         PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in swizzle expression");
@@ -247,13 +287,20 @@ public:
     }
 
     /// The inner expression the access operation is applied to.
-    [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
-    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mInner; }
     /// A character coded swizzle. E.g., xzy will return a 'vec3' with [x, z, y].
     [[nodiscard]] inline const std::string& swizzle() const { return mSwizzle; }
 
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mInner.get());
+        if (recursive)
+            mInner->forEachExpression(visitor, recursive);
+    };
+
 private:
-    Ptr<Expression> mExpr;
+    Ptr<Expression> mInner;
     std::string mSwizzle;
 };
 
@@ -262,21 +309,28 @@ class AccessExpression : public Expression {
 public:
     inline AccessExpression(const parser::Location& loc, const Ptr<Expression>& expr, size_t index)
         : Expression(loc, ExpressionType::Access)
-        , mExpr(expr)
+        , mInner(expr)
         , mIndex(index)
     {
         PEXPR_ASSERT(expr != nullptr, "Expected valid pointer in access expression");
     }
 
     /// The inner expression the access operation is applied to.
-    [[nodiscard]] inline Ptr<Expression> inner() const { return mExpr; }
-    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mExpr; }
+    [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
+    [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mInner; }
 
     /// The index of the vector.
     [[nodiscard]] inline size_t index() const { return mIndex; }
 
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mInner.get());
+        if (recursive)
+            mInner->forEachExpression(visitor, recursive);
+    };
+
 private:
-    Ptr<Expression> mExpr;
+    Ptr<Expression> mInner;
     size_t mIndex;
 };
 
@@ -293,6 +347,8 @@ public:
 
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
     [[nodiscard]] inline Ptr<Closure>& closureMut() & { return mClosure; }
+
+    void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override;
 
 private:
     Ptr<Closure> mClosure;
@@ -322,6 +378,8 @@ public:
     [[nodiscard]] inline Ptr<Closure> elseClosure() const { return mElseClosure; }
     [[nodiscard]] inline Ptr<Closure>& elseClosureMut() & { return mElseClosure; }
 
+    void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override;
+
 private:
     ClosureList mBranches;
     Ptr<Closure> mElseClosure;
@@ -345,6 +403,16 @@ public:
 
     [[nodiscard]] inline const std::vector<Ptr<Expression>> entries() const { return mEntries; }
     [[nodiscard]] inline std::vector<Ptr<Expression>>& entries() { return mEntries; }
+
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        for (const auto& e : mEntries)
+            visitor(e.get());
+        if (recursive) {
+            for (const auto& e : mEntries)
+                e->forEachExpression(visitor, recursive);
+        }
+    };
 
 private:
     std::vector<Ptr<Expression>> mEntries;

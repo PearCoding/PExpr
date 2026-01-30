@@ -12,14 +12,14 @@ ClosureAnalyzer::ClosureAnalyzer(utils::Reporter& reporter, bool captureUsage, b
 {
 }
 
-void ClosureAnalyzer::analyzeClosure(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
+void ClosureAnalyzer::analyzeClosure(const Closure* focusedClosure, const Closure* currentClosure,
                                      std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
                                      std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
     collectCapturesFromClosureBody(focusedClosure, currentClosure, outCapturedUsage, outCapturedMutable);
 }
 
-void ClosureAnalyzer::collectCapturesFromClosureBody(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
+void ClosureAnalyzer::collectCapturesFromClosureBody(const Closure* focusedClosure, const Closure* currentClosure,
                                                      std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
                                                      std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
@@ -37,7 +37,7 @@ void ClosureAnalyzer::collectCapturesFromClosureBody(const Ptr<Closure>& focused
         } else if (stmt->type() == StatementType::FunctionDeclaration) {
             const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
             if (!f->isExtern())
-                collectCapturesFromClosureBody(focusedClosure, f->closure(), outCapturedUsage, outCapturedMutable);
+                collectCapturesFromClosureBody(focusedClosure, f->closure().get(), outCapturedUsage, outCapturedMutable);
         }
     }
 
@@ -46,7 +46,7 @@ void ClosureAnalyzer::collectCapturesFromClosureBody(const Ptr<Closure>& focused
         collectCapturesFromExpression(focusedClosure, currentClosure, currentClosure->expression(), outCapturedUsage, outCapturedMutable);
 }
 
-void ClosureAnalyzer::collectCapturesFromExpression(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
+void ClosureAnalyzer::collectCapturesFromExpression(const Closure* focusedClosure, const Closure* currentClosure,
                                                     const Ptr<Expression>& expr,
                                                     std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
                                                     std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
@@ -106,14 +106,14 @@ void ClosureAnalyzer::collectCapturesFromExpression(const Ptr<Closure>& focusedC
     } break;
     case ExpressionType::Closure: {
         const auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        collectCapturesFromClosureBody(focusedClosure, c->closure(), outCapturedUsage, outCapturedMutable);
+        collectCapturesFromClosureBody(focusedClosure, c->closure().get(), outCapturedUsage, outCapturedMutable);
     } break;
     case ExpressionType::Branch: {
         const auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        collectCapturesFromExpression(focusedClosure, br->elseClosure(), br->elseClosure()->expression(), outCapturedUsage, outCapturedMutable);
+        collectCapturesFromExpression(focusedClosure, br->elseClosure().get(), br->elseClosure()->expression(), outCapturedUsage, outCapturedMutable);
         for (const auto& b : br->branches()) {
             collectCapturesFromExpression(focusedClosure, currentClosure, b.Condition, outCapturedUsage, outCapturedMutable);
-            collectCapturesFromClosureBody(focusedClosure, b.Body, outCapturedUsage, outCapturedMutable);
+            collectCapturesFromClosureBody(focusedClosure, b.Body.get(), outCapturedUsage, outCapturedMutable);
         }
     } break;
     default:
@@ -122,7 +122,7 @@ void ClosureAnalyzer::collectCapturesFromExpression(const Ptr<Closure>& focusedC
     }
 }
 
-void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Ptr<Closure>& focusedClosure, const Ptr<Closure>& currentClosure,
+void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Closure* focusedClosure, const Closure* currentClosure,
                                                            const Ptr<Pattern>& pattern,
                                                            std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
                                                            std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)

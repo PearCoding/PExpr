@@ -9,11 +9,16 @@ namespace PExpr::ast {
 
 class Statement {
 public:
-    Statement() = delete;
+    Statement()          = delete;
+    virtual ~Statement() = default;
 
     /// The location this statement is associated with.
     [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
     [[nodiscard]] inline StatementType type() const { return mType; }
+
+    /// Visit all expressions used in this expression
+    /// @param visitor A function that will be called for each expression
+    virtual void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const { PEXPR_UNUSED(visitor, recursive); };
 
 protected:
     Statement(const parser::Location& loc, StatementType type)
@@ -51,6 +56,13 @@ public:
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
 
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mExpression.get());
+        if (recursive)
+            mExpression->forEachExpression(visitor, recursive);
+    };
+
 private:
     Ptr<Pattern> mPattern;
     Ptr<Expression> mExpression;
@@ -70,6 +82,13 @@ public:
     [[nodiscard]] inline Ptr<Pattern> pattern() const { return mPattern; }
     [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
     [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
+
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        visitor(mExpression.get());
+        if (recursive)
+            mExpression->forEachExpression(visitor, recursive);
+    };
 
 private:
     Ptr<Pattern> mPattern;
@@ -100,6 +119,12 @@ public:
     [[nodiscard]] inline const type::Type& returnType() const { return mReturnType; }
     inline void setReturnType(const type::Type& type) { mReturnType = type; }
     [[nodiscard]] inline bool isUnspecified() const { return mReturnType.kind() == type::TypeKind::Unspecified; }
+
+    inline void forEachExpression(const std::function<void(const Expression*)>& visitor, bool recursive) const override
+    {
+        if (recursive)
+            mClosure->forEachExpression(visitor, recursive);
+    };
 
 private:
     const type::ParameterList mParameters;
