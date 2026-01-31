@@ -274,3 +274,38 @@ TEST_CASE("SSAMapper: complex expression trees", "[ssamapper][expressions]")
     REQUIRE(dumped.find("pow") != std::string::npos); // Power operator
 }
 
+TEST_CASE("SSAMapper: branch with mutables", "[ssamapper][controlflow]")
+{
+
+    Environment env;
+    auto ast = env.parse(R"(
+        [[extern, pure]] fn getInput() -> num;
+
+        let mut x:num = 0;
+        let branch_phi = if getInput() < 0.5 {
+            x = 12;
+            let x = 10;
+            x
+        } else {
+            x = 42;
+            20
+        };
+        
+        branch_phi + x
+    )");
+
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+
+    // Should have two phi nodes
+    size_t pos      = 0;
+    size_t phiCount = 0;
+    while ((pos = dumped.find("phi[", pos)) != std::string::npos) {
+        phiCount++;
+        pos += 4;
+    }
+
+    REQUIRE(phiCount == 2);
+}

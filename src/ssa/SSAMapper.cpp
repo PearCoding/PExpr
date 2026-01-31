@@ -1,4 +1,5 @@
 #include "SSAMapper.h"
+#include "SSALiveAnalyzer.h"
 #include "ast/Expression.h"
 #include "ast/Pattern.h"
 #include "ast/Statement.h"
@@ -74,7 +75,7 @@ SSAValue SSAMapper::inlineClosureBody(SSAProgram& program, const std::vector<std
             // This ensures that subsequent variable references use the correct version
             instr->forEachValue([this](const SSAValue& val) {
                 if (!val.isConstant())
-                    mContext.updateFromName(val.name());
+                    mContext.update(val);
             });
         }
     }
@@ -378,7 +379,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             args.push_back(mapExpression(program, p));
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
-        SSAValue tgt             = SSAValue::Named(mContext.fresh(c->name()), c->returnType());
+        SSAValue tgt             = SSAValue::Named(mContext.fresh("%"), c->returnType());
         auto call                = std::make_shared<SSAInstrCall>();
         call->Target             = tgt;
         call->FunctionName       = c->mangledName();
@@ -489,10 +490,10 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
 
         // Prepare labels for each branch, else and join
         std::vector<std::string> branchLabels;
-        branchLabels.reserve(br->branches().size());
+        branchLabels.reserve(br->branches().size() + 1);
         for (size_t i = 0; i < br->branches().size(); ++i)
             branchLabels.push_back(mContext.fresh("lbl"));
-        std::string elseLabel = mContext.fresh("lbl");
+        branchLabels.push_back(mContext.fresh("lbl")); // Else
         std::string joinLabel = mContext.fresh("lbl");
 
         // Emit conditional branches for each branch condition that jump to their label
@@ -511,34 +512,71 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             program.Body.push_back(std::make_shared<SSAInstrBranch>(bInstr));
         }
 
-        // If none matched, fall through to else label; emit else label and inline else body
-        SSAInstrLabel elbl;
-        elbl.Name = elseLabel;
-        program.Body.push_back(std::make_shared<SSAInstrLabel>(elbl));
-        // SSAMapper elseMapper;
-        auto elseProg    = mapClosure(br->elseClosure());
-        SSAValue elseVal = inlineClosureBody(program, elseProg.Body);
-        // after else body jump to join
-        SSAInstrGoto gToJoin;
-        gToJoin.TargetLabel = joinLabel;
-        program.Body.push_back(std::make_shared<SSAInstrGoto>(gToJoin));
+        // Collect all variable updates from all branches and map all branches
+        std::unordered_map<std::string, std::vector<SSAValue>> varUpdates;
+        std::vector<SSAProgram> progs;
+        progs.reserve(branchLabels.size() + 1);
 
-        // Now emit each branch body under its label and jump to join after
+        auto handleBranch = [&](const Ptr<Closure>& closure) {
+            auto prog = mapClosure(closure);
+            SSALiveAnalyzer branchAnalyzer;
+            auto updates = branchAnalyzer.analyze(prog.Body);
+
+            // For each variable updated in this branch, add its value
+            for (const auto& val : updates) {
+                const auto valName = val.baseName();
+
+                // Do not include variables defined inside the branch closure itself
+                if (mContext.getCurrentVersion(valName) < 0)
+                    continue;
+
+                // If this is the first time we see this variable in this branch position,
+                // we need to fill in values for previous branches
+                if (varUpdates.find(valName) == varUpdates.end()) {
+                    int v = mContext.getCurrentVersion(valName);
+
+                    // Initialize with empty values for previous branches
+                    varUpdates[valName].resize(progs.size(), SSAValue::Named(valName + "." + std::to_string(v), val.type()));
+                }
+                varUpdates[valName].push_back(val);
+            }
+
+            // For variables we've seen before but not updated in this branch,
+            // add empty placeholder (will be filled later)
+            for (auto& [valName, vals] : varUpdates) {
+                if (vals.size() == progs.size()) {
+                    int v = mContext.getCurrentVersion(valName);
+
+                    // This variable was updated in a previous branch but not this one
+                    vals.push_back(SSAValue::Named(valName + "." + std::to_string(v), vals.at(0).type()));
+                }
+            }
+
+            progs.push_back(prog);
+        };
+
+        for (const auto& b : br->branches())
+            handleBranch(b.Body);
+        handleBranch(br->elseClosure());
+
         std::vector<SSAValue> branchVals;
-        branchVals.reserve(branchLabels.size());
-        for (size_t i = 0; i < br->branches().size(); ++i) {
+        branchVals.reserve(branchLabels.size() + 1);
+
+        // Start with else and go back
+        for (size_t i = progs.size(); i > 0; --i) {
+            // Add the label
             SSAInstrLabel lbl;
-            lbl.Name = branchLabels[i];
+            lbl.Name = branchLabels.at(i - 1);
             program.Body.push_back(std::make_shared<SSAInstrLabel>(lbl));
 
-            // SSAMapper inner;
-            auto prog        = mapClosure(br->branches()[i].Body);
-            SSAValue lastVal = inlineClosureBody(program, prog.Body);
-            branchVals.push_back(lastVal);
+            // Inline the body
+            SSAValue val = inlineClosureBody(program, progs.at(i - 1).Body);
+            branchVals.push_back(val);
 
-            SSAInstrGoto toJoin;
-            toJoin.TargetLabel = joinLabel;
-            program.Body.push_back(std::make_shared<SSAInstrGoto>(toJoin));
+            // after body jump to join
+            SSAInstrGoto gToJoin;
+            gToJoin.TargetLabel = joinLabel;
+            program.Body.push_back(std::make_shared<SSAInstrGoto>(gToJoin));
         }
 
         // Emit join label
@@ -550,16 +588,31 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         const auto phiType = expr->returnType();
 
         // create phi target with chosen type
-        SSAValue tgt = SSAValue::Named(mContext.fresh("phi"), phiType);
+        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), phiType);
         auto phi     = std::make_shared<SSAInstrPhi>();
         phi->Target  = tgt;
 
         // Insert into phi block
         phi->Conditions = std::move(conditionVals);
-        phi->Branches   = std::move(branchVals);
-        phi->Branches.push_back(elseVal);
+
+        // Insert backwards as the inlined the `else` case first
+        phi->Branches.reserve(branchVals.size());
+        for (size_t i = branchVals.size(); i > 0; --i)
+            phi->Branches.push_back(branchVals[i - 1]);
 
         program.Body.push_back(phi);
+
+        // Create phi nodes for variables updated in all branches
+        for (const auto& [varName, vals] : varUpdates) {
+            // Create a phi node
+            SSAValue phiTgt    = SSAValue::Named(mContext.fresh(varName, true), vals[0].type());
+            auto varPhi        = std::make_shared<SSAInstrPhi>();
+            varPhi->Target     = phiTgt;
+            varPhi->Conditions = phi->Conditions; // Same conditions as main phi
+            varPhi->Branches   = vals;
+            program.Body.push_back(varPhi);
+        }
+
         result = tgt;
     } break;
     default:

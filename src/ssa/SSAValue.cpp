@@ -7,10 +7,28 @@ std::string SSAValue::baseName() const
 {
     PEXPR_ASSERT(!isConstant(), "Only named have a base name");
 
+    return std::get<0>(split());
+}
+
+int SSAValue::version() const
+{
+    PEXPR_ASSERT(!isConstant(), "Only named have a version");
+
+    return std::get<1>(split());
+}
+
+[[nodiscard]] std::tuple<std::string, int> SSAValue::split() const
+{
+    PEXPR_ASSERT(!isConstant(), "Only named have a version and base name");
+
     const auto thisName = name();
-    if (const auto pos = thisName.rfind('.'); pos != std::string::npos)
-        return thisName.substr(0, pos);
-    return thisName;
+    if (const auto pos = thisName.rfind('.'); pos != std::string::npos) {
+        const std::string baseName = thisName.substr(0, pos);
+        const int version          = std::stoi(thisName.substr(pos + 1));
+        return { baseName, version };
+    }
+
+    return { thisName, 0 };
 }
 
 static size_t hashValueVariant(const type::Type& type, const ValueVariant& value)

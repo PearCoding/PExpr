@@ -16,6 +16,8 @@ public:
     }
 
     [[nodiscard]] std::string baseName() const;
+    [[nodiscard]] int version() const;
+    [[nodiscard]] std::tuple<std::string, int> split() const;
     [[nodiscard]] inline std::string name() const
     {
         PEXPR_ASSERT(!isConstant(), "Only non-constant values have a name");
@@ -23,6 +25,7 @@ public:
     }
 
     [[nodiscard]] inline bool isConstant() const { return mIsConstant; }
+    [[nodiscard]] inline bool isTemporary() const { return !isConstant() && baseName() == "%"; }
     [[nodiscard]] inline const type::Type& type() const { return mType; }
 
     template <typename T>
@@ -68,3 +71,14 @@ private:
     ValueVariant mValue = "";
 };
 } // namespace PExpr::ssa
+
+namespace std {
+template <>
+class hash<PExpr::ssa::SSAValue> {
+public:
+    std::size_t operator()(const PExpr::ssa::SSAValue& val) const
+    {
+        return val.hash(true);
+    }
+};
+} // namespace std

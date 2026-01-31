@@ -50,18 +50,11 @@ public:
 
     /// Update context from a variable name (e.g., "x.3")
     /// This updates both global counters and current scope
-    void updateFromName(const std::string& name);
+    void update(const SSAValue& val);
 
 private:
     /// Analyze a single SSA value and update counters
     void analyzeValue(const SSAValue& val);
-
-    /// Extract base name and version from a variable name like "%.5"
-    /// @param name The full variable name
-    /// @param outBase Output parameter for the base name
-    /// @param outVersion Output parameter for the version number
-    /// @return true if the name was parsed successfully
-    static bool parseVariableName(const std::string& name, std::string& outBase, int& outVersion);
 
     /// Get the current scope (mutable)
     std::unordered_map<std::string, int>& currentScope();

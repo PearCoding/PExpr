@@ -107,7 +107,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
 
     bool skipOptimizationPass = false;
-    app.add_flag("--skip-optimization,!--no-skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
+    app.add_flag("--skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
 
     // Add some hidden commandline parameters
     bool listCLI = false;
