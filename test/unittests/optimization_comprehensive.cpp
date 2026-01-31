@@ -187,7 +187,6 @@ TEST_CASE("Optimizer: math identities simplification", "[sscp][identities]")
         [[extern]] fn getInput() -> num;
         
         let a = getInput();
-        let b = getInput();
         
         // Basic math identities that should be simplified
         let id1 = a + 0.0; // Should become a
@@ -196,7 +195,7 @@ TEST_CASE("Optimizer: math identities simplification", "[sscp][identities]")
         let id4 = a / 1.0; // Should become a
         let id5 = 0.0 * a; // Should become 0.0
         let id6 = 1.0 * a; // Should become a
-        let id7 = a * a;   // Should become a^2 (not simplified further)
+        let id7 = a ^ 2;   // Should become a * a
         let id8 = -(-a);   // Should become a
         
         id1 + id2 + id3 + id4 + id5 + id6 + id7 + id8

@@ -32,11 +32,10 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
 
 bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
-    // The following is always enabled as it clears it up internally and has no side-effects
-    if (matchAssignIdentity(ctx, instructions, currentIndex))
-        return true;
-
     if (mOptions.ApplyMathIdentities) {
+        if (matchBasicMathIdentities(ctx, instructions, currentIndex))
+            return true;
+
         if (matchUnaryIdentity(ctx, instructions, currentIndex))
             return true;
 
@@ -64,7 +63,7 @@ bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& i
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchAssignIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
     PEXPR_UNUSED(ctx);
 
@@ -72,24 +71,146 @@ bool SSCPIdentityOptimizer::matchAssignIdentity(SSAContext* ctx, InstructionList
     if (!asg)
         return false;
 
-    if (asg->Operator != SSAInstrAssign::OpKind::Assign || asg->Operands.size() != 1)
+    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->Operands.size() != 2)
         return false;
 
-    const auto asg2 = dynamic_cast<const SSAInstrAssign*>(getDefinition(asg->Operands[0]));
-    if (!asg2)
+    SSAValue left  = asg->Operands[0];
+    SSAValue right = asg->Operands[1];
+
+    // Check if one operand is a constant number
+    Number constVal;
+    bool leftIsConst  = isConstantNumber(left, constVal);
+    bool rightIsConst = isConstantNumber(right, constVal);
+
+    // If both are constant it is the job of constant folding,
+    // if both are non-constant we can't do much
+    if (leftIsConst == rightIsConst)
         return false;
 
-    if (asg2->Operator != SSAInstrAssign::OpKind::Assign || asg2->Operands.size() != 1)
-        return false;
+    // For identities, we need to know which side is constant
+    if (leftIsConst) {
+        // Constant is on left side
+        switch (asg->BinaryOp) {
+        case BinaryOperation::Add:
+            // 0 + a = a
+            if (constVal == Number(0.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { right };
 
-    auto newAsg      = std::make_shared<SSAInstrAssign>();
-    newAsg->Target   = asg->Target;
-    newAsg->Operator = SSAInstrAssign::OpKind::Assign;
-    newAsg->Operands = { asg2->Operands[0] };
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            break;
 
-    mDefinitions[newAsg->Target.name()] = newAsg.get();
-    instructions[currentIndex]          = std::move(newAsg);
-    return true;
+        case BinaryOperation::Mul:
+            // 0 * a = 0
+            if (constVal == Number(0.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { left };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            // 1 * a = a
+            else if (constVal == Number(1.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { right };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    if (rightIsConst) {
+        // Constant is on right side
+        switch (asg->BinaryOp) {
+        case BinaryOperation::Add:
+            // a + 0 = a
+            if (constVal == Number(0.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { left };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            break;
+
+        case BinaryOperation::Sub:
+            // a - 0 = a
+            if (constVal == Number(0.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { left };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            break;
+
+        case BinaryOperation::Mul:
+            // a * 0 = 0
+            if (constVal == Number(0.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { right };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            // a * 1 = a
+            else if (constVal == Number(1.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { left };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            break;
+
+        case BinaryOperation::Div:
+            // a / 1 = a
+            if (constVal == Number(1.0)) {
+                auto newAsg      = std::make_shared<SSAInstrAssign>();
+                newAsg->Target   = asg->Target;
+                newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+                newAsg->Operands = { left };
+
+                mDefinitions[newAsg->Target.name()] = newAsg.get();
+                instructions[currentIndex]          = std::move(newAsg);
+                return true;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return false;
 }
 
 bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
