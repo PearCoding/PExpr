@@ -36,6 +36,9 @@ bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& i
         if (matchBasicMathIdentities(ctx, instructions, currentIndex))
             return true;
 
+        if (matchRepeatedAdditionIdentity(ctx, instructions, currentIndex))
+            return true;
+
         if (matchUnaryIdentity(ctx, instructions, currentIndex))
             return true;
 
@@ -207,6 +210,122 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
 
         default:
             break;
+        }
+    }
+
+    return false;
+}
+
+bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+{
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    if (!asg)
+        return false;
+
+    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->Operands.size() != 2)
+        return false;
+
+    if (asg->BinaryOp != BinaryOperation::Add)
+        return false;
+
+    SSAValue left  = asg->Operands[0];
+    SSAValue right = asg->Operands[1];
+
+    // Map a + a + a = 3*a
+    // Note: a + a is not mapped to 2*n as this might introduce a more costly instruction
+    SSAValue addLeft, addRight;
+    if (isBinaryOp(left, BinaryOperation::Add, addLeft, addRight)) {
+        if (!right.isConstant() && !addLeft.isConstant() && !addRight.isConstant()
+            && addLeft.name() == right.name() && addRight.name() == right.name()) {
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+            newAsg->BinaryOp = BinaryOperation::Mul;
+            newAsg->Operands = { right, SSAValue::Constant(Number(3.0)) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
+            return true;
+        }
+    }
+    if (isBinaryOp(right, BinaryOperation::Add, addLeft, addRight)) {
+        if (!left.isConstant() && !addLeft.isConstant() && !addRight.isConstant()
+            && addLeft.name() == left.name() && addRight.name() == left.name()) {
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+            newAsg->BinaryOp = BinaryOperation::Mul;
+            newAsg->Operands = { left, SSAValue::Constant(Number(3.0)) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
+            return true;
+        }
+    }
+
+    // Check for n*a + a pattern where n is constant
+    SSAValue mulLeft, mulRight;
+    Number constNum;
+
+    // Check if left operand is a multiplication with a constant
+    if (isBinaryOp(left, BinaryOperation::Mul, mulLeft, mulRight)) {
+        if (isConstantNumber(mulLeft, constNum) && mulRight.name() == right.name()) {
+            // n*a + a = (n+1)*a
+            Number newConst  = constNum + Number(1.0);
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+            newAsg->BinaryOp = BinaryOperation::Mul;
+            newAsg->Operands = { right, SSAValue::Constant(newConst) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
+            return true;
+        }
+        if (isConstantNumber(mulRight, constNum) && mulLeft.name() == right.name()) {
+            // a*n + a = (n+1)*a
+            Number newConst  = constNum + Number(1.0);
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+            newAsg->BinaryOp = BinaryOperation::Mul;
+            newAsg->Operands = { right, SSAValue::Constant(newConst) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
+            return true;
+        }
+    }
+
+    // Check if right operand is a multiplication with a constant
+    if (isBinaryOp(right, BinaryOperation::Mul, mulLeft, mulRight)) {
+        if (isConstantNumber(mulLeft, constNum) && mulRight.name() == left.name()) {
+            // a + n*a = (n+1)*a
+            Number newConst  = constNum + Number(1.0);
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+            newAsg->BinaryOp = BinaryOperation::Mul;
+            newAsg->Operands = { left, SSAValue::Constant(newConst) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
+            return true;
+        }
+        if (isConstantNumber(mulRight, constNum) && mulLeft.name() == left.name()) {
+            // a + a*n = (n+1)*a
+            Number newConst  = constNum + Number(1.0);
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Binary;
+            newAsg->BinaryOp = BinaryOperation::Mul;
+            newAsg->Operands = { left, SSAValue::Constant(newConst) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            instructions[currentIndex]          = std::move(newAsg);
+            return true;
         }
     }
 

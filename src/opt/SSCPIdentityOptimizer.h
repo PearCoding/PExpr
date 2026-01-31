@@ -34,9 +34,10 @@ private:
     /// Pattern matching for specific identities
     [[nodiscard]] bool tryApplyIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);
 
-    [[nodiscard]] bool matchBasicMathIdentities(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);    // a + 0 = a, a - 0 = a, a * 1 = a, a / 1 = a, 0 * a = 0, 1 * a = a
-    [[nodiscard]] bool matchUnaryIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);         // -(-a) = a, +a = a, !!a = a
-    [[nodiscard]] bool matchPowerToSquareIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a^2 = a*a
+    [[nodiscard]] bool matchBasicMathIdentities(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);      // a + 0 = a, a - 0 = a, a * 1 = a, a / 1 = a, 0 * a = 0, 1 * a = a
+    [[nodiscard]] bool matchUnaryIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);            // -(-a) = a, +a = a, !!a = a
+    [[nodiscard]] bool matchPowerToSquareIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);    // a^2 = a*a
+    [[nodiscard]] bool matchRepeatedAdditionIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a+a+a = 3*a, n*a + a = (n+1)*a
 
     [[nodiscard]] bool matchPythagoreanIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);          // sin(a)^2 + cos(a)^2 = 1
     [[nodiscard]] bool matchInverseTrigonometricIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // sin(asin(a)) = a, etc.

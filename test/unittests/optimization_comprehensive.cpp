@@ -284,6 +284,81 @@ TEST_CASE("Optimizer: math identities simplification", "[sscp][identities]")
     REQUIRE(neg_count_after < neg_count_before);
 }
 
+TEST_CASE("Optimizer: repeated addition identities", "[sscp][identities]")
+{
+    Environment env;
+    auto ast = env.parse(R"(
+        [[extern]] fn getInput() -> num;
+        
+        let a1 = getInput();
+        let a2 = getInput();
+        let a3 = getInput();
+        let a4 = getInput();
+        
+        // Test repeated addition patterns that should be simplified
+        // Note: a + a should NOT become 2*a
+        // But patterns like n*a + a should become (n+1)*a
+        
+        let pattern1 = a1 + a1;       // Should stay the same  
+        let pattern2 = a2 + a2 + a2;  // Should become 3.0 * a2
+        let pattern3 = a3 + 3.0 * a3; // Should become 4.0 * a3
+        let pattern4 = a4 * 4.0 + a4; // Should become 5.0 * a4
+        
+        pattern1 + pattern2 + pattern3 + pattern4
+    )");
+
+    auto prog = env.map(ast);
+
+    // Count mul operations before optimization
+    auto before             = SSASerializer::serialize(prog);
+    size_t mul_count_before = 0, add_count_before = 0;
+    size_t pos = 0;
+
+    while ((pos = before.find("mul(", pos)) != std::string::npos) {
+        mul_count_before++;
+        pos += 4;
+    }
+
+    pos = 0;
+    while ((pos = before.find("add(", pos)) != std::string::npos) {
+        add_count_before++;
+        pos += 4;
+    }
+
+    // Run full optimization with math identities
+    auto opts = opt::OptimizerOptions::High();
+    opt::Optimizer::Run(opts, prog);
+
+    auto after = SSASerializer::serialize(prog);
+
+    // Count operations after optimization
+    size_t mul_count_after = 0, add_count_after = 0;
+    pos = 0;
+
+    while ((pos = after.find("mul(", pos)) != std::string::npos) {
+        mul_count_after++;
+        pos += 4;
+    }
+
+    pos = 0;
+    while ((pos = after.find("add(", pos)) != std::string::npos) {
+        add_count_after++;
+        pos += 4;
+    }
+
+    // Repeated addition identities should reduce operations
+    // We should have fewer add operations (n*a + a -> (n+1)*a eliminates adds)
+    REQUIRE(add_count_after + mul_count_after < add_count_before + mul_count_before);
+
+    // Also check that we can find the expected constants in the output
+    // The patterns should be simplified to 3*a, 4*a, 5*a
+    // So we should see constants 3, 4, 5 in the output, but not 2
+    REQUIRE(after.find(" 2:num") == std::string::npos);
+    REQUIRE(after.find(" 3:num") != std::string::npos);
+    REQUIRE(after.find(" 4:num") != std::string::npos);
+    REQUIRE(after.find(" 5:num") != std::string::npos);
+}
+
 TEST_CASE("Optimizer: vector constant folding", "[sscp][constantfolding]")
 {
     Environment env;
