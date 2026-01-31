@@ -37,7 +37,7 @@ private:
     [[nodiscard]] bool matchAssignIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a=a (internal cleanup)
 
     [[nodiscard]] bool matchUnaryIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);         // -(-a) = a, +a = a, !!a = a
-    [[nodiscard]] bool matchSquareToPowerIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a*a = a^2
+    [[nodiscard]] bool matchPowerToSquareIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a^2 = a*a
 
     [[nodiscard]] bool matchPythagoreanIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);          // sin(a)^2 + cos(a)^2 = 1
     [[nodiscard]] bool matchInverseTrigonometricIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // sin(asin(a)) = a, etc.

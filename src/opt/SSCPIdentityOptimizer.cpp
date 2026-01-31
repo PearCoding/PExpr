@@ -40,7 +40,7 @@ bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& i
         if (matchUnaryIdentity(ctx, instructions, currentIndex))
             return true;
 
-        if (matchSquareToPowerIdentity(ctx, instructions, currentIndex))
+        if (matchPowerToSquareIdentity(ctx, instructions, currentIndex))
             return true;
     }
 
@@ -189,7 +189,7 @@ bool SSCPIdentityOptimizer::matchPythagoreanIdentity(SSAContext* ctx, Instructio
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchSquareToPowerIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchPowerToSquareIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
 {
     PEXPR_UNUSED(ctx);
 
@@ -197,20 +197,20 @@ bool SSCPIdentityOptimizer::matchSquareToPowerIdentity(SSAContext* ctx, Instruct
     if (!asg)
         return false;
 
-    // Match: a*a = a^2
-    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->BinaryOp != BinaryOperation::Mul)
+    // Match: a^2 = a*a
+    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->BinaryOp != BinaryOperation::Pow)
         return false;
 
     if (asg->Operands.size() != 2)
         return false;
 
-    // Check if both operands are the same
-    if (isSameValue(asg->Operands[0], asg->Operands[1])) {
+    // Check if this is pow(x, 2)
+    if (Number powExponent; isConstantNumber(asg->Operands[1], powExponent) && powExponent == Number(2.0)) {
         auto newAsg      = std::make_shared<SSAInstrAssign>();
         newAsg->Target   = asg->Target;
         newAsg->Operator = SSAInstrAssign::OpKind::Binary;
-        newAsg->BinaryOp = BinaryOperation::Pow;
-        newAsg->Operands = { asg->Operands[0], SSAValue::Constant(Number(2.0)) };
+        newAsg->BinaryOp = BinaryOperation::Mul;
+        newAsg->Operands = { asg->Operands[0], asg->Operands[0] };
 
         mDefinitions[newAsg->Target.name()] = newAsg.get();
         instructions[currentIndex]          = std::move(newAsg);
