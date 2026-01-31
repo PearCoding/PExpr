@@ -159,7 +159,6 @@ void SSAInstrBranch::forEachOperand(const std::function<void(const SSAValue&)>& 
 
 void SSAInstrPhi::forEachOperand(const std::function<void(SSAValue&)>& visitor)
 {
-    visitor(Target);
     for (auto& cond : Conditions)
         visitor(cond);
     for (auto& branch : Branches)
@@ -168,7 +167,6 @@ void SSAInstrPhi::forEachOperand(const std::function<void(SSAValue&)>& visitor)
 
 void SSAInstrPhi::forEachOperand(const std::function<void(const SSAValue&)>& visitor) const
 {
-    visitor(Target);
     for (const auto& cond : Conditions)
         visitor(cond);
     for (const auto& branch : Branches)

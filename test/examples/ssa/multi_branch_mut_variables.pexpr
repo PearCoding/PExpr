@@ -1,0 +1,19 @@
+// Branch with phi node and multiple variables
+[[extern, pure]] fn getInput() -> num;
+
+let mut x:num = 0;
+let branch_phi = if getInput() < 0.5 {
+    x = if getInput() < 0.25 {
+        x = 111; // < Useless, but can be done
+        7 
+    } else {
+        8
+    };
+    10
+} else {
+    x = 42;
+    20
+};
+
+// This should produces two phi nodes
+branch_phi + x

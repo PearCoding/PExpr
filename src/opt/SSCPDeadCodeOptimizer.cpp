@@ -47,7 +47,7 @@ void SSCPDeadCodeOptimizer::countUsesInInstr(const SSAInstr* instr)
 
     instr->forEachOperand([this](const SSAValue& val) {
         if (!val.isConstant())
-            ++mUseCount[val.name()];
+            mUseCount[val.name()]++;
     });
 }
 
