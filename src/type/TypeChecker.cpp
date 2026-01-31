@@ -578,62 +578,53 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpre
 
     expr->setReturnType(Type(TypeKind::Unspecified));
 
-    if (innerType.isTuple()) {
-        bool hadCastError = false;
-        expr->innerMut()  = injectCastIfNeeded(expr->inner(), Type::AsVector(innerType.size()), &hadCastError);
-        if (hadCastError)
-            return Type(TypeKind::Error);
-        innerType = expr->inner()->returnType();
+    if (!innerType.isTuple()) {
+        mReporter.errorf(expr->location(), "Swizzle operator is only defined for vector types");
+        return Type(TypeKind::Error);
     }
 
     // The access operator also allows expanding e.g., vec2.xyxy -> vec4 operations
-    if (innerType.isVector()) {
-        const auto& swizzle = expr->swizzle();
+    const auto& swizzle   = expr->swizzle();
+    const size_t vec_size = innerType.size();
 
-        const size_t vec_size = innerType.size();
-
-        if (vec_size == 0 || vec_size > 4) {
-            mReporter.errorf(expr->location(), "The access operator is only defined for vector types of 1-4, but got a vector of size %zu instead", vec_size);
-            return Type(TypeKind::Error);
-        }
-
-        bool isValid = true;
-        for (char c : swizzle) {
-            isValid = (c == 'x' || c == 'r'
-                       || (vec_size > 1 && c == 'y') || (vec_size > 1 && c == 'g')
-                       || (vec_size > 2 && c == 'z') || (vec_size > 2 && c == 'b')
-                       || (vec_size > 3 && c == 'w') || (vec_size > 3 && c == 'a'));
-
-            if (!isValid)
-                break;
-        }
-
-        PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
-        if (!isValid) {
-            mReporter.errorf(expr->location(), "Invalid swizzle components '%s' given", std::string(swizzle).c_str());
-            return Type(TypeKind::Error);
-        } else {
-            switch (swizzle.size()) {
-            case 1:
-                expr->setReturnType(Type(TypeKind::Number));
-                break;
-            case 2:
-                expr->setReturnType(Type({ Type(TypeKind::Number), Type(TypeKind::Number) }));
-                break;
-            case 3:
-                expr->setReturnType(Type({ Type(TypeKind::Number), Type(TypeKind::Number), Type(TypeKind::Number) }));
-                break;
-            case 4:
-                expr->setReturnType(Type({ Type(TypeKind::Number), Type(TypeKind::Number), Type(TypeKind::Number), Type(TypeKind::Number) }));
-                break;
-            default:
-                mReporter.errorf(expr->location(), "Expected a maximum of 4 components but got %zu", swizzle.size());
-                return Type(TypeKind::Error);
-            }
-        }
-    } else {
-        mReporter.errorf(expr->location(), "Swizzle operator is only defined for vector types");
+    if (vec_size == 0) {
+        mReporter.errorf(expr->location(), "The access operator can not be applied to empty tuples");
         return Type(TypeKind::Error);
+    }
+
+    bool isValid = true;
+    for (char c : swizzle) {
+        isValid = (c == 'x' || c == 'r'
+                   || (vec_size > 1 && c == 'y') || (vec_size > 1 && c == 'g')
+                   || (vec_size > 2 && c == 'z') || (vec_size > 2 && c == 'b')
+                   || (vec_size > 3 && c == 'w') || (vec_size > 3 && c == 'a'));
+
+        if (!isValid)
+            break;
+    }
+
+    if (!isValid || swizzle.empty()) {
+        mReporter.errorf(expr->location(), "Invalid swizzle components '%s' given", std::string(swizzle).c_str());
+        return Type(TypeKind::Error);
+    } else {
+        PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
+
+        std::vector<Type> retTypes;
+        retTypes.reserve(swizzle.size());
+        for (char c : swizzle) {
+            if (c == 'x' || c == 'r')
+                retTypes.push_back(innerType.components().at(0));
+            else if (c == 'y' || c == 'g')
+                retTypes.push_back(innerType.components().at(1));
+            else if (c == 'z' || c == 'b')
+                retTypes.push_back(innerType.components().at(2));
+            else if (c == 'w' || c == 'a')
+                retTypes.push_back(innerType.components().at(3));
+        }
+        if (retTypes.size() == 1)
+            expr->setReturnType(retTypes[0]);
+        else
+            expr->setReturnType(Type(std::move(retTypes)));
     }
 
     return expr->returnType();
