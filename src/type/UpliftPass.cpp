@@ -17,29 +17,16 @@ UpliftPass::UpliftPass(utils::Reporter& reporter)
 {
 }
 
-void UpliftPass::handle(const Ptr<Closure>& closure)
+void UpliftPass::handle(const Ptr<Closure>& closureRoot)
 {
-    processClosure(closure);
-}
+    auto handleStatement = [this](Closure* closure, Statement* stmt) {
+        const auto f = dynamic_cast<FunctionDeclarationStatement*>(stmt);
 
-void UpliftPass::processClosure(const Ptr<Closure>& closure)
-{
-    // For each function declaration, determine captured variables and
-    // uplift them to parameters; also recursively process nested closures.
-    for (const auto& stmt : closure->statements()) {
-        if (stmt->type() != StatementType::FunctionDeclaration)
-            continue;
-
-        const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-
-        // If extern skip
-        if (f->isExtern())
-            continue;
+        // If not a function declaration or extern skip
+        if (!f || f->isExtern())
+            return;
 
         PEXPR_ASSERT(f->closure(), "A non-external function needs a body");
-
-        // Recurse into nested closure body first (from the bottom up first)
-        processClosure(f->closure());
 
         // collect captures from function body
         std::map<std::string, Ptr<VariableDef>> capturedUsage;
@@ -69,7 +56,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
             }
 
             // Update all captured variables such that the parameters are used instead
-            updateVariables(f->closure(), capturedToParameter);
+            updateVariables(f->closure().get(), capturedToParameter);
 
             // Determine new return type
             Type newReturnType = f->returnType();
@@ -84,7 +71,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
 
             // Build new mangled name with new parameter types
             const std::string oldMangled = f->mangledName();
-            const std::string newMangled = makeMangledNameFromTypes(f->name(), newParams, closure.get());
+            const std::string newMangled = makeMangledNameFromTypes(f->name(), newParams, closure);
 
             // Update local symbol table: replace function entry
             const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern(), f->hasSideEffects());
@@ -102,7 +89,7 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
 
                 // Replace the final expression with a tuple that includes mutable captures
                 if (f->closure()->expression())
-                    newClosure->expressionMut() = createReturnTuple(f->closure(),
+                    newClosure->expressionMut() = createReturnTuple(f->closure().get(),
                                                                     f->closure()->expression(),
                                                                     capturedMutable);
 
@@ -123,18 +110,16 @@ void UpliftPass::processClosure(const Ptr<Closure>& closure)
             // We'll append arguments corresponding to the captured variables in the same order they were added.
             updateCallsInClosure(closure, oldDef, newDef, parameterToCaptured, capturedMutable);
         }
-    }
+    };
 
-    // Finally, process nested closures that are not function declarations (i.e., closure expressions inside top-level expr)
-    if (closure->expression() && closure->expression()->type() == ExpressionType::Closure) {
-        const auto cexpr = std::reinterpret_pointer_cast<ClosureExpression>(closure->expression());
-        processClosure(cexpr->closure());
-    }
+    // For each function declaration, determine captured variables and
+    // uplift them to parameters; also recursively process nested closures.
+    Visitor::forEachStatement(closureRoot.get(), handleStatement, false /* Go from bottom to up*/);
 }
 
 //-------------------------------------------------------------------------------------
 
-void UpliftPass::updateCallsInExpression(const Ptr<ast::Closure>& currentClosure, Ptr<Expression>& expr,
+void UpliftPass::updateCallsInExpression(ast::Closure* currentClosure, Ptr<Expression>& expr,
                                          const FunctionDef& oldDef, const FunctionDef& newDef,
                                          const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
                                          const std::map<std::string, Ptr<VariableDef>>& mutableCaptures)
@@ -174,7 +159,7 @@ void UpliftPass::updateCallsInExpression(const Ptr<ast::Closure>& currentClosure
                 // 3. Updates the mutable variables
                 // 4. Returns the original result
 
-                auto closure = std::make_shared<ast::Closure>(c->location(), currentClosure.get());
+                auto closure = std::make_shared<ast::Closure>(c->location(), currentClosure);
 
                 // Create a pattern for destructuring the tuple
                 std::vector<ast::PatternElement> patternElements;
@@ -262,14 +247,14 @@ void UpliftPass::updateCallsInExpression(const Ptr<ast::Closure>& currentClosure
     } break;
     case ExpressionType::Closure: {
         const auto c = std::reinterpret_pointer_cast<ClosureExpression>(expr);
-        updateCallsInClosure(c->closure(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+        updateCallsInClosure(c->closure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
     } break;
     case ExpressionType::Branch: {
         const auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
-        updateCallsInClosure(br->elseClosure(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+        updateCallsInClosure(br->elseClosure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
         for (auto& b : br->branches()) {
             updateCallsInExpression(currentClosure, b.Condition, oldDef, newDef, parameterToCaptured, mutableCaptures);
-            updateCallsInClosure(b.Body, oldDef, newDef, parameterToCaptured, mutableCaptures);
+            updateCallsInClosure(b.Body.get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
         }
     } break;
     case ExpressionType::Literal:
@@ -282,7 +267,7 @@ void UpliftPass::updateCallsInExpression(const Ptr<ast::Closure>& currentClosure
     }
 }
 
-void UpliftPass::updateCallsInClosure(const Ptr<Closure>& closure,
+void UpliftPass::updateCallsInClosure(Closure* closure,
                                       const FunctionDef& oldDef, const FunctionDef& newDef,
                                       const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
                                       const std::map<std::string, Ptr<VariableDef>>& mutableCaptures)
@@ -299,7 +284,7 @@ void UpliftPass::updateCallsInClosure(const Ptr<Closure>& closure,
         } else if (stmt->type() == StatementType::FunctionDeclaration) {
             const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
             if (!f->isExtern())
-                updateCallsInClosure(f->closure(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+                updateCallsInClosure(f->closure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
         } else if (stmt->type() == StatementType::TypeAlias) {
             // Nothing to do
         } else {
@@ -311,13 +296,13 @@ void UpliftPass::updateCallsInClosure(const Ptr<Closure>& closure,
     if (closure->expression()) {
         auto expr = closure->expression();
         if (expr->type() == ExpressionType::Closure)
-            updateCallsInClosure(std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+            updateCallsInClosure(std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
         else
             updateCallsInExpression(closure, closure->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
     }
 }
 
-Ptr<ast::Expression> UpliftPass::createReturnTuple(const Ptr<ast::Closure>& funcClosure,
+Ptr<ast::Expression> UpliftPass::createReturnTuple(const ast::Closure* funcClosure,
                                                    const Ptr<ast::Expression>& originalReturnExpr,
                                                    const std::map<std::string, Ptr<VariableDef>>& mutableCaptures)
 {
@@ -348,12 +333,12 @@ Ptr<ast::Expression> UpliftPass::createReturnTuple(const Ptr<ast::Closure>& func
 
 //-------------------------------------------------------------------------------------
 
-void UpliftPass::updateVariables(const Ptr<ast::Closure>& closure,
+void UpliftPass::updateVariables(const ast::Closure* closure,
                                  const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter)
 {
     // Update variables inside statements
     Visitor::forEachStatement(
-        closure.get(),
+        closure,
         [&](const Closure* currentClosure, const Statement* stmt) {
             PEXPR_UNUSED(currentClosure);
 
@@ -383,7 +368,7 @@ void UpliftPass::updateVariables(const Ptr<ast::Closure>& closure,
 
     // Update variables in expressions
     Visitor::forEachExpression(
-        closure.get(),
+        closure,
         [&](const Closure* currentClosure, const Expression* expr) {
             PEXPR_UNUSED(currentClosure);
             if (expr->type() != ExpressionType::Variable)

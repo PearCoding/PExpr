@@ -62,6 +62,28 @@ public:
         }
     }
 
+    inline void replaceStatement(Statement* oldStmt, const Ptr<Statement>& newStmt)
+    {
+        PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
+        PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
+        for (auto& st : mStatements) {
+            if (st.get() == oldStmt) {
+                st = newStmt;
+                break;
+            }
+        }
+    }
+
+    inline void replaceStatement(Statement* oldStmt, Ptr<Statement>&& newStmt)
+    {
+        PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
+        PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
+        for (auto& st : mStatements) {
+            if (st.get() == oldStmt)
+                st = std::move(newStmt);
+        }
+    }
+
     // Internal usage
     [[nodiscard]] inline const type::SymbolTable& symbols() const { return mSymbols; }
     [[nodiscard]] inline type::SymbolTable& symbols() { return mSymbols; }
