@@ -2,6 +2,7 @@
 
 #include "OptimizerOptions.h"
 #include "ast/Enums.h"
+#include "ssa/BasicBlockAnalyzer.h"
 
 #include <memory>
 #include <unordered_map>
@@ -26,25 +27,28 @@ public:
     {
     }
 
-    /// Apply identity optimizations to the instruction list
+    /// Apply identity optimizations to the basic blocks inside the instructions
     /// Returns true if any changes were made
     [[nodiscard]] bool applyIdentities(ssa::SSAContext* ctx, InstructionList& instructions);
 
 private:
+    /// Apply to a specific subrange of instructions [begin, end)
+    [[nodiscard]] bool applyIdentitiesToRange(ssa::SSAContext* ctx, InstructionList::iterator begin, InstructionList::iterator end);
+
     /// Pattern matching for specific identities
-    [[nodiscard]] bool tryApplyIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);
+    [[nodiscard]] bool tryApplyIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);
 
-    [[nodiscard]] bool matchBasicMathIdentities(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);      // a + 0 = a, a - 0 = a, a * 1 = a, a / 1 = a, 0 * a = 0, 1 * a = a
-    [[nodiscard]] bool matchUnaryIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);            // -(-a) = a, +a = a, !!a = a
-    [[nodiscard]] bool matchPowerToSquareIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);    // a^2 = a*a
-    [[nodiscard]] bool matchRepeatedAdditionIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // a+a+a = 3*a, n*a + a = (n+1)*a
+    [[nodiscard]] bool matchBasicMathIdentities(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);      // a + 0 = a, a - 0 = a, a * 1 = a, a / 1 = a, 0 * a = 0, 1 * a = a
+    [[nodiscard]] bool matchUnaryIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);            // -(-a) = a, +a = a, !!a = a
+    [[nodiscard]] bool matchPowerToSquareIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);    // a^2 = a*a
+    [[nodiscard]] bool matchRepeatedAdditionIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction); // a+a+a = 3*a, n*a + a = (n+1)*a
 
-    [[nodiscard]] bool matchPythagoreanIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);          // sin(a)^2 + cos(a)^2 = 1
-    [[nodiscard]] bool matchInverseTrigonometricIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // sin(asin(a)) = a, etc.
+    [[nodiscard]] bool matchPythagoreanIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);          // sin(a)^2 + cos(a)^2 = 1
+    [[nodiscard]] bool matchInverseTrigonometricIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction); // sin(asin(a)) = a, etc.
 
-    [[nodiscard]] bool matchAngleAdditionIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);  // sin(a)*cos(b) +/- cos(a)*sin(b)
-    [[nodiscard]] bool matchDoubleAngleIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex);    // 2*sin(a)*cos(a) = sin(2*a)
-    [[nodiscard]] bool matchPowerReductionIdentity(ssa::SSAContext* ctx, InstructionList& instructions, size_t currentIndex); // (1-cos(2*a))/2 = sin(a)^2
+    [[nodiscard]] bool matchAngleAdditionIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);  // sin(a)*cos(b) +/- cos(a)*sin(b)
+    [[nodiscard]] bool matchDoubleAngleIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);    // 2*sin(a)*cos(a) = sin(2*a)
+    [[nodiscard]] bool matchPowerReductionIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction); // (1-cos(2*a))/2 = sin(a)^2
 
     /// Helper to check if an assignment is a function call
     [[nodiscard]] bool isCallToIntrinsic(const ssa::SSAValue& val, std::string_view funcName) const;
@@ -73,6 +77,7 @@ private:
     std::unordered_map<std::string, const ssa::SSAInstr*> mDefinitions;
 
     const OptimizerOptions mOptions;
+    ssa::BasicBlockAnalyzer mBlockAnalyzer;
 };
 
 } // namespace PExpr::opt

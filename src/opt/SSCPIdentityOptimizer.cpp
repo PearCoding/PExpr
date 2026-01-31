@@ -11,9 +11,37 @@ using namespace ssa;
 
 bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& instructions)
 {
+    mBlockAnalyzer.identifyBasicBlocks(instructions);
+    // mBlockAnalyzer.buildControlFlowGraph(instructions); // < Not needed here
+
+    bool changed = false;
+
+    // Process each basic block separately
+    const auto& blocks = mBlockAnalyzer.getBasicBlocks();
+    for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
+        const auto& block = blocks[blockIdx];
+        if (block.startIndex >= instructions.size()
+            || block.endIndex > instructions.size()
+            || block.startIndex >= block.endIndex)
+            continue;
+
+        // Apply CSE to this basic block range
+        auto blockBegin   = instructions.begin() + block.startIndex;
+        auto blockEnd     = instructions.begin() + block.endIndex;
+        bool blockChanged = applyIdentitiesToRange(ctx, blockBegin, blockEnd);
+
+        if (blockChanged)
+            changed = true;
+    }
+
+    return changed;
+}
+
+bool SSCPIdentityOptimizer::applyIdentitiesToRange(ssa::SSAContext* ctx, InstructionList::iterator begin, InstructionList::iterator end)
+{
     // Build definition map
     mDefinitions.clear();
-    std::ranges::for_each(instructions, [this](const auto& instrPtr) {
+    std::ranges::for_each(begin, end, [this](const auto& instrPtr) {
         if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
             mDefinitions[asg->Target.name()] = asg;
         else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
@@ -23,54 +51,54 @@ bool SSCPIdentityOptimizer::applyIdentities(SSAContext* ctx, InstructionList& in
     });
 
     bool changed = false;
-    std::ranges::for_each(std::views::iota(0u, instructions.size()), [&](size_t i) {
-        if (tryApplyIdentity(ctx, instructions, i))
+    std::ranges::for_each(begin, end, [&](auto& instrPtr) {
+        if (tryApplyIdentity(ctx, instrPtr))
             changed = true;
     });
     return changed;
 }
 
-bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     if (mOptions.ApplyMathIdentities) {
-        if (matchBasicMathIdentities(ctx, instructions, currentIndex))
+        if (matchBasicMathIdentities(ctx, currentInstruction))
             return true;
 
-        if (matchRepeatedAdditionIdentity(ctx, instructions, currentIndex))
+        if (matchRepeatedAdditionIdentity(ctx, currentInstruction))
             return true;
 
-        if (matchUnaryIdentity(ctx, instructions, currentIndex))
+        if (matchUnaryIdentity(ctx, currentInstruction))
             return true;
 
-        if (matchPowerToSquareIdentity(ctx, instructions, currentIndex))
+        if (matchPowerToSquareIdentity(ctx, currentInstruction))
             return true;
     }
 
     if (mOptions.ApplyTrigonometricIdentities) {
-        if (matchPythagoreanIdentity(ctx, instructions, currentIndex))
+        if (matchPythagoreanIdentity(ctx, currentInstruction))
             return true;
 
-        if (matchInverseTrigonometricIdentity(ctx, instructions, currentIndex))
+        if (matchInverseTrigonometricIdentity(ctx, currentInstruction))
             return true;
 
-        if (matchAngleAdditionIdentity(ctx, instructions, currentIndex))
+        if (matchAngleAdditionIdentity(ctx, currentInstruction))
             return true;
 
-        if (matchDoubleAngleIdentity(ctx, instructions, currentIndex))
+        if (matchDoubleAngleIdentity(ctx, currentInstruction))
             return true;
 
-        if (matchPowerReductionIdentity(ctx, instructions, currentIndex))
+        if (matchPowerReductionIdentity(ctx, currentInstruction))
             return true;
     }
 
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -103,7 +131,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { right };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             break;
@@ -117,7 +145,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { left };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             // 1 * a = a
@@ -128,7 +156,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { right };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             break;
@@ -150,7 +178,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { left };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             break;
@@ -164,7 +192,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { left };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             break;
@@ -178,7 +206,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { right };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             // a * 1 = a
@@ -189,7 +217,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { left };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             break;
@@ -203,7 +231,7 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
                 newAsg->Operands = { left };
 
                 mDefinitions[newAsg->Target.name()] = newAsg.get();
-                instructions[currentIndex]          = std::move(newAsg);
+                currentInstruction                  = std::move(newAsg);
                 return true;
             }
             break;
@@ -216,11 +244,11 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, Instructio
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -246,7 +274,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
             newAsg->Operands = { right, SSAValue::Constant(Number(3.0)) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
     }
@@ -260,7 +288,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
             newAsg->Operands = { left, SSAValue::Constant(Number(3.0)) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
     }
@@ -281,7 +309,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
             newAsg->Operands = { right, SSAValue::Constant(newConst) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
         if (isConstantNumber(mulRight, constNum) && mulLeft.name() == right.name()) {
@@ -294,7 +322,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
             newAsg->Operands = { right, SSAValue::Constant(newConst) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
     }
@@ -311,7 +339,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
             newAsg->Operands = { left, SSAValue::Constant(newConst) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
         if (isConstantNumber(mulRight, constNum) && mulLeft.name() == left.name()) {
@@ -324,7 +352,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
             newAsg->Operands = { left, SSAValue::Constant(newConst) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
     }
@@ -332,11 +360,11 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, Instr
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -351,7 +379,7 @@ bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList&
         newAsg->Operands = { asg->Operands[0] };
 
         mDefinitions[newAsg->Target.name()] = newAsg.get();
-        instructions[currentIndex]          = std::move(newAsg);
+        currentInstruction                  = std::move(newAsg);
         return true;
     }
 
@@ -373,16 +401,16 @@ bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, InstructionList&
         newAsg->Operands = { operand->Operands[0] };
 
         mDefinitions[newAsg->Target.name()] = newAsg.get();
-        instructions[currentIndex]          = std::move(newAsg);
+        currentInstruction                  = std::move(newAsg);
     }
     return true;
 }
 
-bool SSCPIdentityOptimizer::matchPythagoreanIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchPythagoreanIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -429,11 +457,11 @@ bool SSCPIdentityOptimizer::matchPythagoreanIdentity(SSAContext* ctx, Instructio
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchPowerToSquareIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchPowerToSquareIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -453,18 +481,18 @@ bool SSCPIdentityOptimizer::matchPowerToSquareIdentity(SSAContext* ctx, Instruct
         newAsg->Operands = { asg->Operands[0], asg->Operands[0] };
 
         mDefinitions[newAsg->Target.name()] = newAsg.get();
-        instructions[currentIndex]          = std::move(newAsg);
+        currentInstruction                  = std::move(newAsg);
         return true;
     }
 
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto call = dynamic_cast<const SSAInstrCall*>(instructions.at(currentIndex).get());
+    const auto call = dynamic_cast<const SSAInstrCall*>(currentInstruction.get());
     if (!call)
         return false;
 
@@ -489,7 +517,7 @@ bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, I
             newAsg->Operands = { call2->Arguments.at(0) };
 
             mDefinitions[newAsg->Target.name()] = newAsg.get();
-            instructions[currentIndex]          = std::move(newAsg);
+            currentInstruction                  = std::move(newAsg);
             return true;
         }
     }
@@ -497,11 +525,11 @@ bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, I
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchAngleAdditionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchAngleAdditionIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -529,11 +557,11 @@ bool SSCPIdentityOptimizer::matchAngleAdditionIdentity(SSAContext* ctx, Instruct
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchDoubleAngleIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchDoubleAngleIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 
@@ -548,11 +576,11 @@ bool SSCPIdentityOptimizer::matchDoubleAngleIdentity(SSAContext* ctx, Instructio
     return false;
 }
 
-bool SSCPIdentityOptimizer::matchPowerReductionIdentity(SSAContext* ctx, InstructionList& instructions, size_t currentIndex)
+bool SSCPIdentityOptimizer::matchPowerReductionIdentity(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
 {
     PEXPR_UNUSED(ctx);
 
-    const auto asg = dynamic_cast<const SSAInstrAssign*>(instructions.at(currentIndex).get());
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
     if (!asg)
         return false;
 

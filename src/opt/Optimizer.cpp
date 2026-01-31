@@ -111,7 +111,7 @@ bool Optimizer::processBody(InstructionList& body)
             changed = true;
     }
 
-    // 3) Apply identity optimizations
+    // 3) Apply identity optimizations per basic block
     if (mIdentityOptimizer->applyIdentities(mContext.get(), body))
         changed = true;
 
