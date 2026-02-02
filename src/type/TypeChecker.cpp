@@ -442,9 +442,9 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
                 expr->setReturnType(expr->left()->returnType());
         } else if (expr->op() != BinaryOperation::Div && rightType.isTuple() && isConvertible(rightType, Type::AsVector(rightType.size())) && isConvertible(leftType, TypeKind::Number)) { // < f * v,  i * v
             expr->leftMut()  = injectCastIfNeeded(expr->left(), Type(TypeKind::Number), &hadCastError);
-            expr->rightMut() = injectCastIfNeeded(expr->right(), Type::AsVector(leftType.size()), &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), Type::AsVector(rightType.size()), &hadCastError);
             if (!hadCastError)
-                expr->setReturnType(expr->left()->returnType());
+                expr->setReturnType(expr->right()->returnType());
         }
         break;
     case BinaryOperation::Pow:
