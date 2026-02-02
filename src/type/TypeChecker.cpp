@@ -289,6 +289,9 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>&
         return handleNode(closure, std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
         return handleNode(closure, std::reinterpret_pointer_cast<BranchExpression>(expr));
+    case ExpressionType::Error:
+        // Error from the parser, continue type-checking as much as possible
+        return Type(TypeKind::Error);
     default:
         PEXPR_ASSERT(false, "Unhandled expression type");
         return Type(TypeKind::Error);
@@ -641,7 +644,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpres
     if (innerType.kind() == TypeKind::Tuple) {
         const size_t vec_size = innerType.size();
         if (vec_size < expr->index()) {
-            mReporter.errorf(expr->location(), "Out of bounds access with %zu on tuple of size %zu", expr->index(), vec_size);
+            mReporter.errorf(expr->location(), "Trying to access element %zu of tuple of size %zu", expr->index(), vec_size);
             return Type(TypeKind::Error);
         }
     } else {

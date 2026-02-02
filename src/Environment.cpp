@@ -46,7 +46,7 @@ Ptr<Closure> Environment::parse(std::istream& stream, const std::filesystem::pat
 
     auto expr = parser.parse(&mGlobals);
 
-    if (!expr || parser.hasError())
+    if (!expr)
         return nullptr;
 
     // Do type checking to set all the types inside the AST correctly

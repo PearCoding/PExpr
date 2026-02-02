@@ -13,9 +13,9 @@ let mut m = 5;
 m = "string"; // int -> string
 
 // 4. Return type mismatch in function
-fn bad_return() -> int {
+fn bad_return() -> int = {
     3.14 // returns num instead of int
-}
+};
 
 // 5. Access non-existent field
 let vec = [1, 2, 3];
