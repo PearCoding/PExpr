@@ -35,7 +35,7 @@ public:
     inline void newLine()
     {
         mLine++;
-        mColumn = 0;
+        mColumn = 1;
     }
 
     inline friend Location operator+(const Location& loc, size_t i)
