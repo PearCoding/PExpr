@@ -528,3 +528,73 @@ TEST_CASE("Optimizer: interaction between multiple optimizations", "[sscp][integ
     REQUIRE(sin_count_after < sin_count_before);
     REQUIRE(cos_count_after < cos_count_before);
 }
+
+TEST_CASE("Optimizer: force function inlining", "[sscp][inlining][force]")
+{
+    Environment env;
+    auto ast = env.parse(R"(
+        [[extern]] fn getInput() -> int;
+        // Functions called multiple times with non-constant arguments
+        fn add(x: int, y: int) = x + y;
+        fn multiply(x: int, y: int) = x * y;
+
+        let a = getInput();
+        let b = getInput();
+        let c = getInput();
+        let d = getInput();
+
+        // These calls should NOT be inlined with regular inlining
+        // because function is called multiple times with non-constant args
+        let result1 = add(a, b);
+        let result2 = multiply(c, d);
+        let result3 = add(result1, result2);
+
+        result3
+    )");
+
+    auto prog = env.map(ast);
+
+    // Check for function definitions before optimization
+    auto before = SSASerializer::serialize(prog);
+    REQUIRE(before.find("fn _Z3add") != std::string::npos);      // Function should exist
+    REQUIRE(before.find("fn _Z8multiply") != std::string::npos); // Function should exist
+    REQUIRE(before.find("call[_Z3add") != std::string::npos);    // Should have calls
+
+    // Run optimization with regular inlining (not force)
+    auto opts            = opt::OptimizerOptions::None();
+    opts.InlineFunctions = true;
+    opts.RemoveDeadCode  = true;
+    opt::Optimizer::Run(opts, prog);
+
+    auto afterRegular = SSASerializer::serialize(prog);
+
+    // With regular inlining, functions should still exist because:
+    // - They're called multiple times
+    // - Arguments are not constants
+    REQUIRE(afterRegular.find("fn _Z3add") != std::string::npos);
+    REQUIRE(afterRegular.find("call[_Z3add") != std::string::npos);
+    // - Called once
+    REQUIRE(afterRegular.find("fn _Z8multiply") == std::string::npos);
+    REQUIRE(afterRegular.find("call[_Z8multiply") == std::string::npos);
+
+    // Now test with force inlining
+    // Re-map to get fresh program
+    prog = env.map(ast);
+
+    auto optsForce                 = opt::OptimizerOptions::None();
+    optsForce.ForceInlineFunctions = true;
+    optsForce.RemoveDeadCode       = true;
+    opt::Optimizer::Run(optsForce, prog);
+
+    auto afterForce = SSASerializer::serialize(prog);
+
+    // With force inlining, functions should NOT exist
+    REQUIRE(afterForce.find("fn _Z3add") == std::string::npos);
+    REQUIRE(afterForce.find("fn _Z8multiply") == std::string::npos);
+    REQUIRE(afterForce.find("call[_Z3add") == std::string::npos);
+    REQUIRE(afterForce.find("call[_Z8multiply") == std::string::npos);
+
+    // Should have direct arithmetic operations instead
+    REQUIRE(afterForce.find("add(") != std::string::npos);
+    REQUIRE(afterForce.find("mul(") != std::string::npos);
+}

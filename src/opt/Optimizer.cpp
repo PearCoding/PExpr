@@ -84,7 +84,7 @@ void Optimizer::runProgram(ssa::SSAProgram& program)
                 changed = true;
         }
 
-        if (mOptions.InlineFunctions) {
+        if (mOptions.InlineFunctions || mOptions.ForceInlineFunctions) {
             // Check if we can inline some functions
             for (auto& func : program.Functions) {
                 if (mFunctionInliner->attempFunctionInlining(mContext.get(), program, func))

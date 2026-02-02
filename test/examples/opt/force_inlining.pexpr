@@ -1,0 +1,17 @@
+// Force function inlining test
+// Function called multiple times with non-constant arguments
+fn add(x: int, y: int) = x + y;
+fn multiply(x: int, y: int) = x * y;
+
+let a = 5;
+let b = 10;
+let c = 15;
+let d = 20;
+
+// These calls should be inlined even though arguments are not constants
+// and function is called multiple times
+let result1 = add(a, b);
+let result2 = multiply(c, d);
+let result3 = add(result1, result2);
+
+result3

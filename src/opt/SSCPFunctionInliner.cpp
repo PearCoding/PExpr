@@ -39,7 +39,10 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& pr
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first
+                    if (mOptions.ForceInlineFunctions && inlineFunctionCall(ctx, call, func, body, i)) { //< Force inlining
+                        changed = true;
+                        break;
+                    } else if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first
                         changed = true;
                         break;
                     } else if (mCallCounts[func.Name] == 1 && inlineFunctionCall(ctx, call, func, body, i)) { //< Fall back to basic inlining for single-call functions
