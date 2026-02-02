@@ -24,11 +24,13 @@ public:
 
     /// Parse the stream until eof and return the corresponding AST tree.
     /// If an error was detected, a nullptr will be returned instead.
-    Ptr<ast::Closure> parse(std::istream& stream);
+    /// @param filename Optional filename for error reports
+    Ptr<ast::Closure> parse(std::istream& stream, const std::filesystem::path& filename = {});
 
     /// Parse the given string and return the corresponding AST tree.
     /// If an error was detected, a nullptr will be returned instead.
-    Ptr<ast::Closure> parse(std::string_view str);
+    /// @param filename Optional filename for error reports
+    Ptr<ast::Closure> parse(std::string_view str, const std::filesystem::path& filename = {});
 
     [[nodiscard]] ssa::SSAProgram map(const Ptr<ast::Closure>& closure);
 

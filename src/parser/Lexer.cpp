@@ -4,10 +4,10 @@
 #include <sstream>
 
 namespace PExpr::parser {
-Lexer::Lexer(std::istream& stream, utils::Reporter& reporter)
+Lexer::Lexer(std::istream& stream, utils::Reporter& reporter, const std::filesystem::path& filename)
     : mStream(stream)
     , mChar(0)
-    , mLocation(0)
+    , mLocation(0, filename)
     , mTemp{}
     , mReporter(reporter)
 {

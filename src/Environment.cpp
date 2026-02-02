@@ -39,9 +39,9 @@ void Environment::registerFunction(const std::string& name, const std::vector<Ty
     mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true, hasSideEffect));
 }
 
-Ptr<Closure> Environment::parse(std::istream& stream)
+Ptr<Closure> Environment::parse(std::istream& stream, const std::filesystem::path& filename)
 {
-    parser::Lexer lexer(stream, mReporter);
+    parser::Lexer lexer(stream, mReporter, filename);
     parser::Parser parser(lexer, mReporter);
 
     auto expr = parser.parse(&mGlobals);
@@ -63,10 +63,10 @@ Ptr<Closure> Environment::parse(std::istream& stream)
     return expr;
 }
 
-Ptr<Closure> Environment::parse(std::string_view str)
+Ptr<Closure> Environment::parse(std::string_view str, const std::filesystem::path& filename)
 {
     std::istringstream stream(str.data());
-    return parse(stream);
+    return parse(stream, filename);
 }
 
 bool Environment::doTypeChecking(const Ptr<Closure>& closure)

@@ -9,7 +9,7 @@
 namespace PExpr::parser {
 class Lexer {
 public:
-    Lexer(std::istream& stream, utils::Reporter& reporter);
+    Lexer(std::istream& stream, utils::Reporter& reporter, const std::filesystem::path& filename = {});
 
     Token next();
 

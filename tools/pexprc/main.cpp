@@ -166,7 +166,7 @@ int main(int argc, char** argv)
 
     ssa::SSAProgram program;
     if (!readSSAIR) {
-        auto ast = env.parse(sourceFile);
+        auto ast = env.parse(sourceFile, std::filesystem::absolute(inputFile));
 
         if (ast == nullptr)
             return env.reporter().errorCount();

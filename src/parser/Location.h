@@ -9,20 +9,23 @@ namespace PExpr::parser {
 /// Location within the given expression stream.
 class Location {
 public:
-    inline explicit Location(size_t pos)
-        : mColumn(pos)
+    inline explicit Location(size_t pos, const std::filesystem::path& filename = {})
+        : mFilename(filename)
+        , mColumn(pos)
         , mLine(1)
     {
     }
 
-    inline explicit Location(size_t line, size_t col)
-        : mColumn(col)
+    inline Location(size_t line, size_t col, const std::filesystem::path& filename = {})
+        : mFilename(filename)
+        , mColumn(col)
         , mLine(line)
     {
     }
 
-    inline size_t line() const { return mLine; }
-    inline size_t column() const { return mColumn; }
+    [[nodiscard]] inline const std::filesystem::path& filename() const { return mFilename; }
+    [[nodiscard]] inline size_t line() const { return mLine; }
+    [[nodiscard]] inline size_t column() const { return mColumn; }
     inline Location& operator++()
     {
         mColumn++;
@@ -37,7 +40,7 @@ public:
 
     inline friend Location operator+(const Location& loc, size_t i)
     {
-        return Location(loc.line(), loc.column() + i);
+        return Location(loc.line(), loc.column() + i, loc.filename());
     }
 
     inline friend Location operator+(size_t i, const Location& loc)
@@ -47,12 +50,18 @@ public:
 
     inline friend std::ostream& operator<<(std::ostream& os, const Location& loc)
     {
-        os << "(:" << loc.line() << ":" << loc.column() << ")";
+        if (loc.filename().empty())
+            os << "(:" << loc.line() << ":" << loc.column() << ")";
+        else
+            os << "(" << loc.filename().generic_string() << ":" << loc.line() << ":" << loc.column() << ")";
         return os;
     }
 
     [[nodiscard]] inline friend std::strong_ordering operator<=>(const Location& a, const Location& b)
     {
+        if (const auto cmp = a.filename() <=> b.filename(); cmp != std::strong_ordering::equal)
+            return cmp;
+
         if (const auto cmp = a.line() <=> b.line(); cmp != std::strong_ordering::equal)
             return cmp;
 
@@ -60,6 +69,7 @@ public:
     }
 
 private:
+    std::filesystem::path mFilename; //< Only used for diagnosis and error/warning reports. Never included in the file itself
     size_t mColumn;
     size_t mLine;
 };
@@ -73,7 +83,8 @@ public:
     {
         const auto h1 = std::hash<size_t>{}(loc.line());
         const auto h2 = std::hash<size_t>{}(loc.column());
-        return h1 ^ (h2 << 1);
+        const auto h3 = std::hash<std::filesystem::path>{}(loc.filename());
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
     }
 };
 } // namespace std
