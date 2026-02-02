@@ -72,6 +72,11 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure)
     for (const auto& statement : closure->statements())
         handleNode(closure, statement);
 
+    if (!closure->expression()) {
+        mReporter.errorf(closure->location(), "Closure has no final expression");
+        return Type(TypeKind::Error);
+    }
+
     const Type type = handleNode(closure, closure->expression());
     closure->expression()->setReturnType(type);
     return type;
