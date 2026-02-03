@@ -91,197 +91,19 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
     auto program = SSAProgram{};
 
     // map statements
-    for (const auto& stmt : closure->statements())
-        mapStatement(program, stmt);
+    SSAValue lastValue;
+    for (const auto& expr : closure->expressions())
+        lastValue = mapExpression(program, expr);
 
     // map final expression as return
-    if (closure->expression()) {
-        SSAValue v = mapExpression(program, closure->expression());
+    if (closure->hasFinalExpression()) {
         auto ret   = std::make_shared<SSAInstrReturn>();
-        ret->Value = v;
+        ret->Value = lastValue;
         program.Body.push_back(ret);
     }
 
     mContext.popScope();
     return program;
-}
-
-void SSAMapper::mapStatement(SSAProgram& program, const Ptr<Statement>& stmt)
-{
-    PEXPR_ASSERT(stmt, "Expected valid statement to map");
-
-    switch (stmt->type()) {
-    case StatementType::VariableDeclaration: {
-        auto declStmt       = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
-        SSAValue rhs        = mapExpression(program, declStmt->expression());
-        const auto& pattern = declStmt->pattern();
-
-        // TODO: Rework this
-        // Check if pattern is a single simple binding (i.e., regular variable declaration)
-        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            const auto varDef = pattern->elements()[0].simpleBinding();
-
-            PEXPR_ASSERT(varDef->type().kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
-
-            // Cast if needed
-            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
-
-            // Assign to variable (fresh name for declaration)
-            SSAInstrAssign asg;
-            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
-            asg.Target   = tgt;
-            asg.Operator = SSAInstrAssign::OpKind::Assign;
-            asg.Operands = { finalVal };
-            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-        } else {
-            // Destructuring pattern: RHS must be a tuple
-            // Get tuple type and component types
-            const Type& tupleType = rhs.type();
-            PEXPR_ASSERT(tupleType.isTuple(), "Destructuring requires tuple type");
-
-            // Helper function to recursively process pattern elements
-            std::function<void(const Pattern&, SSAValue, const Type&)> processPattern =
-                [&](const Pattern& pattern, SSAValue tupleValue, const Type& tupleType) -> void {
-                PEXPR_ASSERT(tupleType.isTuple(), "Expected tuple type for destructuring");
-                const auto& components = tupleType.components();
-
-                for (size_t i = 0; i < pattern.size(); ++i) {
-                    const auto& elem     = pattern.elements()[i];
-                    const Type& elemType = components.at(i);
-
-                    // Extract tuple element using Access operation
-                    SSAValue index   = SSAValue::Constant((Integer)(i));
-                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
-                    {
-                        SSAInstrAssign access;
-                        access.Target   = elemVal;
-                        access.Operator = SSAInstrAssign::OpKind::Access;
-                        access.Operands = { tupleValue, index };
-                        program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
-                    }
-
-                    if (elem.isSimpleBinding()) {
-                        const auto varDef = elem.simpleBinding();
-
-                        PEXPR_ASSERT(varDef->type().kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
-
-                        // Cast if needed (can't be really handled in the TypeChecker)
-                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
-
-                        // Assign to variable (fresh name for declaration)
-                        SSAInstrAssign asg;
-                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
-                        asg.Target   = tgt;
-                        asg.Operator = SSAInstrAssign::OpKind::Assign;
-                        asg.Operands = { finalVal };
-                        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-                    } else {
-                        // Nested pattern - recurse
-                        processPattern(*elem.nestedPattern(), elemVal, elemType);
-                    }
-                }
-            };
-
-            processPattern(*pattern, rhs, tupleType);
-        }
-    } break;
-    case StatementType::VariableAssignment: {
-        auto assignStmt     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
-        SSAValue rhs        = mapExpression(program, assignStmt->expression());
-        const auto& pattern = assignStmt->pattern();
-
-        // TODO: Rework this
-        // Check if pattern is a single simple binding (i.e., regular variable assignment)
-        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            const auto varDef = pattern->elements()[0].simpleBinding();
-
-            // Cast if needed
-            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
-
-            // Assign to variable (fresh version for assignment)
-            SSAInstrAssign asg;
-            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
-            asg.Target   = tgt;
-            asg.Operator = SSAInstrAssign::OpKind::Assign;
-            asg.Operands = { finalVal };
-            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-        } else {
-            // Destructuring pattern: RHS must be a tuple
-            // Helper function to recursively process pattern elements for assignment
-            std::function<void(const Pattern&, SSAValue)> processPattern =
-                [&](const Pattern& pattern, SSAValue tupleValue) -> void {
-                PEXPR_ASSERT(tupleValue.type().isTuple(), "Expected tuple type for destructuring");
-                const auto& components = tupleValue.type().components();
-                for (size_t i = 0; i < pattern.size(); ++i) {
-                    const auto& elem     = pattern.elements()[i];
-                    const Type& elemType = components.at(i);
-
-                    // Extract tuple element using Access operation
-                    SSAValue index   = SSAValue::Constant((Integer)i);
-                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
-                    {
-                        SSAInstrAssign access;
-                        access.Target   = elemVal;
-                        access.Operator = SSAInstrAssign::OpKind::Access;
-                        access.Operands = { tupleValue, index };
-                        program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
-                    }
-
-                    if (elem.isSimpleBinding()) {
-                        const auto varDef = elem.simpleBinding();
-
-                        // Cast if needed (can't be really handled in the TypeChecker)
-                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
-
-                        // Assign to variable (fresh version for assignment)
-                        SSAInstrAssign asg;
-                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
-                        asg.Target   = tgt;
-                        asg.Operator = SSAInstrAssign::OpKind::Assign;
-                        asg.Operands = { finalVal };
-                        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-                    } else {
-                        // Nested pattern - recurse
-                        processPattern(*elem.nestedPattern(), elemVal);
-                    }
-                }
-            };
-
-            processPattern(*pattern, rhs);
-        }
-    } break;
-    case StatementType::FunctionDeclaration: {
-        auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-
-        // Prepare SSAFunction entry up-front and insert into program so recursive
-        // calls (or other functions mapping) can see the function entry.
-        SSAFunction func;
-        func.Name = f->mangledName();
-        func.Parameters.reserve(f->parameters().size());
-        for (const auto& p : f->parameters())
-            func.Parameters.push_back(p->uniqueName());
-        func.ReturnType    = f->returnType();
-        func.External      = f->isExtern();
-        func.HasSideEffect = f->hasSideEffects();
-
-        // Acquire inner closure if available
-        if (f->closure()) {
-            auto innerProg = mapClosure(f->closure());
-            func.Body      = std::move(innerProg.Body);
-
-            // Given the uplifting all functions are global
-            program.Functions.insert(program.Functions.end(), innerProg.Functions.begin(), innerProg.Functions.end());
-        }
-
-        program.Functions.push_back(std::move(func));
-    } break;
-    case StatementType::TypeAlias:
-        // Type aliases are compile-time only, nothing to map
-        break;
-    default:
-        PEXPR_ASSERT(false, "unsupported statement type");
-        break;
-    }
 }
 
 SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
@@ -615,6 +437,173 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
 
         result = tgt;
     } break;
+    case ExpressionType::VariableDeclaration: {
+        auto declStmt       = std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr);
+        SSAValue rhs        = mapExpression(program, declStmt->expression());
+        const auto& pattern = declStmt->pattern();
+
+        // TODO: Rework this
+        // Check if pattern is a single simple binding (i.e., regular variable declaration)
+        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+            const auto varDef = pattern->elements()[0].simpleBinding();
+
+            PEXPR_ASSERT(varDef->type().kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
+
+            // Cast if needed
+            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
+
+            // Assign to variable (fresh name for declaration)
+            SSAInstrAssign asg;
+            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
+            asg.Target   = tgt;
+            asg.Operator = SSAInstrAssign::OpKind::Assign;
+            asg.Operands = { finalVal };
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        } else {
+            // Destructuring pattern: RHS must be a tuple
+            // Get tuple type and component types
+            const Type& tupleType = rhs.type();
+            PEXPR_ASSERT(tupleType.isTuple(), "Destructuring requires tuple type");
+
+            // Helper function to recursively process pattern elements
+            std::function<void(const Pattern&, SSAValue, const Type&)> processPattern =
+                [&](const Pattern& pattern, SSAValue tupleValue, const Type& tupleType) -> void {
+                PEXPR_ASSERT(tupleType.isTuple(), "Expected tuple type for destructuring");
+                const auto& components = tupleType.components();
+
+                for (size_t i = 0; i < pattern.size(); ++i) {
+                    const auto& elem     = pattern.elements()[i];
+                    const Type& elemType = components.at(i);
+
+                    // Extract tuple element using Access operation
+                    SSAValue index   = SSAValue::Constant((Integer)(i));
+                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
+                    {
+                        SSAInstrAssign access;
+                        access.Target   = elemVal;
+                        access.Operator = SSAInstrAssign::OpKind::Access;
+                        access.Operands = { tupleValue, index };
+                        program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
+                    }
+
+                    if (elem.isSimpleBinding()) {
+                        const auto varDef = elem.simpleBinding();
+
+                        PEXPR_ASSERT(varDef->type().kind() != TypeKind::Unspecified, "All unspecified types must be specified in the SSA stage.");
+
+                        // Cast if needed (can't be really handled in the TypeChecker)
+                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
+
+                        // Assign to variable (fresh name for declaration)
+                        SSAInstrAssign asg;
+                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
+                        asg.Target   = tgt;
+                        asg.Operator = SSAInstrAssign::OpKind::Assign;
+                        asg.Operands = { finalVal };
+                        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+                    } else {
+                        // Nested pattern - recurse
+                        processPattern(*elem.nestedPattern(), elemVal, elemType);
+                    }
+                }
+            };
+
+            processPattern(*pattern, rhs, tupleType);
+        }
+    } break;
+    case ExpressionType::VariableAssignment: {
+        auto assignStmt     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
+        SSAValue rhs        = mapExpression(program, assignStmt->expression());
+        const auto& pattern = assignStmt->pattern();
+
+        // TODO: Rework this
+        // Check if pattern is a single simple binding (i.e., regular variable assignment)
+        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+            const auto varDef = pattern->elements()[0].simpleBinding();
+
+            // Cast if needed
+            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
+
+            // Assign to variable (fresh version for assignment)
+            SSAInstrAssign asg;
+            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
+            asg.Target   = tgt;
+            asg.Operator = SSAInstrAssign::OpKind::Assign;
+            asg.Operands = { finalVal };
+            program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+        } else {
+            // Destructuring pattern: RHS must be a tuple
+            // Helper function to recursively process pattern elements for assignment
+            std::function<void(const Pattern&, SSAValue)> processPattern =
+                [&](const Pattern& pattern, SSAValue tupleValue) -> void {
+                PEXPR_ASSERT(tupleValue.type().isTuple(), "Expected tuple type for destructuring");
+                const auto& components = tupleValue.type().components();
+                for (size_t i = 0; i < pattern.size(); ++i) {
+                    const auto& elem     = pattern.elements()[i];
+                    const Type& elemType = components.at(i);
+
+                    // Extract tuple element using Access operation
+                    SSAValue index   = SSAValue::Constant((Integer)i);
+                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
+                    {
+                        SSAInstrAssign access;
+                        access.Target   = elemVal;
+                        access.Operator = SSAInstrAssign::OpKind::Access;
+                        access.Operands = { tupleValue, index };
+                        program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
+                    }
+
+                    if (elem.isSimpleBinding()) {
+                        const auto varDef = elem.simpleBinding();
+
+                        // Cast if needed (can't be really handled in the TypeChecker)
+                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
+
+                        // Assign to variable (fresh version for assignment)
+                        SSAInstrAssign asg;
+                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
+                        asg.Target   = tgt;
+                        asg.Operator = SSAInstrAssign::OpKind::Assign;
+                        asg.Operands = { finalVal };
+                        program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+                    } else {
+                        // Nested pattern - recurse
+                        processPattern(*elem.nestedPattern(), elemVal);
+                    }
+                }
+            };
+
+            processPattern(*pattern, rhs);
+        }
+    } break;
+    case ExpressionType::FunctionDeclaration: {
+        auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr);
+
+        // Prepare SSAFunction entry up-front and insert into program so recursive
+        // calls (or other functions mapping) can see the function entry.
+        SSAFunction func;
+        func.Name = f->mangledName();
+        func.Parameters.reserve(f->parameters().size());
+        for (const auto& p : f->parameters())
+            func.Parameters.push_back(p->uniqueName());
+        func.ReturnType    = f->functionReturnType();
+        func.External      = f->isExtern();
+        func.HasSideEffect = f->hasSideEffects();
+
+        // Acquire inner closure if available
+        if (f->closure()) {
+            auto innerProg = mapClosure(f->closure());
+            func.Body      = std::move(innerProg.Body);
+
+            // Given the uplifting all functions are global
+            program.Functions.insert(program.Functions.end(), innerProg.Functions.begin(), innerProg.Functions.end());
+        }
+
+        program.Functions.push_back(std::move(func));
+    } break;
+    case ExpressionType::TypeAlias:
+        // Type aliases are compile-time only, nothing to map
+        break;
     default:
         PEXPR_ASSERT(false, "Unknown expression type");
         break;

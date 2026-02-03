@@ -12,7 +12,7 @@ TEST_CASE("TypeChecker: integer arithmetic", "[typechecker]")
 {
     Environment env;
     auto ast = env.parse("1+2");
-    auto t   = ast->expression()->returnType();
+    auto t   = ast->finalExpression()->returnType();
 
     REQUIRE(t.kind() == TypeKind::Integer);
 }
@@ -21,7 +21,7 @@ TEST_CASE("TypeChecker: number arithmetic", "[typechecker]")
 {
     Environment env;
     auto ast = env.parse("1.5+2.25");
-    auto t   = ast->expression()->returnType();
+    auto t   = ast->finalExpression()->returnType();
 
     REQUIRE(t.kind() == TypeKind::Number);
 }
@@ -30,7 +30,7 @@ TEST_CASE("TypeChecker: mixed int and number yields number", "[typechecker]")
 {
     Environment env;
     auto ast = env.parse("1+2.0");
-    auto t   = ast->expression()->returnType();
+    auto t   = ast->finalExpression()->returnType();
 
     REQUIRE(t.kind() == TypeKind::Number);
 }
@@ -39,7 +39,7 @@ TEST_CASE("TypeChecker: variable declaration registers variable and used in expr
 {
     Environment env;
     auto ast = env.parse("let mut x = 1; x = x+4; x+2");
-    auto t   = ast->expression()->returnType();
+    auto t   = ast->finalExpression()->returnType();
 
     REQUIRE(t.kind() == TypeKind::Integer);
 }
@@ -48,7 +48,7 @@ TEST_CASE("TypeChecker: string literal", "[typechecker]")
 {
     Environment env;
     auto ast = env.parse("\"hello\"");
-    auto t   = ast->expression()->returnType();
+    auto t   = ast->finalExpression()->returnType();
 
     REQUIRE(t.kind() == TypeKind::String);
 }
@@ -59,7 +59,7 @@ TEST_CASE("TypeChecker: destructuring declarations", "[typechecker]")
     {
         Environment env;
         auto ast = env.parse("let *[a, b] = [1, 2]; a + b");
-        auto t   = ast->expression()->returnType();
+        auto t   = ast->finalExpression()->returnType();
 
         REQUIRE(t.kind() == TypeKind::Integer);
     }
@@ -68,7 +68,7 @@ TEST_CASE("TypeChecker: destructuring declarations", "[typechecker]")
     {
         Environment env;
         auto ast = env.parse("let *[a:vec2, b:num] = [[1,2], 3.0]; a.x + b");
-        auto t   = ast->expression()->returnType();
+        auto t   = ast->finalExpression()->returnType();
 
         REQUIRE(t.kind() == TypeKind::Number);
     }
@@ -77,7 +77,7 @@ TEST_CASE("TypeChecker: destructuring declarations", "[typechecker]")
     {
         Environment env;
         auto ast = env.parse("let *[mut a, b] = [1, 2]; a = 3; a + b");
-        auto t   = ast->expression()->returnType();
+        auto t   = ast->finalExpression()->returnType();
 
         REQUIRE(t.kind() == TypeKind::Integer);
     }
@@ -95,7 +95,7 @@ TEST_CASE("TypeChecker: destructuring declarations", "[typechecker]")
     {
         Environment env;
         auto ast = env.parse("let *[a:num, b] = [1, true]; b");
-        auto t   = ast->expression()->returnType();
+        auto t   = ast->finalExpression()->returnType();
 
         REQUIRE(t.kind() == TypeKind::Boolean);
     }
@@ -109,7 +109,7 @@ TEST_CASE("TypeChecker: destructuring assignments", "[typechecker]")
         auto ast = env.parse("let mut x = 1; let mut y = 2; *[x, y] = [3, 4]; x + y");
         REQUIRE(ast != nullptr);
 
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
 
         REQUIRE(t.kind() == TypeKind::Integer);
         REQUIRE(env.reporter().errorCount() == 0);
@@ -153,7 +153,7 @@ TEST_CASE("TypeChecker: destructuring assignments", "[typechecker]")
         auto ast = env.parse("let mut a = 1; let mut b = 2; *[b, a] = [a, b]; a + b");
         REQUIRE(ast != nullptr);
 
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.kind() == TypeKind::Integer);
         REQUIRE(env.reporter().errorCount() == 0);
     }

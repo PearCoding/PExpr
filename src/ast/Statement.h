@@ -6,46 +6,16 @@
 #include "type/Type.h"
 
 namespace PExpr::ast {
-
-class Statement {
-public:
-    Statement()          = delete;
-    virtual ~Statement() = default;
-
-    /// The location this statement is associated with.
-    [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
-    [[nodiscard]] inline StatementType type() const { return mType; }
-
-protected:
-    Statement(const parser::Location& loc, StatementType type)
-        : mLocation(loc)
-        , mType(type)
-    {
-    }
-
-private:
-    const parser::Location mLocation;
-    const StatementType mType;
-};
-
-/// Internal statement created when an unrecoverable error occured
-class ErrorStatement : public Statement {
-public:
-    ErrorStatement(const parser::Location& loc)
-        : Statement(loc, StatementType::Error)
-    {
-    }
-};
-
 /// Unified declaration statement for both single variable and destructuring patterns
 /// Example: "let a:num = 5;" or "let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
-class VariableDeclarationStatement : public Statement {
+class VariableDeclarationStatement : public Expression {
 public:
     VariableDeclarationStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Statement(loc, StatementType::VariableDeclaration)
+        : Expression(loc, ExpressionType::VariableDeclaration)
         , mPattern(pattern)
         , mExpression(expr)
     {
+        setReturnType(type::Type::Void());
     }
 
     [[nodiscard]] inline Ptr<Pattern> pattern() const { return mPattern; }
@@ -59,13 +29,14 @@ private:
 
 /// Unified assignment statement for both single variable and destructuring patterns
 /// Example: "a = 5;" or "*[c, d] = foo();"
-class VariableAssignmentStatement : public Statement {
+class VariableAssignmentStatement : public Expression {
 public:
     VariableAssignmentStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Statement(loc, StatementType::VariableAssignment)
+        : Expression(loc, ExpressionType::VariableAssignment)
         , mPattern(pattern)
         , mExpression(expr)
     {
+        setReturnType(type::Type::Void());
     }
 
     [[nodiscard]] inline Ptr<Pattern> pattern() const { return mPattern; }
@@ -77,17 +48,19 @@ private:
     Ptr<Expression> mExpression;
 };
 
-class FunctionDeclarationStatement : public Statement {
+class FunctionDeclarationStatement : public Expression {
 public:
-    FunctionDeclarationStatement(const parser::Location& loc, const std::string& name, const type::ParameterList& parameters, const Ptr<Closure>& closure, const type::Type& returnType, const std::string& mangledName, bool hasSideEffects)
-        : Statement(loc, StatementType::FunctionDeclaration)
+    FunctionDeclarationStatement(const parser::Location& loc, const std::string& name, const type::ParameterList& parameters,
+                                 const Ptr<Closure>& closure, const type::Type& returnType, const std::string& mangledName, bool hasSideEffects)
+        : Expression(loc, ExpressionType::FunctionDeclaration)
         , mParameters(parameters)
-        , mReturnType(returnType)
+        , mFunctionReturnType(returnType)
         , mName(name)
         , mMangledName(mangledName)
         , mClosure(closure)
         , mHasSideEffects(hasSideEffects)
     {
+        setReturnType(type::Type::Void());
     }
 
     [[nodiscard]] inline const std::string& name() const { return mName; }
@@ -98,26 +71,27 @@ public:
     [[nodiscard]] inline bool hasSideEffects() const { return mHasSideEffects; }
     [[nodiscard]] inline Ptr<Closure> closure() const { return mClosure; }
 
-    [[nodiscard]] inline const type::Type& returnType() const { return mReturnType; }
-    inline void setReturnType(const type::Type& type) { mReturnType = type; }
-    [[nodiscard]] inline bool isUnspecified() const { return mReturnType.kind() == type::TypeKind::Unspecified; }
+    [[nodiscard]] inline const type::Type& functionReturnType() const { return mFunctionReturnType; }
+    inline void setFunctionReturnType(const type::Type& type) { mFunctionReturnType = type; }
+    [[nodiscard]] inline bool isUnspecified() const { return !mFunctionReturnType.isSpecified(); }
 
 private:
     const type::ParameterList mParameters;
-    type::Type mReturnType;
+    type::Type mFunctionReturnType;
     const std::string mName;
     const std::string mMangledName;
     const Ptr<Closure> mClosure;
     const bool mHasSideEffects;
 };
 
-class TypeAliasStatement : public Statement {
+class TypeAliasStatement : public Expression {
 public:
     TypeAliasStatement(const parser::Location& loc, const std::string& name, const type::Type& aliasedType)
-        : Statement(loc, StatementType::TypeAlias)
+        : Expression(loc, ExpressionType::TypeAlias)
         , mName(name)
         , mAliasedType(aliasedType)
     {
+        setReturnType(type::Type::Void());
     }
 
     [[nodiscard]] inline const std::string& name() const { return mName; }

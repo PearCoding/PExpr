@@ -19,8 +19,8 @@ UpliftPass::UpliftPass(utils::Reporter& reporter)
 
 void UpliftPass::handle(const Ptr<Closure>& closureRoot)
 {
-    auto handleStatement = [this](Closure* closure, Statement* stmt) {
-        const auto f = dynamic_cast<FunctionDeclarationStatement*>(stmt);
+    auto handleExpression = [this](Closure* closure, Expression* expr) {
+        const auto f = dynamic_cast<FunctionDeclarationStatement*>(expr);
 
         // If not a function declaration or extern skip
         if (!f || f->isExtern())
@@ -59,11 +59,12 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
             updateVariables(f->closure().get(), capturedToParameter);
 
             // Determine new return type
-            Type newReturnType = f->returnType();
+            auto newReturnType = f->functionReturnType();
             if (!capturedMutable.empty()) {
                 // Create tuple type: (original_return_type, mutable_var1_type, mutable_var2_type, ...)
                 std::vector<Type> tupleComponents;
-                tupleComponents.push_back(f->returnType());
+                if (!newReturnType.isVoid())
+                    tupleComponents.push_back(newReturnType);
                 for (const auto& mutVar : capturedMutable)
                     tupleComponents.push_back(mutVar.second->type());
                 newReturnType = Type(std::move(tupleComponents));
@@ -74,7 +75,7 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
             const std::string newMangled = makeMangledNameFromTypes(f->name(), newParams, closure);
 
             // Update local symbol table: replace function entry
-            const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->returnType(), f->isExtern(), f->hasSideEffects());
+            const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->functionReturnType(), f->isExtern(), f->hasSideEffects());
             const auto newDef = FunctionDef(f->name(), newMangled, newParams, newReturnType, f->isExtern(), f->hasSideEffects());
 
             closure->symbols().removeFunction(oldDef);
@@ -83,15 +84,14 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
             if (!capturedMutable.empty()) {
                 // Create new closure with modified return expression
                 auto newClosure = std::make_shared<Closure>(f->closure()->location(), f->closure()->parent());
-                // Copy statements
-                for (const auto& s : f->closure()->statements())
-                    newClosure->addStatement(s);
+                // Copy expressions
+                for (const auto& s : f->closure()->expressions())
+                    newClosure->addExpression(s);
 
-                // Replace the final expression with a tuple that includes mutable captures
-                if (f->closure()->expression())
-                    newClosure->expressionMut() = createReturnTuple(f->closure().get(),
-                                                                    f->closure()->expression(),
-                                                                    capturedMutable);
+                if (f->closure()->hasFinalExpression()) //< Replace the final expression with a tuple that includes mutable captures
+                    newClosure->finalExpressionMut() = createReturnTuple(f->closure().get(), f->closure()->finalExpression(), capturedMutable);
+                else //< If the function is void, add a new expression returning the mutables only
+                    newClosure->addExpression(createReturnTuple(f->closure().get(), nullptr, capturedMutable));
 
                 // Copy symbol table
                 newClosure->symbols() = f->closure()->symbols();
@@ -104,7 +104,7 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
             PEXPR_ASSERT(newFunc->name() == f->name(), "Name of function should stay the same after uplift");
 
             // Replace in closure statements:
-            closure->replaceStatement(stmt, std::move(newFunc));
+            closure->replaceExpression(expr, std::move(newFunc));
 
             // Now update all calls in this closure's scope to pass the captured variables
             // We'll append arguments corresponding to the captured variables in the same order they were added.
@@ -114,7 +114,7 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
 
     // For each function declaration, determine captured variables and
     // uplift them to parameters; also recursively process nested closures.
-    Visitor::forEachStatement(closureRoot.get(), handleStatement, false /* Go from bottom to up*/);
+    Visitor::forEachExpression(closureRoot.get(), handleExpression, false /* Go from bottom to up*/);
 }
 
 //-------------------------------------------------------------------------------------
@@ -164,30 +164,39 @@ void UpliftPass::updateCallsInExpression(ast::Closure* currentClosure, Ptr<Expre
                 // Create a pattern for destructuring the tuple
                 std::vector<ast::PatternElement> patternElements;
 
-                // First element is the result (use a unique name)
-                auto resultVar = std::make_shared<VariableDef>("__result", newDef.returnType().components()[0], false, c->location());
-                patternElements.push_back(ast::PatternElement::makeSimple(c->location(), resultVar));
-                if (!closure->symbols().addVariable(resultVar))
-                    mReporter.errorf(c->location(), "Variable '%s' for uplifting already exists in the current scope", resultVar->name().c_str());
+                const bool hasResultVar = mutableCaptures.size() < newDef.returnType().size();
+
+                Ptr<VariableDef> resultVar;
+                if (hasResultVar) {
+                    // First element is the result
+                    resultVar = std::make_shared<VariableDef>("__result", newDef.returnType().components()[0], false, c->location());
+                    patternElements.push_back(ast::PatternElement::makeSimple(c->location(), resultVar));
+                    if (!closure->symbols().addVariable(resultVar))
+                        mReporter.errorf(c->location(), "Variable '%s' for uplifting already exists in the current scope", resultVar->name().c_str());
+                }
 
                 // Subsequent elements are the mutable captures
-                for (const auto& kv : mutableCaptures)
-                    patternElements.push_back(ast::PatternElement::makeSimple(c->location(), kv.second));
+                for (const auto& kv : mutableCaptures) {
+                    auto mutVar = std::make_shared<VariableDef>("__mut_" + kv.first, kv.second->type(), false, c->location());
+                    patternElements.push_back(ast::PatternElement::makeSimple(c->location(), mutVar));
+                    if (!closure->symbols().addVariable(mutVar))
+                        mReporter.errorf(c->location(), "Variable '%s' for uplifting already exists in the current scope", mutVar->name().c_str());
+                }
 
                 auto pattern = std::make_shared<ast::Pattern>(c->location(), patternElements);
 
                 // Create a destructuring variable declaration
                 auto varDecl = std::make_shared<ast::VariableDeclarationStatement>(c->location(), pattern, c);
 
-                closure->addStatement(varDecl);
+                closure->addExpression(varDecl);
 
                 // Add assignments to update the mutable variables
-                size_t i = 1;
+                size_t i = hasResultVar ? 1 : 0;
                 for (const auto& kv : mutableCaptures) {
                     const std::string varName = kv.first;
 
                     // Create assignment pattern
-                    auto assignPattern = std::make_shared<ast::Pattern>(c->location(), std::vector<ast::PatternElement>{ ast::PatternElement::makeSimple(c->location(), patternElements.at(i).simpleBinding()) });
+                    auto assignPattern = std::make_shared<ast::Pattern>(c->location(), std::vector<ast::PatternElement>{ ast::PatternElement::makeSimple(c->location(), kv.second) });
 
                     // Create variable expression for the new value
                     auto newValueExpr = std::make_shared<ast::VariableExpression>(c->location(), patternElements.at(i).simpleBinding());
@@ -196,18 +205,20 @@ void UpliftPass::updateCallsInExpression(ast::Closure* currentClosure, Ptr<Expre
                     // Create assignment statement
                     auto assignStmt = std::make_shared<ast::VariableAssignmentStatement>(c->location(), assignPattern, newValueExpr);
 
-                    closure->addStatement(assignStmt);
+                    closure->addExpression(assignStmt);
                     ++i;
                 }
 
-                // Set the closure's expression to return the original result
-                auto resultExpr = std::make_shared<ast::VariableExpression>(c->location(), resultVar);
-                resultExpr->setReturnType(newDef.returnType().components()[0]);
-                closure->expressionMut() = resultExpr;
+                if (resultVar) {
+                    // Set the closure's expression to return the original result
+                    auto resultExpr = std::make_shared<ast::VariableExpression>(c->location(), resultVar);
+                    resultExpr->setReturnType(newDef.returnType().components()[0]);
+                    closure->addExpression(resultExpr);
+                }
 
                 // Create a closure expression to replace the original call
                 auto closureExpr = std::make_shared<ast::ClosureExpression>(c->location(), closure);
-                closureExpr->setReturnType(newDef.returnType().components()[0]);
+                closureExpr->setReturnType(hasResultVar ? newDef.returnType().components()[0] : Type::Void());
 
                 // Replace the expression
                 expr = closureExpr;
@@ -257,8 +268,22 @@ void UpliftPass::updateCallsInExpression(ast::Closure* currentClosure, Ptr<Expre
             updateCallsInClosure(b.Body.get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
         }
     } break;
+    case ExpressionType::VariableDeclaration: {
+        auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr);
+        updateCallsInExpression(currentClosure, declStmt->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+    } break;
+    case ExpressionType::VariableAssignment: {
+        auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
+        updateCallsInExpression(currentClosure, assignStmt->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+    } break;
+    case ExpressionType::FunctionDeclaration: {
+        const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr);
+        if (!f->isExtern())
+            updateCallsInClosure(f->closure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+    } break;
     case ExpressionType::Literal:
     case ExpressionType::Variable:
+    case ExpressionType::TypeAlias:
         // Ignore
         break;
     default:
@@ -272,33 +297,12 @@ void UpliftPass::updateCallsInClosure(Closure* closure,
                                       const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
                                       const std::map<std::string, Ptr<VariableDef>>& mutableCaptures)
 {
-    // Update calls inside statements
-    for (const auto& stmt : closure->statements()) {
-        // For variable decl/assign and function decl bodies, inspect expressions
-        if (stmt->type() == StatementType::VariableDeclaration) {
-            auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(stmt);
-            updateCallsInExpression(closure, declStmt->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
-        } else if (stmt->type() == StatementType::VariableAssignment) {
-            auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(stmt);
-            updateCallsInExpression(closure, assignStmt->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
-        } else if (stmt->type() == StatementType::FunctionDeclaration) {
-            const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(stmt);
-            if (!f->isExtern())
-                updateCallsInClosure(f->closure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
-        } else if (stmt->type() == StatementType::TypeAlias) {
-            // Nothing to do
-        } else {
-            PEXPR_ASSERT(false, "Non exhaustive StatementType check in UpliftPass");
-        }
-    }
-
-    // Update final expression
-    if (closure->expression()) {
-        auto expr = closure->expression();
+    // Update calls inside the closure
+    for (auto& expr : closure->expressions()) {
         if (expr->type() == ExpressionType::Closure)
             updateCallsInClosure(std::reinterpret_pointer_cast<ClosureExpression>(expr)->closure().get(), oldDef, newDef, parameterToCaptured, mutableCaptures);
         else
-            updateCallsInExpression(closure, closure->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+            updateCallsInExpression(closure, expr, oldDef, newDef, parameterToCaptured, mutableCaptures);
     }
 }
 
@@ -309,23 +313,25 @@ Ptr<ast::Expression> UpliftPass::createReturnTuple(const ast::Closure* funcClosu
     std::vector<Type> tupleTypes;
     std::vector<Ptr<Expression>> tupleEntries;
 
-    tupleTypes.push_back(originalReturnExpr->returnType());
-    tupleEntries.push_back(originalReturnExpr);
+    if (originalReturnExpr) {
+        tupleTypes.push_back(originalReturnExpr->returnType());
+        tupleEntries.push_back(originalReturnExpr);
+    }
 
     // Add variable expressions for each mutable capture
     for (const auto& kv : mutableCaptures) {
         // Look up the type from the symbol table
-        if (auto def = funcClosure->symbols().lookupVariable(originalReturnExpr->location(), kv.first)) {
-            auto varExpr = std::make_shared<VariableExpression>(originalReturnExpr->location(), def);
+        if (auto def = funcClosure->symbols().lookupVariable(funcClosure->location(), kv.first)) {
+            auto varExpr = std::make_shared<VariableExpression>(funcClosure->location(), def);
             varExpr->setReturnType(def->type());
-            tupleEntries.push_back(varExpr);
+            tupleEntries.push_back(std::move(varExpr));
             tupleTypes.push_back(def->type());
         } else {
-            mReporter.errorf(originalReturnExpr->location(), "Can not find the mutable variable '%s' in the uplifted function", kv.first.c_str());
+            mReporter.errorf(funcClosure->location(), "Can not find the mutable variable '%s' in the uplifted function", kv.first.c_str());
         }
     }
 
-    auto tupleExpr = std::make_shared<TupleExpression>(originalReturnExpr->location(), tupleEntries);
+    auto tupleExpr = std::make_shared<TupleExpression>(funcClosure->location(), tupleEntries);
     tupleExpr->setReturnType(Type(std::move(tupleTypes)));
 
     return tupleExpr;
@@ -333,50 +339,38 @@ Ptr<ast::Expression> UpliftPass::createReturnTuple(const ast::Closure* funcClosu
 
 //-------------------------------------------------------------------------------------
 
-void UpliftPass::updateVariables(const ast::Closure* closure,
+void UpliftPass::updateVariables(ast::Closure* closure,
                                  const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter)
 {
-    // Update variables inside statements
-    Visitor::forEachStatement(
-        closure,
-        [&](const Closure* currentClosure, const Statement* stmt) {
-            PEXPR_UNUSED(currentClosure);
-
-            if (stmt->type() != StatementType::VariableAssignment)
-                return;
-
-            auto assignStmt = dynamic_cast<const VariableAssignmentStatement*>(stmt);
-
-            // Update the assignment if it is on a captured one
-            std::function<void(Pattern&)> processPattern =
-                [&](Pattern& pattern) -> void {
-                for (size_t i = 0; i < pattern.size(); ++i) {
-                    auto& elem = pattern.elements()[i];
-
-                    if (elem.isSimpleBinding()) {
-                        if (capturedToParameter.contains(elem.simpleBinding()))
-                            elem.setAsSimpleBinding(capturedToParameter.at(elem.simpleBinding()));
-                    } else {
-                        // Nested pattern - recurse
-                        processPattern(*elem.nestedPattern());
-                    }
-                }
-            };
-
-            processPattern(*assignStmt->pattern());
-        });
-
-    // Update variables in expressions
     Visitor::forEachExpression(
         closure,
-        [&](const Closure* currentClosure, const Expression* expr) {
+        [&](Closure* currentClosure, Expression* expr) {
             PEXPR_UNUSED(currentClosure);
-            if (expr->type() != ExpressionType::Variable)
-                return;
+            if (expr->type() == ExpressionType::Variable) {
+                auto v = dynamic_cast<VariableExpression*>(expr);
+                if (capturedToParameter.contains(v->variable()))
+                    v->setVariable(capturedToParameter.at(v->variable()));
+            } else if (expr->type() == ExpressionType::VariableAssignment) {
+                auto assignStmt = dynamic_cast<VariableAssignmentStatement*>(expr);
 
-            auto v = const_cast<VariableExpression*>(dynamic_cast<const VariableExpression*>(expr));
-            if (capturedToParameter.contains(v->variable()))
-                v->setVariable(capturedToParameter.at(v->variable()));
+                // Update the assignment if it is on a captured one
+                std::function<void(Pattern&)> processPattern =
+                    [&](Pattern& pattern) -> void {
+                    for (size_t i = 0; i < pattern.size(); ++i) {
+                        auto& elem = pattern.elements()[i];
+
+                        if (elem.isSimpleBinding()) {
+                            if (capturedToParameter.contains(elem.simpleBinding()))
+                                elem.setAsSimpleBinding(capturedToParameter.at(elem.simpleBinding()));
+                        } else {
+                            // Nested pattern - recurse
+                            processPattern(*elem.nestedPattern());
+                        }
+                    }
+                };
+
+                processPattern(*assignStmt->pattern());
+            }
         });
 }
 } // namespace PExpr::type

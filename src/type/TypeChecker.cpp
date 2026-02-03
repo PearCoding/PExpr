@@ -56,216 +56,22 @@ Type TypeChecker::handle(const Ptr<Closure>& closure)
 Type TypeChecker::handleNode(const Ptr<Closure>& closure)
 {
     // Preregister functions in this closure
-    for (const auto& statement : closure->statements()) {
-        if (statement->type() == StatementType::FunctionDeclaration) {
-            const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
-
+    for (const auto& expr : closure->expressions()) {
+        if (expr->type() == ExpressionType::FunctionDeclaration) {
             // Pre-register a provisional function definition
-            if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
+            const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr);
+            if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
                 mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
-        } else if (statement->type() == StatementType::TypeAlias) {
-            // Type aliases are already registered by the parser immediately
-            // No need to re-register here
         }
     }
 
-    for (const auto& statement : closure->statements())
-        handleNode(closure, statement);
+    for (const auto& expr : closure->expressions())
+        handleNode(closure, expr);
 
-    if (!closure->expression()) {
-        mReporter.errorf(closure->location(), "Closure has no final expression");
-        return Type(TypeKind::Error);
-    }
-
-    const Type type = handleNode(closure, closure->expression());
-    closure->expression()->setReturnType(type);
-    return type;
-}
-
-void TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Statement>& statement)
-{
-    switch (statement->type()) {
-    case StatementType::VariableDeclaration: {
-        const auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement);
-        const auto& pattern = declStmt->pattern();
-
-        // Type-check the RHS expression
-        const auto rhsType = handleNode(closure, declStmt->expression());
-        if (rhsType.kind() == TypeKind::Error)
-            return;
-
-        // TODO: Rework this
-        // Check if pattern is a single simple binding (i.e., regular variable declaration)
-        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            auto binding = pattern->elements()[0].simpleBinding();
-
-            // Check type compatibility if explicit type is provided
-            if (binding->type().kind() != TypeKind::Unspecified) {
-                if (!isConvertible(rhsType, binding->type())) {
-                    mReporter.errorf(declStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
-                                     rhsType.toString().c_str(), binding->type().toString().c_str(), binding->name().c_str());
-                    return;
-                }
-            } else {
-                // If the variable was unspecified before, replace it
-                binding->setType(rhsType);
-            }
-        } else {
-            // Destructuring pattern: RHS must return a tuple
-            if (!rhsType.isTuple()) {
-                mReporter.errorf(declStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
-                return;
-            }
-
-            // Register variables using the original rhsType
-            std::function<bool(Pattern&, const Type&)> registerVariables =
-                [&](Pattern& pattern, const Type& type) -> bool {
-                if (!type.isTuple()) {
-                    mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
-                    return false;
-                }
-
-                const auto& components = type.components();
-                if (pattern.size() != components.size()) {
-                    mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
-                    return false;
-                }
-
-                for (size_t i = 0; i < pattern.size(); ++i) {
-                    auto& elem           = pattern.elements()[i];
-                    const auto& elemType = components.at(i);
-
-                    if (elem.isSimpleBinding()) {
-                        auto binding = elem.simpleBinding();
-
-                        // Check type compatibility if explicit type is provided
-                        if (binding->type().kind() != TypeKind::Unspecified) {
-                            if (!isConvertible(elemType, binding->type())) {
-                                mReporter.errorf(declStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
-                                                 elemType.toString().c_str(), binding->type().toString().c_str(), binding->name().c_str());
-                                return false;
-                            }
-                        } else {
-                            binding->setType(elemType);
-                        }
-                    } else {
-                        // Nested pattern - recurse
-                        if (!registerVariables(*elem.nestedPattern(), elemType))
-                            return false;
-                    }
-                }
-
-                return true;
-            };
-
-            registerVariables(*pattern, rhsType);
-        }
-    } break;
-    case StatementType::VariableAssignment: {
-        const auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement);
-        auto pattern          = assignStmt->pattern();
-
-        // Type-check the RHS expression
-        const auto rhsType = handleNode(closure, assignStmt->expression());
-        if (rhsType.kind() == TypeKind::Error)
-            return;
-
-        // TODO: Rework this
-        // Check if pattern is a single simple binding (i.e., regular variable assignment)
-        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            auto binding = pattern->elements()[0].simpleBinding();
-
-            if (!binding->isMutable()) {
-                mReporter.errorf(assignStmt->location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
-                return;
-            }
-
-            // Check type compatibility
-            const auto& varType = binding->type();
-            if (!isConvertible(rhsType, varType)) {
-                mReporter.errorf(assignStmt->location(), "Cannot convert from '%s' to '%s' for variable '%s'",
-                                 rhsType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
-                return;
-            }
-        } else {
-            // Destructuring pattern: RHS must be a tuple
-            if (!rhsType.isTuple()) {
-                mReporter.errorf(assignStmt->location(), "Destructuring requires a tuple expression on the right-hand side");
-                return;
-            }
-
-            // Helper function to recursively process pattern elements for assignment
-            std::function<bool(Pattern&, const Type&)> processPattern =
-                [&](Pattern& pattern, const Type& type) -> bool {
-                if (!type.isTuple()) {
-                    mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
-                    return false;
-                }
-
-                const auto& components = type.components();
-                if (pattern.size() != components.size()) {
-                    mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
-                    return false;
-                }
-
-                for (size_t i = 0; i < pattern.size(); ++i) {
-                    auto& elem           = pattern.elements()[i];
-                    const auto& elemType = components.at(i);
-
-                    if (elem.isSimpleBinding()) {
-                        auto binding = elem.simpleBinding();
-
-                        if (!binding->isMutable()) {
-                            mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
-                            return false;
-                        }
-
-                        // Check type compatibility
-                        const auto& varType = binding->type();
-                        if (!isConvertible(elemType, varType)) {
-                            mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
-                                             elemType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
-                            return false;
-                        }
-                    } else {
-                        // Nested pattern - recurse
-                        if (!processPattern(*elem.nestedPattern(), elemType))
-                            return false;
-                    }
-                }
-
-                return true;
-            };
-
-            processPattern(*pattern, rhsType);
-        }
-    } break;
-    case StatementType::FunctionDeclaration: {
-        const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement);
-
-        if (funcStmt->isExtern() || !funcStmt->closure()) {
-            // Do nothing
-        } else {
-            // Type-check the function body to determine the return type and process it
-            const auto returnType = handleNode(funcStmt->closure());
-
-            // The declared return type (potentially unspecified)
-            const auto declaredReturnType = funcStmt->returnType();
-
-            if (declaredReturnType.kind() == TypeKind::Unspecified || declaredReturnType.kind() == TypeKind::Error)
-                funcStmt->setReturnType(returnType);
-
-            if (returnType.kind() == TypeKind::Unspecified) {
-                mReporter.errorf(funcStmt->location(), "Could not determine return type for function '%s'", funcStmt->name().c_str());
-                return;
-            }
-
-            closure->symbols().replaceFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->returnType(), funcStmt->isExtern(), funcStmt->hasSideEffects()));
-            funcStmt->closure()->expressionMut() = injectCastIfNeeded(funcStmt->closure()->expression(), funcStmt->returnType(), nullptr);
-        }
-    } break;
-    default:
-        break;
+    if (closure->hasFinalExpression()) {
+        return closure->finalExpression()->returnType();
+    } else {
+        return Type::Void();
     }
 }
 
@@ -294,12 +100,20 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>&
         return handleNode(closure, std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
         return handleNode(closure, std::reinterpret_pointer_cast<BranchExpression>(expr));
+    case ExpressionType::VariableDeclaration:
+        return handleNode(closure, std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr));
+    case ExpressionType::VariableAssignment:
+        return handleNode(closure, std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr));
+    case ExpressionType::FunctionDeclaration:
+        return handleNode(closure, std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr));
+    case ExpressionType::TypeAlias:
+        return Type::Void();
     case ExpressionType::Error:
         // Error from the parser, continue type-checking as much as possible
-        return Type(TypeKind::Error);
+        return Type::Error();
     default:
         PEXPR_ASSERT(false, "Unhandled expression type");
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 }
 
@@ -316,26 +130,27 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<ClosureExpre
 Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpression>& expr)
 {
     // Setup conditionals
-    bool hadCastError = false;
+    bool hadError = false;
     for (auto& branch : expr->branches()) {
         handleNode(closure, branch.Condition);
-        branch.Condition = injectCastIfNeeded(branch.Condition, Type(TypeKind::Boolean), &hadCastError);
-
-        if (hadCastError)
-            return Type(TypeKind::Error);
+        branch.Condition = injectCastIfNeeded(branch.Condition, Type(TypeKind::Boolean), &hadError);
     }
 
     // Determine the type of the expression
-    Type returnType = handleNode(expr->elseClosure());
-    if (returnType.kind() == TypeKind::Error) // Error handled somewhere else
-        return returnType;
+    Type returnType = Type::Unspecified();
+
+    if (expr->elseClosure()) {
+        returnType = handleNode(expr->elseClosure());
+        if (returnType.isError()) // Error handled somewhere else
+            hadError = true;
+    }
 
     for (const auto& branch : expr->branches()) {
         const auto bodyType = handleNode(branch.Body);
-        if (bodyType.kind() == TypeKind::Error) // Error handled somewhere else
-            return bodyType;
+        if (bodyType.isError()) // Error handled somewhere else
+            hadError = true;
 
-        if (returnType.kind() == TypeKind::Unspecified) {
+        if (!returnType.isSpecified()) {
             returnType = bodyType;
         } else if (bodyType != returnType) {
             if (isConvertible(bodyType, returnType)) {
@@ -344,21 +159,26 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
                 returnType = bodyType;
             } else {
                 mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
-                return Type(TypeKind::Error);
+                return Type::Error();
             }
         }
     }
 
     // Inject casts if necessary
-    expr->elseClosure()->expressionMut() = injectCastIfNeeded(expr->elseClosure()->expression(), returnType, &hadCastError);
+    if (expr->elseClosure())
+        expr->elseClosure()->finalExpressionMut() = injectCastIfNeeded(expr->elseClosure()->finalExpression(), returnType, &hadError);
     for (auto& branch : expr->branches())
-        branch.Body->expressionMut() = injectCastIfNeeded(branch.Body->expression(), returnType, &hadCastError);
+        branch.Body->finalExpressionMut() = injectCastIfNeeded(branch.Body->finalExpression(), returnType, &hadError);
 
-    if (!hadCastError)
+    // TODO: If the else branch is missing, mark the type as "partial"
+
+    if (!hadError) {
         expr->setReturnType(returnType);
-    else
-        expr->setReturnType(Type(TypeKind::Error));
-    return returnType;
+        return returnType;
+    } else {
+        expr->setReturnType(Type::Error());
+        return Type::Error();
+    }
 }
 
 Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<VariableExpression>& expr)
@@ -380,7 +200,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpress
     if (innerType.kind() == TypeKind::Error) // Error handled somewhere else
         return innerType;
 
-    expr->setReturnType(Type(TypeKind::Unspecified));
+    expr->setReturnType(Type::Unspecified());
 
     switch (expr->op()) {
     case UnaryOperation::Pos:
@@ -400,7 +220,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<UnaryExpress
 
     if (expr->isUnspecified()) {
         typeError(mReporter, expr, innerType);
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     return expr->returnType();
@@ -411,9 +231,9 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
     auto leftType  = handleNode(closure, expr->left());
     auto rightType = handleNode(closure, expr->right());
     if (leftType.kind() == TypeKind::Error || rightType.kind() == TypeKind::Error)
-        return Type(TypeKind::Error); // Error was caught somewhere else
+        return Type::Error(); // Error was caught somewhere else
 
-    expr->setReturnType(Type(TypeKind::Unspecified));
+    expr->setReturnType(Type::Unspecified());
 
     bool hadCastError = false;
     switch (expr->op()) {
@@ -517,7 +337,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
 
     if (expr->isUnspecified()) {
         typeError(mReporter, expr, leftType, rightType);
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     return expr->returnType();
@@ -542,37 +362,38 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpressi
     fromArgs.reserve(expr->parameters().size());
 
     // First, type-check arguments to obtain their types.
+    bool hadError = false;
     for (size_t i = 0; i < expr->parameters().size(); ++i) {
         auto type = handleNode(closure, expr->parameters().at(i));
         if (type.kind() == TypeKind::Error)
-            return type; // Error was caught somewhere else
+            hadError = true; // Error was caught somewhere else
         fromArgs.push_back(type);
     }
 
-    expr->setReturnType(Type(TypeKind::Unspecified));
+    expr->setReturnType(Type::Unspecified());
 
     // Lookup the function (this allows matching with implicit convertible args)
     if (const auto def = closure->symbols().lookupFunction(expr->location(), expr->name(), fromArgs); def.has_value()) {
         // For any parameter where the actual type differs from the parameter type
         // and an implicit conversion exists, inject an implicit CastExpression
         // (explicit=false) so downstream passes see an explicit cast node.
-        bool hadCastError = false;
+
         const auto& pList = def.value().parameters();
         for (size_t i = 0; i < expr->parameters().size() && i < pList.size(); ++i) {
             const auto desired = pList[i]->type();
-            auto castExpr      = injectCastIfNeeded(expr->parameters().at(i), desired, &hadCastError);
+            auto castExpr      = injectCastIfNeeded(expr->parameters().at(i), desired, &hadError);
             fromArgs[i]        = castExpr->returnType();
             expr->replaceParameter(i, castExpr);
         }
 
-        if (!hadCastError)
+        if (!hadError)
             expr->setReturnType(def.value().returnType());
         else
-            expr->setReturnType(Type(TypeKind::Error));
+            expr->setReturnType(Type::Error());
         expr->setMangledName(def->mangledName());
     } else {
         mReporter.errorf(expr->location(), "Function '%s(%s)' is unknown or ambiguous", expr->name().c_str(), printArgs(fromArgs).c_str());
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     return expr->returnType();
@@ -584,11 +405,11 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpre
     if (innerType.kind() == TypeKind::Error)
         return innerType; // Error was caught somewhere else
 
-    expr->setReturnType(Type(TypeKind::Unspecified));
+    expr->setReturnType(Type::Unspecified());
 
     if (!innerType.isTuple()) {
         mReporter.errorf(expr->location(), "Swizzle operator is only defined for vector types");
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     // The access operator also allows expanding e.g., vec2.xyxy -> vec4 operations
@@ -597,7 +418,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpre
 
     if (vec_size == 0) {
         mReporter.errorf(expr->location(), "The access operator can not be applied to empty tuples");
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     bool isValid = true;
@@ -613,7 +434,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<SwizzleExpre
 
     if (!isValid || swizzle.empty()) {
         mReporter.errorf(expr->location(), "Invalid swizzle components '%s' given", std::string(swizzle).c_str());
-        return Type(TypeKind::Error);
+        return Type::Error();
     } else {
         PEXPR_ASSERT(swizzle.size() > 0, "Expected at least a single component");
 
@@ -644,17 +465,17 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpres
     if (innerType.kind() == TypeKind::Error)
         return innerType; // Error was caught somewhere else
 
-    expr->setReturnType(Type(TypeKind::Unspecified));
+    expr->setReturnType(Type::Unspecified());
 
     if (innerType.kind() == TypeKind::Tuple) {
         const size_t vec_size = innerType.size();
         if (vec_size < expr->index()) {
             mReporter.errorf(expr->location(), "Trying to access element %zu of tuple of size %zu", expr->index(), vec_size);
-            return Type(TypeKind::Error);
+            return Type::Error();
         }
     } else {
         mReporter.errorf(expr->location(), "Access operator is only defined for tuple/vector types");
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     expr->setReturnType(innerType.components().at(expr->index()));
@@ -665,7 +486,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<TupleExpress
 {
     if (expr->entries().size() == 0) {
         mReporter.errorf(expr->location(), "Can not create an empty tuple");
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 
     // Ensure each entry is type-checked.
@@ -694,16 +515,226 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CastExpressi
     if (expr->isExplicit()) {
         if (!isExplicitConvertible(innerType, expr->toType())) {
             mReporter.errorf(expr->location(), "Cannot cast from '%s' to '%s'", innerType.toString().data(), expr->toType().toString().data());
-            return Type(TypeKind::Error);
+            return Type::Error();
         }
     } else {
         if (!isConvertible(innerType, expr->toType())) {
             mReporter.errorf(expr->location(), "Implicit conversion from '%s' to '%s' is not allowed", innerType.toString().data(), expr->toType().toString().data());
-            return Type(TypeKind::Error);
+            return Type::Error();
         }
     }
 
     expr->setReturnType(expr->toType());
     return expr->returnType();
 }
+
+Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableDeclarationStatement>& expr)
+{
+    // Type-check the RHS expression
+    const auto rhsType = handleNode(closure, expr->expression());
+    if (rhsType.isError())
+        return Type::Error();
+
+    // TODO: Rework this
+    // Check if pattern is a single simple binding (i.e., regular variable declaration)
+    const auto& pattern = expr->pattern();
+    if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+        auto binding = pattern->elements()[0].simpleBinding();
+
+        // Check type compatibility if explicit type is provided
+        if (binding->type().isSpecified()) {
+            if (binding->type().isVoid()) {
+                mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", binding->name().c_str());
+                return Type::Error();
+            }
+
+            if (!isConvertible(rhsType, binding->type())) {
+                mReporter.errorf(expr->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
+                                 rhsType.toString().c_str(), binding->type().toString().c_str(), binding->name().c_str());
+                return Type::Error();
+            }
+        } else {
+            // If the variable was unspecified before, replace it
+            binding->setType(rhsType);
+        }
+
+        return Type::Void();
+    } else {
+        // Destructuring pattern: RHS must return a tuple
+        if (!rhsType.isTuple()) {
+            mReporter.errorf(expr->location(), "Destructuring requires a tuple expression on the right-hand side");
+            return Type::Error();
+        }
+
+        // Register variables using the original rhsType
+        std::function<bool(Pattern&, const Type&)> registerVariables =
+            [&](Pattern& pattern, const Type& type) -> bool {
+            if (!type.isTuple()) {
+                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
+                return false;
+            }
+
+            const auto& components = type.components();
+            if (pattern.size() != components.size()) {
+                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
+                return false;
+            }
+
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                auto& elem           = pattern.elements()[i];
+                const auto& elemType = components.at(i);
+
+                if (elem.isSimpleBinding()) {
+                    auto binding = elem.simpleBinding();
+
+                    // Check type compatibility if explicit type is provided
+                    if (binding->type().isSpecified()) {
+                        if (binding->type().isVoid()) {
+                            mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", binding->name().c_str());
+                            return false;
+                        }
+
+                        if (!isConvertible(elemType, binding->type())) {
+                            mReporter.errorf(expr->location(), "Cannot convert from '%s' to '%s' for variable '%s' declaration",
+                                             elemType.toString().c_str(), binding->type().toString().c_str(), binding->name().c_str());
+                            return false;
+                        }
+                    } else {
+                        binding->setType(elemType);
+                    }
+                } else {
+                    // Nested pattern - recurse
+                    if (!registerVariables(*elem.nestedPattern(), elemType))
+                        return false;
+                }
+            }
+
+            return true;
+        };
+
+        if (registerVariables(*pattern, rhsType))
+            return Type::Void(); //< In contrary to C/C++ we do not allow 'let k = (a = 44) * 4;' type of expressions.
+        else
+            return Type::Error();
+    }
+}
+
+Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableAssignmentStatement>& expr)
+{
+    // Type-check the RHS expression
+    const auto rhsType = handleNode(closure, expr->expression());
+    if (rhsType.isError())
+        return rhsType;
+
+    // TODO: Rework this
+    // Check if pattern is a single simple binding (i.e., regular variable assignment)
+    auto pattern = expr->pattern();
+    if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
+        auto binding = pattern->elements()[0].simpleBinding();
+
+        if (!binding->isMutable()) {
+            mReporter.errorf(expr->location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
+            return Type::Error();
+        }
+
+        // Check type compatibility
+        const auto& varType = binding->type();
+        if (varType.isVoid()) {
+            mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", binding->name().c_str());
+            return Type::Error();
+        }
+
+        if (!isConvertible(rhsType, varType)) {
+            mReporter.errorf(expr->location(), "Cannot convert from '%s' to '%s' for variable '%s'",
+                             rhsType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
+            return Type::Error();
+        }
+
+        return Type::Void();
+    } else {
+        // Destructuring pattern: RHS must be a tuple
+        if (!rhsType.isTuple()) {
+            mReporter.errorf(expr->location(), "Destructuring requires a tuple expression on the right-hand side");
+            return Type::Error();
+        }
+
+        // Helper function to recursively process pattern elements for assignment
+        std::function<bool(Pattern&, const Type&)> processPattern =
+            [&](Pattern& pattern, const Type& type) -> bool {
+            if (!type.isTuple()) {
+                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
+                return false;
+            }
+
+            const auto& components = type.components();
+            if (pattern.size() != components.size()) {
+                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
+                return false;
+            }
+
+            for (size_t i = 0; i < pattern.size(); ++i) {
+                auto& elem           = pattern.elements()[i];
+                const auto& elemType = components.at(i);
+
+                if (elem.isSimpleBinding()) {
+                    auto binding = elem.simpleBinding();
+
+                    if (!binding->isMutable()) {
+                        mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
+                        return false;
+                    }
+
+                    // Check type compatibility
+                    const auto& varType = binding->type();
+                    if (varType.isVoid()) {
+                        mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", binding->name().c_str());
+                        return false;
+                    }
+
+                    if (!isConvertible(elemType, varType)) {
+                        mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
+                                         elemType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
+                        return false;
+                    }
+                } else {
+                    // Nested pattern - recurse
+                    if (!processPattern(*elem.nestedPattern(), elemType))
+                        return false;
+                }
+            }
+
+            return true;
+        };
+
+        if (processPattern(*pattern, rhsType))
+            return Type::Void(); //< In contrary to C/C++ we do not allow 'let k = (a = 44) * 4;' type of expressions.
+        else
+            return Type::Error();
+    }
+}
+
+Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::FunctionDeclarationStatement>& expr)
+{
+    if (expr->isExtern() || !expr->closure()) {
+        // Do nothing
+    } else {
+        // Type-check the function body to determine the return type and process it
+        const auto functionReturnType = handleNode(expr->closure());
+
+        // The declared return type (potentially unspecified)
+        if (!expr->functionReturnType().isSpecified())
+            expr->setFunctionReturnType(functionReturnType);
+
+        if (!functionReturnType.isSpecified()) {
+            mReporter.errorf(expr->location(), "Could not determine return type for function '%s'", expr->name().c_str());
+            return Type::Error();
+        }
+
+        closure->symbols().replaceFunction(FunctionDef(expr->name(), expr->mangledName(), expr->parameters(), expr->functionReturnType(), expr->isExtern(), expr->hasSideEffects()));
+        if (closure->hasFinalExpression())
+            expr->closure()->finalExpressionMut() = injectCastIfNeeded(expr->closure()->finalExpression(), expr->functionReturnType(), nullptr);
+    }
+    return Type::Void();
+}
+
 } // namespace PExpr::type

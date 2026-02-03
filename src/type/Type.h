@@ -17,6 +17,7 @@ enum class TypeKind {
     Number,
     String,
     Tuple,
+    Void, // < No type. Used by statements and other stuff
 };
 
 /// Type representation that can be elementary or tuple
@@ -53,6 +54,10 @@ public:
         return Type(std::move(innerTypes));
     }
 
+    [[nodiscard]] inline static Type Unspecified() { return Type(TypeKind::Unspecified); }
+    [[nodiscard]] inline static Type Error() { return Type(TypeKind::Error); }
+    [[nodiscard]] inline static Type Void() { return Type(TypeKind::Void); }
+
     /// Construct type from a ValueVariant
     [[nodiscard]] static Type FromVariant(const ValueVariant& value);
 
@@ -64,6 +69,10 @@ public:
 
     /// Check if this is a tuple type
     [[nodiscard]] inline bool isTuple() const { return mKind == TypeKind::Tuple; }
+
+    [[nodiscard]] inline bool isSpecified() const { return mKind != TypeKind::Unspecified && mKind != TypeKind::Error; }
+    [[nodiscard]] inline bool isError() const { return mKind == TypeKind::Error; }
+    [[nodiscard]] inline bool isVoid() const { return mKind == TypeKind::Void; }
 
     /// For tuple types, get component types
     [[nodiscard]] inline const std::vector<Type>& components() const

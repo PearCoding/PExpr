@@ -241,7 +241,7 @@ TEST_CASE("Type system integration: parsing and type checking", "[integration]")
     {
         auto ast = env.parse("let t: [int, num] = [1, 2.5]; t");
         REQUIRE(ast != nullptr);
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.isTuple());
         REQUIRE(t.components().size() == 2);
         REQUIRE(t.components()[0].kind() == TypeKind::Integer);
@@ -252,7 +252,7 @@ TEST_CASE("Type system integration: parsing and type checking", "[integration]")
     {
         auto ast = env.parse("let v: vec3 = [1.0, 2.0, 3.0]; v");
         REQUIRE(ast != nullptr);
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.isVector());
         REQUIRE(t.size() == 3);
     }
@@ -261,7 +261,7 @@ TEST_CASE("Type system integration: parsing and type checking", "[integration]")
     {
         auto ast = env.parse("let t = [true, 42, 3.14]; t[1]");
         REQUIRE(ast != nullptr);
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.kind() == TypeKind::Integer);
     }
 
@@ -269,7 +269,7 @@ TEST_CASE("Type system integration: parsing and type checking", "[integration]")
     {
         auto ast = env.parse("let t: [bool, [int, num]] = [true, [42, 3.14]]; t[1][0]");
         REQUIRE(ast != nullptr);
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.kind() == TypeKind::Integer);
     }
 
@@ -286,7 +286,7 @@ TEST_CASE("Type system integration: parsing and type checking", "[integration]")
             process([true, 5])
         )");
         REQUIRE(ast != nullptr);
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.kind() == TypeKind::Number);
     }
 
@@ -294,7 +294,7 @@ TEST_CASE("Type system integration: parsing and type checking", "[integration]")
     {
         auto ast = env.parse("let t: [num, num] = [1, 2]; t");
         REQUIRE(ast != nullptr);
-        auto t = ast->expression()->returnType();
+        auto t = ast->finalExpression()->returnType();
         REQUIRE(t.isTuple());
         REQUIRE(t.components()[0].kind() == TypeKind::Number);
         REQUIRE(t.components()[1].kind() == TypeKind::Number);

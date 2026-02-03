@@ -27,6 +27,7 @@ public:
         addTypeAlias("int", Type(TypeKind::Integer));
         addTypeAlias("num", Type(TypeKind::Number));
         addTypeAlias("str", Type(TypeKind::String));
+        addTypeAlias("void", Type::Void());
         addTypeAlias("vec2", Type::AsVector(2));
         addTypeAlias("vec3", Type::AsVector(3));
         addTypeAlias("vec4", Type::AsVector(4));

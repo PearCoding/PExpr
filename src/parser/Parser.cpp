@@ -135,7 +135,7 @@ private:
             mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
 
         while (true) {
-            // Check for attributes before statement
+            // Check for attributes before statements/expressions
             AttributeList attrs;
             if (P.cur(0).Type == TokenType::OpenSquareBracket && P.cur(1).Type == TokenType::OpenSquareBracket) {
                 P.expect(TokenType::OpenSquareBracket);
@@ -149,39 +149,34 @@ private:
                 // Could be regular variable or destructuring declaration
                 if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
                     // Destructuring declaration: let *[pattern] = expr;
-                    closure->addStatement(p_destructuring_statement(true, attrs));
+                    closure->addExpression(p_destructuring_statement(true, attrs));
                 } else {
                     // Regular variable declaration
-                    closure->addStatement(p_variable_statement(true, attrs));
+                    closure->addExpression(p_variable_statement(true, attrs));
                 }
             } else if (P.accept(TokenType::Function)) {
                 // Function
-                closure->addStatement(p_function_statement(attrs));
+                closure->addExpression(p_function_statement(attrs));
             } else if (P.accept(TokenType::Using)) {
                 // Type alias
-                closure->addStatement(p_type_alias_statement(attrs));
+                closure->addExpression(p_type_alias_statement(attrs));
             } else if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
                 // Destructuring assignment: *[pattern] = expr;
-                closure->addStatement(p_destructuring_statement(false, attrs));
+                closure->addExpression(p_destructuring_statement(false, attrs));
             } else if (P.cur(0).Type == TokenType::Identifier && P.cur(1).Type == TokenType::Assign) {
                 // Regular variable assignment
-                closure->addStatement(p_variable_statement(false, attrs));
+                closure->addExpression(p_variable_statement(false, attrs));
             } else {
-                break;
+                closure->addExpression(p_expression());
+                if (!P.accept(TokenType::Semicolon))
+                    break;
             }
         }
 
-        if (P.cur().Type == TokenType::ClosedBraces) {
-            P.mReporter.errorf(P.cur().Location, "Expected an expression at the end of a closure but got '%s' instead", Token::toString(TokenType::ClosedBraces).data());
-            return closure;
-        }
-
-        closure->expressionMut() = p_expression();
-
         // Check for a trailing semicolon
         const auto semicolonLoc = P.cur().Location;
-        if (P.accept(TokenType::Semicolon))
-            P.mReporter.warningf(utils::RT_WARNING_TRAILING_SEMICOLON, semicolonLoc, "Trailing '%s' at the end of an expression", Token::toString(TokenType::Semicolon).data());
+        if (P.accept(TokenType::Semicolon) && closure->hasFinalExpression())
+            P.mReporter.warningf(utils::RT_WARNING_TRAILING_SEMICOLON, semicolonLoc, "Trailing '%s' at the end of an return expression", Token::toString(TokenType::Semicolon).data());
 
         mCurrentClosure = mCurrentClosure->parent();
 
@@ -189,7 +184,7 @@ private:
     }
 
     // Unified variable statement (single identifier or pattern)
-    inline Ptr<Statement> p_variable_statement(bool is_declaration, const AttributeList& attrs)
+    inline Ptr<Expression> p_variable_statement(bool is_declaration, const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
 
@@ -234,13 +229,13 @@ private:
                 return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
             } else {
                 P.mReporter.errorf(idLoc, "Unknown variable '%s' in the current scope", varName.c_str());
-                return std::make_shared<ErrorStatement>(loc);
+                return std::make_shared<ErrorExpression>(loc);
             }
         }
     }
 
     // Destructuring statement (pattern)
-    inline Ptr<Statement> p_destructuring_statement(bool is_declaration, const AttributeList& attrs)
+    inline Ptr<Expression> p_destructuring_statement(bool is_declaration, const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
 
@@ -252,7 +247,7 @@ private:
         // Parse pattern (allow mut/type annotations only for declarations)
         auto pattern = p_pattern(is_declaration);
         if (!pattern)
-            return std::make_shared<ErrorStatement>(loc);
+            return std::make_shared<ErrorExpression>(loc);
 
         P.expect(TokenType::Assign);
 
@@ -279,6 +274,8 @@ private:
             P.expect(TokenType::Identifier);
             P.expect(TokenType::Colon);
             const auto type = p_type();
+            if (type.isVoid())
+                P.mReporter.errorf(loc, "Parameter '%s' can not be of type 'void'", paramName.c_str());
             list.push_back(std::make_shared<VariableDef>(paramName, type, isMutable, loc));
         } while (P.accept(TokenType::Comma));
 
@@ -317,10 +314,13 @@ private:
                     // Optional type annotation (only allowed in declarations)
                     Type declaredType = Type(TypeKind::Unspecified);
                     if (P.accept(TokenType::Colon)) {
-                        if (is_declaration)
+                        if (is_declaration) {
                             declaredType = p_type();
-                        else
+                            if (declaredType.isVoid())
+                                P.mReporter.errorf(elemLoc, "Declared variable '%s' can not be of type 'void'", elemName.c_str());
+                        } else {
                             P.mReporter.errorf(P.cur().Location, "Type annotations are not allowed in destructuring assignments");
+                        }
                     }
 
                     if (is_declaration) {
@@ -420,7 +420,7 @@ private:
         }
     };
 
-    inline Ptr<Statement> p_function_statement(const AttributeList& attrs)
+    inline Ptr<Expression> p_function_statement(const AttributeList& attrs)
     {
         const auto loc = P.cur().Location;
 
@@ -458,8 +458,8 @@ private:
             }
 
             P.expect(TokenType::Assign);
-            Ptr<Expression> expr     = p_expression();
-            closure->expressionMut() = expr;
+            Ptr<Expression> expr = p_expression();
+            closure->addExpression(expr);
             P.expect(TokenType::Semicolon);
 
             mCurrentClosure = closure->parent();
@@ -597,7 +597,9 @@ private:
                 // Use the expression's original location for the cast node
                 const auto loc    = expr->location();
                 const auto toType = p_type();
-                expr              = std::make_shared<CastExpression>(loc, toType, expr);
+                if (toType.isVoid())
+                    P.mReporter.errorf(loc, "Can not cast to 'void'");
+                expr = std::make_shared<CastExpression>(loc, toType, expr);
                 continue;
             }
 
@@ -679,13 +681,15 @@ private:
             branches.push_back(BranchExpression::SingleBranch{ condition, closure });
         }
 
-        P.expect(TokenType::Else);
-        P.expect(TokenType::OpenBraces);
-        const auto elseClosure = p_closure();
-        P.expect(TokenType::ClosedBraces);
+        Ptr<Closure> elseClosure;
+        if (P.accept(TokenType::Else)) {
+            P.expect(TokenType::OpenBraces);
+            elseClosure = p_closure();
+            P.expect(TokenType::ClosedBraces);
+        }
 
         // Check if we even have a correct if expression
-        if (branches.empty() || !elseClosure)
+        if (branches.empty())
             return std::make_shared<ErrorExpression>(loc);
 
         return std::make_shared<BranchExpression>(loc, branches, elseClosure);
@@ -790,7 +794,7 @@ private:
             return {};
     }
 
-    inline Ptr<Statement> p_type_alias_statement(const AttributeList& attrs)
+    inline Ptr<Expression> p_type_alias_statement(const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
 
@@ -825,25 +829,29 @@ private:
 
             // Not a known type alias
             P.mReporter.errorf(P.cur().Location, "Unknown type name '%s'", name.c_str());
-            return Type(TypeKind::Error);
+            return Type::Error();
         } else if (P.cur().Type == TokenType::OpenSquareBracket) {
             // Tuple type: [T1, T2, ...]
             P.expect(TokenType::OpenSquareBracket);
             std::vector<Type> components;
             if (P.cur().Type != TokenType::ClosedSquareBracket) {
                 do {
-                    components.push_back(p_type());
+                    const auto loc = P.cur().Location;
+                    auto type      = p_type();
+                    if (type.isVoid())
+                        P.mReporter.errorf(loc, "Have type 'void' inside tuples");
+                    components.push_back(std::move(type));
                 } while (P.accept(TokenType::Comma));
             }
             P.expect(TokenType::ClosedSquareBracket);
             if (components.empty()) {
                 P.mReporter.errorf(P.cur().Location, "Tuple type must have at least one component");
-                return Type(TypeKind::Error);
+                return Type::Error();
             }
             return Type(std::move(components));
         } else {
             P.error(std::to_array<TokenType>({ TokenType::Identifier, TokenType::OpenSquareBracket }));
-            return Type(TypeKind::Error);
+            return Type::Error();
         }
     }
 };

@@ -18,10 +18,10 @@ void ClosureAnalyzer::analyzeClosure(const Closure* focusedClosure,
                                      std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
     auto captureUsage = [&](const Closure* closure, const Expression* expr) {
-        if (expr->type() != ExpressionType::Variable)
+        const auto v = dynamic_cast<const VariableExpression*>(expr);
+        if (!v)
             return;
 
-        const auto v           = dynamic_cast<const VariableExpression*>(expr);
         const SymbolTable* tbl = nullptr;
         if (auto def = closure->symbols().lookupVariable(v->location(), v->variable()->name(), &tbl)) {
             // Go up the ladder until we find the top focusedClosure or end up in global
@@ -37,14 +37,13 @@ void ClosureAnalyzer::analyzeClosure(const Closure* focusedClosure,
     if (mCaptureUsage)
         Visitor::forEachExpression(focusedClosure, captureUsage);
 
-    auto captureMutable = [&](const Closure* closure, const Statement* stmt) {
-        if (stmt->type() == StatementType::VariableAssignment) {
-            const auto assignStmt = dynamic_cast<const VariableAssignmentStatement*>(stmt);
-            collectMutableAssignmentsFromPattern(focusedClosure, closure, assignStmt->pattern(), outCapturedUsage, outCapturedMutable);
-        }
+    auto captureMutable = [&](const Closure* closure, const Expression* expr) {
+        const auto assignExpr = dynamic_cast<const VariableAssignmentStatement*>(expr);
+        if (assignExpr)
+            collectMutableAssignmentsFromPattern(focusedClosure, closure, assignExpr->pattern(), outCapturedUsage, outCapturedMutable);
     };
     if (mCaptureModification)
-        Visitor::forEachStatement(focusedClosure, captureMutable);
+        Visitor::forEachExpression(focusedClosure, captureMutable);
 }
 
 void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Closure* focusedClosure, const Closure* currentClosure,

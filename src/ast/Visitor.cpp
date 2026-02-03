@@ -10,7 +10,6 @@ template <bool CallFirst, bool IsConst>
 class VisitorImpl {
 public:
     using ClosureClass    = typename std::conditional_t<IsConst, const Closure*, Closure*>;
-    using StatementClass  = typename std::conditional_t<IsConst, const Statement*, Statement*>;
     using ExpressionClass = typename std::conditional_t<IsConst, const Expression*, Expression*>;
 
     template <typename T>
@@ -18,107 +17,28 @@ public:
 
     static void forEachOnClosure(ClosureClass closure,
                                  const std::function<void(ClosureClass, ExpressionClass)>& callbackExpr,
-                                 const std::function<void(ClosureClass, StatementClass)>& callbackStmt,
                                  const std::function<void(ClosureClass)>& callbackClosure)
     {
         if (!closure)
             return;
 
         if constexpr (CallFirst) {
-            if (callbackStmt) {
-                for (const auto& stmt : closure->statements())
-                    callbackStmt(closure, stmt.get());
-            }
-            if (callbackExpr && closure->expression())
-                callbackExpr(closure, closure->expression().get());
+            for (const auto& expr : closure->expressions())
+                callbackExpr(closure, expr.get());
         }
 
         // Visit all statements in the closure
-        for (const auto& stmt : closure->statements())
-            forEachOnStatement(stmt.get(), closure, callbackExpr, callbackStmt, callbackClosure);
-
-        // Visit the closure's expression if it exists
-        if (closure->expression())
-            forEachOnExpression(closure->expression().get(), closure, callbackExpr, callbackStmt, callbackClosure);
+        for (const auto& expr : closure->expressions())
+            forEachOnExpression(expr.get(), closure, callbackExpr, callbackClosure);
 
         if constexpr (!CallFirst) {
-            if (callbackStmt) {
-                for (const auto& stmt : closure->statements())
-                    callbackStmt(closure, stmt.get());
-            }
-            if (callbackExpr && closure->expression())
-                callbackExpr(closure, closure->expression().get());
-        }
-    }
-
-    static void forEachOnStatement(StatementClass statement, ClosureClass context,
-                                   const std::function<void(ClosureClass, ExpressionClass)>& callbackExpr,
-                                   const std::function<void(ClosureClass, StatementClass)>& callbackStmt,
-                                   const std::function<void(ClosureClass)>& callbackClosure)
-    {
-        if (!statement)
-            return;
-
-        // Handle different statement types
-        switch (statement->type()) {
-        case StatementType::VariableDeclaration: {
-            auto decl = dynamic_cast<const VariableDeclarationStatement*>(statement);
-            if (decl && decl->expression()) {
-                if constexpr (CallFirst) {
-                    if (callbackExpr)
-                        callbackExpr(context, decl->expression().get());
-                }
-                forEachOnExpression(decl->expression().get(), context, callbackExpr, callbackStmt, callbackClosure);
-                if constexpr (!CallFirst)
-                    if (callbackExpr)
-                        callbackExpr(context, decl->expression().get());
-            }
-            break;
-        }
-        case StatementType::VariableAssignment: {
-            auto assign = dynamic_cast<const VariableAssignmentStatement*>(statement);
-            if (assign && assign->expression()) {
-                if constexpr (CallFirst) {
-                    if (callbackExpr)
-                        callbackExpr(context, assign->expression().get());
-                }
-                forEachOnExpression(assign->expression().get(), context, callbackExpr, callbackStmt, callbackClosure);
-                if constexpr (!CallFirst) {
-                    if (callbackExpr)
-                        callbackExpr(context, assign->expression().get());
-                }
-            }
-            break;
-        }
-        case StatementType::FunctionDeclaration: {
-            auto func = dynamic_cast<const FunctionDeclarationStatement*>(statement);
-            if (func && func->closure()) {
-                // For function declarations, visit the closure with the closure as context
-                if constexpr (CallFirst) {
-                    if (callbackClosure)
-                        callbackClosure(func->closure().get());
-                }
-                forEachOnClosure(func->closure().get(), callbackExpr, callbackStmt, callbackClosure);
-                if constexpr (!CallFirst) {
-                    if (callbackClosure)
-                        callbackClosure(func->closure().get());
-                }
-            }
-            break;
-        }
-        case StatementType::TypeAlias:
-        case StatementType::Error:
-            // No expressions in these statement types
-            break;
-        default:
-            PEXPR_ASSERT(false, "Non exhaustive statement types");
-            break;
+            for (const auto& expr : closure->expressions())
+                callbackExpr(closure, expr.get());
         }
     }
 
     static void forEachOnExpression(ExpressionClass expression, ClosureClass context,
                                     const std::function<void(ClosureClass, ExpressionClass)>& callbackExpr,
-                                    const std::function<void(ClosureClass, StatementClass)>& callbackStmt,
                                     const std::function<void(ClosureClass)>& callbackClosure)
     {
         if (!expression)
@@ -134,7 +54,7 @@ public:
                     if (callbackExpr)
                         callbackExpr(context, cast->inner().get());
                 }
-                forEachOnExpression(cast->inner().get(), context, callbackExpr, callbackStmt, callbackClosure);
+                forEachOnExpression(cast->inner().get(), context, callbackExpr, callbackClosure);
                 if constexpr (!CallFirst) {
                     if (callbackExpr)
                         callbackExpr(context, cast->inner().get());
@@ -149,7 +69,7 @@ public:
                     if (callbackExpr)
                         callbackExpr(context, unary->inner().get());
                 }
-                forEachOnExpression(unary->inner().get(), context, callbackExpr, callbackStmt, callbackClosure);
+                forEachOnExpression(unary->inner().get(), context, callbackExpr, callbackClosure);
                 if constexpr (!CallFirst) {
                     if (callbackExpr)
                         callbackExpr(context, unary->inner().get());
@@ -166,8 +86,8 @@ public:
                         callbackExpr(context, binary->right().get());
                     }
                 }
-                forEachOnExpression(binary->left().get(), context, callbackExpr, callbackStmt, callbackClosure);
-                forEachOnExpression(binary->right().get(), context, callbackExpr, callbackStmt, callbackClosure);
+                forEachOnExpression(binary->left().get(), context, callbackExpr, callbackClosure);
+                forEachOnExpression(binary->right().get(), context, callbackExpr, callbackClosure);
                 if constexpr (!CallFirst) {
                     if (callbackExpr) {
                         callbackExpr(context, binary->left().get());
@@ -185,7 +105,7 @@ public:
                         if (callbackExpr)
                             callbackExpr(context, param.get());
                     }
-                    forEachOnExpression(param.get(), context, callbackExpr, callbackStmt, callbackClosure);
+                    forEachOnExpression(param.get(), context, callbackExpr, callbackClosure);
                     if constexpr (!CallFirst) {
                         if (callbackExpr)
                             callbackExpr(context, param.get());
@@ -201,7 +121,7 @@ public:
                     if (callbackExpr)
                         callbackExpr(context, swizzle->inner().get());
                 }
-                forEachOnExpression(swizzle->inner().get(), context, callbackExpr, callbackStmt, callbackClosure);
+                forEachOnExpression(swizzle->inner().get(), context, callbackExpr, callbackClosure);
                 if constexpr (!CallFirst) {
                     if (callbackExpr)
                         callbackExpr(context, swizzle->inner().get());
@@ -216,7 +136,7 @@ public:
                     if (callbackExpr)
                         callbackExpr(context, access->inner().get());
                 }
-                forEachOnExpression(access->inner().get(), context, callbackExpr, callbackStmt, callbackClosure);
+                forEachOnExpression(access->inner().get(), context, callbackExpr, callbackClosure);
                 if constexpr (!CallFirst) {
                     if (callbackExpr)
                         callbackExpr(context, access->inner().get());
@@ -231,7 +151,7 @@ public:
                     if (callbackClosure)
                         callbackClosure(closureExpr->closure().get());
                 }
-                forEachOnClosure(closureExpr->closure().get(), callbackExpr, callbackStmt, callbackClosure);
+                forEachOnClosure(closureExpr->closure().get(), callbackExpr, callbackClosure);
                 if constexpr (!CallFirst) {
                     if (callbackClosure)
                         callbackClosure(closureExpr->closure().get());
@@ -257,21 +177,17 @@ public:
                         callbackClosure(branch->elseClosure().get());
                 }
 
-                // Visit conditions
+                // Visit conditions and branches
                 for (const auto& b : branch->branches()) {
                     if (b.Condition)
-                        forEachOnExpression(b.Condition.get(), context, callbackExpr, callbackStmt, callbackClosure);
-                }
-
-                // Visit closures in branches
-                for (const auto& b : branch->branches()) {
+                        forEachOnExpression(b.Condition.get(), context, callbackExpr, callbackClosure);
                     if (b.Body)
-                        forEachOnClosure(b.Body.get(), callbackExpr, callbackStmt, callbackClosure);
+                        forEachOnClosure(b.Body.get(), callbackExpr, callbackClosure);
                 }
 
                 // Visit else closure
                 if (branch->elseClosure())
-                    forEachOnClosure(branch->elseClosure().get(), callbackExpr, callbackStmt, callbackClosure);
+                    forEachOnClosure(branch->elseClosure().get(), callbackExpr, callbackClosure);
 
                 if constexpr (!CallFirst) {
                     for (const auto& b : branch->branches()) {
@@ -298,7 +214,7 @@ public:
                         if (callbackExpr)
                             callbackExpr(context, entry.get());
                     }
-                    forEachOnExpression(entry.get(), context, callbackExpr, callbackStmt, callbackClosure);
+                    forEachOnExpression(entry.get(), context, callbackExpr, callbackClosure);
                     if constexpr (!CallFirst) {
                         if (callbackExpr)
                             callbackExpr(context, entry.get());
@@ -307,6 +223,52 @@ public:
             }
             break;
         }
+        case ExpressionType::VariableDeclaration: {
+            auto decl = dynamic_cast<const VariableDeclarationStatement*>(expression);
+            if (decl && decl->expression()) {
+                if constexpr (CallFirst) {
+                    if (callbackExpr)
+                        callbackExpr(context, decl->expression().get());
+                }
+                forEachOnExpression(decl->expression().get(), context, callbackExpr, callbackClosure);
+                if constexpr (!CallFirst)
+                    if (callbackExpr)
+                        callbackExpr(context, decl->expression().get());
+            }
+            break;
+        }
+        case ExpressionType::VariableAssignment: {
+            auto assign = dynamic_cast<const VariableAssignmentStatement*>(expression);
+            if (assign && assign->expression()) {
+                if constexpr (CallFirst) {
+                    if (callbackExpr)
+                        callbackExpr(context, assign->expression().get());
+                }
+                forEachOnExpression(assign->expression().get(), context, callbackExpr, callbackClosure);
+                if constexpr (!CallFirst) {
+                    if (callbackExpr)
+                        callbackExpr(context, assign->expression().get());
+                }
+            }
+            break;
+        }
+        case ExpressionType::FunctionDeclaration: {
+            auto func = dynamic_cast<const FunctionDeclarationStatement*>(expression);
+            if (func && func->closure()) {
+                // For function declarations, visit the closure with the closure as context
+                if constexpr (CallFirst) {
+                    if (callbackClosure)
+                        callbackClosure(func->closure().get());
+                }
+                forEachOnClosure(func->closure().get(), callbackExpr, callbackClosure);
+                if constexpr (!CallFirst) {
+                    if (callbackClosure)
+                        callbackClosure(func->closure().get());
+                }
+            }
+            break;
+        }
+        case ExpressionType::TypeAlias:
         case ExpressionType::Variable:
         case ExpressionType::Literal:
         case ExpressionType::Error:
@@ -326,20 +288,9 @@ void Visitor::forEachExpression(const Closure* closure,
                                 bool visitFirst)
 {
     if (visitFirst)
-        VisitorImpl<true, true>::forEachOnClosure(closure, callback, nullptr, nullptr);
+        VisitorImpl<true, true>::forEachOnClosure(closure, callback, nullptr);
     else
-        VisitorImpl<false, true>::forEachOnClosure(closure, callback, nullptr, nullptr);
-}
-
-void Visitor::forEachExpression(const Statement* statement,
-                                const Closure* context,
-                                const std::function<void(const Closure*, const Expression*)>& callback,
-                                bool visitFirst)
-{
-    if (visitFirst)
-        VisitorImpl<true, true>::forEachOnStatement(statement, context, callback, nullptr, nullptr);
-    else
-        VisitorImpl<false, true>::forEachOnStatement(statement, context, callback, nullptr, nullptr);
+        VisitorImpl<false, true>::forEachOnClosure(closure, callback, nullptr);
 }
 
 void Visitor::forEachExpression(const Expression* expression,
@@ -348,19 +299,9 @@ void Visitor::forEachExpression(const Expression* expression,
                                 bool visitFirst)
 {
     if (visitFirst)
-        VisitorImpl<true, true>::forEachOnExpression(expression, context, callback, nullptr, nullptr);
+        VisitorImpl<true, true>::forEachOnExpression(expression, context, callback, nullptr);
     else
-        VisitorImpl<false, true>::forEachOnExpression(expression, context, callback, nullptr, nullptr);
-}
-
-void Visitor::forEachStatement(const Closure* closure,
-                               const std::function<void(const Closure*, const Statement*)>& callback,
-                               bool visitFirst)
-{
-    if (visitFirst)
-        VisitorImpl<true, true>::forEachOnClosure(closure, nullptr, callback, nullptr);
-    else
-        VisitorImpl<false, true>::forEachOnClosure(closure, nullptr, callback, nullptr);
+        VisitorImpl<false, true>::forEachOnExpression(expression, context, callback, nullptr);
 }
 
 void Visitor::forEachClosure(const Closure* closure,
@@ -368,9 +309,9 @@ void Visitor::forEachClosure(const Closure* closure,
                              bool visitFirst)
 {
     if (visitFirst)
-        VisitorImpl<true, true>::forEachOnClosure(closure, nullptr, nullptr, callback);
+        VisitorImpl<true, true>::forEachOnClosure(closure, nullptr,  callback);
     else
-        VisitorImpl<false, true>::forEachOnClosure(closure, nullptr, nullptr, callback);
+        VisitorImpl<false, true>::forEachOnClosure(closure, nullptr,  callback);
 }
 
 void Visitor::forEachExpression(Closure* closure,
@@ -378,20 +319,9 @@ void Visitor::forEachExpression(Closure* closure,
                                 bool visitFirst)
 {
     if (visitFirst)
-        VisitorImpl<true, false>::forEachOnClosure(closure, callback, nullptr, nullptr);
+        VisitorImpl<true, false>::forEachOnClosure(closure, callback,  nullptr);
     else
-        VisitorImpl<false, false>::forEachOnClosure(closure, callback, nullptr, nullptr);
-}
-
-void Visitor::forEachExpression(Statement* statement,
-                                Closure* context,
-                                const std::function<void(Closure*, Expression*)>& callback,
-                                bool visitFirst)
-{
-    if (visitFirst)
-        VisitorImpl<true, false>::forEachOnStatement(statement, context, callback, nullptr, nullptr);
-    else
-        VisitorImpl<false, false>::forEachOnStatement(statement, context, callback, nullptr, nullptr);
+        VisitorImpl<false, false>::forEachOnClosure(closure, callback, nullptr);
 }
 
 void Visitor::forEachExpression(Expression* expression,
@@ -400,19 +330,9 @@ void Visitor::forEachExpression(Expression* expression,
                                 bool visitFirst)
 {
     if (visitFirst)
-        VisitorImpl<true, false>::forEachOnExpression(expression, context, callback, nullptr, nullptr);
+        VisitorImpl<true, false>::forEachOnExpression(expression, context, callback,  nullptr);
     else
-        VisitorImpl<false, false>::forEachOnExpression(expression, context, callback, nullptr, nullptr);
-}
-
-void Visitor::forEachStatement(Closure* closure,
-                               const std::function<void(Closure*, Statement*)>& callback,
-                               bool visitFirst)
-{
-    if (visitFirst)
-        VisitorImpl<true, false>::forEachOnClosure(closure, nullptr, callback, nullptr);
-    else
-        VisitorImpl<false, false>::forEachOnClosure(closure, nullptr, callback, nullptr);
+        VisitorImpl<false, false>::forEachOnExpression(expression, context, callback,  nullptr);
 }
 
 void Visitor::forEachClosure(Closure* closure,
@@ -420,9 +340,9 @@ void Visitor::forEachClosure(Closure* closure,
                              bool visitFirst)
 {
     if (visitFirst)
-        VisitorImpl<true, false>::forEachOnClosure(closure, nullptr, nullptr, callback);
+        VisitorImpl<true, false>::forEachOnClosure(closure, nullptr, callback);
     else
-        VisitorImpl<false, false>::forEachOnClosure(closure, nullptr, nullptr, callback);
+        VisitorImpl<false, false>::forEachOnClosure(closure, nullptr, callback);
 }
 
 } // namespace PExpr::ast

@@ -3,6 +3,7 @@
 #include "SymbolTable.h"
 #include "ast/Closure.h"
 #include "ast/Expression.h"
+#include "ast/Statement.h"
 #include "utils/Reporter.h"
 
 namespace PExpr::type {
@@ -18,7 +19,6 @@ public:
 
 private:
     Type handleNode(const Ptr<ast::Closure>& closure);
-    void handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::Statement>& statement);
 
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::Expression>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::ClosureExpression>& expr);
@@ -32,6 +32,9 @@ private:
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::AccessExpression>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::CastExpression>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::TupleExpression>& expr);
+    Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableDeclarationStatement>& expr);
+    Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableAssignmentStatement>& expr);
+    Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::FunctionDeclarationStatement>& expr);
 
     [[nodiscard]] Ptr<ast::Expression> injectCastIfNeeded(const Ptr<ast::Expression>& origExpression, const Type& toType, bool* hadError);
 

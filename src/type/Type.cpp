@@ -18,6 +18,8 @@ std::string Type::toString() const
         return "num";
     case TypeKind::String:
         return "str";
+    case TypeKind::Void:
+        return "void";
     case TypeKind::Tuple: {
         std::stringstream ss;
         if (isVector()) {
@@ -58,7 +60,7 @@ Type Type::FromVariant(const ValueVariant& value)
         return Type(innerTypes);
     } else {
         PEXPR_ASSERT(false, "Invalid ValueVariant");
-        return Type(TypeKind::Error);
+        return Type::Error();
     }
 }
 

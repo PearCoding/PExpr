@@ -30,26 +30,22 @@ enum class BinaryOperation {
 };
 
 enum class ExpressionType {
-    Error,    /// Internally used expression type.
-    Variable, /// A standard variable access.
-    Literal,  /// A literal.
-    Unary,    /// Unary operation.
-    Binary,   /// Binary operation.
-    Call,     /// Call to a function.
-    Swizzle,  /// Component swizzle operation.
-    Access,   /// Vector single component lookup
-    Cast,     /// Implicit/explicit cast expression.
-    Closure,  /// An enclosed closure
-    Branch,   /// If, elif and else block
-    Tuple,    /// Vector [x,y,z,w]
-};
-
-enum class StatementType {
-    Error,               /// Internally used statement type.
-    VariableDeclaration, /// New declaration of a variable (single or destructuring)
-    VariableAssignment,  /// Update of a variable (single or destructuring)
-    FunctionDeclaration, /// New declaration of a function
-    TypeAlias,           /// Type alias declaration using 'using'
+    Error,               /// Internally used expression type.
+    VariableDeclaration, /// New declaration of a variable (single or destructuring) [statement -> void]
+    VariableAssignment,  /// Update of a variable (single or destructuring)          [statement -> void]
+    FunctionDeclaration, /// New declaration of a function                           [statement -> void]
+    TypeAlias,           /// Type alias declaration using 'using'                    [statement -> void]
+    Variable,            /// A standard variable access.
+    Literal,             /// A literal.
+    Unary,               /// Unary operation.
+    Binary,              /// Binary operation.
+    Call,                /// Call to a function.
+    Swizzle,             /// Component swizzle operation.
+    Access,              /// Vector single component lookup
+    Cast,                /// Implicit/explicit cast expression.
+    Closure,             /// An enclosed closure
+    Branch,              /// If, elif and else block
+    Tuple,               /// Vector [x,y,z,w]
 };
 
 /// Returns printable representation of the given operation.

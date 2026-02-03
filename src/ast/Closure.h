@@ -6,10 +6,9 @@
 
 namespace PExpr::ast {
 class Expression;
-class Statement;
 class Closure {
 public:
-    using StatementList = std::vector<Ptr<Statement>>;
+    using ExpressionList = std::vector<Ptr<Expression>>;
 
     explicit Closure(const parser::Location& loc, Closure* parent = nullptr)
         : mParent(parent)
@@ -29,22 +28,31 @@ public:
         mSymbols.setParent(p ? &p->symbols() : nullptr);
     }
 
-    [[nodiscard]] inline const StatementList& statements() const { return mStatements; }
-    [[nodiscard]] inline StatementList& statements() { return mStatements; }
-    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
-    [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
+    [[nodiscard]] inline const ExpressionList& expressions() const { return mExpressions; }
+    [[nodiscard]] inline ExpressionList& expressions() { return mExpressions; }
 
-    inline void addStatement(const Ptr<Statement>& statement)
+    [[nodiscard]] bool hasFinalExpression() const;
+
+    [[nodiscard]] inline Ptr<Expression> finalExpression() const
     {
-        PEXPR_ASSERT(statement != nullptr, "Expected valid statement");
-        mStatements.push_back(statement);
+        return mExpressions.back();
+    }
+    [[nodiscard]] inline Ptr<Expression>& finalExpressionMut() &
+    {
+        return mExpressions.back();
     }
 
-    inline void replaceStatement(const Ptr<Statement>& oldStmt, const Ptr<Statement>& newStmt)
+    inline void addExpression(const Ptr<Expression>& statement)
+    {
+        PEXPR_ASSERT(statement != nullptr, "Expected valid statement");
+        mExpressions.push_back(statement);
+    }
+
+    inline void replaceExpression(const Ptr<Expression>& oldStmt, const Ptr<Expression>& newStmt)
     {
         PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
         PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
-        for (auto& st : mStatements) {
+        for (auto& st : mExpressions) {
             if (st == oldStmt) {
                 st = newStmt;
                 break;
@@ -52,21 +60,21 @@ public:
         }
     }
 
-    inline void replaceStatement(const Ptr<Statement>& oldStmt, Ptr<Statement>&& newStmt)
+    inline void replaceExpression(const Ptr<Expression>& oldStmt, Ptr<Expression>&& newStmt)
     {
         PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
         PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
-        for (auto& st : mStatements) {
+        for (auto& st : mExpressions) {
             if (st == oldStmt)
                 st = std::move(newStmt);
         }
     }
 
-    inline void replaceStatement(Statement* oldStmt, const Ptr<Statement>& newStmt)
+    inline void replaceExpression(Expression* oldStmt, const Ptr<Expression>& newStmt)
     {
         PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
         PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
-        for (auto& st : mStatements) {
+        for (auto& st : mExpressions) {
             if (st.get() == oldStmt) {
                 st = newStmt;
                 break;
@@ -74,11 +82,11 @@ public:
         }
     }
 
-    inline void replaceStatement(Statement* oldStmt, Ptr<Statement>&& newStmt)
+    inline void replaceExpression(Expression* oldStmt, Ptr<Expression>&& newStmt)
     {
         PEXPR_ASSERT(oldStmt != nullptr, "Expected valid original statement");
         PEXPR_ASSERT(newStmt != nullptr, "Expected valid new statement");
-        for (auto& st : mStatements) {
+        for (auto& st : mExpressions) {
             if (st.get() == oldStmt)
                 st = std::move(newStmt);
         }
@@ -93,7 +101,6 @@ private:
     type::SymbolTable mSymbols;
 
     parser::Location mLocation;
-    StatementList mStatements;
-    Ptr<Expression> mExpression;
+    ExpressionList mExpressions;
 };
 } // namespace PExpr::ast

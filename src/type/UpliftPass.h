@@ -25,8 +25,6 @@ public:
 private:
     utils::Reporter& mReporter;
 
-    void processClosure(const Ptr<ast::Closure>& closure);
-
     // Traverse and update call expressions to append additional arguments when
     // the target function signature expects more parameters (e.g. uplifted captures).
     void updateCallsInExpression(ast::Closure* currentClosure, Ptr<ast::Expression>& expr,
@@ -38,7 +36,7 @@ private:
                               const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& parameterToCaptured,
                               const std::map<std::string, Ptr<VariableDef>>& mutableCaptures);
 
-    void updateVariables(const ast::Closure* closure, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
+    void updateVariables(ast::Closure* closure, const std::unordered_map<Ptr<VariableDef>, Ptr<VariableDef>>& capturedToParameter);
 
     // Create a tuple expression for the return value that includes original return
     // plus updated mutable captured variables.

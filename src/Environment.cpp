@@ -73,9 +73,7 @@ bool Environment::doTypeChecking(const Ptr<Closure>& closure)
 {
     TypeChecker checker(mReporter);
     const auto retType = checker.handle(closure);
-    if (retType.kind() == TypeKind::Unspecified || retType.kind() == TypeKind::Error)
-        return false;
-    return true;
+    return retType.isSpecified();
 }
 
 ssa::SSAProgram Environment::map(const Ptr<ast::Closure>& closure)

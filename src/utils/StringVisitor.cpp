@@ -13,22 +13,6 @@ std::string StringVisitor::pad(size_t level)
     return str;
 }
 
-std::string StringVisitor::visit(size_t level, const Ptr<Statement>& statement)
-{
-    switch (statement->type()) {
-    case StatementType::VariableDeclaration:
-        return dump(level, std::reinterpret_pointer_cast<VariableDeclarationStatement>(statement));
-    case StatementType::VariableAssignment:
-        return dump(level, std::reinterpret_pointer_cast<VariableAssignmentStatement>(statement));
-    case StatementType::FunctionDeclaration:
-        return dump(level, std::reinterpret_pointer_cast<FunctionDeclarationStatement>(statement));
-    case StatementType::TypeAlias:
-        return dump(level, std::reinterpret_pointer_cast<TypeAliasStatement>(statement));
-    default:
-        return "ERROR";
-    }
-}
-
 std::string StringVisitor::visit(size_t level, const Ptr<Expression>& expr)
 {
     switch (expr->type()) {
@@ -54,6 +38,14 @@ std::string StringVisitor::visit(size_t level, const Ptr<Expression>& expr)
         return dump(level, std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
         return dump(level, std::reinterpret_pointer_cast<BranchExpression>(expr));
+    case ExpressionType::VariableDeclaration:
+        return dump(level, std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr));
+    case ExpressionType::VariableAssignment:
+        return dump(level, std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr));
+    case ExpressionType::FunctionDeclaration:
+        return dump(level, std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr));
+    case ExpressionType::TypeAlias:
+        return dump(level, std::reinterpret_pointer_cast<TypeAliasStatement>(expr));
     default:
         PEXPR_ASSERT(false, "Unhandled expression type");
         return "ERROR";
@@ -62,11 +54,18 @@ std::string StringVisitor::visit(size_t level, const Ptr<Expression>& expr)
 
 std::string StringVisitor::dump(size_t level, const Ptr<Closure>& closure)
 {
-    std::stringstream stream;
-    for (const auto& statements : closure->statements())
-        stream << pad(level) << visit(level, statements) << std::endl;
+    if (closure->expressions().empty())
+        return "";
 
-    stream << pad(level) << visit(level, closure->expression());
+    std::stringstream stream;
+    for (size_t i = 0; i < closure->expressions().size()-1; ++i) {
+        const auto& expr = closure->expressions()[i];
+        stream << pad(level) << visit(level, expr) << ";" << std::endl;
+    }
+
+    stream << pad(level) << visit(level, closure->finalExpression());
+    if (!closure->hasFinalExpression()) // If the final expression is void (aka, a statement, append a semicolon)
+        stream << ";";
     return stream.str();
 }
 
@@ -84,7 +83,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableDeclarationState
         stream << varDef->name();
         if (varDef->type().kind() != type::TypeKind::Unspecified)
             stream << ":" << varDef->type().toString();
-        stream << " = " << visit(level, statement->expression()) << ";";
+        stream << " = " << visit(level, statement->expression());
         return stream.str();
     }
 
@@ -116,7 +115,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableDeclarationState
 
     stream << "*";
     dumpPattern(*pattern);
-    stream << " = " << visit(level, statement->expression()) << ";";
+    stream << " = " << visit(level, statement->expression());
     return stream.str();
 }
 
@@ -129,7 +128,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableAssignmentStatem
         const auto varDef = pattern->elements()[0].simpleBinding();
         std::stringstream stream;
         stream << varDef->name();
-        stream << " = " << visit(level, statement->expression()) << ";";
+        stream << " = " << visit(level, statement->expression());
         return stream.str();
     }
 
@@ -156,7 +155,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableAssignmentStatem
 
     stream << "*";
     dumpPattern(*pattern);
-    stream << " = " << visit(level, statement->expression()) << ";";
+    stream << " = " << visit(level, statement->expression());
     return stream.str();
 }
 
@@ -182,7 +181,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<FunctionDeclarationState
         stream << param->name() << ":" << param->type().toString();
     }
 
-    stream << ") -> " << statement->returnType().toString();
+    stream << ") -> " << statement->functionReturnType().toString();
 
     if (!statement->isExtern()) {
         stream << " = {" << std::endl
@@ -190,7 +189,6 @@ std::string StringVisitor::dump(size_t level, const Ptr<FunctionDeclarationState
                << pad(level) << "}";
     }
 
-    stream << ";";
     return stream.str();
 }
 
@@ -297,7 +295,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<TupleExpression>& expr)
 std::string StringVisitor::dump(size_t, const Ptr<TypeAliasStatement>& statement)
 {
     std::stringstream stream;
-    stream << "using " << statement->name() << " = " << statement->aliasedType().toString() << ";";
+    stream << "using " << statement->name() << " = " << statement->aliasedType().toString();
     return stream.str();
 }
 

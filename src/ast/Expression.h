@@ -9,7 +9,7 @@ namespace PExpr::ast {
 /// Abstract expression. Can not be created directly.
 class Expression {
 public:
-    Expression() = delete;
+    Expression()          = delete;
     virtual ~Expression() = default;
 
     /// The location this expression is associated with.
@@ -24,8 +24,10 @@ public:
     /// Update the return type. Used by the typechecker
     inline void setReturnType(const type::Type& type) { mReturnType = type; }
 
-    /// True if the type this expression evaluates to is yet 'unspecified'.
-    [[nodiscard]] inline bool isUnspecified() const { return mReturnType.kind() == type::TypeKind::Unspecified; }
+    /// True if the type this expression evaluates to is yet 'unspecified' or 'error'.
+    [[nodiscard]] inline bool isUnspecified() const { return !mReturnType.isSpecified(); }
+    [[nodiscard]] inline bool isError() const { return mReturnType.isError(); }
+    [[nodiscard]] inline bool isVoid() const { return mReturnType.isVoid(); }
 
 protected:
     inline Expression(const parser::Location& loc, ExpressionType type)
@@ -58,6 +60,7 @@ public:
         , mVariable(variable)
     {
         PEXPR_ASSERT(variable, "Expected a valid variable for the expression");
+        PEXPR_ASSERT(!variable->type().isVoid(), "A variable can not have the type 'void'");
     }
 
     [[nodiscard]] inline Ptr<type::VariableDef> variable() const { return mVariable; }
@@ -74,7 +77,7 @@ public:
         : Expression(loc, ExpressionType::Literal)
         , mValue(value)
     {
-        PEXPR_ASSERT(type.kind() != type::TypeKind::Unspecified, "Expected a specified type as a constant");
+        PEXPR_ASSERT(type.isSpecified() && !type.isVoid(), "Expected a elementary type as a constant");
         setReturnType(type);
     }
 
@@ -131,7 +134,7 @@ public:
     [[nodiscard]] inline Ptr<Expression> inner() const { return mInner; }
     [[nodiscard]] inline Ptr<Expression>& innerMut() & { return mInner; }
     [[nodiscard]] inline bool isExplicit() const { return mExplicit; }
-    
+
 private:
     type::Type mToType;
     Ptr<Expression> mInner;
@@ -314,7 +317,6 @@ public:
         , mElseClosure(else_closure)
     {
         PEXPR_ASSERT(!branches.empty(), "Expected a minimum of one condition");
-        PEXPR_ASSERT(else_closure != nullptr, "Expected valid pointer for else closure");
     }
 
     /// The actual unary operation of this expression.
