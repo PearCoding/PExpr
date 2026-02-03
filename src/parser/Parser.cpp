@@ -163,7 +163,8 @@ private:
             } else if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
                 // Destructuring assignment: *[pattern] = expr;
                 closure->addExpression(p_destructuring_statement(false, attrs));
-            } else if (P.cur(0).Type == TokenType::Identifier && P.cur(1).Type == TokenType::Assign) {
+            } else if (P.cur(0).Type == TokenType::Identifier
+                       && (P.cur(1).Type == TokenType::Assign || P.cur(1).Type == TokenType::PlusAssign || P.cur(1).Type == TokenType::MinusAssign || P.cur(1).Type == TokenType::MulAssign || P.cur(1).Type == TokenType::DivAssign)) {
                 // Regular variable assignment
                 closure->addExpression(p_variable_statement(false, attrs));
             } else if (P.cur(0).Type == TokenType::ClosedBraces && mCurrentClosure->parent()) {
@@ -206,9 +207,15 @@ private:
         if (is_declaration && P.accept(TokenType::Colon))
             declaredType = p_type();
 
-        P.expect(TokenType::Assign);
+        // Get the assignment operator (could be =, +=, -=, *=, /=)
+        const TokenType assignOp = P.cur().Type;
+        if (assignOp != TokenType::Assign && assignOp != TokenType::PlusAssign && assignOp != TokenType::MinusAssign && assignOp != TokenType::MulAssign && assignOp != TokenType::DivAssign) {
+            P.mReporter.errorf(P.cur().Location, "Expected assignment operator");
+            return std::make_shared<ErrorExpression>(loc);
+        }
+        P.next(); // Consume the assignment operator
 
-        auto expr = p_expression();
+        auto rightExpr = p_expression();
 
         P.expect(TokenType::Semicolon);
 
@@ -223,13 +230,52 @@ private:
             elements.push_back(PatternElement::makeSimple(idLoc, variableDef));
             auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
 
-            return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(expr));
+            // For declarations, only simple assignment is allowed
+            if (assignOp != TokenType::Assign) {
+                P.mReporter.errorf(idLoc, "Compound assignment operators are not allowed in declarations");
+                return std::make_shared<ErrorExpression>(loc);
+            }
+
+            return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(rightExpr));
         } else {
             if (auto lkp = mCurrentClosure->symbols().lookupVariable(idLoc, varName)) {
                 Pattern::ElementList elements;
                 elements.push_back(PatternElement::makeSimple(idLoc, lkp));
                 auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
-                return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
+
+                Ptr<Expression> assignmentExpr = rightExpr;
+
+                // Transform compound assignments to binary operations
+                if (assignOp != TokenType::Assign) {
+                    // Map token type to binary operation
+                    BinaryOperation binOp;
+                    switch (assignOp) {
+                    case TokenType::PlusAssign:
+                        binOp = BinaryOperation::Add;
+                        break;
+                    case TokenType::MinusAssign:
+                        binOp = BinaryOperation::Sub;
+                        break;
+                    case TokenType::MulAssign:
+                        binOp = BinaryOperation::Mul;
+                        break;
+                    case TokenType::DivAssign:
+                        binOp = BinaryOperation::Div;
+                        break;
+                    default:
+                        PEXPR_ASSERT(false, "Unhandled compound assignment operator");
+                        binOp = BinaryOperation::Add;
+                        break;
+                    }
+
+                    // Create variable expression for the left side
+                    auto varExpr = std::make_shared<VariableExpression>(idLoc, lkp);
+
+                    // Create binary expression: left op right
+                    assignmentExpr = std::make_shared<BinaryExpression>(loc, binOp, varExpr, rightExpr);
+                }
+
+                return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(assignmentExpr));
             } else {
                 P.mReporter.errorf(idLoc, "Unknown variable '%s' in the current scope", varName.c_str());
                 return std::make_shared<ErrorExpression>(loc);
@@ -252,7 +298,19 @@ private:
         if (!pattern)
             return std::make_shared<ErrorExpression>(loc);
 
-        P.expect(TokenType::Assign);
+        // Get the assignment operator (could be =, +=, -=, *=, /=)
+        const TokenType assignOp = P.cur().Type;
+        if (assignOp != TokenType::Assign && assignOp != TokenType::PlusAssign && assignOp != TokenType::MinusAssign && assignOp != TokenType::MulAssign && assignOp != TokenType::DivAssign) {
+            P.mReporter.errorf(P.cur().Location, "Expected assignment operator");
+            return std::make_shared<ErrorExpression>(loc);
+        }
+        P.next(); // Consume the assignment operator
+
+        // For destructuring, only simple assignment is allowed
+        if (assignOp != TokenType::Assign) {
+            P.mReporter.errorf(loc, "Compound assignment operators are not allowed with destructuring patterns");
+            return std::make_shared<ErrorExpression>(loc);
+        }
 
         auto expr = p_expression();
 

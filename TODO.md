@@ -34,3 +34,5 @@
 - [x] Redo variables. Keep track where a variable was declared. Use, similar to mangledName of functions a unique name for variables. This extremely simplifies SSA and many other stages.
 - [ ] Add [[constant]] attribute for variables which have to be constant evaluated and must not be in the final SSA
 - [ ] Add [[constant]] attribute for expressions which have to be constant evaluated and must not be in the final SSA
+- [x] Add syntactic sugar for variable assignments with "+=", "-=", ...
+- [ ] Remove some of the annoying habits (e.g., "fn foo(...) = { };" instead of "fn foo(...) { }" and "if ... {...};" instead of "if ... {...}")

@@ -1,0 +1,29 @@
+// Test compound assignment operators
+let mut a = 5;
+a += 3;  // a = 8
+a -= 2;  // a = 6
+a *= 4;  // a = 24
+a /= 3;  // a = 8
+
+let mut b = 10.0;
+b += 2.5;  // b = 12.5
+b -= 1.5;  // b = 11.0
+b *= 2.0;  // b = 22.0
+b /= 4.0;  // b = 5.5
+
+let mut c = 100;
+c += 10 * 2;  // c = 120
+c -= 30 / 2;  // c = 105
+c *= 2 + 1;   // c = 315
+c /= 5;       // c = 63
+
+// Test error: compound assignment in declaration (should fail)
+// let mut d += 5; // Not allowed
+
+// Test error: compound assignment with destructuring (should fail)
+// let mut e = 10;
+// let mut f = 20;
+// *[e, f] += [1, 2];  // Not allowed
+
+// Final expression to return
+a + b + c

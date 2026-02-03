@@ -37,22 +37,34 @@ Token Lexer::next()
             return Token(prevLoc, TokenType::OpenSquareBracket);
         if (accept(']'))
             return Token(prevLoc, TokenType::ClosedSquareBracket);
-        if (accept('+'))
-            return Token(prevLoc, TokenType::Plus);
+        if (accept('+')) {
+            if (accept('='))
+                return Token(prevLoc, TokenType::PlusAssign);
+            else
+                return Token(prevLoc, TokenType::Plus);
+        }
         if (accept('-')) {
-            if (accept('>'))
+            if (accept('='))
+                return Token(prevLoc, TokenType::MinusAssign);
+            else if (accept('>'))
                 return Token(prevLoc, TokenType::ArrowRight);
             else
                 return Token(prevLoc, TokenType::Minus);
         }
-        if (accept('*'))
-            return Token(prevLoc, TokenType::Mul);
+        if (accept('*')) {
+            if (accept('='))
+                return Token(prevLoc, TokenType::MulAssign);
+            else
+                return Token(prevLoc, TokenType::Mul);
+        }
         if (accept(':'))
             return Token(prevLoc, TokenType::Colon);
         if (accept(';'))
             return Token(prevLoc, TokenType::Semicolon);
         if (accept('/')) {
-            if (accept('*')) {
+            if (accept('='))
+                return Token(prevLoc, TokenType::DivAssign);
+            else if (accept('*')) {
                 eatComments(true);
                 continue;
             } else if (accept('/')) {

@@ -37,6 +37,10 @@ enum class TokenType {
     Colon,               // :
     Semicolon,           // ;
     Assign,              // =
+    PlusAssign,          // +=
+    MinusAssign,         // -=
+    MulAssign,           // *=
+    DivAssign,           // /=
 
     ArrowRight, // ->
 

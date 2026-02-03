@@ -73,6 +73,14 @@ std::string Token::toString(TokenType type)
         return "!=";
     case TokenType::Assign:
         return "=";
+    case TokenType::PlusAssign:
+        return "+=";
+    case TokenType::MinusAssign:
+        return "-=";
+    case TokenType::MulAssign:
+        return "*=";
+    case TokenType::DivAssign:
+        return "/=";
     case TokenType::ArrowRight:
         return "->";
     case TokenType::If:
