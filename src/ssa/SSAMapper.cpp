@@ -97,7 +97,8 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
 
     // map final expression as return
     if (closure->hasFinalExpression() && lastValue) {
-        auto ret   = std::make_shared<SSAInstrReturn>();
+        auto ret = std::make_shared<SSAInstrReturn>();
+        PEXPR_ASSERT(lastValue.has_value(), "Expected lastValue to have a value for final expression return");
         ret->Value = *lastValue;
         program.Body.push_back(ret);
     }
@@ -159,8 +160,11 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         auto v = std::reinterpret_pointer_cast<TupleExpression>(expr);
         std::vector<SSAValue> inners;
         inners.reserve(v->entries().size());
-        for (const auto& e : v->entries())
-            inners.push_back(*mapExpression(program, e));
+        for (const auto& e : v->entries()) {
+            auto mapped = mapExpression(program, e);
+            PEXPR_ASSERT(mapped.has_value(), "Expected tuple entry expression to produce a value");
+            inners.push_back(*mapped);
+        }
 
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), v->returnType());
         SSAInstrAssign asg;
@@ -171,8 +175,10 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         result = tgt;
     } break;
     case ExpressionType::Unary: {
-        auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        SSAValue inner = *mapExpression(program, u->inner());
+        auto u      = std::reinterpret_pointer_cast<UnaryExpression>(expr);
+        auto mapped = mapExpression(program, u->inner());
+        PEXPR_ASSERT(mapped.has_value(), "Expected unary inner expression to produce a value");
+        SSAValue inner = *mapped;
         SSAValue tgt   = SSAValue::Named(mContext.fresh("%"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
@@ -183,9 +189,13 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         result = tgt;
     } break;
     case ExpressionType::Binary: {
-        auto b       = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        SSAValue L   = *mapExpression(program, b->left());
-        SSAValue R   = *mapExpression(program, b->right());
+        auto b          = std::reinterpret_pointer_cast<BinaryExpression>(expr);
+        auto leftMapped = mapExpression(program, b->left());
+        PEXPR_ASSERT(leftMapped.has_value(), "Expected binary left expression to produce a value");
+        auto rightMapped = mapExpression(program, b->right());
+        PEXPR_ASSERT(rightMapped.has_value(), "Expected binary right expression to produce a value");
+        SSAValue L   = *leftMapped;
+        SSAValue R   = *rightMapped;
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
@@ -199,8 +209,11 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         auto c = std::reinterpret_pointer_cast<CallExpression>(expr);
         std::vector<SSAValue> args;
         args.reserve(c->parameters().size());
-        for (const auto& p : c->parameters())
-            args.push_back(*mapExpression(program, p));
+        for (const auto& p : c->parameters()) {
+            auto mapped = mapExpression(program, p);
+            PEXPR_ASSERT(mapped.has_value(), "Expected call parameter expression to produce a value");
+            args.push_back(*mapped);
+        }
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
         SSAValue tgt             = SSAValue::Named(mContext.fresh("%"), c->returnType());
@@ -213,8 +226,10 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         result = tgt;
     } break;
     case ExpressionType::Swizzle: {
-        auto a                     = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
-        SSAValue in                = *mapExpression(program, a->inner());
+        auto a      = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
+        auto mapped = mapExpression(program, a->inner());
+        PEXPR_ASSERT(mapped.has_value(), "Expected swizzle inner expression to produce a value");
+        SSAValue in                = *mapped;
         const std::string& swizzle = a->swizzle();
 
         // Helper to map swizzle character to index
@@ -274,8 +289,10 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         }
     } break;
     case ExpressionType::Access: {
-        auto a       = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        SSAValue in  = *mapExpression(program, a->inner());
+        auto a      = std::reinterpret_pointer_cast<AccessExpression>(expr);
+        auto mapped = mapExpression(program, a->inner());
+        PEXPR_ASSERT(mapped.has_value(), "Expected access inner expression to produce a value");
+        SSAValue in  = *mapped;
         SSAValue cst = SSAValue::Constant((Integer)a->index());
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
@@ -288,7 +305,9 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
     case ExpressionType::Cast: {
         auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
         // Map inner expression and emit an SSA cast instruction
-        SSAValue inner = *mapExpression(program, c->inner());
+        auto mapped = mapExpression(program, c->inner());
+        PEXPR_ASSERT(mapped.has_value(), "Expected cast inner expression to produce a value");
+        SSAValue inner = *mapped;
         // If both types match do nothing else typechecker should ensure correctness
         if (inner.type() == c->toType()) {
             result = inner;
@@ -329,7 +348,9 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         for (size_t i = 0; i < br->branches().size(); ++i) {
             const auto& single = br->branches()[i];
             // map condition expression
-            SSAValue cond = *mapExpression(program, single.Condition);
+            auto mapped = mapExpression(program, single.Condition);
+            PEXPR_ASSERT(mapped.has_value(), "Expected branch condition expression to produce a value");
+            SSAValue cond = *mapped;
             conditionVals.push_back(cond);
 
             // emit branch instruction
@@ -463,8 +484,10 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         }
     } break;
     case ExpressionType::VariableDeclaration: {
-        auto declStmt       = std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr);
-        SSAValue rhs        = *mapExpression(program, declStmt->expression());
+        auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr);
+        auto mapped   = mapExpression(program, declStmt->expression());
+        PEXPR_ASSERT(mapped.has_value(), "Expected variable declaration expression to produce a value");
+        SSAValue rhs        = *mapped;
         const auto& pattern = declStmt->pattern();
 
         // TODO: Rework this
@@ -537,8 +560,10 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         }
     } break;
     case ExpressionType::VariableAssignment: {
-        auto assignStmt     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
-        SSAValue rhs        = *mapExpression(program, assignStmt->expression());
+        auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
+        auto mapped     = mapExpression(program, assignStmt->expression());
+        PEXPR_ASSERT(mapped.has_value(), "Expected variable assignment expression to produce a value");
+        SSAValue rhs        = *mapped;
         const auto& pattern = assignStmt->pattern();
 
         // TODO: Rework this
