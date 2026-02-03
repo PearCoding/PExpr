@@ -160,8 +160,8 @@ TEST_CASE("Parser: conditional expressions", "[parser][conditionals]")
             x
         )");
 
-        // Should produce parser error
-        REQUIRE(env.reporter().errorCount() > 0);
+        // Correct in the newest version. Will produce warnings though
+        REQUIRE(env.reporter().errorCount() == 0);
     }
 }
 

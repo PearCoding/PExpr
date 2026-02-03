@@ -3,6 +3,7 @@
 #include "type/SymbolTable.h"
 
 #include <functional>
+#include <ranges>
 
 namespace PExpr::ast {
 class Expression;
@@ -30,6 +31,14 @@ public:
 
     [[nodiscard]] inline const ExpressionList& expressions() const { return mExpressions; }
     [[nodiscard]] inline ExpressionList& expressions() { return mExpressions; }
+
+    [[nodiscard]] inline auto expressionsWithoutFinal() const
+    {
+        if (hasFinalExpression())
+            return std::ranges::subrange(mExpressions.begin(), mExpressions.end() - 1);
+        else
+            return std::ranges::subrange(mExpressions.begin(), mExpressions.end());
+    }
 
     [[nodiscard]] bool hasFinalExpression() const;
 

@@ -166,6 +166,9 @@ private:
             } else if (P.cur(0).Type == TokenType::Identifier && P.cur(1).Type == TokenType::Assign) {
                 // Regular variable assignment
                 closure->addExpression(p_variable_statement(false, attrs));
+            } else if (P.cur(0).Type == TokenType::ClosedBraces && mCurrentClosure->parent()) {
+                // We are not the translation unit and want to close out the expression. Do it!
+                break;
             } else {
                 closure->addExpression(p_expression());
                 if (!P.accept(TokenType::Semicolon))

@@ -25,7 +25,7 @@ public:
 
 private:
     [[nodiscard]] SSAProgram mapClosure(const Ptr<ast::Closure>& closure);
-    [[nodiscard]] SSAValue mapExpression(SSAProgram& program, const Ptr<ast::Expression>& expr);
+    [[nodiscard]] std::optional<SSAValue> mapExpression(SSAProgram& program, const Ptr<ast::Expression>& expr);
 
     [[nodiscard]] SSAValue castIfNeeded(SSAProgram& program, const parser::Location& loc, const SSAValue& fromValue, const type::Type& toType);
 

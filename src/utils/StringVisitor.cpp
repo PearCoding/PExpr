@@ -58,7 +58,7 @@ std::string StringVisitor::dump(size_t level, const Ptr<Closure>& closure)
         return "";
 
     std::stringstream stream;
-    for (size_t i = 0; i < closure->expressions().size()-1; ++i) {
+    for (size_t i = 0; i < closure->expressions().size() - 1; ++i) {
         const auto& expr = closure->expressions()[i];
         stream << pad(level) << visit(level, expr) << ";" << std::endl;
     }
@@ -273,9 +273,11 @@ std::string StringVisitor::dump(size_t level, const Ptr<BranchExpression>& expr)
                << pad(level) << "}";
     }
 
-    stream << " else {" << std::endl
-           << dump(level + 1, expr->elseClosure()) << std::endl
-           << pad(level) << "}";
+    if (expr->elseClosure()) {
+        stream << " else {" << std::endl
+               << dump(level + 1, expr->elseClosure()) << std::endl
+               << pad(level) << "}";
+    }
     return stream.str();
 }
 

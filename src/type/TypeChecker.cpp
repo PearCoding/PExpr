@@ -68,6 +68,13 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure)
     for (const auto& expr : closure->expressions())
         handleNode(closure, expr);
 
+    for (const auto& expr : closure->expressionsWithoutFinal()) {
+        if (!expr->returnType().isVoid())
+            mReporter.warningf(utils::RT_WARNING_UNUSED_CLOSURE_RETURN, expr->location(),
+                               "Statement returns a value of type '%s' which is unused",
+                               expr->returnType().toString().data());
+    }
+
     if (closure->hasFinalExpression()) {
         return closure->finalExpression()->returnType();
     } else {
@@ -158,19 +165,29 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
             } else if (isConvertible(returnType, bodyType)) {
                 returnType = bodyType;
             } else {
-                mReporter.errorf(branch.Condition->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
+                mReporter.errorf(branch.Body->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
                 return Type::Error();
             }
         }
     }
 
     // Inject casts if necessary
-    if (expr->elseClosure())
+    if (expr->elseClosure()) {
         expr->elseClosure()->finalExpressionMut() = injectCastIfNeeded(expr->elseClosure()->finalExpression(), returnType, &hadError);
-    for (auto& branch : expr->branches())
-        branch.Body->finalExpressionMut() = injectCastIfNeeded(branch.Body->finalExpression(), returnType, &hadError);
-
-    // TODO: If the else branch is missing, mark the type as "partial"
+        for (auto& branch : expr->branches())
+            branch.Body->finalExpressionMut() = injectCastIfNeeded(branch.Body->finalExpression(), returnType, &hadError);
+    } else {
+        // No else case means this expression has partial returns, which we do not support and fallback to 'void'.
+        if (!returnType.isVoid()) {
+            for (auto& branch : expr->branches()) {
+                if (branch.Body->hasFinalExpression() && !branch.Body->finalExpression()->returnType().isVoid())
+                    mReporter.warningf(utils::RT_WARNING_UNUSED_CLOSURE_RETURN, branch.Body->location(),
+                                       "Branch returns a value of type '%s' which is unused",
+                                       branch.Body->finalExpression()->returnType().toString().data());
+            }
+        }
+        returnType = Type::Void();
+    }
 
     if (!hadError) {
         expr->setReturnType(returnType);

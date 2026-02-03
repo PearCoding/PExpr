@@ -91,14 +91,14 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
     auto program = SSAProgram{};
 
     // map statements
-    SSAValue lastValue;
+    std::optional<SSAValue> lastValue;
     for (const auto& expr : closure->expressions())
         lastValue = mapExpression(program, expr);
 
     // map final expression as return
-    if (closure->hasFinalExpression()) {
+    if (closure->hasFinalExpression() && lastValue) {
         auto ret   = std::make_shared<SSAInstrReturn>();
-        ret->Value = lastValue;
+        ret->Value = *lastValue;
         program.Body.push_back(ret);
     }
 
@@ -106,17 +106,19 @@ SSAProgram SSAMapper::mapClosure(const Ptr<Closure>& closure)
     return program;
 }
 
-SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
+std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& expr)
 {
     PEXPR_ASSERT(expr, "Expected valid expression to map");
+
+    // Note: We explicitly assume some the right-hand side of expressions/statements to have a value.
+    // It is the responsibility of the TypeChecker to bail out before we crash here.
 
     // reuse cached value if present
     auto it = mExprValues.find(expr.get());
     if (it != mExprValues.end())
         return it->second;
 
-    SSAValue result;
-
+    std::optional<SSAValue> result;
     switch (expr->type()) {
     case ExpressionType::Literal: {
         auto lit = std::reinterpret_pointer_cast<LiteralExpression>(expr);
@@ -158,7 +160,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         std::vector<SSAValue> inners;
         inners.reserve(v->entries().size());
         for (const auto& e : v->entries())
-            inners.push_back(mapExpression(program, e));
+            inners.push_back(*mapExpression(program, e));
 
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), v->returnType());
         SSAInstrAssign asg;
@@ -170,7 +172,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     } break;
     case ExpressionType::Unary: {
         auto u         = std::reinterpret_pointer_cast<UnaryExpression>(expr);
-        SSAValue inner = mapExpression(program, u->inner());
+        SSAValue inner = *mapExpression(program, u->inner());
         SSAValue tgt   = SSAValue::Named(mContext.fresh("%"), u->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
@@ -182,8 +184,8 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     } break;
     case ExpressionType::Binary: {
         auto b       = std::reinterpret_pointer_cast<BinaryExpression>(expr);
-        SSAValue L   = mapExpression(program, b->left());
-        SSAValue R   = mapExpression(program, b->right());
+        SSAValue L   = *mapExpression(program, b->left());
+        SSAValue R   = *mapExpression(program, b->right());
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), b->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
@@ -198,7 +200,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         std::vector<SSAValue> args;
         args.reserve(c->parameters().size());
         for (const auto& p : c->parameters())
-            args.push_back(mapExpression(program, p));
+            args.push_back(*mapExpression(program, p));
 
         PEXPR_ASSERT(!c->mangledName().empty(), "The typechecker must run before the SSAMapper and assign valid mangled names to function calls!");
         SSAValue tgt             = SSAValue::Named(mContext.fresh("%"), c->returnType());
@@ -212,7 +214,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     } break;
     case ExpressionType::Swizzle: {
         auto a                     = std::reinterpret_pointer_cast<SwizzleExpression>(expr);
-        SSAValue in                = mapExpression(program, a->inner());
+        SSAValue in                = *mapExpression(program, a->inner());
         const std::string& swizzle = a->swizzle();
 
         // Helper to map swizzle character to index
@@ -273,7 +275,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     } break;
     case ExpressionType::Access: {
         auto a       = std::reinterpret_pointer_cast<AccessExpression>(expr);
-        SSAValue in  = mapExpression(program, a->inner());
+        SSAValue in  = *mapExpression(program, a->inner());
         SSAValue cst = SSAValue::Constant((Integer)a->index());
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
         SSAInstrAssign asg;
@@ -286,7 +288,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Cast: {
         auto c = std::reinterpret_pointer_cast<CastExpression>(expr);
         // Map inner expression and emit an SSA cast instruction
-        SSAValue inner = mapExpression(program, c->inner());
+        SSAValue inner = *mapExpression(program, c->inner());
         // If both types match do nothing else typechecker should ensure correctness
         if (inner.type() == c->toType()) {
             result = inner;
@@ -310,12 +312,15 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     case ExpressionType::Branch: {
         auto br = std::reinterpret_pointer_cast<BranchExpression>(expr);
 
+        const bool hasElseCase = br->elseClosure() != nullptr;
+
         // Prepare labels for each branch, else and join
         std::vector<std::string> branchLabels;
         branchLabels.reserve(br->branches().size() + 1);
         for (size_t i = 0; i < br->branches().size(); ++i)
             branchLabels.push_back(mContext.fresh("lbl"));
-        branchLabels.push_back(mContext.fresh("lbl")); // Else
+        if (hasElseCase)
+            branchLabels.push_back(mContext.fresh("lbl")); // Else
         std::string joinLabel = mContext.fresh("lbl");
 
         // Emit conditional branches for each branch condition that jump to their label
@@ -324,7 +329,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
         for (size_t i = 0; i < br->branches().size(); ++i) {
             const auto& single = br->branches()[i];
             // map condition expression
-            SSAValue cond = mapExpression(program, single.Condition);
+            SSAValue cond = *mapExpression(program, single.Condition);
             conditionVals.push_back(cond);
 
             // emit branch instruction
@@ -379,12 +384,29 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
 
         for (const auto& b : br->branches())
             handleBranch(b.Body);
-        handleBranch(br->elseClosure());
+        if (hasElseCase) {
+            handleBranch(br->elseClosure());
+        } else {
+            // If we have no else case, add an extra update with the previous value
+            for (auto& [valName, vals] : varUpdates) {
+                int v = mContext.getCurrentVersion(valName);
+
+                // This variable was updated in a some other branch but not this one
+                vals.push_back(SSAValue::Named(valName + "." + std::to_string(v), vals.at(0).type()));
+            }
+        }
 
         std::vector<SSAValue> branchVals;
         branchVals.reserve(branchLabels.size() + 1);
 
-        // Start with else and go back
+        if (!hasElseCase) {
+            // If we do not have an else case add a jump to the join label (aka, empty else closure)
+            SSAInstrGoto gToJoin;
+            gToJoin.TargetLabel = joinLabel;
+            program.Body.push_back(std::make_shared<SSAInstrGoto>(gToJoin));
+        }
+
+        // Start with the back and go back
         for (size_t i = progs.size(); i > 0; --i) {
             // Add the label
             SSAInstrLabel lbl;
@@ -408,21 +430,26 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
 
         // Use the BranchExpression's declared return type as the phi node type.
         const auto phiType = expr->returnType();
+        if (hasElseCase && !phiType.isVoid()) {
+            // create phi target with chosen type
+            SSAValue tgt = SSAValue::Named(mContext.fresh("%"), phiType);
+            auto phi     = std::make_shared<SSAInstrPhi>();
+            phi->Target  = tgt;
 
-        // create phi target with chosen type
-        SSAValue tgt = SSAValue::Named(mContext.fresh("%"), phiType);
-        auto phi     = std::make_shared<SSAInstrPhi>();
-        phi->Target  = tgt;
+            // Insert into phi block
+            phi->Conditions = conditionVals;
 
-        // Insert into phi block
-        phi->Conditions = std::move(conditionVals);
+            // Insert backwards as the inlined the `else` case first
+            phi->Branches.reserve(branchVals.size());
+            for (size_t i = branchVals.size(); i > 0; --i)
+                phi->Branches.push_back(branchVals[i - 1]);
 
-        // Insert backwards as the inlined the `else` case first
-        phi->Branches.reserve(branchVals.size());
-        for (size_t i = branchVals.size(); i > 0; --i)
-            phi->Branches.push_back(branchVals[i - 1]);
+            program.Body.push_back(phi);
 
-        program.Body.push_back(phi);
+            result = tgt;
+        } else {
+            PEXPR_ASSERT(phiType.isVoid(), "TypeChecker did miss a branch statement without an else case but not of type 'void'");
+        }
 
         // Create phi nodes for variables updated in all branches
         for (const auto& [varName, vals] : varUpdates) {
@@ -430,16 +457,14 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
             SSAValue phiTgt    = SSAValue::Named(mContext.fresh(varName, true), vals[0].type());
             auto varPhi        = std::make_shared<SSAInstrPhi>();
             varPhi->Target     = phiTgt;
-            varPhi->Conditions = phi->Conditions; // Same conditions as main phi
+            varPhi->Conditions = conditionVals; // Same conditions as main phi
             varPhi->Branches   = vals;
             program.Body.push_back(varPhi);
         }
-
-        result = tgt;
     } break;
     case ExpressionType::VariableDeclaration: {
         auto declStmt       = std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr);
-        SSAValue rhs        = mapExpression(program, declStmt->expression());
+        SSAValue rhs        = *mapExpression(program, declStmt->expression());
         const auto& pattern = declStmt->pattern();
 
         // TODO: Rework this
@@ -513,7 +538,7 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     } break;
     case ExpressionType::VariableAssignment: {
         auto assignStmt     = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
-        SSAValue rhs        = mapExpression(program, assignStmt->expression());
+        SSAValue rhs        = *mapExpression(program, assignStmt->expression());
         const auto& pattern = assignStmt->pattern();
 
         // TODO: Rework this
@@ -610,7 +635,8 @@ SSAValue SSAMapper::mapExpression(SSAProgram& program, const Ptr<Expression>& ex
     }
 
     // cache result
-    mExprValues[expr.get()] = result;
+    if (result)
+        mExprValues[expr.get()] = *result;
     return result;
 }
 
