@@ -1,0 +1,21 @@
+// Example of tail call optimization
+// A tail call occurs when a function call is the last operation before returning
+
+// Simple tail recursive factorial
+fn factorial_tail(n:int, acc:int) -> int = 
+    if n <= 1 { acc } else { factorial_tail(n - 1, acc * n) };
+
+// Another tail recursive function: sum of integers
+fn sum_tail(n:int, acc:int) -> int = 
+    if n <= 0 { acc } else { sum_tail(n - 1, acc + n) };
+
+// Tail recursive GCD (Euclidean algorithm)
+fn gcd_tail(a:int, b:int) -> int = 
+    if b == 0 { a } else { gcd_tail(b, a % b) };
+
+// Test the tail recursive functions
+let fact_result = factorial_tail(5, 1);
+let sum_result  = sum_tail(10, 0);
+let gcd_result  = gcd_tail(48, 18);
+
+fact_result + sum_result + gcd_result

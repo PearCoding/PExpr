@@ -8,6 +8,7 @@
 #include "SSCPIdentityOptimizer.h"
 #include "SSCPPreOptimizer.h"
 #include "SSCPSideEffectAnalyzer.h"
+#include "SSCPTailCallOptimizer.h"
 
 namespace PExpr::opt {
 
@@ -26,6 +27,7 @@ Optimizer::Optimizer(const OptimizerOptions& opts)
     , mSideEffectAnalyzer(std::make_unique<SSCPSideEffectAnalyzer>())
     , mCommonSubexpressionEliminator(std::make_unique<SSCPCommonSubexpressionEliminator>(opts))
     , mPreOptimizer(std::make_unique<SSCPPreOptimizer>(opts))
+    , mTailCallOptimizer(std::make_unique<SSCPTailCallOptimizer>())
 {
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
@@ -145,6 +147,12 @@ bool Optimizer::processBody(InstructionList& body)
         // 9) Apply partial redundancy elimination
         // if (mPreOptimizer->applyPRE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
         //     changed = true;
+    }
+
+    // 10) Apply tail call optimization
+    if (mOptions.OptimizeTailCalls) {
+        if (mTailCallOptimizer->optimizeTailCalls(mContext.get(), body))
+            changed = true;
     }
 
     return changed;

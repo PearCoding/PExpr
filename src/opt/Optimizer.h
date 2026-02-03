@@ -19,8 +19,9 @@ class SSCPIdentityOptimizer;
 class SSCPSideEffectAnalyzer;
 class SSCPCommonSubexpressionEliminator;
 class SSCPPreOptimizer;
+class SSCPTailCallOptimizer;
 
-/// Sparse Conditional Constant Propagation (SSCP) pass for the SSA IR.
+/// Optimizer containing multiple optimization passes for the SSA IR.
 class Optimizer {
 public:
     using InstructionList = std::vector<std::shared_ptr<ssa::SSAInstr>>;
@@ -28,7 +29,8 @@ public:
     /// Run the passes on a program. Modifies the program in-place.
     static void Run(const OptimizerOptions& opts, ssa::SSAProgram& program);
 
-    /// Run the passes on a subset of instructions. Modifies the instructions in-place. This prevents function inlining
+    /// Run the passes on a subset of instructions. Modifies the instructions in-place. 
+    /// This does not apply function inlining
     static void Run(const OptimizerOptions& opts, InstructionList& body);
 
 private:
@@ -53,6 +55,7 @@ private:
     std::unique_ptr<SSCPSideEffectAnalyzer> mSideEffectAnalyzer;
     std::unique_ptr<SSCPCommonSubexpressionEliminator> mCommonSubexpressionEliminator;
     std::unique_ptr<SSCPPreOptimizer> mPreOptimizer;
+    std::unique_ptr<SSCPTailCallOptimizer> mTailCallOptimizer;
 };
 
 } // namespace PExpr::opt

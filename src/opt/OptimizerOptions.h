@@ -4,47 +4,53 @@
 
 namespace PExpr::opt {
 struct OptimizerOptions {
-    bool EnableConstantFolding         = true;
-    bool EnableConstantFoldingNumber   = true;
-    bool RemoveDeadCode                = true;
-    bool InlineFunctions               = true;
+    bool EnableConstantFolding         = false;
+    bool EnableConstantFoldingNumber   = false;
+    bool RemoveDeadCode                = false;
+    bool InlineFunctions               = false;
     bool ForceInlineFunctions          = false; // < Force inline all internal functions, eliminating all functions from IR
-    bool ApplyMathIdentities           = true;  // < Standard math identities
-    bool ApplyTrigonometricIdentities  = true;  // < Trigonometric identities (sin, cos, ...)
-    bool EliminateCommonSubexpressions = true;  // < Common subexpression elimination (CSE)
-    bool EliminatePartialRedundancies  = true;  // < Partial redundancy elimination (PRE)
+    bool ApplyMathIdentities           = false; // < Standard math identities
+    bool ApplyTrigonometricIdentities  = false; // < Trigonometric identities (sin, cos, ...)
+    bool EliminateCommonSubexpressions = false; // < Common subexpression elimination (CSE)
+    bool EliminatePartialRedundancies  = false; // < Partial redundancy elimination (PRE)
+    bool OptimizeTailCalls             = false; // < Tail call optimization
 
+    /// No option is enabled. Using --no-optimization
     [[nodiscard]] inline static OptimizerOptions None()
     {
-        return OptimizerOptions{
-            .EnableConstantFolding         = false,
-            .EnableConstantFoldingNumber   = false,
-            .RemoveDeadCode                = false,
-            .InlineFunctions               = false,
-            .ApplyMathIdentities           = false,
-            .ApplyTrigonometricIdentities  = false,
-            .EliminateCommonSubexpressions = false,
-            .EliminatePartialRedundancies  = false,
-        };
+        return OptimizerOptions{};
     }
 
-    [[nodiscard]] inline static OptimizerOptions Low()
+    /// The absolute minimum is enabled. This is the default without flags or -O0.
+    [[nodiscard]] inline static OptimizerOptions Minimum()
     {
         auto opts                          = None();
+        opts.RemoveDeadCode                = true;
+        return opts;
+    }
+
+    /// Some easy optimizations. This is -O1.
+    [[nodiscard]] inline static OptimizerOptions Low()
+    {
+        auto opts                          = Minimum();
         opts.EnableConstantFolding         = true;
         opts.RemoveDeadCode                = true;
         opts.EliminateCommonSubexpressions = true;
         return opts;
     }
 
+    /// Some medium optimizations which might increase the code size. This is -O2.
     [[nodiscard]] inline static OptimizerOptions Medium()
     {
         auto opts                         = Low();
         opts.InlineFunctions              = true;
         opts.EliminatePartialRedundancies = true;
+        opts.OptimizeTailCalls            = true;
         return opts;
     }
 
+    /// Some large optimizations. Ignores IEEE-754 compiliance. 
+    /// This is -O3 (and resembles --fast-math in some other compilers)
     [[nodiscard]] inline static OptimizerOptions High()
     {
         auto opts                         = Medium();

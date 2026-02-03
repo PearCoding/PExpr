@@ -86,10 +86,10 @@ int main(int argc, char** argv)
     app.add_option_function<std::string>("-W,--warning", handleWarningCmd, "Set warnings");
     app.add_flag_callback("--no-warnings", [&]() { warningFlags = 0; }, "Disable all warnings");
 
-    opt::OptimizerOptions optimizationOptions = opt::OptimizerOptions::None();
+    opt::OptimizerOptions optimizationOptions = opt::OptimizerOptions::Minimum();
     app.add_option_function<int>("-O", [&](int opt) { 
         if (opt == 0)
-            optimizationOptions = opt::OptimizerOptions::None();
+            optimizationOptions = opt::OptimizerOptions::Minimum();
         else if (opt == 1)
             optimizationOptions = opt::OptimizerOptions::Low();
         else if (opt == 2)
