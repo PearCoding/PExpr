@@ -32,3 +32,5 @@
 - [x] Handle implicit casts better. Maybe as a separate pass or similar?
 - [ ] Add modules (per file)
 - [x] Redo variables. Keep track where a variable was declared. Use, similar to mangledName of functions a unique name for variables. This extremely simplifies SSA and many other stages.
+- [ ] Add [[constant]] attribute for variables which have to be constant evaluated and must not be in the final SSA
+- [ ] Add [[constant]] attribute for expressions which have to be constant evaluated and must not be in the final SSA
