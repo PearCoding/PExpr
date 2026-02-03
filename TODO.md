@@ -21,7 +21,7 @@
 - [x] Allow attributes for every statement. Give intrinsics special names. 
 - [ ] Add loop expression (like https://zig.guide/language-basics/loops-as-expressions/)
 - [ ] Add loop statements
-- [ ] Add if statements
+- [x] Add if statements
 - [x] Refactor code to use std::ranges if applicable
 - [x] Add SSA IR serialization with write and read functionality
 - [x] Add support for tuples

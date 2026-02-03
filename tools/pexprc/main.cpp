@@ -80,6 +80,10 @@ int main(int argc, char** argv)
             warningFlags |= RT_WARNING_PURE_INTERNAL_FUNCTIONS;
         else if (name == "no-pure-internal-function")
             warningFlags &= ~(uint32_t)RT_WARNING_PURE_INTERNAL_FUNCTIONS;
+        else if (name == "unused-return")
+            warningFlags |= RT_WARNING_UNUSED_CLOSURE_RETURN;
+        else if (name == "no-unused-return")
+            warningFlags &= ~(uint32_t)RT_WARNING_UNUSED_CLOSURE_RETURN;
         else
             throw CLI::RuntimeError();
     };
