@@ -15,7 +15,7 @@
 - [x] Common subexpression elimination (CSE)
 - [ ] Algebraic simplification & strength reduction
 - [ ] Value range propagation
-- [ ] Tail call optimization
+- [-] Tail call optimization
 - [ ] Memory/register allocation optimizations
 - [x] Most optimization ignore code blocks. Fix that by extracting basic blocks and applying on them. Only some passes should be applied to all blocks. 
 - [x] Allow attributes for every statement. Give intrinsics special names. 

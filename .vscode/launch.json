@@ -27,6 +27,17 @@
         "console": "integratedTerminal"
     },
     {
+        "name": "pexprc No Opt",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+        "args": ["--skip-optimization", "--std-output", "${file}"],
+        "stopAtEntry": false,
+        "cwd": "${command:cmake.buildDirectory}",
+        "environment": [],
+        "console": "integratedTerminal"
+    },
+    {
         "name": "pexprc -O0",
         "type": "cppvsdbg",
         "request": "launch",
