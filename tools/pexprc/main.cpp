@@ -6,6 +6,8 @@
 
 #include "Environment.h"
 #include "opt/Optimizer.h"
+#include "rvm/RVMMapper.h"
+#include "rvm/RVMSerializer.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
 #include "ssa/SSAValidator.h"
@@ -47,7 +49,10 @@ int main(int argc, char** argv)
     app.add_flag("--std-output", useStdOutput, "Dump the result into the standard output");
 
     bool emitAST = false;
-    app.add_flag("--emit-ast", emitAST, "Emit AST instead of the IR");
+    app.add_flag("--emit-ast", emitAST, "Emit AST instead of the SSA IR");
+
+    bool emitRVM = false;
+    app.add_flag("--emit-rvm", emitRVM, "Emit RVM (register-based virtual machine) IR instead of the SSA IR");
 
     bool readSSAIR = false;
     app.add_flag("--input-ir", readSSAIR, "Read SSA IR produced by a previous run instead of a file with PExpr syntax");
@@ -198,19 +203,25 @@ int main(int argc, char** argv)
         return env.reporter().errorCount() + 1;
     }
 
-    if (skipOptimizationPass) {
+    if (!skipOptimizationPass) {
+        // Optimize
+        opt::Optimizer::Run(optimizationOptions, program);
+
+        if (!ssa::SSAValidator::checkIfTyped(&program)) {
+            std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;
+            return env.reporter().errorCount() + 1;
+        }
+    }
+
+    if (!emitRVM) {
         dumpOutput(ssa::SSASerializer::serialize(program));
         return env.reporter().errorCount();
     }
 
-    // Optimize
-    opt::Optimizer::Run(optimizationOptions, program);
-    dumpOutput(ssa::SSASerializer::serialize(program));
+    rvm::RVMMapper mapper;
+    auto rvmProgram = mapper.mapProgram(program);
 
-    if (!ssa::SSAValidator::checkIfTyped(&program)) {
-        std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;
-        return env.reporter().errorCount() + 1;
-    }
+    dumpOutput(rvm::RVMSerializer::serialize(rvmProgram));
 
     return env.reporter().errorCount();
 }

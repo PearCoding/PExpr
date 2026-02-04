@@ -1,0 +1,162 @@
+#pragma once
+
+#include "RVMValue.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <variant>
+#include <vector>
+
+namespace PExpr::rvm {
+/// General RVM instruction
+class RVMInstr {
+public:
+    virtual ~RVMInstr() = default;
+
+    /// Get instruction opcode
+    [[nodiscard]] virtual Opcode opcode() const = 0;
+
+    /// Get destination register (if any)
+    [[nodiscard]] virtual std::optional<RVMValue> dst() const = 0;
+
+    /// Get source operands
+    [[nodiscard]] virtual std::vector<RVMValue> srcs() const = 0;
+
+    /// Visit all RVMValues in this instruction
+    void forEachValue(const std::function<void(RVMValue&)>& visitor);
+    void forEachValue(const std::function<void(const RVMValue&)>& visitor) const;
+};
+
+/// 2-operand instruction: dst = op src (unary ops, conversions)
+class RVMInstr2Op : public RVMInstr {
+public:
+    RVMInstr2Op(Opcode op, RVMValue dst, RVMValue src);
+
+    [[nodiscard]] Opcode opcode() const override { return mOpcode; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return { mSrc }; }
+
+private:
+    Opcode mOpcode;
+    RVMValue mDst;
+    RVMValue mSrc;
+};
+
+/// 3-operand instruction: dst = op src1 src2 (arithmetic/logical)
+class RVMInstr3Op : public RVMInstr {
+public:
+    RVMInstr3Op(Opcode op, RVMValue dst, RVMValue src1, RVMValue src2);
+
+    [[nodiscard]] Opcode opcode() const override { return mOpcode; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return { mSrc1, mSrc2 }; }
+
+private:
+    Opcode mOpcode;
+    RVMValue mDst;
+    RVMValue mSrc1;
+    RVMValue mSrc2;
+};
+
+/// Branch instruction
+class RVMInstrBranch : public RVMInstr {
+public:
+    RVMInstrBranch(Opcode cond, RVMValue src, const std::string& targetLabel);
+
+    [[nodiscard]] Opcode opcode() const override { return mCond; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return { mSrc }; }
+    [[nodiscard]] const std::string& targetLabel() const { return mTargetLabel; }
+
+private:
+    Opcode mCond; // BR, BRZ, BRNZ
+    RVMValue mSrc;
+    std::string mTargetLabel; // Label name (will be resolved to offset in later pass)
+};
+
+/// Jump instruction
+class RVMInstrJump : public RVMInstr {
+public:
+    RVMInstrJump(const std::string& targetLabel);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::JMP; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] const std::string& targetLabel() const { return mTargetLabel; }
+
+private:
+    std::string mTargetLabel; // Label name (will be resolved to offset in later pass)
+};
+
+/// Label instruction (marks a position in code for jumps/branches)
+class RVMInstrLabel : public RVMInstr {
+public:
+    RVMInstrLabel(const std::string& name);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::RET; } // Placeholder, labels don't execute
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] const std::string& labelName() const { return mName; }
+
+private:
+    std::string mName;
+};
+
+/// Call instruction
+/// TODO: Split into call_external and call
+class RVMInstrCall : public RVMInstr {
+public:
+    RVMInstrCall(std::optional<RVMValue> dst, const std::string& funcName,
+                 const std::vector<RVMValue>& args);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::CALL; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return mArgs; }
+    [[nodiscard]] const std::string& functionName() const { return mFuncName; }
+
+private:
+    std::optional<RVMValue> mDst;
+    std::string mFuncName;
+    std::vector<RVMValue> mArgs;
+};
+
+/// Return instruction
+class RVMInstrReturn : public RVMInstr {
+public:
+    RVMInstrReturn(std::optional<RVMValue> retVal);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::RET; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override
+    {
+        return mRetVal ? std::vector<RVMValue>{ *mRetVal } : std::vector<RVMValue>{};
+    }
+    [[nodiscard]] std::optional<RVMValue> returnValue() const { return mRetVal; }
+
+private:
+    std::optional<RVMValue> mRetVal;
+};
+
+/// Push frame instruction
+class RVMInstrPushFrame : public RVMInstr {
+public:
+    RVMInstrPushFrame();
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::PUSH_FRAME; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+};
+
+/// Pop frame instruction
+class RVMInstrPopFrame : public RVMInstr {
+public:
+    RVMInstrPopFrame();
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::POP_FRAME; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+};
+
+} // namespace PExpr::rvm
