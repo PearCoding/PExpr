@@ -1,0 +1,13 @@
+// Showcasing basic if statements (not if expressions)
+
+let mut k = 22;
+
+// A 'if' statement. No requirement for an 'else' case
+if true {
+    k = 11;
+};
+
+// A 'if' expression. Note the necessity of the 'else' case
+let v = if true { 1 } else { 2 };
+
+k 
