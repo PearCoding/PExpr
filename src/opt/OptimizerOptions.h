@@ -34,7 +34,6 @@ struct OptimizerOptions {
     {
         auto opts                          = Minimum();
         opts.EnableConstantFolding         = true;
-        opts.RemoveDeadCode                = true;
         opts.EliminateCommonSubexpressions = true;
         return opts;
     }

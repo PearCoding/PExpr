@@ -176,4 +176,65 @@ bool SSCPControlFlowOptimizer::collapsePhiNodes(InstructionList& instructions)
     return changed;
 }
 
+bool SSCPControlFlowOptimizer::collapseBrNodes(InstructionList& instructions)
+{
+    if (instructions.empty())
+        return false;
+
+    bool changed = false;
+
+    // Check all branches and remove or map it into a goto when condition is constant
+    for (auto it = instructions.begin(); it != instructions.end();) {
+        if (auto br = dynamic_cast<const SSAInstrBranch*>(it->get())) {
+            if (br->Condition.isConstant() && br->Condition.type().kind() == type::TypeKind::Boolean) {
+                const bool condVal = br->Condition.valueAs<bool>();
+
+                if (condVal) { // < True -> replace by a goto
+                    SSAInstrGoto gt;
+                    gt.TargetLabel = br->TargetLabel;
+                    *it            = std::make_shared<SSAInstrGoto>(std::move(gt));
+                } else { // False -> remove
+                    it = instructions.erase(it);
+                }
+                // Do not use 'br' after this point
+
+                changed = true;
+            }
+        }
+
+        ++it;
+    }
+    return changed;
+}
+
+bool SSCPControlFlowOptimizer::cleanupGotoNodes(InstructionList& instructions)
+{
+    if (instructions.empty())
+        return false;
+
+    bool changed = false;
+
+    // Delete all instructions between a goto and a label (as it is dead code)
+    for (auto it = instructions.begin(); it != instructions.end();) {
+        if (dynamic_cast<const SSAInstrGoto*>(it->get())) {
+            auto git = it + 1;
+            auto eit = git;
+            // Get the block until a label
+            while (eit != instructions.end()) {
+                if (dynamic_cast<const SSAInstrLabel*>(eit->get()))
+                    break;
+                eit++;
+            }
+
+            if (git != eit) {
+                it      = instructions.erase(git, eit);
+                changed = true;
+            }
+        }
+
+        ++it;
+    }
+    return changed;
+}
+
 } // namespace PExpr::opt

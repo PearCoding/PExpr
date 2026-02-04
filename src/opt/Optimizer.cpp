@@ -138,8 +138,8 @@ bool Optimizer::processBody(InstructionList& body)
         changed = true;
 
     if (mOptions.RemoveDeadCode) {
-        // 8) Collapse phi nodes
-        if (mControlFlowOptimizer->collapsePhiNodes(body))
+        // 8) Collapse condition based nodes
+        if (mControlFlowOptimizer->collapse(body))
             changed = true;
     }
 
