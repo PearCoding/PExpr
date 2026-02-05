@@ -57,7 +57,6 @@ public:
     // OpKind specific data
     ast::UnaryOperation UnaryOp   = ast::UnaryOperation::Pos;
     ast::BinaryOperation BinaryOp = ast::BinaryOperation::Add;
-    std::string Swizzle;
     std::vector<SSAValue> Operands;
 
     [[nodiscard]] size_t hash(bool includeTargetName = true) const override;

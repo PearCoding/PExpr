@@ -10,6 +10,7 @@
 #include "rvm/RVMSerializer.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
+#include "ssa/SSATupleDissolvePass.h"
 #include "ssa/SSAValidator.h"
 #include "utils/StringVisitor.h"
 
@@ -95,6 +96,8 @@ int main(int argc, char** argv)
     app.add_option_function<std::string>("-W,--warning", handleWarningCmd, "Set warnings");
     app.add_flag_callback("--no-warnings", [&]() { warningFlags = 0; }, "Disable all warnings");
 
+    bool dissolveTuples = false; //< For test purposes
+
     opt::OptimizerOptions optimizationOptions = opt::OptimizerOptions::Minimum();
     app.add_option_function<int>("-O", [&](int opt) { 
         if (opt == 0)
@@ -115,6 +118,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-trigonometric-identities,!--no-opt-trigonometric-identities", optimizationOptions.ApplyTrigonometricIdentities, "Apply trigonometric identities");
     app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
+    app.add_flag("--opt-dissolve-tuples,!--no-opt-dissolve-tuples", dissolveTuples, "Dissolve tuples. For test purposes");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
@@ -211,6 +215,11 @@ int main(int argc, char** argv)
             std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;
             return env.reporter().errorCount() + 1;
         }
+    }
+
+    if (emitRVM || dissolveTuples) {
+        ssa::SSATupleDissolvePass pass;
+        pass.dissolve(program);
     }
 
     if (!emitRVM) {

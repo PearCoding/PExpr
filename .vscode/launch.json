@@ -49,6 +49,17 @@
         "console": "integratedTerminal"
     },
     {
+        "name": "pexprc -O0 TupleDissolve",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+        "args": ["-O0", "--opt-dissolve-tuples", "--std-output", "${file}"],
+        "stopAtEntry": false,
+        "cwd": "${command:cmake.buildDirectory}",
+        "environment": [],
+        "console": "integratedTerminal"
+    },
+    {
         "name": "pexprc -O1",
         "type": "cppvsdbg",
         "request": "launch",

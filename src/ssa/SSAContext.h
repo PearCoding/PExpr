@@ -28,9 +28,9 @@ public:
 
     /// Generate a fresh variable name based on the given base name
     /// Increments the counter for the base and returns a unique name
-    /// @param base The base name for the variable (e.g., "tmp", "%", "x")
+    /// @param base The base name for the variable (e.g., "name", "%", "x")
     /// @param updateScope If true, update the current scope with the new version
-    /// @return A unique variable name like "tmp.5" or "%.12"
+    /// @return A unique variable name like "name.5" or "%.12"
     std::string fresh(const std::string& base, bool updateScope = false);
 
     /// Push a new scope onto the scope stack
