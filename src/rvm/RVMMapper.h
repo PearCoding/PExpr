@@ -13,13 +13,15 @@ public:
 
     /// Map a single SSA function to RVM function
     static RVMFunction mapFunction(const ssa::SSAFunction& ssaFunc,
-                                   std::shared_ptr<RVMStringTable> stringTable);
+                                   std::shared_ptr<RVMStringTable> stringTable,
+                                   const ssa::SSAProgram& ssaProgram);
 
     /// Map SSA instructions to RVM instructions
     static std::vector<std::shared_ptr<RVMInstr>> mapInstructions(
         const std::vector<std::shared_ptr<ssa::SSAInstr>>& ssaInstrs,
         std::shared_ptr<RVMStringTable> stringTable,
-        RVMContext& context);
+        RVMContext& context,
+        const ssa::SSAProgram& ssaProgram);
 
     /// Map SSA value to RVM value
     static RVMValue mapValue(const ssa::SSAValue& ssaValue,
@@ -33,7 +35,8 @@ public:
     static std::vector<std::shared_ptr<RVMInstr>> dissolveTupleInstruction(
         const std::shared_ptr<ssa::SSAInstr>& ssaInstr,
         std::shared_ptr<RVMStringTable> stringTable,
-        RVMContext& context);
+        RVMContext& context,
+        const ssa::SSAProgram& ssaProgram);
 
 private:
     // Helper functions for specific instruction types
@@ -42,12 +45,13 @@ private:
         std::shared_ptr<RVMStringTable> stringTable,
         RVMContext& context);
 
-    static std::shared_ptr<RVMInstr> mapCall(
+    static std::vector<std::shared_ptr<RVMInstr>> mapCall(
         const ssa::SSAInstrCall& instr,
         std::shared_ptr<RVMStringTable> stringTable,
-        RVMContext& context);
+        RVMContext& context,
+        const ssa::SSAProgram& ssaProgram);
 
-    static std::shared_ptr<RVMInstr> mapReturn(
+    static std::vector<std::shared_ptr<RVMInstr>> mapReturn(
         const ssa::SSAInstrReturn& instr,
         std::shared_ptr<RVMStringTable> stringTable,
         RVMContext& context);

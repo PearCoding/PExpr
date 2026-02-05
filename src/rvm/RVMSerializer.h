@@ -53,6 +53,12 @@ public:
     /// Convert string to opcode
     static Opcode stringToOpcode(const std::string& str);
 
+    /// Parse an instruction from a line of text (used for testing)
+    static std::shared_ptr<RVMInstr> readInstruction(const std::string& line);
+
+    /// Parse a value from string representation
+    static bool parseValue(const std::string& str, RVMValue& outValue);
+
 private:
     // Internal helper functions for writing specific instruction types
     static void write2Op(std::ostream& os, const RVMInstr2Op& instr);
@@ -67,8 +73,6 @@ private:
     static void writePopFrame(std::ostream& os, const RVMInstrPopFrame& instr);
 
     // Internal helper functions for reading/parsing
-    static std::shared_ptr<RVMInstr> readInstruction(const std::string& line);
-    static bool parseValue(const std::string& str, RVMValue& outValue);
     static std::vector<RVMValue> parseValueList(const std::string& str);
 };
 

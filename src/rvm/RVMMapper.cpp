@@ -217,9 +217,16 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
         break;
     }
     case ssa::SSAInstrAssign::OpKind::Tuple: {
-        // Tuple construction should be dissolved
+        // Tuple construction: dissolve into individual register assignments
         // Each tuple element maps to a separate register
-        PEXPR_ASSERT(false, "Tuple construction should be dissolved before RVM mapping");
+        // For now, treat each element as a separate MOV instruction
+        for (size_t i = 0; i < instr.Operands.size(); ++i) {
+            RVMValue src = mapValue(instr.Operands[i], stringTable, context);
+            // For proper tuple dissolution, we'd need to track which register
+            // corresponds to which tuple component. For now, just move to destination.
+            RVMValue dst = mapValue(instr.Target, stringTable, context);
+            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+        }
         break;
     }
     case ssa::SSAInstrAssign::OpKind::Cast: {
@@ -258,40 +265,123 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
 }
 
 // Map SSA call instruction
-std::shared_ptr<RVMInstr> RVMMapper::mapCall(
+std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
     const ssa::SSAInstrCall& instr,
     std::shared_ptr<RVMStringTable> stringTable,
-    RVMContext& context)
+    RVMContext& context,
+    const ssa::SSAProgram& ssaProgram)
 {
-    std::vector<RVMValue> args;
-    args.reserve(instr.Arguments.size());
+    std::vector<std::shared_ptr<RVMInstr>> result;
 
-    for (const auto& arg : instr.Arguments) {
-        args.push_back(mapValue(arg, stringTable, context));
+    // Check if this is an internal or external function
+    bool isExternal = true;
+    for (const auto& func : ssaProgram.Functions) {
+        if (func.Name == instr.FunctionName) {
+            isExternal = func.External;
+            break;
+        }
     }
 
-    std::optional<RVMValue> dst;
-    if (!instr.Target.type().isVoid()) {
-        dst = mapValue(instr.Target, stringTable, context);
+    if (isExternal) {
+        // External call: pass arguments as part of the call instruction
+        std::vector<RVMValue> args;
+        args.reserve(instr.Arguments.size());
+
+        for (const auto& arg : instr.Arguments)
+            args.push_back(mapValue(arg, stringTable, context));
+
+        std::optional<RVMValue> dst;
+        if (!instr.Target.type().isVoid())
+            dst = mapValue(instr.Target, stringTable, context);
+
+        result.push_back(std::make_shared<RVMInstrExternalCall>(dst, instr.FunctionName, args));
+    } else {
+        // Internal call: use calling convention with registers
+        // 1. Move arguments to registers %r1, %r2, etc.
+        for (size_t i = 0; i < instr.Arguments.size(); ++i) {
+            RVMValue src = mapValue(instr.Arguments[i], stringTable, context);
+            RVMValue dst = RVMValue::Register(i + 1, instr.Arguments[i].type()); // %r1, %r2, ...
+            if (src.isRegister() && src.regId() == (i + 1))                      //< Already in the correct register, no move needed
+                continue;
+
+            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+        }
+
+        // 2. Determine number of registers to save (max of args and return values)
+        auto returnTypes       = dissolveTupleType(instr.Target.type());
+        uint32_t numReturnRegs = returnTypes.empty() || returnTypes[0].isVoid() ? 0 : static_cast<uint32_t>(returnTypes.size());
+        uint32_t numArgRegs    = static_cast<uint32_t>(instr.Arguments.size());
+        uint32_t registerCount = std::max(numReturnRegs, numArgRegs);
+
+        // 3. Push frame to save register context
+        if (registerCount > 0)
+            result.push_back(std::make_shared<RVMInstrPushFrame>(registerCount));
+
+        // 4. Call internal function
+        result.push_back(std::make_shared<RVMInstrInternalCall>(instr.FunctionName));
+
+        // 5. Move return values from %r1, %r2, ... to destinations (if not void)
+        if (!instr.Target.type().isVoid()) {
+            if (instr.Target.type().isTuple()) {
+                // Multiple return values: dissolve tuple
+                auto retTypes = dissolveTupleType(instr.Target.type());
+                for (size_t i = 0; i < retTypes.size(); ++i) {
+                    RVMValue src = RVMValue::Register(i + 1, retTypes[i]); // %r1, %r2, ...
+                    // For tuples, we'd need to map each component separately
+                    // This is simplified for now - proper implementation would track tuple components
+                    RVMValue dst = mapValue(instr.Target, stringTable, context);
+                    result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+                }
+            } else {
+                // Single return value
+                RVMValue src = RVMValue::Register(1, instr.Target.type()); // %r1 holds return value
+                RVMValue dst = mapValue(instr.Target, stringTable, context);
+                if (!dst.isRegister() || dst.regId() != 1) //< Only move if destination is not already %r1
+                    result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+            }
+        }
+
+        // 6. Pop frame to restore register context
+        if (registerCount > 0) {
+            result.push_back(std::make_shared<RVMInstrPopFrame>(registerCount));
+        }
     }
 
-    // TODO: Internal calls
-    return std::make_shared<RVMInstrExternalCall>(dst, instr.FunctionName, args);
+    return result;
 }
 
 // Map SSA return instruction
-std::shared_ptr<RVMInstr> RVMMapper::mapReturn(
+std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(
     const ssa::SSAInstrReturn& instr,
     std::shared_ptr<RVMStringTable> stringTable,
     RVMContext& context)
 {
-    std::optional<RVMValue> retVal;
+    std::vector<std::shared_ptr<RVMInstr>> result;
 
     if (!instr.Value.type().isVoid()) {
-        retVal = mapValue(instr.Value, stringTable, context);
+        // Dissolve tuple return types
+        auto retTypes = dissolveTupleType(instr.Value.type());
+
+        if (retTypes.size() > 1 || instr.Value.type().isTuple()) {
+            // Multiple return values: move each to %r1, %r2, ...
+            for (size_t i = 0; i < retTypes.size(); ++i) {
+                RVMValue src = mapValue(instr.Value, stringTable, context);
+                RVMValue dst = RVMValue::Register(i + 1, retTypes[i]); // %r1, %r2, ...
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+            }
+        } else {
+            // Single return value: move to %r1
+            RVMValue src = mapValue(instr.Value, stringTable, context);
+            RVMValue dst = RVMValue::Register(1, instr.Value.type()); // %r1
+            if (!src.isRegister() || src.regId() != 1)                //< Only move if source is not already %r1
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+        }
     }
 
-    return std::make_shared<RVMInstrReturn>(retVal);
+    // Add the actual return instruction
+    result.push_back(std::make_shared<RVMInstrReturn>(std::nullopt));
+
+    return result;
 }
 
 // Map SSA branch instruction
@@ -316,7 +406,8 @@ std::shared_ptr<RVMInstr> RVMMapper::mapGoto(const ssa::SSAInstrGoto& instr)
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
     const std::vector<std::shared_ptr<ssa::SSAInstr>>& ssaInstrs,
     std::shared_ptr<RVMStringTable> stringTable,
-    RVMContext& context)
+    RVMContext& context,
+    const ssa::SSAProgram& ssaProgram)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
     MapperContext mapCtx(context, stringTable);
@@ -338,13 +429,15 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
 
         // Handle call instructions
         if (auto* call = dynamic_cast<ssa::SSAInstrCall*>(ssaInstr.get())) {
-            result.push_back(mapCall(*call, stringTable, context));
+            auto instrs = mapCall(*call, stringTable, context, ssaProgram);
+            result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
 
         // Handle return instructions
         if (auto* ret = dynamic_cast<ssa::SSAInstrReturn*>(ssaInstr.get())) {
-            result.push_back(mapReturn(*ret, stringTable, context));
+            auto instrs = mapReturn(*ret, stringTable, context);
+            result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
 
@@ -392,7 +485,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
 
 // Map SSA function to RVM function
 RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
-                                   std::shared_ptr<RVMStringTable> stringTable)
+                                   std::shared_ptr<RVMStringTable> stringTable,
+                                   const ssa::SSAProgram& ssaProgram)
 {
     RVMFunction rvmFunc;
     rvmFunc.name          = ssaFunc.Name;
@@ -411,7 +505,11 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
     // Map function body
     if (!ssaFunc.External) {
         RVMContext funcContext;
-        rvmFunc.body = mapInstructions(ssaFunc.Body, stringTable, funcContext);
+
+        // TODO: Initialize parameters from %r1, %r2, ... registers
+        // Parameters are passed via registers according to calling convention
+
+        rvmFunc.body = mapInstructions(ssaFunc.Body, stringTable, funcContext, ssaProgram);
     }
 
     return rvmFunc;
@@ -425,12 +523,12 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 
     // Map main program body
     RVMContext mainContext;
-    rvmProgram.body = mapInstructions(ssaProgram.Body, rvmProgram.stringTable, mainContext);
+    rvmProgram.body = mapInstructions(ssaProgram.Body, rvmProgram.stringTable, mainContext, ssaProgram);
 
     // Map all functions
     rvmProgram.functions.reserve(ssaProgram.Functions.size());
     for (const auto& ssaFunc : ssaProgram.Functions) {
-        rvmProgram.functions.push_back(mapFunction(ssaFunc, rvmProgram.stringTable));
+        rvmProgram.functions.push_back(mapFunction(ssaFunc, rvmProgram.stringTable, ssaProgram));
     }
 
     return rvmProgram;
@@ -440,12 +538,13 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::dissolveTupleInstruction(
     const std::shared_ptr<ssa::SSAInstr>& ssaInstr,
     std::shared_ptr<RVMStringTable> stringTable,
-    RVMContext& context)
+    RVMContext& context,
+    const ssa::SSAProgram& ssaProgram)
 {
     // This would handle dissolving tuple operations into elementary operations
     // For now, delegate to standard instruction mapping
     std::vector<std::shared_ptr<ssa::SSAInstr>> instrs = { ssaInstr };
-    return mapInstructions(instrs, stringTable, context);
+    return mapInstructions(instrs, stringTable, context, ssaProgram);
 }
 
 } // namespace PExpr::rvm

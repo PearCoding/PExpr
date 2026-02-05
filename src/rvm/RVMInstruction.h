@@ -152,24 +152,32 @@ private:
     std::optional<RVMValue> mRetVal;
 };
 
-/// Push frame instruction
+/// Push frame instruction - saves registers %r1 to %r{count}
 class RVMInstrPushFrame : public RVMInstr {
 public:
-    RVMInstrPushFrame();
+    RVMInstrPushFrame(uint32_t registerCount);
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::PUSH_FRAME; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] uint32_t registerCount() const { return mRegisterCount; }
+
+private:
+    uint32_t mRegisterCount; // Number of registers to save, starting from %r1
 };
 
-/// Pop frame instruction
+/// Pop frame instruction - restores registers %r1 to %r{count}
 class RVMInstrPopFrame : public RVMInstr {
 public:
-    RVMInstrPopFrame();
+    RVMInstrPopFrame(uint32_t registerCount);
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::POP_FRAME; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] uint32_t registerCount() const { return mRegisterCount; }
+
+private:
+    uint32_t mRegisterCount; // Number of registers to restore, starting from %r1
 };
 
 } // namespace PExpr::rvm

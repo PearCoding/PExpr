@@ -285,14 +285,12 @@ void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
 
 void RVMSerializer::writePushFrame(std::ostream& os, const RVMInstrPushFrame& instr)
 {
-    PEXPR_UNUSED(instr);
-    os << "push_frame";
+    os << "push_frame " << instr.registerCount();
 }
 
 void RVMSerializer::writePopFrame(std::ostream& os, const RVMInstrPopFrame& instr)
 {
-    PEXPR_UNUSED(instr);
-    os << "pop_frame";
+    os << "pop_frame " << instr.registerCount();
 }
 
 void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
@@ -595,10 +593,28 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         return nullptr;
 
     // Check for push/pop frame
-    if (trimmed == "push_frame")
-        return std::make_shared<RVMInstrPushFrame>();
-    if (trimmed == "pop_frame")
-        return std::make_shared<RVMInstrPopFrame>();
+    if (trimmed.rfind("push_frame ", 0) == 0 || trimmed == "push_frame") {
+        uint32_t count = 0;
+        if (trimmed.size() > 11) {
+            try {
+                count = std::stoul(trimmed.substr(11));
+            } catch (...) {
+                count = 0;
+            }
+        }
+        return std::make_shared<RVMInstrPushFrame>(count);
+    }
+    if (trimmed.rfind("pop_frame ", 0) == 0 || trimmed == "pop_frame") {
+        uint32_t count = 0;
+        if (trimmed.size() > 10) {
+            try {
+                count = std::stoul(trimmed.substr(10));
+            } catch (...) {
+                count = 0;
+            }
+        }
+        return std::make_shared<RVMInstrPopFrame>(count);
+    }
 
     // Check for label (format: labelname:)
     if (trimmed.back() == ':' && trimmed.find('=') == std::string::npos) {

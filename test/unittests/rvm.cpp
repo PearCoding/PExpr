@@ -197,16 +197,18 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
 
     SECTION("Frame instructions")
     {
-        auto pushInstr = std::make_shared<RVMInstrPushFrame>();
-        auto popInstr  = std::make_shared<RVMInstrPopFrame>();
+        auto pushInstr = std::make_shared<RVMInstrPushFrame>(3);
+        auto popInstr  = std::make_shared<RVMInstrPopFrame>(3);
 
         REQUIRE(pushInstr->opcode() == Opcode::PUSH_FRAME);
         REQUIRE_FALSE(pushInstr->dst().has_value());
         REQUIRE(pushInstr->srcs().empty());
+        REQUIRE(pushInstr->registerCount() == 3);
 
         REQUIRE(popInstr->opcode() == Opcode::POP_FRAME);
         REQUIRE_FALSE(popInstr->dst().has_value());
         REQUIRE(popInstr->srcs().empty());
+        REQUIRE(popInstr->registerCount() == 3);
     }
 
     SECTION("Branch instruction")
@@ -664,5 +666,168 @@ TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")
             REQUIRE(instr->opcode() == op);
             REQUIRE(instr->dst().value() == dst);
         }
+    }
+}
+
+TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][calling]")
+{
+    SECTION("Internal call instruction")
+    {
+        auto instr = std::make_shared<RVMInstrInternalCall>("my_function");
+        
+        REQUIRE(instr->opcode() == Opcode::CALL_INTERNAL);
+        REQUIRE(instr->functionName() == "my_function");
+        REQUIRE_FALSE(instr->dst().has_value());
+        REQUIRE(instr->srcs().empty());
+    }
+
+    SECTION("Internal call serialization")
+    {
+        auto instr = std::make_shared<RVMInstrInternalCall>("test_func");
+        
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *instr);
+        std::string instrStr = oss.str();
+        
+        REQUIRE(instrStr.find("call_internal") != std::string::npos);
+        REQUIRE(instrStr.find("test_func") != std::string::npos);
+    }
+}
+
+TEST_CASE("RVMInstructions: frame instructions with register counts", "[rvm][instructions][calling]")
+{
+    SECTION("Push frame with register count")
+    {
+        auto pushInstr = std::make_shared<RVMInstrPushFrame>(5);
+        
+        REQUIRE(pushInstr->opcode() == Opcode::PUSH_FRAME);
+        REQUIRE(pushInstr->registerCount() == 5);
+        
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *pushInstr);
+        std::string instrStr = oss.str();
+        
+        REQUIRE(instrStr.find("push_frame") != std::string::npos);
+        REQUIRE(instrStr.find("5") != std::string::npos);
+    }
+
+    SECTION("Pop frame with register count")
+    {
+        auto popInstr = std::make_shared<RVMInstrPopFrame>(3);
+        
+        REQUIRE(popInstr->opcode() == Opcode::POP_FRAME);
+        REQUIRE(popInstr->registerCount() == 3);
+        
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *popInstr);
+        std::string instrStr = oss.str();
+        
+        REQUIRE(instrStr.find("pop_frame") != std::string::npos);
+        REQUIRE(instrStr.find("3") != std::string::npos);
+    }
+
+    SECTION("Frame instruction serialization roundtrip")
+    {
+        auto pushInstr = std::make_shared<RVMInstrPushFrame>(7);
+        
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *pushInstr);
+        std::string serialized = oss.str();
+        
+        // Parse it back
+        auto parsed = RVMSerializer::readInstruction(serialized);
+        REQUIRE(parsed != nullptr);
+        
+        auto* pushParsed = dynamic_cast<RVMInstrPushFrame*>(parsed.get());
+        REQUIRE(pushParsed != nullptr);
+        REQUIRE(pushParsed->registerCount() == 7);
+    }
+}
+
+TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper][tuple]")
+{
+    SECTION("Simple tuple with 2 elements")
+    {
+        std::vector<Type> components = {
+            Type(TypeKind::Integer),
+            Type(TypeKind::Number)
+        };
+        Type tupleType(components);
+        
+        auto dissolved = RVMMapper::dissolveTupleType(tupleType);
+        
+        REQUIRE(dissolved.size() == 2);
+        REQUIRE(dissolved[0].kind() == TypeKind::Integer);
+        REQUIRE(dissolved[1].kind() == TypeKind::Number);
+    }
+
+    SECTION("Nested tuple dissolution")
+    {
+        // Create (int, (num, num), bool)
+        std::vector<Type> inner = {
+            Type(TypeKind::Number),
+            Type(TypeKind::Number)
+        };
+        Type innerTuple(inner);
+        
+        std::vector<Type> outer = {
+            Type(TypeKind::Integer),
+            innerTuple,
+            Type(TypeKind::Boolean)
+        };
+        Type outerTuple(outer);
+        
+        auto dissolved = RVMMapper::dissolveTupleType(outerTuple);
+        
+        REQUIRE(dissolved.size() == 4);
+        REQUIRE(dissolved[0].kind() == TypeKind::Integer);
+        REQUIRE(dissolved[1].kind() == TypeKind::Number);
+        REQUIRE(dissolved[2].kind() == TypeKind::Number);
+        REQUIRE(dissolved[3].kind() == TypeKind::Boolean);
+    }
+
+    SECTION("Non-tuple type returns single element")
+    {
+        Type intType(TypeKind::Integer);
+        auto dissolved = RVMMapper::dissolveTupleType(intType);
+        
+        REQUIRE(dissolved.size() == 1);
+        REQUIRE(dissolved[0].kind() == TypeKind::Integer);
+    }
+}
+
+TEST_CASE("RVMSerializer: frame instruction deserialization", "[rvm][serializer][calling]")
+{
+    SECTION("Deserialize push_frame with count")
+    {
+        std::string line = "push_frame 4";
+        auto instr = RVMSerializer::readInstruction(line);
+        
+        REQUIRE(instr != nullptr);
+        auto* pushFrame = dynamic_cast<RVMInstrPushFrame*>(instr.get());
+        REQUIRE(pushFrame != nullptr);
+        REQUIRE(pushFrame->registerCount() == 4);
+    }
+
+    SECTION("Deserialize pop_frame with count")
+    {
+        std::string line = "pop_frame 2";
+        auto instr = RVMSerializer::readInstruction(line);
+        
+        REQUIRE(instr != nullptr);
+        auto* popFrame = dynamic_cast<RVMInstrPopFrame*>(instr.get());
+        REQUIRE(popFrame != nullptr);
+        REQUIRE(popFrame->registerCount() == 2);
+    }
+
+    SECTION("Deserialize push_frame without count (backwards compatibility)")
+    {
+        std::string line = "push_frame";
+        auto instr = RVMSerializer::readInstruction(line);
+        
+        REQUIRE(instr != nullptr);
+        auto* pushFrame = dynamic_cast<RVMInstrPushFrame*>(instr.get());
+        REQUIRE(pushFrame != nullptr);
+        REQUIRE(pushFrame->registerCount() == 0);
     }
 }

@@ -74,8 +74,14 @@ RVMInstrReturn::RVMInstrReturn(std::optional<RVMValue> retVal)
 {
 }
 
-RVMInstrPushFrame::RVMInstrPushFrame() = default;
+RVMInstrPushFrame::RVMInstrPushFrame(uint32_t registerCount)
+    : mRegisterCount(registerCount)
+{
+}
 
-RVMInstrPopFrame::RVMInstrPopFrame() = default;
+RVMInstrPopFrame::RVMInstrPopFrame(uint32_t registerCount)
+    : mRegisterCount(registerCount)
+{
+}
 
 } // namespace PExpr::rvm
