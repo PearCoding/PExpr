@@ -593,9 +593,9 @@ TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
             RVMValue::Constant(Number(3.14))
         };
 
-        auto instr = std::make_shared<RVMInstrCall>(dst, "test_func", args);
+        auto instr = std::make_shared<RVMInstrExternalCall>(dst, "test_func", args);
 
-        REQUIRE(instr->opcode() == Opcode::CALL);
+        REQUIRE(instr->opcode() == Opcode::CALL_EXTERNAL);
         REQUIRE(instr->dst().has_value());
         REQUIRE(instr->dst().value() == dst);
         REQUIRE(instr->functionName() == "test_func");
@@ -610,9 +610,9 @@ TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
             RVMValue::Constant(Integer(42))
         };
 
-        auto instr = std::make_shared<RVMInstrCall>(std::nullopt, "void_func", args);
+        auto instr = std::make_shared<RVMInstrExternalCall>(std::nullopt, "void_func", args);
 
-        REQUIRE(instr->opcode() == Opcode::CALL);
+        REQUIRE(instr->opcode() == Opcode::CALL_EXTERNAL);
         REQUIRE_FALSE(instr->dst().has_value());
         REQUIRE(instr->functionName() == "void_func");
     }

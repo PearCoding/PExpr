@@ -78,8 +78,10 @@ std::string RVMSerializer::opcodeToString(Opcode op)
         return "brnz";
     case Opcode::JMP:
         return "jmp";
-    case Opcode::CALL:
-        return "call";
+    case Opcode::CALL_EXTERNAL:
+        return "call_external";
+    case Opcode::CALL_INTERNAL:
+        return "call_internal";
     case Opcode::RET:
         return "ret";
 
@@ -158,8 +160,10 @@ Opcode RVMSerializer::stringToOpcode(const std::string& str)
         return Opcode::BRNZ;
     if (str == "jmp")
         return Opcode::JMP;
-    if (str == "call")
-        return Opcode::CALL;
+    if (str == "call_external")
+        return Opcode::CALL_EXTERNAL;
+    if (str == "call_internal")
+        return Opcode::CALL_INTERNAL;
     if (str == "ret")
         return Opcode::RET;
 
@@ -248,13 +252,13 @@ void RVMSerializer::writeLabel(std::ostream& os, const RVMInstrLabel& instr)
     os << instr.labelName() << ":";
 }
 
-void RVMSerializer::writeCall(std::ostream& os, const RVMInstrCall& instr)
+void RVMSerializer::writeCall(std::ostream& os, const RVMInstrExternalCall& instr)
 {
     if (instr.dst().has_value()) {
         write(os, instr.dst().value());
         os << " = ";
     }
-    os << "call " << instr.functionName() << "(";
+    os << "call_external " << instr.functionName() << "(";
 
     auto srcs = instr.srcs();
     for (size_t i = 0; i < srcs.size(); ++i) {
@@ -263,6 +267,11 @@ void RVMSerializer::writeCall(std::ostream& os, const RVMInstrCall& instr)
         write(os, srcs[i]);
     }
     os << ")";
+}
+
+void RVMSerializer::writeCall(std::ostream& os, const RVMInstrInternalCall& instr)
+{
+    os << "call_internal " << instr.functionName();
 }
 
 void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
@@ -298,8 +307,10 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
         writeBranch(os, *branch);
     else if (const auto* jump = dynamic_cast<const RVMInstrJump*>(&instr))
         writeJump(os, *jump);
-    else if (const auto* call = dynamic_cast<const RVMInstrCall*>(&instr))
-        writeCall(os, *call);
+    else if (const auto* callE = dynamic_cast<const RVMInstrExternalCall*>(&instr))
+        writeCall(os, *callE);
+    else if (const auto* callI = dynamic_cast<const RVMInstrInternalCall*>(&instr))
+        writeCall(os, *callI);
     else if (const auto* ret = dynamic_cast<const RVMInstrReturn*>(&instr))
         writeReturn(os, *ret);
     else if (const auto* pushFrame = dynamic_cast<const RVMInstrPushFrame*>(&instr))
@@ -677,18 +688,24 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             }
         }
 
-        // Check for call
-        if (rest.rfind("call ", 0) == 0) {
+        // Check for call_external
+        if (rest.rfind("call_external ", 0) == 0) {
             size_t parenStart = rest.find('(');
             size_t parenEnd   = rest.find(')', parenStart);
             if (parenStart == std::string::npos || parenEnd == std::string::npos)
                 return nullptr;
 
-            std::string funcName = trim(rest.substr(5, parenStart - 5));
+            std::string funcName = trim(rest.substr(15, parenStart - 5));
             std::string argsStr  = rest.substr(parenStart + 1, parenEnd - parenStart - 1);
 
             std::vector<RVMValue> args = parseValueList(argsStr);
-            return std::make_shared<RVMInstrCall>(dst, funcName, args);
+            return std::make_shared<RVMInstrExternalCall>(dst, funcName, args);
+        }
+
+        // Check for call_internal
+        if (rest.rfind("call_internal ", 0) == 0) {
+            std::string funcName = trim(rest.substr(15));
+            return std::make_shared<RVMInstrInternalCall>(funcName);
         }
     }
 

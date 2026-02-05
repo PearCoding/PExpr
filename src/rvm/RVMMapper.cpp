@@ -275,7 +275,8 @@ std::shared_ptr<RVMInstr> RVMMapper::mapCall(
         dst = mapValue(instr.Target, stringTable, context);
     }
 
-    return std::make_shared<RVMInstrCall>(dst, instr.FunctionName, args);
+    // TODO: Internal calls
+    return std::make_shared<RVMInstrExternalCall>(dst, instr.FunctionName, args);
 }
 
 // Map SSA return instruction

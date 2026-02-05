@@ -60,7 +60,8 @@ private:
     static void writeBranch(std::ostream& os, const RVMInstrBranch& instr);
     static void writeJump(std::ostream& os, const RVMInstrJump& instr);
     static void writeLabel(std::ostream& os, const RVMInstrLabel& instr);
-    static void writeCall(std::ostream& os, const RVMInstrCall& instr);
+    static void writeCall(std::ostream& os, const RVMInstrExternalCall& instr);
+    static void writeCall(std::ostream& os, const RVMInstrInternalCall& instr);
     static void writeReturn(std::ostream& os, const RVMInstrReturn& instr);
     static void writePushFrame(std::ostream& os, const RVMInstrPushFrame& instr);
     static void writePopFrame(std::ostream& os, const RVMInstrPopFrame& instr);

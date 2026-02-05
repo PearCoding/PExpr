@@ -56,11 +56,16 @@ RVMInstrLabel::RVMInstrLabel(const std::string& name)
 {
 }
 
-RVMInstrCall::RVMInstrCall(std::optional<RVMValue> dst, const std::string& funcName,
-                           const std::vector<RVMValue>& args)
+RVMInstrExternalCall::RVMInstrExternalCall(std::optional<RVMValue> dst, const std::string& funcName,
+                                           const std::vector<RVMValue>& args)
     : mDst(dst)
     , mFuncName(funcName)
     , mArgs(args)
+{
+}
+
+RVMInstrInternalCall::RVMInstrInternalCall(const std::string& funcName)
+    : mFuncName(funcName)
 {
 }
 

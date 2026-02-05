@@ -50,12 +50,13 @@ enum class Opcode : uint8_t {
     B2F, // Boolean to Float
 
     // Control flow
-    BR,   // Branch conditional
-    BRZ,  // Branch if zero
-    BRNZ, // Branch if not zero
-    JMP,  // Unconditional jump
-    CALL, // Function call
-    RET,  // Return
+    BR,            // Branch conditional
+    BRZ,           // Branch if zero
+    BRNZ,          // Branch if not zero
+    JMP,           // Unconditional jump
+    CALL_EXTERNAL, // Function call to an external function (host)
+    CALL_INTERNAL, // Function call to an internal function (PExpr)
+    RET,           // Return
 
     // Register frame operations
     PUSH_FRAME, // Push register frame onto stack

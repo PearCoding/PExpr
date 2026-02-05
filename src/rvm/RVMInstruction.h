@@ -106,12 +106,12 @@ private:
 
 /// Call instruction
 /// TODO: Split into call_external and call
-class RVMInstrCall : public RVMInstr {
+class RVMInstrExternalCall : public RVMInstr {
 public:
-    RVMInstrCall(std::optional<RVMValue> dst, const std::string& funcName,
-                 const std::vector<RVMValue>& args);
+    RVMInstrExternalCall(std::optional<RVMValue> dst, const std::string& funcName,
+                         const std::vector<RVMValue>& args);
 
-    [[nodiscard]] Opcode opcode() const override { return Opcode::CALL; }
+    [[nodiscard]] Opcode opcode() const override { return Opcode::CALL_EXTERNAL; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return mArgs; }
     [[nodiscard]] const std::string& functionName() const { return mFuncName; }
@@ -120,6 +120,19 @@ private:
     std::optional<RVMValue> mDst;
     std::string mFuncName;
     std::vector<RVMValue> mArgs;
+};
+
+class RVMInstrInternalCall : public RVMInstr {
+public:
+    RVMInstrInternalCall(const std::string& funcName);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::CALL_INTERNAL; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] const std::string& functionName() const { return mFuncName; }
+
+private:
+    std::string mFuncName;
 };
 
 /// Return instruction
