@@ -36,6 +36,6 @@
 - [ ] Add [[constant]] attribute for expressions which have to be constant evaluated and must not be in the final SSA
 - [x] Add syntactic sugar for variable assignments with "+=", "-=", ...
 - [ ] Remove some of the annoying habits (e.g., "fn foo(...) = { };" instead of "fn foo(...) { }" and "if ... {...};" instead of "if ... {...}")
-- [ ] RVM needs correct phi node handling. 
+- [x] RVM needs correct phi node handling. 
 - [x] RVM needs tuple dissolving implemented. -> Handled in SSA except for 'call' and 'return' instructions.
 - [-] Split the call of functions in RVM into two cases: "call_external" as the way we handled calls for now and "call_internal" which uses a standard order of registers (saved via push_frame) to call.

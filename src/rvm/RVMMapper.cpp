@@ -454,28 +454,58 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
 
         // Handle phi instructions
         if (auto* phi = dynamic_cast<ssa::SSAInstrPhi*>(ssaInstr.get())) {
-            // Phi nodes need special handling in RVM
-            // For now, we convert them to a series of conditional moves
-            // This is simplified - proper handling would require more sophisticated analysis
-            // TODO
+            // Phi nodes select values based on conditions
+            // Implementation: result = cond1 ? val1 : (cond2 ? val2 : ... elseVal)
+            // We need to generate conditional branches for this
             RVMValue dst = mapValue(phi->Target, stringTable, context);
-
-            // Convert phi to conditional moves based on conditions
+            
+            if (phi->Conditions.empty()) {
+                // No conditions, just use the else branch (or first branch if no else)
+                size_t branchIdx = phi->Branches.size() > 0 ? 0 : 0;
+                if (branchIdx < phi->Branches.size()) {
+                    RVMValue branchVal = mapValue(phi->Branches[branchIdx], stringTable, context);
+                    result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
+                }
+                continue;
+            }
+            
+            // Generate conditional selection logic
+            // For N conditions, we need N-1 conditional branches and a final else/default
+            std::string phiEndLabel = "phi_end_" + std::to_string(result.size()); // Unique label
+            
             for (size_t i = 0; i < phi->Conditions.size(); ++i) {
-                RVMValue cond   = mapValue(phi->Conditions[i], stringTable, context);
-                RVMValue branch = mapValue(phi->Branches[i], stringTable, context);
-
-                // If condition is true, move branch value to dst
-                // This is a simplified representation - actual implementation may vary
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branch));
+                RVMValue cond = mapValue(phi->Conditions[i], stringTable, context);
+                RVMValue branchVal = mapValue(phi->Branches[i], stringTable, context);
+                
+                // If condition is true, move branch value and jump to end
+                // Branch if condition is false to next condition
+                std::string nextLabel = "phi_next_" + std::to_string(result.size()) + "_" + std::to_string(i);
+                
+                // Branch if condition is zero (false) to next condition
+                result.push_back(std::make_shared<RVMInstrBranch>(Opcode::BRZ, cond, nextLabel));
+                
+                // Condition is true: move branch value to destination
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
+                result.push_back(std::make_shared<RVMInstrJump>(phiEndLabel));
+                
+                // Next condition label
+                result.push_back(std::make_shared<RVMInstrLabel>(nextLabel));
             }
-
-            // Handle else branch
-            if (phi->Branches.size() > phi->Conditions.size()) {
-                RVMValue elseBranch = mapValue(phi->Branches.back(), stringTable, context);
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, elseBranch));
+            
+            // Handle else branch (if exists) or default (last branch)
+            size_t elseIdx = phi->Conditions.size();
+            if (elseIdx < phi->Branches.size()) {
+                // There's an explicit else branch
+                RVMValue elseVal = mapValue(phi->Branches[elseIdx], stringTable, context);
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, elseVal));
+            } else if (phi->Branches.size() > phi->Conditions.size()) {
+                // Should not happen based on SSA spec, but handle gracefully
+                RVMValue defaultVal = mapValue(phi->Branches.back(), stringTable, context);
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, defaultVal));
             }
-            continue;
+            
+            // End of phi resolution
+            result.push_back(std::make_shared<RVMInstrLabel>(phiEndLabel));
         }
     }
 
