@@ -14,6 +14,7 @@ struct OptimizerOptions {
     bool EliminateCommonSubexpressions = false; // < Common subexpression elimination (CSE)
     bool EliminatePartialRedundancies  = false; // < Partial redundancy elimination (PRE)
     bool OptimizeTailCalls             = false; // < Tail call optimization
+    bool DissolveTuples                = false; // < Dissolve tuples to elementary types (except call and returns). Not recommended, but necessary for RVM
 
     /// No option is enabled. Using --no-optimization
     [[nodiscard]] inline static OptimizerOptions None()
@@ -24,8 +25,8 @@ struct OptimizerOptions {
     /// The absolute minimum is enabled. This is the default without flags or -O0.
     [[nodiscard]] inline static OptimizerOptions Minimum()
     {
-        auto opts                          = None();
-        opts.RemoveDeadCode                = true;
+        auto opts           = None();
+        opts.RemoveDeadCode = true;
         return opts;
     }
 
@@ -48,7 +49,7 @@ struct OptimizerOptions {
         return opts;
     }
 
-    /// Some large optimizations. Ignores IEEE-754 compiliance. 
+    /// Some large optimizations. Ignores IEEE-754 compiliance.
     /// This is -O3 (and resembles --fast-math in some other compilers)
     [[nodiscard]] inline static OptimizerOptions High()
     {

@@ -3,9 +3,16 @@
 #include "Environment.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
-#include "ssa/SSATupleDissolvePass.h"
 
 using namespace PExpr;
+
+[[nodiscard]] inline static auto MakeTupleOptimization()
+{
+    auto opts           = opt::OptimizerOptions::Minimum();
+    opts.RemoveDeadCode = true;
+    opts.DissolveTuples = true;
+    return opts;
+}
 
 TEST_CASE("SSATupleDissolvePass - Simple tuple creation and access", "[tuple_dissolve]")
 {
@@ -32,8 +39,7 @@ TEST_CASE("SSATupleDissolvePass - Simple tuple creation and access", "[tuple_dis
     REQUIRE(hasTuplesBefore);
 
     // Apply dissolve pass
-    ssa::SSATupleDissolvePass dissolvePass;
-    bool changed = dissolvePass.dissolve(program);
+    bool changed = env.optimize(program, MakeTupleOptimization());
     REQUIRE(changed);
 
     // After dissolve, we should have no tuple values
@@ -63,8 +69,7 @@ TEST_CASE("SSATupleDissolvePass - Nested tuple access", "[tuple_dissolve]")
     auto program = env.map(closure);
 
     // Apply dissolve pass iteratively until no tuples remain
-    ssa::SSATupleDissolvePass dissolvePass;
-    bool changed = dissolvePass.dissolve(program);
+    bool changed = env.optimize(program, MakeTupleOptimization());
     REQUIRE(changed);
 
     // Verify no tuples remain
@@ -92,8 +97,7 @@ TEST_CASE("SSATupleDissolvePass - Tuple in phi node", "[tuple_dissolve]")
     auto program = env.map(closure);
 
     // Apply dissolve pass iteratively
-    ssa::SSATupleDissolvePass dissolvePass;
-    bool changed = dissolvePass.dissolve(program);
+    bool changed = env.optimize(program, MakeTupleOptimization());
     REQUIRE(changed);
 
     // Verify no tuples remain
@@ -122,8 +126,7 @@ TEST_CASE("SSATupleDissolvePass - Swizzle operation", "[tuple_dissolve]")
     auto program = env.map(closure);
 
     // Apply dissolve pass iteratively
-    ssa::SSATupleDissolvePass dissolvePass;
-    bool changed = dissolvePass.dissolve(program);
+    bool changed = env.optimize(program, MakeTupleOptimization());
     REQUIRE(changed);
 
     // Verify no tuples remain
@@ -152,8 +155,7 @@ TEST_CASE("SSATupleDissolvePass - Tuple cast", "[tuple_dissolve]")
     auto program = env.map(closure);
 
     // Apply dissolve pass iteratively
-    ssa::SSATupleDissolvePass dissolvePass;
-    bool changed = dissolvePass.dissolve(program);
+    bool changed = env.optimize(program, MakeTupleOptimization());
     REQUIRE(changed);
 
     // Verify no tuples remain

@@ -31,13 +31,6 @@ public:
     /// Map SSA type to elementary types (dissolve tuples)
     static std::vector<type::Type> dissolveTupleType(const type::Type& type);
 
-    /// Map SSA instruction to RVM instructions (dissolve tuples)
-    static std::vector<std::shared_ptr<RVMInstr>> dissolveTupleInstruction(
-        const std::shared_ptr<ssa::SSAInstr>& ssaInstr,
-        std::shared_ptr<RVMStringTable> stringTable,
-        RVMContext& context,
-        const ssa::SSAProgram& ssaProgram);
-
 private:
     // Helper functions for specific instruction types
     static std::vector<std::shared_ptr<RVMInstr>> mapAssign(

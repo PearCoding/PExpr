@@ -1,5 +1,6 @@
 #include "Optimizer.h"
 
+#include "SSATupleDissolvePass.h"
 #include "SSCPCommonSubexpressionEliminator.h"
 #include "SSCPConstantFolder.h"
 #include "SSCPControlFlowOptimizer.h"
@@ -28,6 +29,7 @@ Optimizer::Optimizer(const OptimizerOptions& opts)
     , mCommonSubexpressionEliminator(std::make_unique<SSCPCommonSubexpressionEliminator>(opts))
     , mPreOptimizer(std::make_unique<SSCPPreOptimizer>(opts))
     , mTailCallOptimizer(std::make_unique<SSCPTailCallOptimizer>())
+    , mTupleDissolvePass(std::make_unique<SSATupleDissolvePass>())
 {
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
@@ -62,6 +64,7 @@ void Optimizer::Run(const OptimizerOptions& opts, InstructionList& body)
 void Optimizer::runProgram(ssa::SSAProgram& program)
 {
     mSideEffectAnalyzer->propagateSideEffects(program);
+    mTupleDissolvePass->clear();
 
     // Keep optimizing until no changes are possible
     bool changed = true;
@@ -71,28 +74,24 @@ void Optimizer::runProgram(ssa::SSAProgram& program)
         mFunctionInliner->analyzeCallGraph(program);
 
         // Remove unused functions at the beginning to speed up stuff later
-        if (mOptions.RemoveDeadCode) {
-            if (mFunctionInliner->removeUnusedFunctions(program))
-                changed = true; // < Should not really change something, but lets still try
-        }
+        if (mOptions.RemoveDeadCode)
+            changed |= mFunctionInliner->removeUnusedFunctions(program);
 
         // Process main program body
-        if (processBody(program.Body))
-            changed = true;
+        changed |= processBody(program.Body);
 
         // Process all functions
-        for (auto& func : program.Functions) {
-            if (processBody(func.Body))
-                changed = true;
-        }
+        for (auto& func : program.Functions)
+            changed |= processBody(func.Body);
 
         if (mOptions.InlineFunctions || mOptions.ForceInlineFunctions) {
             // Check if we can inline some functions
-            for (auto& func : program.Functions) {
-                if (mFunctionInliner->attempFunctionInlining(mContext.get(), program, func))
-                    changed = true;
-            }
+            for (auto& func : program.Functions)
+                changed |= mFunctionInliner->attempFunctionInlining(mContext.get(), program, func);
         }
+
+        if (mOptions.DissolveTuples)
+            changed |= mTupleDissolvePass->dissolve(mContext.get(), program);
     }
 }
 
@@ -104,44 +103,32 @@ bool Optimizer::processBody(InstructionList& body)
     bool changed = false;
 
     // 1) Replace operands with known constants where possible
-    if (mConstantFolder->replaceOperandIfConst(body))
-        changed = true;
+    changed |= mConstantFolder->replaceOperandIfConst(body);
 
     // 2) Try to fold assignments into constants. This requires dead code removal, or it will just go on for ever.
-    if (mOptions.EnableConstantFolding && mOptions.RemoveDeadCode) {
-        if (mConstantFolder->foldToConstants(mOptions.EnableConstantFoldingNumber, body))
-            changed = true;
-    }
+    if (mOptions.EnableConstantFolding && mOptions.RemoveDeadCode)
+        changed |= mConstantFolder->foldToConstants(mOptions.EnableConstantFoldingNumber, body);
 
     // 3) Apply identity optimizations per basic block
-    if (mIdentityOptimizer->applyIdentities(mContext.get(), body))
-        changed = true;
+    changed |= mIdentityOptimizer->applyIdentities(mContext.get(), body);
 
-    if (mOptions.EliminateCommonSubexpressions) {
-        // 4) Apply common subexpression elimination per basic block
-        if (mCommonSubexpressionEliminator->applyCSE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
-            changed = true;
-    }
+    // 4) Apply common subexpression elimination per basic block
+    if (mOptions.EliminateCommonSubexpressions)
+        changed |= mCommonSubexpressionEliminator->applyCSE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions());
 
-    if (mOptions.RemoveDeadCode) {
-        // 5) Remove dead assigns without side effects
-        if (mDeadCodeOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions()))
-            changed = true;
-    }
+    // 5) Remove dead assigns without side effects
+    if (mOptions.RemoveDeadCode)
+        changed |= mDeadCodeOptimizer->removeDeadAssigns(body, mSideEffectAnalyzer->getSideEffectFunctions());
 
     // 6) Remove empty branches
-    if (mControlFlowOptimizer->removeEmptyBranches(body))
-        changed = true;
+    changed |= mControlFlowOptimizer->removeEmptyBranches(body);
 
     // 7) Handle unused labels
-    if (mControlFlowOptimizer->removeObsoleteLabels(body))
-        changed = true;
+    changed |= mControlFlowOptimizer->removeObsoleteLabels(body);
 
-    if (mOptions.RemoveDeadCode) {
-        // 8) Collapse condition based nodes
-        if (mControlFlowOptimizer->collapse(body))
-            changed = true;
-    }
+    // 8) Collapse condition based nodes
+    if (mOptions.RemoveDeadCode)
+        changed |= mControlFlowOptimizer->collapse(body);
 
     if (mOptions.EliminatePartialRedundancies) {
         // 9) Apply partial redundancy elimination
@@ -150,10 +137,8 @@ bool Optimizer::processBody(InstructionList& body)
     }
 
     // 10) Apply tail call optimization
-    if (mOptions.OptimizeTailCalls) {
-        if (mTailCallOptimizer->optimizeTailCalls(mContext.get(), body))
-            changed = true;
-    }
+    if (mOptions.OptimizeTailCalls)
+        changed |= mTailCallOptimizer->optimizeTailCalls(mContext.get(), body);
 
     return changed;
 }

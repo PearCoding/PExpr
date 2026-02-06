@@ -20,6 +20,7 @@ class SSCPSideEffectAnalyzer;
 class SSCPCommonSubexpressionEliminator;
 class SSCPPreOptimizer;
 class SSCPTailCallOptimizer;
+class SSATupleDissolvePass;
 
 /// Optimizer containing multiple optimization passes for the SSA IR.
 class Optimizer {
@@ -29,7 +30,7 @@ public:
     /// Run the passes on a program. Modifies the program in-place.
     static void Run(const OptimizerOptions& opts, ssa::SSAProgram& program);
 
-    /// Run the passes on a subset of instructions. Modifies the instructions in-place. 
+    /// Run the passes on a subset of instructions. Modifies the instructions in-place.
     /// This does not apply function inlining
     static void Run(const OptimizerOptions& opts, InstructionList& body);
 
@@ -56,6 +57,7 @@ private:
     std::unique_ptr<SSCPCommonSubexpressionEliminator> mCommonSubexpressionEliminator;
     std::unique_ptr<SSCPPreOptimizer> mPreOptimizer;
     std::unique_ptr<SSCPTailCallOptimizer> mTailCallOptimizer;
+    std::unique_ptr<SSATupleDissolvePass> mTupleDissolvePass;
 };
 
 } // namespace PExpr::opt

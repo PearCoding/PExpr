@@ -1,17 +1,15 @@
 #include "SSATupleDissolvePass.h"
-#include "SSAInstruction.h"
-#include "opt/SSCPDeadCodeOptimizer.h"
-#include "opt/SSCPSideEffectAnalyzer.h"
+#include "SSCPDeadCodeOptimizer.h"
+#include "SSCPSideEffectAnalyzer.h"
+#include "ssa/SSAInstruction.h"
 
 #include <algorithm>
 
-namespace PExpr::ssa {
+namespace PExpr::opt {
+using namespace ssa;
 
-bool SSATupleDissolvePass::dissolve(SSAProgram& program)
+bool SSATupleDissolvePass::dissolve(SSAContext* context, SSAProgram& program)
 {
-    mContext.reset();
-    mContext.analyze(program);
-
     opt::SSCPSideEffectAnalyzer sideEffects;
     sideEffects.propagateSideEffects(program);
 
@@ -20,16 +18,7 @@ bool SSATupleDissolvePass::dissolve(SSAProgram& program)
     // Repeat dissolve and dead-code analysis until no further changes
     auto handleInstructions = [&](InstructionList& instructions) {
         while (true) {
-            auto copy         = instructions;
-            bool changedBlock = dissolveInstructions(instructions);
-            if (changedBlock) {
-                opt::SSCPDeadCodeOptimizer deadOpt;
-                if (deadOpt.removeDeadAssigns(instructions, sideEffects.getSideEffectFunctions())) {
-                    // Check if we really changed something
-                    if (copy == instructions)
-                        changedBlock = false;
-                }
-            }
+            bool changedBlock = dissolveInstructions(context, instructions);
 
             changed |= changedBlock;
             if (!changedBlock)
@@ -47,29 +36,8 @@ bool SSATupleDissolvePass::dissolve(SSAProgram& program)
     return changed;
 }
 
-bool SSATupleDissolvePass::hasTupleValues(const InstructionList& instructions)
+bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, InstructionList& instructions)
 {
-    for (const auto& instrPtr : instructions) {
-        bool foundTuple = false;
-
-        instrPtr->forEachValue([&foundTuple](const SSAValue& val) {
-            if (val.type().isTuple())
-                foundTuple = true;
-        });
-
-        if (foundTuple)
-            return true;
-    }
-    return false;
-}
-
-bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
-{
-    mTupleElements.clear();
-
-    if (!hasTupleValues(instructions))
-        return false;
-
     // Note: We keep the original instructions (except for some rare cases) and rely on dead-code analysis to remove them.
     // If calls or returns have no use for it, it will be cleaned up by dead-code analysis.
 
@@ -81,6 +49,12 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
     for (const auto& instrPtr : instructions) {
         // Handle SSAInstrAssign
         if (auto assign = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
+            if (mTupleElements.contains(assign->Target.hash())) {
+                // Already handled in a previous pass, keep at it is
+                newInstructions.push_back(instrPtr);
+                continue;
+            }
+
             // Case 1: Tuple creation -> Create multiple assignments
             if (assign->Operator == SSAInstrAssign::OpKind::Tuple) {
                 const auto& operands         = assign->Operands;
@@ -91,7 +65,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                 std::vector<SSAValue> resultElements;
                 resultElements.reserve(targetComponents.size());
                 for (size_t i = 0; i < targetComponents.size(); ++i) {
-                    SSAValue elemTarget = SSAValue::Named(mContext.fresh("%"), targetComponents[i]);
+                    SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents[i]);
                     auto newAssign      = std::make_shared<SSAInstrAssign>();
                     newAssign->Target   = elemTarget;
                     newAssign->Operator = SSAInstrAssign::OpKind::Assign;
@@ -102,7 +76,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
 
                 changed = true;
 
-                mTupleElements[target.name()] = std::move(resultElements);
+                mTupleElements[target.hash()] = std::move(resultElements);
             }
 
             // Case 2: Access on tuple - resolve to direct value
@@ -113,7 +87,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                 if (tupleVal.type().isTuple() && indexVal.isConstant()) {
                     size_t index = static_cast<size_t>(indexVal.valueAs<Integer>());
 
-                    auto it = mTupleElements.find(tupleVal.name());
+                    auto it = mTupleElements.find(tupleVal.hash());
                     if (it != mTupleElements.end() && index < it->second.size()) {
                         const auto& element = it->second[index];
 
@@ -138,7 +112,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
             if (assign->Operator == SSAInstrAssign::OpKind::Unary
                 && assign->Operands.size() == 1 && assign->Operands[0].type().isTuple()) {
                 const auto& sourceVal = assign->Operands[0];
-                auto it               = mTupleElements.find(sourceVal.name());
+                auto it               = mTupleElements.find(sourceVal.hash());
                 if (it != mTupleElements.end()) {
                     const auto& sourceElements   = it->second;
                     const auto& targetType       = assign->Target.type();
@@ -148,7 +122,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                     resultElements.reserve(sourceElements.size());
 
                     for (size_t i = 0; i < sourceElements.size(); ++i) {
-                        SSAValue elemTarget = SSAValue::Named(mContext.fresh("%"), targetComponents[i]);
+                        SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents[i]);
                         auto elemInstr      = std::make_shared<SSAInstrAssign>();
                         elemInstr->Target   = elemTarget;
                         elemInstr->Operator = SSAInstrAssign::OpKind::Unary;
@@ -161,7 +135,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                     changed = true;
 
                     // Store the dissolved tuple
-                    mTupleElements[assign->Target.name()] = std::move(resultElements);
+                    mTupleElements[assign->Target.hash()] = std::move(resultElements);
                 }
             }
 
@@ -172,8 +146,8 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                 const auto& retVal   = assign->Target;
 
                 if (leftVal.type().isTuple() && rightVal.type().isTuple()) { //< Tuple = Tuple op Tuple
-                    auto leftIt  = mTupleElements.find(leftVal.name());
-                    auto rightIt = mTupleElements.find(rightVal.name());
+                    auto leftIt  = mTupleElements.find(leftVal.hash());
+                    auto rightIt = mTupleElements.find(rightVal.hash());
 
                     if (leftIt != mTupleElements.end() && rightIt != mTupleElements.end()) {
                         const auto& leftElements     = leftIt->second;
@@ -185,7 +159,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                         resultElements.reserve(targetComponents.size());
 
                         for (size_t i = 0; i < targetComponents.size(); ++i) {
-                            SSAValue elemTarget = SSAValue::Named(mContext.fresh("%"), targetComponents.at(i));
+                            SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents.at(i));
                             auto elemInstr      = std::make_shared<SSAInstrAssign>();
                             elemInstr->Target   = elemTarget;
                             elemInstr->Operator = SSAInstrAssign::OpKind::Binary;
@@ -198,10 +172,10 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                         changed = true;
 
                         // Store the dissolved tuple
-                        mTupleElements[assign->Target.name()] = std::move(resultElements);
+                        mTupleElements[assign->Target.hash()] = std::move(resultElements);
                     }
                 } else if (!leftVal.type().isTuple() && rightVal.type().isTuple()) { //< Tuple = Scalar op Tuple
-                    auto rightIt = mTupleElements.find(rightVal.name());
+                    auto rightIt = mTupleElements.find(rightVal.hash());
 
                     if (rightIt != mTupleElements.end()) {
                         const auto& rightElements    = rightIt->second;
@@ -212,7 +186,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                         resultElements.reserve(targetComponents.size());
 
                         for (size_t i = 0; i < targetComponents.size(); ++i) {
-                            SSAValue elemTarget = SSAValue::Named(mContext.fresh("%"), targetComponents.at(i));
+                            SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents.at(i));
                             auto elemInstr      = std::make_shared<SSAInstrAssign>();
                             elemInstr->Target   = elemTarget;
                             elemInstr->Operator = SSAInstrAssign::OpKind::Binary;
@@ -225,10 +199,10 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                         changed = true;
 
                         // Store the dissolved tuple
-                        mTupleElements[assign->Target.name()] = std::move(resultElements);
+                        mTupleElements[assign->Target.hash()] = std::move(resultElements);
                     }
                 } else if (leftVal.type().isTuple() && !rightVal.type().isTuple()) { //< Tuple = Tuple op Scalar
-                    auto leftIt = mTupleElements.find(leftVal.name());
+                    auto leftIt = mTupleElements.find(leftVal.hash());
 
                     if (leftIt != mTupleElements.end()) {
                         const auto& leftElements     = leftIt->second;
@@ -239,7 +213,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                         resultElements.reserve(targetComponents.size());
 
                         for (size_t i = 0; i < targetComponents.size(); ++i) {
-                            SSAValue elemTarget = SSAValue::Named(mContext.fresh("%"), targetComponents.at(i));
+                            SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents.at(i));
                             auto elemInstr      = std::make_shared<SSAInstrAssign>();
                             elemInstr->Target   = elemTarget;
                             elemInstr->Operator = SSAInstrAssign::OpKind::Binary;
@@ -252,7 +226,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                         changed = true;
 
                         // Store the dissolved tuple
-                        mTupleElements[assign->Target.name()] = std::move(resultElements);
+                        mTupleElements[assign->Target.hash()] = std::move(resultElements);
                     }
                 } else if (!retVal.type().isTuple() && !leftVal.type().isTuple() && !rightVal.type().isTuple()) { //< Scalar = Scalar op Scalar
                     // Ignore
@@ -265,7 +239,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
             if (assign->Operator == SSAInstrAssign::OpKind::Cast
                 && assign->Operands.size() == 1 && assign->Operands[0].type().isTuple()) {
                 const auto& sourceVal = assign->Operands[0];
-                auto it               = mTupleElements.find(sourceVal.name());
+                auto it               = mTupleElements.find(sourceVal.hash());
                 if (it != mTupleElements.end()) {
                     const auto& sourceElements   = it->second;
                     const auto& targetType       = assign->Target.type();
@@ -279,7 +253,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
 
                         if (!(sourceElements[i].type() == elemType)) {
                             // Need to cast this element
-                            SSAValue castedElem = SSAValue::Named(mContext.fresh("%"), elemType);
+                            SSAValue castedElem = SSAValue::Named(context->fresh("%"), elemType);
                             auto castInstr      = std::make_shared<SSAInstrAssign>();
                             castInstr->Target   = castedElem;
                             castInstr->Operator = SSAInstrAssign::OpKind::Cast;
@@ -294,7 +268,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                     changed = true;
 
                     // Store the dissolved tuple
-                    mTupleElements[assign->Target.name()] = castedElements;
+                    mTupleElements[assign->Target.hash()] = castedElements;
                 }
             }
 
@@ -302,7 +276,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
             if (assign->Operator == SSAInstrAssign::OpKind::Assign
                 && assign->Operands.size() == 1 && assign->Operands[0].type().isTuple()) {
                 const auto& sourceVal = assign->Operands[0];
-                auto it               = mTupleElements.find(sourceVal.name());
+                auto it               = mTupleElements.find(sourceVal.hash());
                 if (it != mTupleElements.end()) {
                     const auto& sourceElements   = it->second;
                     const auto& targetType       = assign->Target.type();
@@ -312,7 +286,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                     resultElements.reserve(sourceElements.size());
 
                     for (size_t i = 0; i < sourceElements.size(); ++i) {
-                        SSAValue elemTarget = SSAValue::Named(mContext.fresh("%"), targetComponents.at(i));
+                        SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents.at(i));
                         auto elemInstr      = std::make_shared<SSAInstrAssign>();
                         elemInstr->Target   = elemTarget;
                         elemInstr->Operator = SSAInstrAssign::OpKind::Unary;
@@ -325,14 +299,14 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                     changed = true;
 
                     // Store the dissolved tuple
-                    mTupleElements[assign->Target.name()] = resultElements;
+                    mTupleElements[assign->Target.hash()] = resultElements;
                 }
             }
         }
 
         // Handle SSAInstrPhi with tuple types
         if (auto phi = dynamic_cast<SSAInstrPhi*>(instrPtr.get())) {
-            if (phi->Target.type().isTuple()) {
+            if (!mTupleElements.contains(phi->Target.hash()) && phi->Target.type().isTuple()) {
                 const auto& targetType   = phi->Target.type();
                 const size_t numElements = targetType.components().size();
 
@@ -342,7 +316,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
 
                 for (size_t elemIdx = 0; elemIdx < numElements; ++elemIdx) {
                     const auto& elemType = targetType.components()[elemIdx];
-                    SSAValue elemTarget  = SSAValue::Named(mContext.fresh("%"), elemType);
+                    SSAValue elemTarget  = SSAValue::Named(context->fresh("%"), elemType);
 
                     auto elemPhi        = std::make_shared<SSAInstrPhi>();
                     elemPhi->Target     = elemTarget;
@@ -352,7 +326,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                     elemPhi->Branches.reserve(phi->Branches.size());
                     for (const auto& branchVal : phi->Branches) {
                         if (branchVal.type().isTuple()) {
-                            auto it = mTupleElements.find(branchVal.name());
+                            auto it = mTupleElements.find(branchVal.hash());
                             if (it != mTupleElements.end() && elemIdx < it->second.size()) {
                                 elemPhi->Branches.push_back(it->second[elemIdx]);
                             } else {
@@ -372,7 +346,7 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
                 changed = true;
 
                 // Store the dissolved tuple
-                mTupleElements[phi->Target.name()] = targetElements;
+                mTupleElements[phi->Target.hash()] = targetElements;
             }
         }
 
@@ -394,4 +368,4 @@ bool SSATupleDissolvePass::dissolveInstructions(InstructionList& instructions)
     return changed;
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt

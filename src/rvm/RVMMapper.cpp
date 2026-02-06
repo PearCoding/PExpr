@@ -342,9 +342,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
         }
 
         // 6. Pop frame to restore register context
-        if (registerCount > 0) {
+        if (registerCount > 0)
             result.push_back(std::make_shared<RVMInstrPopFrame>(registerCount));
-        }
     }
 
     return result;
@@ -494,6 +493,8 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
     rvmFunc.external      = ssaFunc.External;
     rvmFunc.hasSideEffect = ssaFunc.HasSideEffect;
 
+    // TODO: Tuple parameters and return values do not work!
+
     // Dissolve tuple parameters into elementary types
     for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
         // For now, assume parameters are elementary types
@@ -527,24 +528,10 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 
     // Map all functions
     rvmProgram.functions.reserve(ssaProgram.Functions.size());
-    for (const auto& ssaFunc : ssaProgram.Functions) {
+    for (const auto& ssaFunc : ssaProgram.Functions)
         rvmProgram.functions.push_back(mapFunction(ssaFunc, rvmProgram.stringTable, ssaProgram));
-    }
 
     return rvmProgram;
-}
-
-// Dissolve tuple instruction (placeholder for now)
-std::vector<std::shared_ptr<RVMInstr>> RVMMapper::dissolveTupleInstruction(
-    const std::shared_ptr<ssa::SSAInstr>& ssaInstr,
-    std::shared_ptr<RVMStringTable> stringTable,
-    RVMContext& context,
-    const ssa::SSAProgram& ssaProgram)
-{
-    // This would handle dissolving tuple operations into elementary operations
-    // For now, delegate to standard instruction mapping
-    std::vector<std::shared_ptr<ssa::SSAInstr>> instrs = { ssaInstr };
-    return mapInstructions(instrs, stringTable, context, ssaProgram);
 }
 
 } // namespace PExpr::rvm
