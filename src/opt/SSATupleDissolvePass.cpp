@@ -49,12 +49,6 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
     for (const auto& instrPtr : instructions) {
         // Handle SSAInstrAssign
         if (auto assign = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            if (mTupleElements.contains(assign->Target.hash())) {
-                // Already handled in a previous pass, keep at it is
-                newInstructions.push_back(instrPtr);
-                continue;
-            }
-
             // Case 1: Tuple creation -> Create multiple assignments
             if (assign->Operator == SSAInstrAssign::OpKind::Tuple) {
                 const auto& operands         = assign->Operands;
@@ -77,6 +71,7 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
                 changed = true;
 
                 mTupleElements[target.hash()] = std::move(resultElements);
+                continue; // Don't emit the original tuple instruction
             }
 
             // Case 2: Access on tuple - resolve to direct value
@@ -136,6 +131,7 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                     // Store the dissolved tuple
                     mTupleElements[assign->Target.hash()] = std::move(resultElements);
+                    continue; // Don't emit the original unary instruction
                 }
             }
 
@@ -173,6 +169,7 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                         // Store the dissolved tuple
                         mTupleElements[assign->Target.hash()] = std::move(resultElements);
+                        continue; // Don't emit the original binary instruction
                     }
                 } else if (!leftVal.type().isTuple() && rightVal.type().isTuple()) { //< Tuple = Scalar op Tuple
                     auto rightIt = mTupleElements.find(rightVal.hash());
@@ -200,6 +197,7 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                         // Store the dissolved tuple
                         mTupleElements[assign->Target.hash()] = std::move(resultElements);
+                        continue; // Don't emit the original binary instruction
                     }
                 } else if (leftVal.type().isTuple() && !rightVal.type().isTuple()) { //< Tuple = Tuple op Scalar
                     auto leftIt = mTupleElements.find(leftVal.hash());
@@ -227,9 +225,10 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                         // Store the dissolved tuple
                         mTupleElements[assign->Target.hash()] = std::move(resultElements);
+                        continue; // Don't emit the original binary instruction
                     }
                 } else if (!retVal.type().isTuple() && !leftVal.type().isTuple() && !rightVal.type().isTuple()) { //< Scalar = Scalar op Scalar
-                    // Ignore
+                    // Ignore - fall through to add the instruction
                 } else {
                     PEXPR_ASSERT(false, "Ill-configured binary SSA instruction detected");
                 }
@@ -269,6 +268,7 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                     // Store the dissolved tuple
                     mTupleElements[assign->Target.hash()] = castedElements;
+                    continue; // Don't emit the original cast instruction
                 }
             }
 
@@ -300,8 +300,12 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                     // Store the dissolved tuple
                     mTupleElements[assign->Target.hash()] = resultElements;
+                    continue; // Don't emit the original assign instruction
                 }
             }
+            
+            // If we get here, this SSAInstrAssign wasn't handled by any tuple-specific case
+            newInstructions.push_back(instrPtr);
         }
 
         // Handle SSAInstrPhi with tuple types
@@ -347,25 +351,108 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
                 // Store the dissolved tuple
                 mTupleElements[phi->Target.hash()] = targetElements;
+                continue; // Don't emit the original phi instruction
+            } else {
+                newInstructions.push_back(instrPtr);
             }
         }
 
         // Handle SSAInstrCall with tuple arguments or return values
-        if (dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
-            // For calls, we have to keep the tuples. This can not be solved at this stage
-            // TODO: Insert a tuple instruction here to make a new value from the previously dissolved values instead of using the old one
-            // -> This allows optimization and only tuple, call and returns will remain 
+        if (auto call = dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
+            // Check if any argument is a tuple that has been dissolved
+            std::vector<SSAValue> newArgs;
+            bool argsChanged = false;
+            
+            for (const auto& arg : call->Arguments) {
+                if (arg.type().isTuple()) {
+                    auto it = mTupleElements.find(arg.hash());
+                    if (it != mTupleElements.end()) {
+                        // This tuple has been dissolved, need to reconstruct it
+                        const auto& elements = it->second;
+                        SSAValue newTuple = SSAValue::Named(context->fresh("%"), arg.type());
+                        
+                        // Create a tuple instruction to reconstruct the tuple
+                        auto tupleInstr = std::make_shared<SSAInstrAssign>();
+                        tupleInstr->Target = newTuple;
+                        tupleInstr->Operator = SSAInstrAssign::OpKind::Tuple;
+                        tupleInstr->Operands = elements;
+                        newInstructions.push_back(tupleInstr);
+                        
+                        newArgs.push_back(newTuple);
+                        argsChanged = true;
+                        continue;
+                    }
+                }
+                newArgs.push_back(arg);
+            }
+            
+            if (argsChanged) {
+                // Create a new call instruction with reconstructed tuple arguments
+                auto newCall = std::make_shared<SSAInstrCall>();
+                newCall->Target = call->Target;
+                newCall->FunctionName = call->FunctionName;
+                newCall->PublicFunctionName = call->PublicFunctionName;
+                newCall->Arguments = std::move(newArgs);
+                newInstructions.push_back(newCall);
+                changed = true;
+            } else {
+                newInstructions.push_back(instrPtr);
+            }
+            
+            // If the call returns a tuple, we need to dissolve it
+            if (call->Target.type().isTuple() && !mTupleElements.contains(call->Target.hash())) {
+                // Dissolve the returned tuple
+                const auto& targetType = call->Target.type();
+                const auto& targetComponents = targetType.components();
+                
+                std::vector<SSAValue> resultElements;
+                resultElements.reserve(targetComponents.size());
+                
+                for (size_t i = 0; i < targetComponents.size(); ++i) {
+                    SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents[i]);
+                    auto accessInstr = std::make_shared<SSAInstrAssign>();
+                    accessInstr->Target = elemTarget;
+                    accessInstr->Operator = SSAInstrAssign::OpKind::Access;
+                    accessInstr->Operands = { call->Target, SSAValue::Constant(static_cast<Integer>(i)) };
+                    newInstructions.push_back(accessInstr);
+                    resultElements.push_back(elemTarget);
+                }
+                
+                mTupleElements[call->Target.hash()] = std::move(resultElements);
+                changed = true;
+            }
         }
-
         // Handle SSAInstrReturn with tuple value
-        if (dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
-            // For returns, we have to keep the tuples. This can not be solved at this stage
-            // TODO: Insert a tuple instruction here to make a new value from the previously dissolved values instead of using the old one
-            // -> This allows optimization and only tuple, call and returns will remain 
+        else if (auto ret = dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
+            if (ret->Value.type().isTuple()) {
+                auto it = mTupleElements.find(ret->Value.hash());
+                if (it != mTupleElements.end()) {
+                    // The tuple has been dissolved, need to reconstruct it
+                    const auto& elements = it->second;
+                    SSAValue newTuple = SSAValue::Named(context->fresh("%"), ret->Value.type());
+                    
+                    // Create a tuple instruction to reconstruct the tuple
+                    auto tupleInstr = std::make_shared<SSAInstrAssign>();
+                    tupleInstr->Target = newTuple;
+                    tupleInstr->Operator = SSAInstrAssign::OpKind::Tuple;
+                    tupleInstr->Operands = elements;
+                    newInstructions.push_back(tupleInstr);
+                    
+                    // Create a new return instruction with the reconstructed tuple
+                    auto newRet = std::make_shared<SSAInstrReturn>();
+                    newRet->Value = newTuple;
+                    newInstructions.push_back(newRet);
+                    
+                    changed = true;
+                } else {
+                    // Tuple hasn't been dissolved yet, keep as-is
+                    newInstructions.push_back(instrPtr);
+                }
+            } else {
+                // Not a tuple, keep as-is
+                newInstructions.push_back(instrPtr);
+            }
         }
-
-        // Keep instruction as-is
-        newInstructions.push_back(instrPtr);
     }
 
     instructions = std::move(newInstructions);
