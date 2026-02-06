@@ -234,7 +234,7 @@ int main(int argc, char** argv)
         return env.reporter().errorCount();
     }
 
-    rvm::RVMMapper mapper;
+    rvm::RVMMapper mapper(std::make_shared<rvm::RVMStringTable>());
     auto rvmProgram = mapper.mapProgram(program);
 
     dumpOutput(rvm::RVMSerializer::serialize(rvmProgram));

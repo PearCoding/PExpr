@@ -7,39 +7,11 @@
 namespace PExpr::rvm {
 using namespace ast;
 
-// Helper structure to track SSA value to RVM register(s) mapping
-// Since tuples need to be dissolved, one SSA value may map to multiple registers
-struct ValueMapping {
-    std::vector<RVMValue> values; // For tuples, this contains multiple elementary values
-};
-
-// Context for mapping SSA to RVM
-class MapperContext {
-public:
-    std::shared_ptr<RVMStringTable> stringTable;
-    RVMContext& rvmContext;
-    std::unordered_map<std::string, ValueMapping> ssaToRvmMap;
-
-    explicit MapperContext(RVMContext& ctx, std::shared_ptr<RVMStringTable> strTable)
-        : stringTable(std::move(strTable))
-        , rvmContext(ctx)
-    {
-    }
-
-    void mapValue(const std::string& ssaName, const ValueMapping& mapping)
-    {
-        ssaToRvmMap[ssaName] = mapping;
-    }
-
-    ValueMapping getValue(const std::string& ssaName)
-    {
-        auto it = ssaToRvmMap.find(ssaName);
-        if (it != ssaToRvmMap.end())
-            return it->second;
-        // Return empty mapping if not found
-        return ValueMapping{};
-    }
-};
+// Constructor
+RVMMapper::RVMMapper(std::shared_ptr<RVMStringTable> stringTable)
+    : mStringTable(std::move(stringTable))
+{
+}
 
 // Dissolve tuple type into elementary types
 std::vector<type::Type> RVMMapper::dissolveTupleType(const type::Type& type)
@@ -59,20 +31,24 @@ std::vector<type::Type> RVMMapper::dissolveTupleType(const type::Type& type)
     return result;
 }
 
-// Map SSA value to RVM value(s), dissolving tuples
+// Map SSA value to RVM value(s), dissolving tuples - public API
 RVMValue RVMMapper::mapValue(const ssa::SSAValue& ssaValue,
-                             std::shared_ptr<RVMStringTable> stringTable,
                              RVMContext& context)
 {
-    MapperContext mapCtx(context, stringTable);
+    return mapValueInternal(ssaValue, context);
+}
 
+// Internal helper for mapping values
+RVMValue RVMMapper::mapValueInternal(const ssa::SSAValue& ssaValue,
+                                     RVMContext& context)
+{
     if (ssaValue.isConstant()) {
         const auto& rawValue = ssaValue.rawValue();
         const auto& type     = ssaValue.type();
 
         // Handle string constants via string table
         if (auto* strPtr = std::get_if<std::string>(&rawValue)) {
-            uint32_t strId = stringTable->addString(*strPtr);
+            uint32_t strId = mStringTable->addString(*strPtr);
             return RVMValue::StringRef(strId, type);
         }
         // Handle tuple constants (need to dissolve)
@@ -90,28 +66,39 @@ RVMValue RVMMapper::mapValue(const ssa::SSAValue& ssaValue,
         }
     }
 
-    // Register/named value - for now create a simple register mapping
-    // In practice, the full mapper context should track SSA name -> RVM register(s)
-    RegId reg = context.allocateRegister(ssaValue.type());
-    return RVMValue::Register(reg, ssaValue.type());
+    // Check if this SSA value has already been mapped
+    if (!ssaValue.isConstant()) {
+        std::string ssaName = ssaValue.name();
+
+        if (auto it = mSSAtoRVMMap.find(ssaName); it != mSSAtoRVMMap.end())
+            return it->second;
+    }
+
+    // Register/named value - allocate register and store mapping
+    RegId reg         = context.allocateRegister(ssaValue.type());
+    RVMValue rvmValue = RVMValue::Register(reg, ssaValue.type());
+
+    // Store the mapping for future reference
+    if (!ssaValue.isConstant())
+        mSSAtoRVMMap[ssaValue.name()] = rvmValue;
+
+    return rvmValue;
 }
 
 // Map SSA assign instruction
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
     const ssa::SSAInstrAssign& instr,
-    std::shared_ptr<RVMStringTable> stringTable,
     RVMContext& context)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
-    MapperContext mapCtx(context, stringTable);
 
     switch (instr.Operator) {
     case ssa::SSAInstrAssign::OpKind::Assign: {
         // Simple assignment: dst = src
         PEXPR_ASSERT(instr.Operands.size() == 1, "Assign expects 1 operand");
 
-        RVMValue dst = mapValue(instr.Target, stringTable, context);
-        RVMValue src = mapValue(instr.Operands[0], stringTable, context);
+        RVMValue dst = mapValue(instr.Target, context);
+        RVMValue src = mapValue(instr.Operands[0], context);
 
         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
         break;
@@ -120,8 +107,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
         // Unary operation
         PEXPR_ASSERT(instr.Operands.size() == 1, "Unary expects 1 operand");
 
-        RVMValue dst = mapValue(instr.Target, stringTable, context);
-        RVMValue src = mapValue(instr.Operands[0], stringTable, context);
+        RVMValue dst = mapValue(instr.Target, context);
+        RVMValue src = mapValue(instr.Operands[0], context);
 
         switch (instr.UnaryOp) {
         case UnaryOperation::Neg: {
@@ -151,9 +138,9 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
         // Binary operation
         PEXPR_ASSERT(instr.Operands.size() == 2, "Binary expects 2 operands");
 
-        RVMValue dst  = mapValue(instr.Target, stringTable, context);
-        RVMValue src1 = mapValue(instr.Operands[0], stringTable, context);
-        RVMValue src2 = mapValue(instr.Operands[1], stringTable, context);
+        RVMValue dst  = mapValue(instr.Target, context);
+        RVMValue src1 = mapValue(instr.Operands[0], context);
+        RVMValue src2 = mapValue(instr.Operands[1], context);
 
         Opcode op;
         switch (instr.BinaryOp) {
@@ -209,8 +196,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
         // For now, treat as a move (simplified)
         PEXPR_ASSERT(instr.Operands.size() == 2, "Access expects 2 operands (tuple, index)");
 
-        RVMValue dst = mapValue(instr.Target, stringTable, context);
-        RVMValue src = mapValue(instr.Operands[0], stringTable, context);
+        RVMValue dst = mapValue(instr.Target, context);
+        RVMValue src = mapValue(instr.Operands[0], context);
 
         // For RVM, tuple access should have been dissolved into direct register access
         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
@@ -221,10 +208,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
         // Each tuple element maps to a separate register
         // For now, treat each element as a separate MOV instruction
         for (size_t i = 0; i < instr.Operands.size(); ++i) {
-            RVMValue src = mapValue(instr.Operands[i], stringTable, context);
+            RVMValue src = mapValue(instr.Operands[i], context);
             // For proper tuple dissolution, we'd need to track which register
             // corresponds to which tuple component. For now, just move to destination.
-            RVMValue dst = mapValue(instr.Target, stringTable, context);
+            RVMValue dst = mapValue(instr.Target, context);
             result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
         }
         break;
@@ -233,8 +220,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
         // Type cast
         PEXPR_ASSERT(instr.Operands.size() == 1, "Cast expects 1 operand");
 
-        RVMValue dst = mapValue(instr.Target, stringTable, context);
-        RVMValue src = mapValue(instr.Operands[0], stringTable, context);
+        RVMValue dst = mapValue(instr.Target, context);
+        RVMValue src = mapValue(instr.Operands[0], context);
 
         const auto& srcType = instr.Operands[0].type();
         const auto& dstType = instr.Target.type();
@@ -267,7 +254,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(
 // Map SSA call instruction
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
     const ssa::SSAInstrCall& instr,
-    std::shared_ptr<RVMStringTable> stringTable,
     RVMContext& context,
     const ssa::SSAProgram& ssaProgram)
 {
@@ -288,18 +274,18 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
         args.reserve(instr.Arguments.size());
 
         for (const auto& arg : instr.Arguments)
-            args.push_back(mapValue(arg, stringTable, context));
+            args.push_back(mapValue(arg, context));
 
         std::optional<RVMValue> dst;
         if (!instr.Target.type().isVoid())
-            dst = mapValue(instr.Target, stringTable, context);
+            dst = mapValue(instr.Target, context);
 
         result.push_back(std::make_shared<RVMInstrExternalCall>(dst, instr.FunctionName, args));
     } else {
         // Internal call: use calling convention with registers
         // 1. Move arguments to registers %r1, %r2, etc.
         for (size_t i = 0; i < instr.Arguments.size(); ++i) {
-            RVMValue src = mapValue(instr.Arguments[i], stringTable, context);
+            RVMValue src = mapValue(instr.Arguments[i], context);
             RVMValue dst = RVMValue::Register(i + 1, instr.Arguments[i].type()); // %r1, %r2, ...
             if (src.isRegister() && src.regId() == (i + 1))                      //< Already in the correct register, no move needed
                 continue;
@@ -329,13 +315,13 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
                     RVMValue src = RVMValue::Register(i + 1, retTypes[i]); // %r1, %r2, ...
                     // For tuples, we'd need to map each component separately
                     // This is simplified for now - proper implementation would track tuple components
-                    RVMValue dst = mapValue(instr.Target, stringTable, context);
+                    RVMValue dst = mapValue(instr.Target, context);
                     result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
                 }
             } else {
                 // Single return value
                 RVMValue src = RVMValue::Register(1, instr.Target.type()); // %r1 holds return value
-                RVMValue dst = mapValue(instr.Target, stringTable, context);
+                RVMValue dst = mapValue(instr.Target, context);
                 if (!dst.isRegister() || dst.regId() != 1) //< Only move if destination is not already %r1
                     result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
             }
@@ -352,7 +338,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
 // Map SSA return instruction
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(
     const ssa::SSAInstrReturn& instr,
-    std::shared_ptr<RVMStringTable> stringTable,
     RVMContext& context)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
@@ -364,13 +349,13 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(
         if (retTypes.size() > 1 || instr.Value.type().isTuple()) {
             // Multiple return values: move each to %r1, %r2, ...
             for (size_t i = 0; i < retTypes.size(); ++i) {
-                RVMValue src = mapValue(instr.Value, stringTable, context);
+                RVMValue src = mapValue(instr.Value, context);
                 RVMValue dst = RVMValue::Register(i + 1, retTypes[i]); // %r1, %r2, ...
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
             }
         } else {
             // Single return value: move to %r1
-            RVMValue src = mapValue(instr.Value, stringTable, context);
+            RVMValue src = mapValue(instr.Value, context);
             RVMValue dst = RVMValue::Register(1, instr.Value.type()); // %r1
             if (!src.isRegister() || src.regId() != 1)                //< Only move if source is not already %r1
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
@@ -386,10 +371,9 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(
 // Map SSA branch instruction
 std::shared_ptr<RVMInstr> RVMMapper::mapBranch(
     const ssa::SSAInstrBranch& instr,
-    std::shared_ptr<RVMStringTable> stringTable,
     RVMContext& context)
 {
-    RVMValue cond = mapValue(instr.Condition, stringTable, context);
+    RVMValue cond = mapValue(instr.Condition, context);
 
     // Branch if not zero (condition is true)
     return std::make_shared<RVMInstrBranch>(Opcode::BRNZ, cond, instr.TargetLabel);
@@ -404,12 +388,10 @@ std::shared_ptr<RVMInstr> RVMMapper::mapGoto(const ssa::SSAInstrGoto& instr)
 // Map SSA instructions to RVM instructions
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
     const std::vector<std::shared_ptr<ssa::SSAInstr>>& ssaInstrs,
-    std::shared_ptr<RVMStringTable> stringTable,
     RVMContext& context,
     const ssa::SSAProgram& ssaProgram)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
-    MapperContext mapCtx(context, stringTable);
 
     for (const auto& ssaInstr : ssaInstrs) {
         // Handle label instructions
@@ -421,28 +403,28 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
 
         // Handle assign instructions
         if (auto* assign = dynamic_cast<ssa::SSAInstrAssign*>(ssaInstr.get())) {
-            auto instrs = mapAssign(*assign, stringTable, context);
+            auto instrs = mapAssign(*assign, context);
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
 
         // Handle call instructions
         if (auto* call = dynamic_cast<ssa::SSAInstrCall*>(ssaInstr.get())) {
-            auto instrs = mapCall(*call, stringTable, context, ssaProgram);
+            auto instrs = mapCall(*call, context, ssaProgram);
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
 
         // Handle return instructions
         if (auto* ret = dynamic_cast<ssa::SSAInstrReturn*>(ssaInstr.get())) {
-            auto instrs = mapReturn(*ret, stringTable, context);
+            auto instrs = mapReturn(*ret, context);
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
 
         // Handle branch instructions
         if (auto* branch = dynamic_cast<ssa::SSAInstrBranch*>(ssaInstr.get())) {
-            result.push_back(mapBranch(*branch, stringTable, context));
+            result.push_back(mapBranch(*branch, context));
             continue;
         }
 
@@ -457,53 +439,53 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
             // Phi nodes select values based on conditions
             // Implementation: result = cond1 ? val1 : (cond2 ? val2 : ... elseVal)
             // We need to generate conditional branches for this
-            RVMValue dst = mapValue(phi->Target, stringTable, context);
-            
+            RVMValue dst = mapValue(phi->Target, context);
+
             if (phi->Conditions.empty()) {
                 // No conditions, just use the else branch (or first branch if no else)
                 size_t branchIdx = phi->Branches.size() > 0 ? 0 : 0;
                 if (branchIdx < phi->Branches.size()) {
-                    RVMValue branchVal = mapValue(phi->Branches[branchIdx], stringTable, context);
+                    RVMValue branchVal = mapValue(phi->Branches[branchIdx], context);
                     result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
                 }
                 continue;
             }
-            
+
             // Generate conditional selection logic
             // For N conditions, we need N-1 conditional branches and a final else/default
             std::string phiEndLabel = "phi_end_" + std::to_string(result.size()); // Unique label
-            
+
             for (size_t i = 0; i < phi->Conditions.size(); ++i) {
-                RVMValue cond = mapValue(phi->Conditions[i], stringTable, context);
-                RVMValue branchVal = mapValue(phi->Branches[i], stringTable, context);
-                
+                RVMValue cond      = mapValue(phi->Conditions[i], context);
+                RVMValue branchVal = mapValue(phi->Branches[i], context);
+
                 // If condition is true, move branch value and jump to end
                 // Branch if condition is false to next condition
                 std::string nextLabel = "phi_next_" + std::to_string(result.size()) + "_" + std::to_string(i);
-                
+
                 // Branch if condition is zero (false) to next condition
                 result.push_back(std::make_shared<RVMInstrBranch>(Opcode::BRZ, cond, nextLabel));
-                
+
                 // Condition is true: move branch value to destination
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
                 result.push_back(std::make_shared<RVMInstrJump>(phiEndLabel));
-                
+
                 // Next condition label
                 result.push_back(std::make_shared<RVMInstrLabel>(nextLabel));
             }
-            
+
             // Handle else branch (if exists) or default (last branch)
             size_t elseIdx = phi->Conditions.size();
             if (elseIdx < phi->Branches.size()) {
                 // There's an explicit else branch
-                RVMValue elseVal = mapValue(phi->Branches[elseIdx], stringTable, context);
+                RVMValue elseVal = mapValue(phi->Branches[elseIdx], context);
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, elseVal));
             } else if (phi->Branches.size() > phi->Conditions.size()) {
                 // Should not happen based on SSA spec, but handle gracefully
-                RVMValue defaultVal = mapValue(phi->Branches.back(), stringTable, context);
+                RVMValue defaultVal = mapValue(phi->Branches.back(), context);
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, defaultVal));
             }
-            
+
             // End of phi resolution
             result.push_back(std::make_shared<RVMInstrLabel>(phiEndLabel));
         }
@@ -514,7 +496,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
 
 // Map SSA function to RVM function
 RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
-                                   std::shared_ptr<RVMStringTable> stringTable,
                                    const ssa::SSAProgram& ssaProgram)
 {
     RVMFunction rvmFunc;
@@ -540,7 +521,7 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
         // TODO: Initialize parameters from %r1, %r2, ... registers
         // Parameters are passed via registers according to calling convention
 
-        rvmFunc.body = mapInstructions(ssaFunc.Body, stringTable, funcContext, ssaProgram);
+        rvmFunc.body = mapInstructions(ssaFunc.Body, funcContext, ssaProgram);
     }
 
     return rvmFunc;
@@ -550,16 +531,16 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
 RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 {
     RVMProgram rvmProgram;
-    rvmProgram.stringTable = std::make_shared<RVMStringTable>();
+    rvmProgram.stringTable = mStringTable;
 
     // Map main program body
     RVMContext mainContext;
-    rvmProgram.body = mapInstructions(ssaProgram.Body, rvmProgram.stringTable, mainContext, ssaProgram);
+    rvmProgram.body = mapInstructions(ssaProgram.Body, mainContext, ssaProgram);
 
     // Map all functions
     rvmProgram.functions.reserve(ssaProgram.Functions.size());
     for (const auto& ssaFunc : ssaProgram.Functions)
-        rvmProgram.functions.push_back(mapFunction(ssaFunc, rvmProgram.stringTable, ssaProgram));
+        rvmProgram.functions.push_back(mapFunction(ssaFunc, ssaProgram));
 
     return rvmProgram;
 }

@@ -38,9 +38,6 @@ bool SSATupleDissolvePass::dissolve(SSAContext* context, SSAProgram& program)
 
 bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, InstructionList& instructions)
 {
-    // Note: We keep the original instructions (except for some rare cases) and rely on dead-code analysis to remove them.
-    // If calls or returns have no use for it, it will be cleaned up by dead-code analysis.
-
     InstructionList newInstructions;
     newInstructions.reserve(instructions.size() * 2); // Estimate
 

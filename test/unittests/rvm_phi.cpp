@@ -37,7 +37,8 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         REQUIRE(ssaStr.find("phi[") != std::string::npos);
 
         // Map to RVM
-        auto rvmProgram = RVMMapper::mapProgram(ssaProgram);
+        auto mapper = RVMMapper(std::make_shared<RVMStringTable>());
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program has conditional branches for phi
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
@@ -69,7 +70,8 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto ssaProgram = env.map(closure);
 
         // Map to RVM
-        auto rvmProgram = RVMMapper::mapProgram(ssaProgram);
+        auto mapper = RVMMapper(std::make_shared<RVMStringTable>());
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program is created
         REQUIRE(rvmProgram.stringTable != nullptr);
@@ -97,7 +99,8 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto ssaProgram = env.map(closure);
 
         // Map to RVM
-        auto rvmProgram = RVMMapper::mapProgram(ssaProgram);
+        auto mapper = RVMMapper(std::make_shared<RVMStringTable>());
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program is created
         REQUIRE(rvmProgram.stringTable != nullptr);
@@ -132,7 +135,8 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto ssaProgram = env.map(closure);
 
         // Map to RVM
-        auto rvmProgram = RVMMapper::mapProgram(ssaProgram);
+        auto mapper = RVMMapper(std::make_shared<RVMStringTable>());
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program has multiple conditional branches
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
@@ -166,7 +170,8 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto ssaProgram = env.map(closure);
 
         // Map to RVM
-        auto rvmProgram = RVMMapper::mapProgram(ssaProgram);
+        auto mapper = RVMMapper(std::make_shared<RVMStringTable>());
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program handles constant condition
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
