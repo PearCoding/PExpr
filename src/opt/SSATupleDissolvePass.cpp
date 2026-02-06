@@ -353,11 +353,15 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
         // Handle SSAInstrCall with tuple arguments or return values
         if (dynamic_cast<SSAInstrCall*>(instrPtr.get())) {
             // For calls, we have to keep the tuples. This can not be solved at this stage
+            // TODO: Insert a tuple instruction here to make a new value from the previously dissolved values instead of using the old one
+            // -> This allows optimization and only tuple, call and returns will remain 
         }
 
         // Handle SSAInstrReturn with tuple value
         if (dynamic_cast<SSAInstrReturn*>(instrPtr.get())) {
             // For returns, we have to keep the tuples. This can not be solved at this stage
+            // TODO: Insert a tuple instruction here to make a new value from the previously dissolved values instead of using the old one
+            // -> This allows optimization and only tuple, call and returns will remain 
         }
 
         // Keep instruction as-is
