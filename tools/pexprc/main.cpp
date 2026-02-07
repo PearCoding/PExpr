@@ -163,6 +163,8 @@ int main(int argc, char** argv)
         outputFile = inputFile;
         if (emitAST)
             outputFile.replace_filename(inputFile.stem().generic_string() + std::string("-ast.pexpr"));
+        else if (emitRVM)
+            outputFile.replace_filename(inputFile.stem().generic_string() + std::string(".pexprrvm"));
         else
             outputFile.replace_extension(".pexprir");
     }

@@ -1,0 +1,157 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "PExprRVM",
+    "scopeName": "source.pexprrvm",
+    "fileTypes": ["pexprrvm"],
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#types"
+        },
+        {
+            "include": "#literals"
+        },
+        {
+            "include": "#operators"
+        },
+        {
+            "include": "#identifiers"
+        },
+        {
+            "include": "#registers"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#labels"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.pexprrvm",
+                    "begin": "//",
+                    "end": "$"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.pexprrvm",
+                    "match": "\\b(br|brz|brnz|jmp|ret|call_external|call_internal|push_frame|pop_frame|load_string)\\b"
+                },
+                {
+                    "name": "keyword.operator.pexprrvm",
+                    "match": "\\b(mov|add|sub|mul|div|mod|pow|and|or|xor|shl|shr|cmp_eq|cmp_ne|cmp_lt|cmp_le|cmp_gt|cmp_ge|i2f|f2i|b2i|i2b|f2b|b2f)\\b"
+                },
+                {
+                    "name": "constant.language.boolean.pexprrvm",
+                    "match": "\\b(true|false)\\b"
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "name": "storage.type.pexprrvm",
+                    "match": "\\b(bool|int|num|str)\\b"
+                }
+            ]
+        },
+        "literals": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.integer.pexprrvm",
+                    "match": "\\b[+-]?[0-9]+\\b(?=:)"
+                },
+                {
+                    "name": "constant.numeric.float.pexprrvm",
+                    "match": "\\b[+-]?[0-9]+\\.[0-9]*([eE][+-]?[0-9]+)?\\b(?=:)|\\b[+-]?[0-9]*\\.[0-9]+([eE][+-]?[0-9]+)?\\b(?=:)|\\b[+-]?[0-9]+[eE][+-]?[0-9]+\\b(?=:)"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.assignment.pexprrvm",
+                    "match": "="
+                },
+                {
+                    "name": "keyword.operator.arrow.pexprrvm",
+                    "match": "->"
+                },
+                {
+                    "name": "keyword.operator.colon.pexprrvm",
+                    "match": ":"
+                },
+                {
+                    "name": "punctuation.parenthesis.pexprrvm",
+                    "match": "[()]"
+                },
+                {
+                    "name": "punctuation.bracket.pexprrvm",
+                    "match": "[\\[\\]]"
+                },
+                {
+                    "name": "punctuation.separator.comma.pexprrvm",
+                    "match": ","
+                }
+            ]
+        },
+        "identifiers": {
+            "patterns": [
+                {
+                    "name": "variable.function.pexprrvm",
+                    "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=\\s*\\()"
+                },
+                {
+                    "name": "variable.other.pexprrvm",
+                    "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+                }
+            ]
+        },
+        "registers": {
+            "patterns": [
+                {
+                    "name": "variable.register.pexprrvm",
+                    "match": "\\%r[0-9]+:(bool|int|num|str)\\b"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "constant.stringref.pexprrvm",
+                    "match": "#str[0-9]+:(str)\\b"
+                },
+                {
+                    "name": "string.quoted.double.pexprrvm",
+                    "begin": "\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.pexprrvm",
+                            "match": "\\\\[\\\\\"'tnrabvfr0xuU]"
+                        }
+                    ]
+                }
+            ]
+        },
+        "labels": {
+            "patterns": [
+                {
+                    "name": "entity.name.label.pexprrvm",
+                    "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b(?=:)"
+                }
+            ]
+        }
+    }
+}

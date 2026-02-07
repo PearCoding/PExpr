@@ -1,8 +1,8 @@
 {
     "name": "pexpr-language-support",
     "displayName": "PExpr Language Support",
-    "description": "Syntax highlighting for PExpr language and the SSA IR language",
-    "version": "0.0.2",
+    "description": "Syntax highlighting for PExpr language, SSA IR language, and RVM IR language",
+    "version": "0.0.3",
     "publisher": "Ömercan Yazici",
     "engines": {
         "vscode": "^1.85.0"
@@ -33,6 +33,17 @@
                     ".pexprir"
                 ],
                 "configuration": "./pexprir-language-configuration.json"
+            },
+            {
+                "id": "pexprrvm",
+                "aliases": [
+                    "PExprRVM",
+                    "pexprrvm"
+                ],
+                "extensions": [
+                    ".pexprrvm"
+                ],
+                "configuration": "./pexprrvm-language-configuration.json"
             }
         ],
         "grammars": [
@@ -45,6 +56,11 @@
                 "language": "pexprir",
                 "scopeName": "source.pexprir",
                 "path": "./pexprir.tmLanguage.json"
+            },
+            {
+                "language": "pexprrvm",
+                "scopeName": "source.pexprrvm",
+                "path": "./pexprrvm.tmLanguage.json"
             }
         ]
     }
