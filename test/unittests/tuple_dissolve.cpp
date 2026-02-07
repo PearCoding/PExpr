@@ -8,7 +8,7 @@ using namespace PExpr;
 
 [[nodiscard]] inline static auto MakeTupleOptimization()
 {
-    auto opts           = opt::OptimizerOptions::Minimum();
+    auto opts           = opt::OptimizerOptions::None();
     opts.RemoveDeadCode = true;
     opts.DissolveTuples = true;
     return opts;

@@ -322,23 +322,23 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
 
 void RVMSerializer::write(std::ostream& os, const RVMFunction& func)
 {
-    if (func.external) {
+    if (func.External) {
         os << "[[extern";
-        if (!func.hasSideEffect)
+        if (!func.HasSideEffect)
             os << ", pure";
         os << "]] ";
     }
 
-    os << "fn " << func.name << "(";
-    for (size_t i = 0; i < func.parameters.size(); ++i) {
+    os << "fn " << func.Name << "(";
+    for (size_t i = 0; i < func.Parameters.size(); ++i) {
         if (i > 0)
             os << ", ";
-        os << "%p" << i << ":" << func.parameters[i].toString();
+        os << "%p" << i << ":" << func.Parameters[i].toString();
     }
-    os << ") : " << func.returnType.toString() << std::endl;
+    os << ") : " << func.ReturnType.toString() << std::endl;
 
-    if (!func.body.empty()) {
-        for (const auto& instr : func.body) {
+    if (!func.Body.empty()) {
+        for (const auto& instr : func.Body) {
             os << "  ";
             write(os, *instr);
             os << std::endl;
@@ -350,21 +350,21 @@ void RVMSerializer::write(std::ostream& os, const RVMFunction& func)
 void RVMSerializer::write(std::ostream& os, const RVMProgram& program)
 {
     // Write string table if present
-    if (program.stringTable && program.stringTable->size() > 0) {
+    if (program.StringTable && program.StringTable->size() > 0) {
         os << "[[strings]]" << std::endl;
-        for (uint32_t i = 0; i < program.stringTable->size(); ++i)
-            os << "  #str" << i << " = \"" << escapeString(program.stringTable->getString(i)) << "\"" << std::endl;
+        for (uint32_t i = 0; i < program.StringTable->size(); ++i)
+            os << "  #str" << i << " = \"" << escapeString(program.StringTable->getString(i)) << "\"" << std::endl;
         os << std::endl;
     }
 
     // Write functions
-    for (const auto& f : program.functions) {
+    for (const auto& f : program.Functions) {
         write(os, f);
         os << std::endl;
     }
 
     // Write main body
-    for (const auto& instr : program.body) {
+    for (const auto& instr : program.Body) {
         write(os, *instr);
         os << std::endl;
     }
@@ -732,7 +732,7 @@ RVMProgram RVMSerializer::read(std::istream& is)
 {
     RVMProgram program;
     auto stringTable    = std::make_shared<RVMStringTable>();
-    program.stringTable = stringTable;
+    program.StringTable = stringTable;
 
     std::string line;
     std::shared_ptr<RVMFunction> currentFunction = nullptr;
@@ -745,7 +745,7 @@ RVMProgram RVMSerializer::read(std::istream& is)
         // Check for end of function
         if (line == "endfn") {
             if (currentFunction) {
-                program.functions.push_back(std::move(*currentFunction));
+                program.Functions.push_back(std::move(*currentFunction));
                 currentFunction.reset();
             }
             continue;
@@ -784,7 +784,7 @@ RVMProgram RVMSerializer::read(std::istream& is)
             size_t parenEnd   = line.find(')', parenStart);
 
             if (parenStart != std::string::npos && parenEnd != std::string::npos) {
-                currentFunction->name = trim(line.substr(3, parenStart - 3));
+                currentFunction->Name = trim(line.substr(3, parenStart - 3));
 
                 // Parse parameters (simplified)
                 std::string paramsStr = line.substr(parenStart + 1, parenEnd - parenStart - 1);
@@ -794,7 +794,7 @@ RVMProgram RVMSerializer::read(std::istream& is)
                         size_t colon = param.find(':');
                         if (colon != std::string::npos) {
                             Type type = parseType(trim(param.substr(colon + 1)));
-                            currentFunction->parameters.push_back(type);
+                            currentFunction->Parameters.push_back(type);
                         }
                     }
                 }
@@ -803,7 +803,7 @@ RVMProgram RVMSerializer::read(std::istream& is)
                 size_t colonPos = line.find(':', parenEnd);
                 if (colonPos != std::string::npos) {
                     std::string returnTypeStr   = trim(line.substr(colonPos + 1));
-                    currentFunction->returnType = parseType(returnTypeStr);
+                    currentFunction->ReturnType = parseType(returnTypeStr);
                 }
             }
             continue;
@@ -813,9 +813,9 @@ RVMProgram RVMSerializer::read(std::istream& is)
         auto instr = readInstruction(line);
         if (instr) {
             if (currentFunction)
-                currentFunction->body.push_back(instr);
+                currentFunction->Body.push_back(instr);
             else
-                program.body.push_back(instr);
+                program.Body.push_back(instr);
         }
     }
 

@@ -199,7 +199,7 @@ PExpr performs extensive compile-time optimizations:
 The `pexprc` compiler supports optimization levels similar to traditional compilers:
 
 ```bash
-# Minimum optimizations (fastest compilation and default)
+# No optimizations (fastest compilation and default)
 pexprc input.pexpr -O0
 
 # Basic optimizations

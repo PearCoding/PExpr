@@ -22,18 +22,11 @@ struct OptimizerOptions {
         return OptimizerOptions{};
     }
 
-    /// The absolute minimum is enabled. This is the default without flags or -O0.
-    [[nodiscard]] inline static OptimizerOptions Minimum()
-    {
-        auto opts           = None();
-        opts.RemoveDeadCode = true;
-        return opts;
-    }
-
     /// Some easy optimizations. This is -O1.
     [[nodiscard]] inline static OptimizerOptions Low()
     {
-        auto opts                          = Minimum();
+        auto opts                          = None();
+        opts.RemoveDeadCode                = true;
         opts.EnableConstantFolding         = true;
         opts.EliminateCommonSubexpressions = true;
         return opts;

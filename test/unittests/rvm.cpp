@@ -468,17 +468,17 @@ TEST_CASE("RVMSerializer: function serialization", "[rvm][serializer]")
     SECTION("Simple function serialization")
     {
         RVMFunction func;
-        func.name = "test_func";
-        func.parameters.push_back(Type(TypeKind::Integer));
-        func.parameters.push_back(Type(TypeKind::Number));
-        func.returnType = Type(TypeKind::Boolean);
-        func.external = false;
+        func.Name = "test_func";
+        func.Parameters.push_back(Type(TypeKind::Integer));
+        func.Parameters.push_back(Type(TypeKind::Number));
+        func.ReturnType = Type(TypeKind::Boolean);
+        func.External = false;
 
         // Add a simple instruction
         RVMValue dst = RVMValue::Register(0, Type(TypeKind::Boolean));
         RVMValue src1 = RVMValue::Register(1, Type(TypeKind::Integer));
         RVMValue src2 = RVMValue::Register(2, Type(TypeKind::Number));
-        func.body.push_back(std::make_shared<RVMInstr3Op>(Opcode::CMP_EQ, dst, src1, src2));
+        func.Body.push_back(std::make_shared<RVMInstr3Op>(Opcode::CMP_EQ, dst, src1, src2));
 
         std::ostringstream oss;
         RVMSerializer::write(oss, func);
@@ -495,11 +495,11 @@ TEST_CASE("RVMSerializer: function serialization", "[rvm][serializer]")
     SECTION("External function serialization")
     {
         RVMFunction func;
-        func.name = "external_func";
-        func.parameters.push_back(Type(TypeKind::Number));
-        func.returnType = Type(TypeKind::Number);
-        func.external = true;
-        func.hasSideEffect = false;
+        func.Name = "external_func";
+        func.Parameters.push_back(Type(TypeKind::Number));
+        func.ReturnType = Type(TypeKind::Number);
+        func.External = true;
+        func.HasSideEffect = false;
 
         std::ostringstream oss;
         RVMSerializer::write(oss, func);
@@ -516,9 +516,9 @@ TEST_CASE("RVMSerializer: program serialization with string table", "[rvm][seria
     SECTION("Program with string table")
     {
         RVMProgram program;
-        program.stringTable = std::make_shared<RVMStringTable>();
-        program.stringTable->addString("Hello");
-        program.stringTable->addString("World");
+        program.StringTable = std::make_shared<RVMStringTable>();
+        program.StringTable->addString("Hello");
+        program.StringTable->addString("World");
 
         std::ostringstream oss;
         RVMSerializer::write(oss, program);

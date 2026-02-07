@@ -306,13 +306,14 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
         // 4. Call internal function
         result.push_back(std::make_shared<RVMInstrInternalCall>(instr.FunctionName));
 
-        // 5. Move return values from %r1, %r2, ... to destinations (if not void)
+        // 5. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
         if (!instr.Target.type().isVoid()) {
+            // TODO: Nested tuples!
             if (instr.Target.type().isTuple()) {
                 // Multiple return values: dissolve tuple
                 auto retTypes = dissolveTupleType(instr.Target.type());
                 for (size_t i = 0; i < retTypes.size(); ++i) {
-                    RVMValue src = RVMValue::Register(i + 1, retTypes[i]); // %r1, %r2, ...
+                    RVMValue src = RVMValue::Register(i, retTypes[i]); // %r0, %r1, %r2, ...
                     // For tuples, we'd need to map each component separately
                     // This is simplified for now - proper implementation would track tuple components
                     RVMValue dst = mapValue(instr.Target, context);
@@ -320,10 +321,11 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(
                 }
             } else {
                 // Single return value
-                RVMValue src = RVMValue::Register(1, instr.Target.type()); // %r1 holds return value
                 RVMValue dst = mapValue(instr.Target, context);
-                if (!dst.isRegister() || dst.regId() != 1) //< Only move if destination is not already %r1
+                if (!dst.isRegister() || dst.regId() != 0) {                   //< Only move if destination is not already %r0
+                    RVMValue src = RVMValue::Register(0, instr.Target.type()); // %r0 holds return value
                     result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+                }
             }
         }
 
@@ -343,22 +345,24 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(
     std::vector<std::shared_ptr<RVMInstr>> result;
 
     if (!instr.Value.type().isVoid()) {
+        // TODO: Not working with nested types
         // Dissolve tuple return types
         auto retTypes = dissolveTupleType(instr.Value.type());
 
         if (retTypes.size() > 1 || instr.Value.type().isTuple()) {
-            // Multiple return values: move each to %r1, %r2, ...
+            // Multiple return values: move each to %r0, %r1, %r2, ...
             for (size_t i = 0; i < retTypes.size(); ++i) {
                 RVMValue src = mapValue(instr.Value, context);
-                RVMValue dst = RVMValue::Register(i + 1, retTypes[i]); // %r1, %r2, ...
+                RVMValue dst = RVMValue::Register(i, retTypes[i]); // %r0, %r1, %r2, ...
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
             }
         } else {
-            // Single return value: move to %r1
+            // Single return value: move to %r0
             RVMValue src = mapValue(instr.Value, context);
-            RVMValue dst = RVMValue::Register(1, instr.Value.type()); // %r1
-            if (!src.isRegister() || src.regId() != 1)                //< Only move if source is not already %r1
+            if (!src.isRegister() || src.regId() != 0) {                  //< Only move if source is not already %r0
+                RVMValue dst = RVMValue::Register(0, instr.Value.type()); // %r0
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+            }
         }
     }
 
@@ -499,10 +503,10 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
                                    const ssa::SSAProgram& ssaProgram)
 {
     RVMFunction rvmFunc;
-    rvmFunc.name          = ssaFunc.Name;
-    rvmFunc.returnType    = ssaFunc.ReturnType;
-    rvmFunc.external      = ssaFunc.External;
-    rvmFunc.hasSideEffect = ssaFunc.HasSideEffect;
+    rvmFunc.Name          = ssaFunc.Name;
+    rvmFunc.ReturnType    = ssaFunc.ReturnType;
+    rvmFunc.External      = ssaFunc.External;
+    rvmFunc.HasSideEffect = ssaFunc.HasSideEffect;
 
     // TODO: Tuple parameters and return values do not work!
 
@@ -511,17 +515,17 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
         // For now, assume parameters are elementary types
         // In full implementation, we'd need to access parameter types
         // and dissolve tuples into multiple parameters
-        rvmFunc.parameters.push_back(type::Type(type::TypeKind::Unspecified));
+        rvmFunc.Parameters.push_back(type::Type(type::TypeKind::Unspecified));
     }
 
     // Map function body
     if (!ssaFunc.External) {
         RVMContext funcContext;
 
-        // TODO: Initialize parameters from %r1, %r2, ... registers
+        // TODO: Initialize parameters from %r0, %r1, %r2, ... registers
         // Parameters are passed via registers according to calling convention
 
-        rvmFunc.body = mapInstructions(ssaFunc.Body, funcContext, ssaProgram);
+        rvmFunc.Body = mapInstructions(ssaFunc.Body, funcContext, ssaProgram);
     }
 
     return rvmFunc;
@@ -531,16 +535,16 @@ RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
 RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 {
     RVMProgram rvmProgram;
-    rvmProgram.stringTable = mStringTable;
+    rvmProgram.StringTable = mStringTable;
 
     // Map main program body
     RVMContext mainContext;
-    rvmProgram.body = mapInstructions(ssaProgram.Body, mainContext, ssaProgram);
+    rvmProgram.Body = mapInstructions(ssaProgram.Body, mainContext, ssaProgram);
 
     // Map all functions
-    rvmProgram.functions.reserve(ssaProgram.Functions.size());
+    rvmProgram.Functions.reserve(ssaProgram.Functions.size());
     for (const auto& ssaFunc : ssaProgram.Functions)
-        rvmProgram.functions.push_back(mapFunction(ssaFunc, ssaProgram));
+        rvmProgram.Functions.push_back(mapFunction(ssaFunc, ssaProgram));
 
     return rvmProgram;
 }

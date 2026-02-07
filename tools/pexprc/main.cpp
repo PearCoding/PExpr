@@ -8,6 +8,7 @@
 #include "opt/Optimizer.h"
 #include "rvm/RVMMapper.h"
 #include "rvm/RVMSerializer.h"
+#include "rvm/RVMValidator.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
 #include "ssa/SSAValidator.h"
@@ -95,10 +96,10 @@ int main(int argc, char** argv)
     app.add_option_function<std::string>("-W,--warning", handleWarningCmd, "Set warnings");
     app.add_flag_callback("--no-warnings", [&]() { warningFlags = 0; }, "Disable all warnings");
 
-    opt::OptimizerOptions optimizationOptions = opt::OptimizerOptions::Minimum();
+    opt::OptimizerOptions optimizationOptions = opt::OptimizerOptions::None();
     app.add_option_function<int>("-O", [&](int opt) { 
         if (opt == 0)
-            optimizationOptions = opt::OptimizerOptions::Minimum();
+            optimizationOptions = opt::OptimizerOptions::None();
         else if (opt == 1)
             optimizationOptions = opt::OptimizerOptions::Low();
         else if (opt == 2)
@@ -198,7 +199,7 @@ int main(int argc, char** argv)
             return env.reporter().errorCount();
 
         if (warningAsError && env.reporter().warningCount() > 0) {
-            std::cerr << "Terminating as a warning was generated" << std::endl;
+            PEXPR_LOG_ERROR << "Terminating as a warning was generated" << std::endl;
             return env.reporter().warningCount();
         }
 
@@ -214,7 +215,7 @@ int main(int argc, char** argv)
     }
 
     if (!ssa::SSAValidator::checkIfTyped(&program)) {
-        std::cerr << "The SSA will be invalid due to unspecified typing!" << std::endl;
+        PEXPR_LOG_ERROR << "The SSA will be invalid due to unspecified typing!" << std::endl;
         dumpOutput(ssa::SSASerializer::serialize(program));
         return env.reporter().errorCount() + 1;
     }
@@ -224,7 +225,7 @@ int main(int argc, char** argv)
         opt::Optimizer::Run(optimizationOptions, program);
 
         if (!ssa::SSAValidator::checkIfTyped(&program)) {
-            std::cerr << "Computed SSA is invalid due to unspecified typing!" << std::endl;
+            PEXPR_LOG_ERROR << "Computed SSA is invalid due to unspecified typing!" << std::endl;
             return env.reporter().errorCount() + 1;
         }
     }
@@ -236,6 +237,9 @@ int main(int argc, char** argv)
 
     rvm::RVMMapper mapper(std::make_shared<rvm::RVMStringTable>());
     auto rvmProgram = mapper.mapProgram(program);
+
+    if (!rvm::RVMValidator::checkIfElementary(&rvmProgram))
+        PEXPR_LOG_WARNING << "Constructed RVM program is invalid due to non-elementary types in registers" << std::endl;
 
     dumpOutput(rvm::RVMSerializer::serialize(rvmProgram));
 
