@@ -488,8 +488,8 @@ std::optional<SSAValue> SSCPConstantFolder::foldAssign(bool foldNumber, const SS
     if (asg->Operator == SSAInstrAssign::OpKind::Access && ops.size() == 2)
         return foldAccessOp(ops.at(0), ops.at(1));
 
-    // Vector [x,y,z,w]
-    if (asg->Operator == SSAInstrAssign::OpKind::Tuple)
+    // Tuple construction [x,y,z,w] - assign with tuple target and multiple operands
+    if (asg->Operator == SSAInstrAssign::OpKind::Assign && asg->Target.type().isTuple() && asg->Operands.size() > 1)
         return foldVectorOp(ops);
 
     // Cast

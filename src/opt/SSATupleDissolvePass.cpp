@@ -4,7 +4,7 @@
 #include "log/Logger.h"
 #include "ssa/SSAInstruction.h"
 
-// #define _TEST_TUPLE_DISSOLVE
+// waw#define _TEST_TUPLE_DISSOLVE
 #ifdef _TEST_TUPLE_DISSOLVE
 #include "ssa/SSASerializer.h"
 #endif
@@ -75,7 +75,8 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
 
     for (const auto& instrPtr : instructions) {
         if (auto assign = dynamic_cast<SSAInstrAssign*>(instrPtr.get())) {
-            if (assign->Operator == SSAInstrAssign::OpKind::Tuple) {
+            // Detect tuple creation: assign instruction with tuple type target and multiple operands
+            if (assign->Operator == SSAInstrAssign::OpKind::Assign && assign->Target.type().isTuple() && assign->Operands.size() > 1) {
                 // Case 1: Tuple creation -> Create multiple assignments
                 const auto& operands         = assign->Operands;
                 const auto& target           = assign->Target;
@@ -96,7 +97,8 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
                         for (size_t j = 0; j < newTuple->elements.size(); ++j)
                             newOperands.push_back(SSAValue(true, operands[i].type().components().at(j), newTuple->elements[j]));
 
-                        newAssign->Operator = SSAInstrAssign::OpKind::Tuple;
+                        // Nested tuple constant: create assign instruction for it
+                        newAssign->Operator = SSAInstrAssign::OpKind::Assign;
                         newAssign->Operands = std::move(newOperands);
                     } else {
                         newAssign->Operator = SSAInstrAssign::OpKind::Assign;
@@ -293,33 +295,15 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
                 }
             } else if (assign->Operator == SSAInstrAssign::OpKind::Assign
                        && assign->Operands.size() == 1 && assign->Operands[0].type().isTuple()) {
-                // Case 7: Assign with tuple source
+                // Case 7: Tuple copy - forward element mapping
                 const auto& sourceVal = assign->Operands[0];
                 if (auto it = mTupleElements.find(sourceVal.hash()); it != mTupleElements.end()) {
-                    const auto& sourceElements   = it->second;
-                    const auto& targetType       = assign->Target.type();
-                    const auto& targetComponents = targetType.components();
-
-                    std::vector<SSAValue> resultElements;
-                    resultElements.reserve(sourceElements.size());
-
-                    for (size_t i = 0; i < sourceElements.size(); ++i) {
-                        SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents.at(i));
-                        auto elemInstr      = std::make_shared<SSAInstrAssign>();
-                        elemInstr->Target   = elemTarget;
-                        elemInstr->Operator = SSAInstrAssign::OpKind::Unary;
-                        elemInstr->UnaryOp  = assign->UnaryOp;
-                        elemInstr->Operands = { sourceElements[i] };
-                        newInstructions.push_back(elemInstr);
-                        resultElements.push_back(elemTarget);
-                    }
-
+                    // Forward the tuple element mapping
+                    mTupleElements[assign->Target.hash()] = it->second;
                     changed = true;
-
-                    // Store the dissolved tuple
-                    mTupleElements[assign->Target.hash()] = resultElements;
                     continue; // Don't emit the original assign instruction
                 }
+                // If source tuple hasn't been dissolved yet, we can't forward
             }
 
             // If we get here, this SSAInstrAssign wasn't handled by any tuple-specific case
@@ -396,7 +380,7 @@ ssa::SSAValue SSATupleDissolvePass::reconstructTuple(const ssa::SSAValue& value,
         // Create a tuple instruction to reconstruct the tuple
         auto tupleInstr      = std::make_shared<SSAInstrAssign>();
         tupleInstr->Target   = newTuple;
-        tupleInstr->Operator = SSAInstrAssign::OpKind::Tuple;
+        tupleInstr->Operator = SSAInstrAssign::OpKind::Assign;
         tupleInstr->Operands = std::move(actualElements);
         instructions.push_back(tupleInstr);
 

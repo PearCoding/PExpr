@@ -124,9 +124,6 @@ void SSASerializer::writeAssign(std::ostream& os, const SSAInstrAssign& instr)
     case SSAInstrAssign::OpKind::Access:
         os << "access";
         break;
-    case SSAInstrAssign::OpKind::Tuple:
-        os << "tuple[" << instr.Operands.size() << "]";
-        break;
     case SSAInstrAssign::OpKind::Cast:
         os << "cast";
         break;
@@ -701,8 +698,6 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
             assign->UnaryOp  = UnaryOperation::Not;
         } else if (op == "cast") {
             assign->Operator = SSAInstrAssign::OpKind::Cast;
-        } else if (op.find("tuple[") == 0) {
-            assign->Operator = SSAInstrAssign::OpKind::Tuple;
         } else if (op == "access") {
             assign->Operator = SSAInstrAssign::OpKind::Access;
         } else {

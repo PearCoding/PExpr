@@ -48,7 +48,6 @@ public:
                         Unary,
                         Binary,
                         Access,
-                        Tuple,
                         Cast };
 
     SSAValue Target;

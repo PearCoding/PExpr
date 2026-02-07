@@ -122,13 +122,36 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
 
     switch (instr.Operator) {
     case ssa::SSAInstrAssign::OpKind::Assign: {
-        // Simple assignment: dst = src
-        PEXPR_ASSERT(instr.Operands.size() == 1, "Assign expects 1 operand");
-
         if (instr.Target.type().isTuple()) {
-            // Forward the association
-            mTupleMap[instr.Target] = mTupleMap.at(instr.Operands[0]);
+            // Tuple assignment: could be tuple copy or tuple construction
+            if (instr.Operands.size() == 1) {
+                // Tuple copy: forward the association
+                mTupleMap[instr.Target] = mTupleMap.at(instr.Operands[0]);
+            } else {
+                // Tuple construction from multiple operands
+                std::vector<RVMValue> elements;
+
+                for (size_t i = 0; i < instr.Operands.size(); ++i) {
+                    if (auto it = mTupleMap.find(instr.Operands[i]); it != mTupleMap.end()) {
+                        for (const auto& e : it->second)
+                            elements.push_back(e);
+                    } else {
+                        const auto dstType = instr.Operands[i].type();
+                        PEXPR_ASSERT(!dstType.isTuple(), "Undetected tuple found during tuple dissolving");
+
+                        RVMValue src = mapValue(instr.Operands[i]);
+                        RVMValue dst = RVMValue::Register(mContext.allocateRegister(dstType), dstType);
+
+                        elements.push_back(dst);
+                        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+                    }
+                }
+
+                mTupleMap[instr.Target] = std::move(elements);
+            }
         } else {
+            // Simple scalar assignment: dst = src
+            PEXPR_ASSERT(instr.Operands.size() == 1, "Scalar assign expects 1 operand");
             RVMValue dst = mapValue(instr.Target);
             RVMValue src = mapValue(instr.Operands[0]);
 
@@ -240,28 +263,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
             // For RVM, tuple access should have been dissolved into direct register access
             result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
         }
-        break;
-    }
-    case ssa::SSAInstrAssign::OpKind::Tuple: {
-        std::vector<RVMValue> elements;
-
-        for (size_t i = 0; i < instr.Operands.size(); ++i) {
-            if (auto it = mTupleMap.find(instr.Operands[i]); it != mTupleMap.end()) {
-                for (const auto& e : it->second)
-                    elements.push_back(e);
-            } else {
-                const auto dstType = instr.Operands[i].type();
-                PEXPR_ASSERT(!dstType.isTuple(), "Undetected tuple found during tuple dissolving");
-
-                RVMValue src = mapValue(instr.Operands[i]);
-                RVMValue dst = RVMValue::Register(mContext.allocateRegister(dstType), dstType);
-
-                elements.push_back(dst);
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-            }
-        }
-
-        mTupleMap[instr.Target] = std::move(elements);
         break;
     }
     case ssa::SSAInstrAssign::OpKind::Cast: {

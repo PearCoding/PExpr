@@ -95,7 +95,9 @@ TEST_CASE("SSAMapper: vector operations with SSA mapping", "[ssamapper][vectors]
     auto dumped = SSASerializer::serialize(prog);
 
     // Should have vector operations
-    REQUIRE(dumped.find("tuple[") != std::string::npos);
+    REQUIRE(dumped.find("assign") != std::string::npos);
+    // Check for vector type annotations
+    REQUIRE(dumped.find("vec3") != std::string::npos);
 }
 
 TEST_CASE("SSAMapper: destructuring with pattern matching", "[ssamapper][destructuring]")

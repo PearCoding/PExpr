@@ -169,7 +169,7 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         SSAValue tgt = SSAValue::Named(mContext.fresh("%"), v->returnType());
         SSAInstrAssign asg;
         asg.Target   = tgt;
-        asg.Operator = SSAInstrAssign::OpKind::Tuple;
+        asg.Operator = SSAInstrAssign::OpKind::Assign;
         asg.Operands = std::move(inners);
         program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
         result = tgt;
@@ -282,7 +282,7 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
             SSAValue tgt = SSAValue::Named(mContext.fresh("%"), a->returnType());
             SSAInstrAssign tuple;
             tuple.Target   = tgt;
-            tuple.Operator = SSAInstrAssign::OpKind::Tuple;
+            tuple.Operator = SSAInstrAssign::OpKind::Assign;
             tuple.Operands = std::move(accessedValues);
             program.Body.push_back(std::make_shared<SSAInstrAssign>(tuple));
             result = tgt;

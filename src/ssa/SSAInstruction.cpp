@@ -28,19 +28,15 @@ size_t SSAInstrAssign::hash(bool includeTargetName) const
             h = h * 31 + Operands[1].hash(true);
         }
         break;
-    case OpKind::Tuple:
-        h = h * 31 + std::hash<size_t>{}(Operands.size());
-        for (const auto& op : Operands)
-            h = h * 31 + op.hash(true);
-        break;
     case OpKind::Cast:
         h = h * 31 + Target.type().hash();
         if (!Operands.empty())
             h = h * 31 + Operands[0].hash(true);
         break;
     case OpKind::Assign:
-        if (!Operands.empty())
-            h = h * 31 + Operands[0].hash(true);
+        h = h * 31 + std::hash<size_t>{}(Operands.size());
+        for (const auto& op : Operands)
+            h = h * 31 + op.hash(true);
         break;
     }
     return h;
