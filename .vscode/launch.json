@@ -124,6 +124,17 @@
         "cwd": "${command:cmake.buildDirectory}",
         "environment": [],
         "console": "integratedTerminal"
+    },
+    {
+        "name": "Fuzzy",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${command:cmake.buildDirectory}/bin/pexpr_fuzzy_tests.exe",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${command:cmake.buildDirectory}",
+        "environment": [],
+        "console": "integratedTerminal"
     }
     ]
 }
