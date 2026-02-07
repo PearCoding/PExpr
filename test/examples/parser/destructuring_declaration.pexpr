@@ -1,3 +1,10 @@
 // Test destructuring declarations
 let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];
 [a, c]
+
+// %.2:[[int, int], bool, num] = tuple[3]([2:num, 4:num]:vec2, true:bool, 2:num)
+// %.3:[int, int] = access(%.2:[[int, int], bool, num], 0:int)
+// %.4:vec2 = cast(%.3:[int, int])
+// %.6:num = access(%.2:[[int, int], bool, num], 2:int)
+// %.7:[vec2, num] = tuple[2](%.4:vec2, %.6:num)
+// return %.7:[vec2, num]

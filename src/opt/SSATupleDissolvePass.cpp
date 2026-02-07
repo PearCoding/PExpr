@@ -4,6 +4,11 @@
 #include "log/Logger.h"
 #include "ssa/SSAInstruction.h"
 
+// #define _TEST_TUPLE_DISSOLVE
+#ifdef _TEST_TUPLE_DISSOLVE
+#include "ssa/SSASerializer.h"
+#endif
+
 #include <algorithm>
 
 namespace PExpr::opt {
@@ -19,10 +24,18 @@ bool SSATupleDissolvePass::dissolve(SSAContext* context, SSAProgram& program)
 
     // Repeat dissolve and dead-code analysis until no further changes
     auto handleInstructions = [&](InstructionList& instructions) {
+#ifdef _TEST_TUPLE_DISSOLVE
+        PEXPR_LOG_DEBUG << SSASerializer::serialize(instructions) << std::endl;
+#endif
+
         bool changedList = false;
         size_t i         = 0;
         while (true) {
             bool changedBlock = dissolveInstructions(context, instructions);
+
+#ifdef _TEST_TUPLE_DISSOLVE
+            PEXPR_LOG_DEBUG << SSASerializer::serialize(instructions) << std::endl;
+#endif
 
             changedList |= changedBlock;
             if (!changedBlock)
@@ -75,8 +88,20 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
                     SSAValue elemTarget = SSAValue::Named(context->fresh("%"), targetComponents[i]);
                     auto newAssign      = std::make_shared<SSAInstrAssign>();
                     newAssign->Target   = elemTarget;
-                    newAssign->Operator = SSAInstrAssign::OpKind::Assign;
-                    newAssign->Operands = { operands.at(i) };
+
+                    if (operands[i].type().isTuple() && operands[i].isConstant()) {
+                        const auto newTuple = operands[i].valueAs<Tuple>();
+                        std::vector<SSAValue> newOperands;
+                        newOperands.reserve(newTuple->elements.size());
+                        for (size_t j = 0; j < newTuple->elements.size(); ++j)
+                            newOperands.push_back(SSAValue(true, operands[i].type().components().at(j), newTuple->elements[j]));
+
+                        newAssign->Operator = SSAInstrAssign::OpKind::Tuple;
+                        newAssign->Operands = std::move(newOperands);
+                    } else {
+                        newAssign->Operator = SSAInstrAssign::OpKind::Assign;
+                        newAssign->Operands = { operands.at(i) };
+                    }
                     newInstructions.push_back(newAssign);
                     resultElements.push_back(elemTarget);
                 }

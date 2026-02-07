@@ -38,4 +38,5 @@
 - [ ] Remove some of the annoying habits (e.g., "fn foo(...) = { };" instead of "fn foo(...) { }" and "if ... {...};" instead of "if ... {...}")
 - [x] RVM needs correct phi node handling. 
 - [x] RVM needs tuple dissolving implemented. -> Handled in SSA except for 'call' and 'return' instructions.
-- [-] Split the call of functions in RVM into two cases: "call_external" as the way we handled calls for now and "call_internal" which uses a standard order of registers (saved via push_frame) to call.
+- [x] Split the call of functions in RVM into two cases: "call_external" as the way we handled calls for now and "call_internal" which uses a standard order of registers (saved via push_frame) to call.
+- [ ] There is no need to have 'tuple' and 'assign' for SSA. Merge 'tuple' functionality to 'assign'.
