@@ -138,3 +138,8 @@ private:
 #define PEXPR_LOG_UNSAFE(l) (PExpr::log::Logger::log((l)))
 /// Threadsafe logging function.
 #define PEXPR_LOG(l) (PExpr::log::Logger::threadsafe().log((l)))
+#define PEXPR_LOG_DEBUG (PEXPR_LOG(PExpr::log::LogLevel::Debug))
+#define PEXPR_LOG_INFO (PEXPR_LOG(PExpr::log::LogLevel::Info))
+#define PEXPR_LOG_WARNING (PEXPR_LOG(PExpr::log::LogLevel::Warning))
+#define PEXPR_LOG_ERROR (PEXPR_LOG(PExpr::log::LogLevel::Error))
+#define PEXPR_LOG_FATAL (PEXPR_LOG(PExpr::log::LogLevel::Fatal))

@@ -259,6 +259,16 @@ void SSASerializer::write(std::ostream& os, const SSAProgram& program)
     }
 }
 
+std::string SSASerializer::serialize(std::span<const std::shared_ptr<SSAInstr>> instructions)
+{
+    std::ostringstream os;
+    for (const auto& instr : instructions) {
+        write(os, *instr);
+        os << std::endl;
+    }
+    return os.str();
+}
+
 std::string SSASerializer::serialize(const SSAProgram& program)
 {
     std::ostringstream oss;

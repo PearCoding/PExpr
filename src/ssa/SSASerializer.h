@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <span>
 #include <vector>
 
 namespace PExpr::ssa {
@@ -30,6 +31,9 @@ public:
 
     /// Read an SSAProgram from a stream (deserialize)
     static SSAProgram read(std::istream& is);
+
+    /// Helper: Serialize an list of instructions to a string (convenience wrapper)
+    [[nodiscard]] static std::string serialize(std::span<const std::shared_ptr<SSAInstr>> instructions);
 
     /// Helper: Serialize an SSAProgram to a string (convenience wrapper)
     [[nodiscard]] static std::string serialize(const SSAProgram& program);

@@ -89,10 +89,11 @@ void Optimizer::runProgram(ssa::SSAProgram& program)
             for (auto& func : program.Functions)
                 changed |= mFunctionInliner->attempFunctionInlining(mContext.get(), program, func);
         }
-
-        if (mOptions.DissolveTuples)
-            changed |= mTupleDissolvePass->dissolve(mContext.get(), program);
     }
+
+    // We can't really repeat over this as it will dissolve tuples and reconstruct it over and over again
+    if (mOptions.DissolveTuples)
+        changed |= mTupleDissolvePass->dissolve(mContext.get(), program);
 }
 
 bool Optimizer::processBody(InstructionList& body)

@@ -29,6 +29,12 @@ private:
     /// @return true if any tuples were dissolved, false otherwise
     bool dissolveInstructions(ssa::SSAContext* context, InstructionList& instructions);
 
+    /// Return and Call instruction require tuples, merge them back
+    /// @return true if changed, false otherwise
+    bool mergeCallAndReturnInstructions(ssa::SSAContext* context, InstructionList& instructions);
+
+    ssa::SSAValue reconstructTuple(const ssa::SSAValue& value, ssa::SSAContext* context, InstructionList& instructions);
+
     /// Map from tuple value hash to their element values
     std::unordered_map<size_t, std::vector<ssa::SSAValue>> mTupleElements;
 };
