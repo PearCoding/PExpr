@@ -238,7 +238,7 @@ int main(int argc, char** argv)
     rvm::RVMMapper mapper;
     auto rvmProgram = mapper.mapProgram(program);
 
-    if (!rvm::RVMValidator::checkIfElementary(&rvmProgram))
+    if (!rvm::RVMValidator::checkIfElementary(rvmProgram))
         PEXPR_LOG_WARNING << "Constructed RVM program is invalid due to non-elementary types in registers" << std::endl;
 
     dumpOutput(rvm::RVMSerializer::serialize(rvmProgram));

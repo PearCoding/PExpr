@@ -5,9 +5,6 @@
 namespace PExpr::rvm {
 
 /// RVM program
-class RVMProgram {
-public:
-    std::vector<std::shared_ptr<RVMInstr>> Body;
-};
+using RVMProgram = std::vector<std::shared_ptr<RVMInstr>>;
 
 } // namespace PExpr::rvm

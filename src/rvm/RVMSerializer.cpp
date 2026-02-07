@@ -341,7 +341,7 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
 void RVMSerializer::write(std::ostream& os, const RVMProgram& program)
 {
     // Write all instructions in the body (including embedded functions)
-    for (const auto& instr : program.Body) {
+    for (const auto& instr : program) {
         write(os, *instr);
         os << std::endl;
     }
@@ -726,7 +726,7 @@ RVMProgram RVMSerializer::read(std::istream& is)
         // Parse instruction
         auto instr = readInstruction(line);
         if (instr)
-            program.Body.push_back(instr);
+            program.push_back(instr);
     }
 
     return program;

@@ -2,19 +2,19 @@
 
 namespace PExpr::rvm {
 
-bool RVMValidator::checkIfElementary(const RVMProgram* program)
+bool RVMValidator::checkIfElementary(const RVMProgram& program)
 {
-    for (const auto& instr : program->Body) {
-        if (!checkIfElementary(instr.get()))
+    for (const auto& instr : program) {
+        if (!checkIfElementary(*instr))
             return false;
     }
     return true;
 }
 
-bool RVMValidator::checkIfElementary(const RVMInstr* instr)
+bool RVMValidator::checkIfElementary(const RVMInstr& instr)
 {
     bool bad = false;
-    instr->forEachValue([&bad](const RVMValue& val) {
+    instr.forEachValue([&bad](const RVMValue& val) {
         if (!checkIfElementary(val))
             bad = true;
     });

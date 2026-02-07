@@ -74,7 +74,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program is created
-        REQUIRE(rvmProgram.Body.size() > 0);
+        REQUIRE(rvmProgram.size() > 0);
 
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
         REQUIRE(!rvmStr.empty());
@@ -102,7 +102,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto rvmProgram = mapper.mapProgram(ssaProgram);
 
         // Verify RVM program is created
-        REQUIRE(rvmProgram.Body.size() > 0);
+        REQUIRE(rvmProgram.size() > 0);
 
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
         REQUIRE(!rvmStr.empty());

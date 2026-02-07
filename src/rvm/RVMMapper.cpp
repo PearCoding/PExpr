@@ -501,7 +501,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
                 const std::string content = val.valueAs<std::string>();
                 if (!mStringMap.contains(content)) {
                     auto target = RVMValue::StringRef(mStringMap.size());
-                    rvmProgram.Body.push_back(std::make_shared<RVMInstrStringLiteral>(target, content));
+                    rvmProgram.push_back(std::make_shared<RVMInstrStringLiteral>(target, content));
                     mStringMap[content] = target;
                 }
             });
@@ -531,18 +531,18 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
             }
             comment += ") : " + ssaFunc.ReturnType.toString();
 
-            rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(comment));
+            rvmProgram.push_back(std::make_shared<RVMInstrComment>(comment));
             hadExternal = true;
         }
     }
 
     if (hadExternal) //< Add an empty line after external function declarations
-        rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(""));
+        rvmProgram.push_back(std::make_shared<RVMInstrComment>(""));
 
     // (3) Map main program body
     RVMContext mainContext;
     auto mainInstructions = mapInstructions(ssaProgram.Body, mainContext, ssaProgram);
-    rvmProgram.Body.insert(rvmProgram.Body.end(), mainInstructions.begin(), mainInstructions.end());
+    rvmProgram.insert(rvmProgram.end(), mainInstructions.begin(), mainInstructions.end());
 
     // (4) Map internal functions and embed them directly in the program body
     for (const auto& ssaFunc : ssaProgram.Functions) {
@@ -555,10 +555,10 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
                 signature += ssaFunc.Parameters[i];
             }
             signature += ") : " + ssaFunc.ReturnType.toString();
-            rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(signature));
+            rvmProgram.push_back(std::make_shared<RVMInstrComment>(signature));
 
             // Add label for the function
-            rvmProgram.Body.push_back(std::make_shared<RVMInstrLabel>(ssaFunc.Name));
+            rvmProgram.push_back(std::make_shared<RVMInstrLabel>(ssaFunc.Name));
 
             // Map function body instructions
             RVMContext funcContext;
@@ -566,7 +566,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 
             // Add function body to main body
             for (auto& instr : funcInstructions)
-                rvmProgram.Body.push_back(instr);
+                rvmProgram.push_back(instr);
         }
     }
 
