@@ -326,33 +326,6 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
     }
 }
 
-void RVMSerializer::write(std::ostream& os, const RVMFunction& func)
-{
-    if (func.External) {
-        os << "[[extern";
-        if (!func.HasSideEffect)
-            os << ", pure";
-        os << "]] ";
-    }
-
-    os << "fn " << func.Name << "(";
-    for (size_t i = 0; i < func.Parameters.size(); ++i) {
-        if (i > 0)
-            os << ", ";
-        os << "%p" << i << ":" << func.Parameters[i].toString();
-    }
-    os << ") : " << func.ReturnType.toString() << std::endl;
-
-    if (!func.Body.empty()) {
-        for (const auto& instr : func.Body) {
-            os << "  ";
-            write(os, *instr);
-            os << std::endl;
-        }
-    }
-    os << "endfn" << std::endl;
-}
-
 void RVMSerializer::write(std::ostream& os, const RVMProgram& program)
 {
     // Write string table if present
@@ -363,13 +336,7 @@ void RVMSerializer::write(std::ostream& os, const RVMProgram& program)
         os << std::endl;
     }
 
-    // Write functions
-    for (const auto& f : program.Functions) {
-        write(os, f);
-        os << std::endl;
-    }
-
-    // Write main body
+    // Write all instructions in the body (including embedded functions)
     for (const auto& instr : program.Body) {
         write(os, *instr);
         os << std::endl;
@@ -747,21 +714,11 @@ RVMProgram RVMSerializer::read(std::istream& is)
     program.StringTable = stringTable;
 
     std::string line;
-    std::shared_ptr<RVMFunction> currentFunction = nullptr;
 
     while (std::getline(is, line)) {
         line = trim(line);
         if (line.empty())
             continue;
-
-        // Check for end of function
-        if (line == "endfn") {
-            if (currentFunction) {
-                program.Functions.push_back(std::move(*currentFunction));
-                currentFunction.reset();
-            }
-            continue;
-        }
 
         // Check for string table
         if (line == "[[strings]]") {
@@ -786,49 +743,10 @@ RVMProgram RVMSerializer::read(std::istream& is)
             continue;
         }
 
-        // Check for function declaration
-        if (line.rfind("fn ", 0) == 0) {
-            currentFunction = std::make_shared<RVMFunction>();
-
-            // Parse function header (simplified)
-            // Format: fn name(params) : returnType
-            size_t parenStart = line.find('(');
-            size_t parenEnd   = line.find(')', parenStart);
-
-            if (parenStart != std::string::npos && parenEnd != std::string::npos) {
-                currentFunction->Name = trim(line.substr(3, parenStart - 3));
-
-                // Parse parameters (simplified)
-                std::string paramsStr = line.substr(parenStart + 1, parenEnd - parenStart - 1);
-                if (!paramsStr.empty()) {
-                    std::vector<std::string> paramTokens = split(paramsStr, ',');
-                    for (const auto& param : paramTokens) {
-                        size_t colon = param.find(':');
-                        if (colon != std::string::npos) {
-                            Type type = parseType(trim(param.substr(colon + 1)));
-                            currentFunction->Parameters.push_back(type);
-                        }
-                    }
-                }
-
-                // Parse return type
-                size_t colonPos = line.find(':', parenEnd);
-                if (colonPos != std::string::npos) {
-                    std::string returnTypeStr   = trim(line.substr(colonPos + 1));
-                    currentFunction->ReturnType = parseType(returnTypeStr);
-                }
-            }
-            continue;
-        }
-
         // Parse instruction
         auto instr = readInstruction(line);
-        if (instr) {
-            if (currentFunction)
-                currentFunction->Body.push_back(instr);
-            else
-                program.Body.push_back(instr);
-        }
+        if (instr)
+            program.Body.push_back(instr);
     }
 
     return program;

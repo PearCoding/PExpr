@@ -463,54 +463,6 @@ TEST_CASE("RVMSerializer: type conversion opcodes", "[rvm][serializer]")
     }
 }
 
-TEST_CASE("RVMSerializer: function serialization", "[rvm][serializer]")
-{
-    SECTION("Simple function serialization")
-    {
-        RVMFunction func;
-        func.Name = "test_func";
-        func.Parameters.push_back(Type(TypeKind::Integer));
-        func.Parameters.push_back(Type(TypeKind::Number));
-        func.ReturnType = Type(TypeKind::Boolean);
-        func.External = false;
-
-        // Add a simple instruction
-        RVMValue dst = RVMValue::Register(0, Type(TypeKind::Boolean));
-        RVMValue src1 = RVMValue::Register(1, Type(TypeKind::Integer));
-        RVMValue src2 = RVMValue::Register(2, Type(TypeKind::Number));
-        func.Body.push_back(std::make_shared<RVMInstr3Op>(Opcode::CMP_EQ, dst, src1, src2));
-
-        std::ostringstream oss;
-        RVMSerializer::write(oss, func);
-        std::string funcStr = oss.str();
-
-        REQUIRE(funcStr.find("fn test_func") != std::string::npos);
-        REQUIRE(funcStr.find("%p0:int") != std::string::npos);
-        REQUIRE(funcStr.find("%p1:num") != std::string::npos);
-        REQUIRE(funcStr.find(": bool") != std::string::npos);
-        REQUIRE(funcStr.find("cmp_eq") != std::string::npos);
-        REQUIRE(funcStr.find("endfn") != std::string::npos);
-    }
-
-    SECTION("External function serialization")
-    {
-        RVMFunction func;
-        func.Name = "external_func";
-        func.Parameters.push_back(Type(TypeKind::Number));
-        func.ReturnType = Type(TypeKind::Number);
-        func.External = true;
-        func.HasSideEffect = false;
-
-        std::ostringstream oss;
-        RVMSerializer::write(oss, func);
-        std::string funcStr = oss.str();
-
-        REQUIRE(funcStr.find("[[extern") != std::string::npos);
-        REQUIRE(funcStr.find("pure") != std::string::npos);
-        REQUIRE(funcStr.find("fn external_func") != std::string::npos);
-    }
-}
-
 TEST_CASE("RVMSerializer: program serialization with string table", "[rvm][serializer]")
 {
     SECTION("Program with string table")

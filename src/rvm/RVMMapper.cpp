@@ -498,53 +498,71 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(
     return result;
 }
 
-// Map SSA function to RVM function
-RVMFunction RVMMapper::mapFunction(const ssa::SSAFunction& ssaFunc,
-                                   const ssa::SSAProgram& ssaProgram)
-{
-    RVMFunction rvmFunc;
-    rvmFunc.Name          = ssaFunc.Name;
-    rvmFunc.ReturnType    = ssaFunc.ReturnType;
-    rvmFunc.External      = ssaFunc.External;
-    rvmFunc.HasSideEffect = ssaFunc.HasSideEffect;
-
-    // TODO: Tuple parameters and return values do not work!
-
-    // Dissolve tuple parameters into elementary types
-    for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
-        // For now, assume parameters are elementary types
-        // In full implementation, we'd need to access parameter types
-        // and dissolve tuples into multiple parameters
-        rvmFunc.Parameters.push_back(type::Type(type::TypeKind::Unspecified));
-    }
-
-    // Map function body
-    if (!ssaFunc.External) {
-        RVMContext funcContext;
-
-        // TODO: Initialize parameters from %r0, %r1, %r2, ... registers
-        // Parameters are passed via registers according to calling convention
-
-        rvmFunc.Body = mapInstructions(ssaFunc.Body, funcContext, ssaProgram);
-    }
-
-    return rvmFunc;
-}
-
 // Map SSA program to RVM program
 RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
 {
     RVMProgram rvmProgram;
     rvmProgram.StringTable = mStringTable;
 
+    // First, handle external functions - they become comments in the body
+    for (const auto& ssaFunc : ssaProgram.Functions) {
+        if (ssaFunc.External) {
+            // Create a comment for external function declaration
+            std::string comment = "[[extern";
+            if (!ssaFunc.HasSideEffect)
+                comment += ", pure";
+            comment += "]] fn " + ssaFunc.Name + "(";
+            
+            for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
+                if (i > 0)
+                    comment += ", ";
+                comment += ssaFunc.Parameters[i];
+            }
+            comment += ") : " + ssaFunc.ReturnType.toString();
+            
+            rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(comment));
+        }
+    }
+    
+    if (!ssaProgram.Functions.empty() && std::any_of(ssaProgram.Functions.begin(), ssaProgram.Functions.end(), 
+        [](const auto& f) { return f.External; })) {
+        // Add an empty line after external function declarations
+        rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(""));
+    }
+
     // Map main program body
     RVMContext mainContext;
-    rvmProgram.Body = mapInstructions(ssaProgram.Body, mainContext, ssaProgram);
+    auto mainInstructions = mapInstructions(ssaProgram.Body, mainContext, ssaProgram);
+    rvmProgram.Body.insert(rvmProgram.Body.end(), mainInstructions.begin(), mainInstructions.end());
 
-    // Map all functions
-    rvmProgram.Functions.reserve(ssaProgram.Functions.size());
-    for (const auto& ssaFunc : ssaProgram.Functions)
-        rvmProgram.Functions.push_back(mapFunction(ssaFunc, ssaProgram));
+    // Map internal functions (non-external) and embed them directly in the program body
+    for (const auto& ssaFunc : ssaProgram.Functions) {
+        if (!ssaFunc.External) {
+            // Add comment with function signature at start of function block
+            std::string signature = "fn " + ssaFunc.Name + "(";
+            for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
+                if (i > 0)
+                    signature += ", ";
+                signature += ssaFunc.Parameters[i];
+            }
+            signature += ") : " + ssaFunc.ReturnType.toString();
+            rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(signature));
+            
+            // Add label for the function
+            rvmProgram.Body.push_back(std::make_shared<RVMInstrLabel>(ssaFunc.Name));
+            
+            // Map function body instructions
+            RVMContext funcContext;
+            auto funcInstructions = mapInstructions(ssaFunc.Body, funcContext, ssaProgram);
+            
+            // Add function body to main body
+            for (auto& instr : funcInstructions)
+                rvmProgram.Body.push_back(instr);
+            
+            // Add empty line after function for readability
+            rvmProgram.Body.push_back(std::make_shared<RVMInstrComment>(""));
+        }
+    }
 
     return rvmProgram;
 }

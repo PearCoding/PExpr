@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RVMFunction.h"
+#include "RVMProgram.h"
 #include "RVMInstruction.h"
 
 #include <iostream>
@@ -16,9 +16,6 @@ class RVMSerializer {
 public:
     /// Write an RVMProgram to a stream in human-readable format
     static void write(std::ostream& os, const RVMProgram& program);
-
-    /// Write an RVMFunction to a stream in human-readable format
-    static void write(std::ostream& os, const RVMFunction& func);
 
     /// Write an RVMInstr to a stream in human-readable format
     static void write(std::ostream& os, const RVMInstr& instr);

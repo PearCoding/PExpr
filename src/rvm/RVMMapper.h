@@ -17,10 +17,6 @@ public:
     /// Map an entire SSA program to RVM program
     RVMProgram mapProgram(const ssa::SSAProgram& ssaProgram);
 
-    /// Map a single SSA function to RVM function
-    RVMFunction mapFunction(const ssa::SSAFunction& ssaFunc,
-                            const ssa::SSAProgram& ssaProgram);
-
     /// Map SSA instructions to RVM instructions
     std::vector<std::shared_ptr<RVMInstr>> mapInstructions(
         const std::vector<std::shared_ptr<ssa::SSAInstr>>& ssaInstrs,
