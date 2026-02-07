@@ -1,7 +1,7 @@
 #pragma once
 
-#include "RVMInstruction.h"
 #include "RVMFunction.h"
+#include "RVMInstruction.h"
 
 #include <iostream>
 #include <memory>
@@ -65,6 +65,7 @@ private:
     static void write3Op(std::ostream& os, const RVMInstr3Op& instr);
     static void writeBranch(std::ostream& os, const RVMInstrBranch& instr);
     static void writeJump(std::ostream& os, const RVMInstrJump& instr);
+    static void writeComment(std::ostream& os, const RVMInstrComment& instr);
     static void writeLabel(std::ostream& os, const RVMInstrLabel& instr);
     static void writeCall(std::ostream& os, const RVMInstrExternalCall& instr);
     static void writeCall(std::ostream& os, const RVMInstrInternalCall& instr);

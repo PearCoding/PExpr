@@ -51,6 +51,11 @@ RVMInstrJump::RVMInstrJump(const std::string& targetLabel)
 {
 }
 
+RVMInstrComment::RVMInstrComment(const std::string& msg)
+    : mMessage(msg)
+{
+}
+
 RVMInstrLabel::RVMInstrLabel(const std::string& name)
     : mName(name)
 {

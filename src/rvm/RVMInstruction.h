@@ -90,6 +90,20 @@ private:
     std::string mTargetLabel; // Label name (will be resolved to offset in later pass)
 };
 
+/// Comment instruction (just a friendly comment for the reader)
+class RVMInstrComment : public RVMInstr {
+public:
+    RVMInstrComment(const std::string& msg);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::RET; } // Placeholder, comments don't execute
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] const std::string& message() const { return mMessage; }
+
+private:
+    std::string mMessage;
+};
+
 /// Label instruction (marks a position in code for jumps/branches)
 class RVMInstrLabel : public RVMInstr {
 public:
@@ -105,7 +119,6 @@ private:
 };
 
 /// Call instruction
-/// TODO: Split into call_external and call
 class RVMInstrExternalCall : public RVMInstr {
 public:
     RVMInstrExternalCall(std::optional<RVMValue> dst, const std::string& funcName,

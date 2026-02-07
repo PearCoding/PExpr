@@ -224,9 +224,8 @@ void RVMSerializer::write3Op(std::ostream& os, const RVMInstr3Op& instr)
     os << " = " << opcodeToString(instr.opcode()) << " ";
 
     auto srcs = instr.srcs();
-    if (srcs.size() >= 1) {
+    if (srcs.size() >= 1)
         write(os, srcs[0]);
-    }
     if (srcs.size() >= 2) {
         os << ", ";
         write(os, srcs[1]);
@@ -245,6 +244,11 @@ void RVMSerializer::writeBranch(std::ostream& os, const RVMInstrBranch& instr)
 void RVMSerializer::writeJump(std::ostream& os, const RVMInstrJump& instr)
 {
     os << "jmp -> " << instr.targetLabel();
+}
+
+void RVMSerializer::writeComment(std::ostream& os, const RVMInstrComment& instr)
+{
+    os << "// " << instr.message();
 }
 
 void RVMSerializer::writeLabel(std::ostream& os, const RVMInstrLabel& instr)
@@ -295,7 +299,9 @@ void RVMSerializer::writePopFrame(std::ostream& os, const RVMInstrPopFrame& inst
 
 void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
 {
-    if (const auto* label = dynamic_cast<const RVMInstrLabel*>(&instr))
+    if (const auto* cmt = dynamic_cast<const RVMInstrComment*>(&instr))
+        writeComment(os, *cmt);
+    else if (const auto* label = dynamic_cast<const RVMInstrLabel*>(&instr))
         writeLabel(os, *label);
     else if (const auto* op2 = dynamic_cast<const RVMInstr2Op*>(&instr))
         write2Op(os, *op2);
@@ -614,6 +620,12 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             }
         }
         return std::make_shared<RVMInstrPopFrame>(count);
+    }
+
+    // Check for comments (format: // ...)
+    if (trimmed.rfind("//", 0) == 0) {
+        std::string message = trim(trimmed.substr(2));
+        return std::make_shared<RVMInstrComment>(message);
     }
 
     // Check for label (format: labelname:)
