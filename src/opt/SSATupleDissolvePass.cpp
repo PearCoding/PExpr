@@ -44,13 +44,8 @@ bool SSATupleDissolvePass::dissolve(SSAContext* context, SSAProgram& program)
     handleInstructions(program.Body);
 
     // Dissolve tuples in all functions
-    for (auto& func : program.Functions) {
-        // Handle tuple parameters
-        for(const auto& param: func.Parameters) {
-            // param
-        }
+    for (auto& func : program.Functions)
         handleInstructions(func.Body);
-    }
 
     if (!converged)
         PEXPR_LOG_WARNING << "[Optimization] SSATupleDissolvePass did not converge" << std::endl;
@@ -382,8 +377,7 @@ ssa::SSAValue SSATupleDissolvePass::reconstructTuple(const ssa::SSAValue& value,
 
         return newTuple;
     } else {
-        // Give up
-        PEXPR_ASSERT(false, "Undetected tuple assignment!");
+        // Give up as it might be function parameters
         return value;
     }
 };

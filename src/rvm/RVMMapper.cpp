@@ -614,6 +614,30 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
             // Add label for the function
             rvmProgram.push_back(std::make_shared<RVMInstrLabel>(ssaFunc.Name));
 
+            // Handle parameters
+            size_t paramIndex = 0;
+            for (const auto& param : ssaFunc.Parameters) {
+                if (param.type().isTuple()) {
+                    // Multiple return values. Essentially a virtual tuple instruction
+                    const auto innerTypes = dissolveTupleType(param.type());
+                    std::vector<RVMValue> values;
+                    for (size_t i = 0; i < innerTypes.size(); ++i) {
+                        size_t srcRegId = paramIndex++;
+                        RVMValue dst    = RVMValue::Register(mContext.allocateRegister(innerTypes[i]), innerTypes[i]);
+                        if (!dst.isRegister() || dst.regId() != srcRegId) {             //< Only move if destination is not already the correct one
+                            RVMValue src = RVMValue::Register(srcRegId, innerTypes[i]); // %rI holds return value
+                            rvmProgram.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+                        }
+                        values.push_back(dst); // %r0, %r1, %r2, ...
+                    }
+                    mTupleMap[param] = std::move(values);
+                } else {
+                    RVMValue rvmValue = RVMValue::Register(paramIndex++, param.type());
+
+                    // Store the mapping for future reference
+                    mSSAtoRVMMap[param.name()] = rvmValue;
+                }
+            }
             // Map function body instructions
             auto funcInstructions = mapInstructions(ssaFunc.Body, ssaProgram);
 
