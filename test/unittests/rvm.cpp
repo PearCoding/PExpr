@@ -2,11 +2,11 @@
 #include <memory>
 #include <string>
 
-#include "rvm/RVMSerializer.h"
-#include "rvm/RVMValue.h"
 #include "rvm/RVMContext.h"
 #include "rvm/RVMMapper.h"
+#include "rvm/RVMSerializer.h"
 #include "rvm/RVMStructs.h"
+#include "rvm/RVMValue.h"
 
 using namespace PExpr;
 using namespace PExpr::rvm;
@@ -39,13 +39,10 @@ TEST_CASE("RVMValue: basic creation and properties", "[rvm][value]")
 
     SECTION("String reference values")
     {
-        auto stringTable = std::make_shared<RVMStringTable>();
-        uint32_t strId   = stringTable->addString("Hello");
-
-        RVMValue strValue = RVMValue::StringRef(strId, Type(TypeKind::String));
+        RVMValue strValue = RVMValue::StringRef(1);
         REQUIRE(strValue.isStringRef());
         REQUIRE(strValue.type() == Type(TypeKind::String));
-        REQUIRE(strValue.stringId() == strId);
+        REQUIRE(strValue.stringId() == 1);
     }
 }
 
@@ -79,45 +76,6 @@ TEST_CASE("RVMValue: equality and hashing", "[rvm][value]")
 
         REQUIRE(constInt1.hash() == constInt2.hash());
         REQUIRE(constInt1.hash() != constInt3.hash());
-    }
-}
-
-TEST_CASE("RVMStringTable: basic operations", "[rvm][stringtable]")
-{
-    auto stringTable = std::make_shared<RVMStringTable>();
-
-    SECTION("Adding strings")
-    {
-        uint32_t id1 = stringTable->addString("Hello");
-        uint32_t id2 = stringTable->addString("World");
-        uint32_t id3 = stringTable->addString("Hello"); // Duplicate
-
-        REQUIRE(id1 == 0u);
-        REQUIRE(id2 == 1u);
-        REQUIRE(id3 == id1); // Should return existing ID
-    }
-
-    SECTION("Retrieving strings")
-    {
-        uint32_t id1 = stringTable->addString("Hello");
-        uint32_t id2 = stringTable->addString("World");
-
-        REQUIRE(stringTable->getString(id1) == "Hello");
-        REQUIRE(stringTable->getString(id2) == "World");
-    }
-
-    SECTION("String lookup")
-    {
-        uint32_t id1 = stringTable->addString("Hello");
-        uint32_t id2 = stringTable->addString("World");
-
-        REQUIRE(stringTable->contains("Hello"));
-        REQUIRE(stringTable->contains("World"));
-        REQUIRE_FALSE(stringTable->contains("Test"));
-
-        REQUIRE(stringTable->getId("Hello") == id1);
-        REQUIRE(stringTable->getId("World") == id2);
-        REQUIRE_FALSE(stringTable->getId("Test").has_value());
     }
 }
 
@@ -234,11 +192,11 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         REQUIRE(instr->srcs().empty());
         REQUIRE(instr->targetLabel() == "loop_start");
     }
-    
+
     SECTION("Label instruction")
     {
         auto instr = std::make_shared<RVMInstrLabel>("my_label");
-        
+
         REQUIRE(instr->labelName() == "my_label");
         REQUIRE_FALSE(instr->dst().has_value());
         REQUIRE(instr->srcs().empty());
@@ -463,27 +421,6 @@ TEST_CASE("RVMSerializer: type conversion opcodes", "[rvm][serializer]")
     }
 }
 
-TEST_CASE("RVMSerializer: program serialization with string table", "[rvm][serializer]")
-{
-    SECTION("Program with string table")
-    {
-        RVMProgram program;
-        program.StringTable = std::make_shared<RVMStringTable>();
-        program.StringTable->addString("Hello");
-        program.StringTable->addString("World");
-
-        std::ostringstream oss;
-        RVMSerializer::write(oss, program);
-        std::string progStr = oss.str();
-
-        REQUIRE(progStr.find("[[strings]]") != std::string::npos);
-        REQUIRE(progStr.find("#str0") != std::string::npos);
-        REQUIRE(progStr.find("\"Hello\"") != std::string::npos);
-        REQUIRE(progStr.find("#str1") != std::string::npos);
-        REQUIRE(progStr.find("\"World\"") != std::string::npos);
-    }
-}
-
 TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper]")
 {
     SECTION("Simple tuple dissolution")
@@ -541,7 +478,7 @@ TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
 {
     SECTION("Call instruction with arguments")
     {
-        RVMValue dst = RVMValue::Register(0, Type(TypeKind::Number));
+        RVMValue dst               = RVMValue::Register(0, Type(TypeKind::Number));
         std::vector<RVMValue> args = {
             RVMValue::Constant(Integer(5)),
             RVMValue::Constant(Number(3.14))
@@ -574,7 +511,7 @@ TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
     SECTION("Return instruction with value")
     {
         RVMValue retVal = RVMValue::Constant(Integer(42));
-        auto instr = std::make_shared<RVMInstrReturn>(retVal);
+        auto instr      = std::make_shared<RVMInstrReturn>(retVal);
 
         REQUIRE(instr->opcode() == Opcode::RET);
         REQUIRE(instr->returnValue().has_value());
@@ -592,7 +529,7 @@ TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
 
 TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")
 {
-    RVMValue dst = RVMValue::Register(0, Type(TypeKind::Number));
+    RVMValue dst  = RVMValue::Register(0, Type(TypeKind::Number));
     RVMValue src1 = RVMValue::Constant(Number(5.0));
     RVMValue src2 = RVMValue::Constant(Number(3.0));
 
@@ -600,7 +537,7 @@ TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")
     {
         auto instr = std::make_shared<RVMInstr3Op>(Opcode::POW, dst, src1, src2);
         REQUIRE(instr->opcode() == Opcode::POW);
-        
+
         std::ostringstream oss;
         RVMSerializer::write(oss, *instr);
         REQUIRE(oss.str().find("pow") != std::string::npos);
@@ -626,7 +563,7 @@ TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][ca
     SECTION("Internal call instruction")
     {
         auto instr = std::make_shared<RVMInstrInternalCall>("my_function");
-        
+
         REQUIRE(instr->opcode() == Opcode::CALL_INTERNAL);
         REQUIRE(instr->functionName() == "my_function");
         REQUIRE_FALSE(instr->dst().has_value());
@@ -636,11 +573,11 @@ TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][ca
     SECTION("Internal call serialization")
     {
         auto instr = std::make_shared<RVMInstrInternalCall>("test_func");
-        
+
         std::ostringstream oss;
         RVMSerializer::write(oss, *instr);
         std::string instrStr = oss.str();
-        
+
         REQUIRE(instrStr.find("call_internal") != std::string::npos);
         REQUIRE(instrStr.find("test_func") != std::string::npos);
     }
@@ -651,14 +588,14 @@ TEST_CASE("RVMInstructions: frame instructions with register counts", "[rvm][ins
     SECTION("Push frame with register count")
     {
         auto pushInstr = std::make_shared<RVMInstrPushFrame>(5);
-        
+
         REQUIRE(pushInstr->opcode() == Opcode::PUSH_FRAME);
         REQUIRE(pushInstr->registerCount() == 5);
-        
+
         std::ostringstream oss;
         RVMSerializer::write(oss, *pushInstr);
         std::string instrStr = oss.str();
-        
+
         REQUIRE(instrStr.find("push_frame") != std::string::npos);
         REQUIRE(instrStr.find("5") != std::string::npos);
     }
@@ -666,14 +603,14 @@ TEST_CASE("RVMInstructions: frame instructions with register counts", "[rvm][ins
     SECTION("Pop frame with register count")
     {
         auto popInstr = std::make_shared<RVMInstrPopFrame>(3);
-        
+
         REQUIRE(popInstr->opcode() == Opcode::POP_FRAME);
         REQUIRE(popInstr->registerCount() == 3);
-        
+
         std::ostringstream oss;
         RVMSerializer::write(oss, *popInstr);
         std::string instrStr = oss.str();
-        
+
         REQUIRE(instrStr.find("pop_frame") != std::string::npos);
         REQUIRE(instrStr.find("3") != std::string::npos);
     }
@@ -681,15 +618,15 @@ TEST_CASE("RVMInstructions: frame instructions with register counts", "[rvm][ins
     SECTION("Frame instruction serialization roundtrip")
     {
         auto pushInstr = std::make_shared<RVMInstrPushFrame>(7);
-        
+
         std::ostringstream oss;
         RVMSerializer::write(oss, *pushInstr);
         std::string serialized = oss.str();
-        
+
         // Parse it back
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* pushParsed = dynamic_cast<RVMInstrPushFrame*>(parsed.get());
         REQUIRE(pushParsed != nullptr);
         REQUIRE(pushParsed->registerCount() == 7);
@@ -705,9 +642,9 @@ TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper][tuple]")
             Type(TypeKind::Number)
         };
         Type tupleType(components);
-        
+
         auto dissolved = RVMMapper::dissolveTupleType(tupleType);
-        
+
         REQUIRE(dissolved.size() == 2);
         REQUIRE(dissolved[0].kind() == TypeKind::Integer);
         REQUIRE(dissolved[1].kind() == TypeKind::Number);
@@ -721,16 +658,16 @@ TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper][tuple]")
             Type(TypeKind::Number)
         };
         Type innerTuple(inner);
-        
+
         std::vector<Type> outer = {
             Type(TypeKind::Integer),
             innerTuple,
             Type(TypeKind::Boolean)
         };
         Type outerTuple(outer);
-        
+
         auto dissolved = RVMMapper::dissolveTupleType(outerTuple);
-        
+
         REQUIRE(dissolved.size() == 4);
         REQUIRE(dissolved[0].kind() == TypeKind::Integer);
         REQUIRE(dissolved[1].kind() == TypeKind::Number);
@@ -742,7 +679,7 @@ TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper][tuple]")
     {
         Type intType(TypeKind::Integer);
         auto dissolved = RVMMapper::dissolveTupleType(intType);
-        
+
         REQUIRE(dissolved.size() == 1);
         REQUIRE(dissolved[0].kind() == TypeKind::Integer);
     }
@@ -753,8 +690,8 @@ TEST_CASE("RVMSerializer: frame instruction deserialization", "[rvm][serializer]
     SECTION("Deserialize push_frame with count")
     {
         std::string line = "push_frame 4";
-        auto instr = RVMSerializer::readInstruction(line);
-        
+        auto instr       = RVMSerializer::readInstruction(line);
+
         REQUIRE(instr != nullptr);
         auto* pushFrame = dynamic_cast<RVMInstrPushFrame*>(instr.get());
         REQUIRE(pushFrame != nullptr);
@@ -764,8 +701,8 @@ TEST_CASE("RVMSerializer: frame instruction deserialization", "[rvm][serializer]
     SECTION("Deserialize pop_frame with count")
     {
         std::string line = "pop_frame 2";
-        auto instr = RVMSerializer::readInstruction(line);
-        
+        auto instr       = RVMSerializer::readInstruction(line);
+
         REQUIRE(instr != nullptr);
         auto* popFrame = dynamic_cast<RVMInstrPopFrame*>(instr.get());
         REQUIRE(popFrame != nullptr);
@@ -775,8 +712,8 @@ TEST_CASE("RVMSerializer: frame instruction deserialization", "[rvm][serializer]
     SECTION("Deserialize push_frame without count (backwards compatibility)")
     {
         std::string line = "push_frame";
-        auto instr = RVMSerializer::readInstruction(line);
-        
+        auto instr       = RVMSerializer::readInstruction(line);
+
         REQUIRE(instr != nullptr);
         auto* pushFrame = dynamic_cast<RVMInstrPushFrame*>(instr.get());
         REQUIRE(pushFrame != nullptr);

@@ -38,11 +38,11 @@ RVMValue RVMValue::Constant(Number v)
     return result;
 }
 
-RVMValue RVMValue::StringRef(uint32_t strId, const type::Type& type)
+RVMValue RVMValue::StringRef(uint32_t strId)
 {
     RVMValue result;
     result.mKind    = Kind::STRING_REF;
-    result.mType    = type;
+    result.mType    = type::Type(type::TypeKind::String);
     result.mStorage = uint32_t(strId);
     return result;
 }

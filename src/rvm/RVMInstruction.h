@@ -193,4 +193,19 @@ private:
     uint32_t mRegisterCount; // Number of registers to restore, starting from %r1
 };
 
+/// String literal instruction - loads a string literal into a register
+class RVMInstrStringLiteral : public RVMInstr {
+public:
+    RVMInstrStringLiteral(RVMValue dst, const std::string& str);
+
+    [[nodiscard]] Opcode opcode() const override { return Opcode::LOAD_STRING; }
+    [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+    [[nodiscard]] const std::string& stringValue() const { return mString; }
+
+private:
+    RVMValue mDst;
+    std::string mString;
+};
+
 } // namespace PExpr::rvm

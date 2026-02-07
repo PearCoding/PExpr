@@ -89,4 +89,10 @@ RVMInstrPopFrame::RVMInstrPopFrame(uint32_t registerCount)
 {
 }
 
+RVMInstrStringLiteral::RVMInstrStringLiteral(RVMValue dst, const std::string& str)
+    : mDst(dst)
+    , mString(str)
+{
+}
+
 } // namespace PExpr::rvm

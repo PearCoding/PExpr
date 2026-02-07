@@ -4,5 +4,4 @@
 #include "RVMContext.h"
 #include "RVMInstruction.h"
 #include "RVMProgram.h"
-#include "RVMStringTable.h"
 #include "RVMValue.h"

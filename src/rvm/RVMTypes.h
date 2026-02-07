@@ -61,6 +61,9 @@ enum class Opcode : uint8_t {
     // Register frame operations
     PUSH_FRAME, // Push register frame onto stack
     POP_FRAME,  // Pop register frame from stack
+
+    // String literal
+    LOAD_STRING, // Load string literal
 };
 
 } // namespace PExpr::rvm

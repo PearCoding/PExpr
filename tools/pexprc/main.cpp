@@ -235,7 +235,7 @@ int main(int argc, char** argv)
         return env.reporter().errorCount();
     }
 
-    rvm::RVMMapper mapper(std::make_shared<rvm::RVMStringTable>());
+    rvm::RVMMapper mapper;
     auto rvmProgram = mapper.mapProgram(program);
 
     if (!rvm::RVMValidator::checkIfElementary(&rvmProgram))

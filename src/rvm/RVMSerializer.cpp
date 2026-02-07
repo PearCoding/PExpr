@@ -91,6 +91,10 @@ std::string RVMSerializer::opcodeToString(Opcode op)
     case Opcode::POP_FRAME:
         return "pop_frame";
 
+    // String literal
+    case Opcode::LOAD_STRING:
+        return "load_string";
+
     default:
         return "unknown";
     }
@@ -297,6 +301,12 @@ void RVMSerializer::writePopFrame(std::ostream& os, const RVMInstrPopFrame& inst
     os << "pop_frame " << instr.registerCount();
 }
 
+void RVMSerializer::writeStringLiteral(std::ostream& os, const RVMInstrStringLiteral& instr)
+{
+    write(os, instr.dst().value());
+    os << " = load_string \"" << escapeString(instr.stringValue()) << "\"";
+}
+
 void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
 {
     if (const auto* cmt = dynamic_cast<const RVMInstrComment*>(&instr))
@@ -321,6 +331,8 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
         writePushFrame(os, *pushFrame);
     else if (const auto* popFrame = dynamic_cast<const RVMInstrPopFrame*>(&instr))
         writePopFrame(os, *popFrame);
+    else if (const auto* strLit = dynamic_cast<const RVMInstrStringLiteral*>(&instr))
+        writeStringLiteral(os, *strLit);
     else {
         os << "unknown_instr";
     }
@@ -328,14 +340,6 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
 
 void RVMSerializer::write(std::ostream& os, const RVMProgram& program)
 {
-    // Write string table if present
-    if (program.StringTable && program.StringTable->size() > 0) {
-        os << "[[strings]]" << std::endl;
-        for (uint32_t i = 0; i < program.StringTable->size(); ++i)
-            os << "  #str" << i << " = \"" << escapeString(program.StringTable->getString(i)) << "\"" << std::endl;
-        os << std::endl;
-    }
-
     // Write all instructions in the body (including embedded functions)
     for (const auto& instr : program.Body) {
         write(os, *instr);
@@ -491,7 +495,7 @@ bool RVMSerializer::parseValue(const std::string& str, RVMValue& outValue)
     if (valueStr.rfind("#str", 0) == 0) {
         try {
             uint32_t strId = std::stoul(valueStr.substr(4));
-            outValue       = RVMValue::StringRef(strId, type);
+            outValue       = RVMValue::StringRef(strId);
             return true;
         } catch (...) {
             return false;
@@ -561,6 +565,8 @@ std::vector<RVMValue> RVMSerializer::parseValueList(const std::string& str)
 
 std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line)
 {
+    // TODO: load_string
+    
     std::string trimmed = trim(line);
     if (trimmed.empty())
         return nullptr;
@@ -710,38 +716,12 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
 RVMProgram RVMSerializer::read(std::istream& is)
 {
     RVMProgram program;
-    auto stringTable    = std::make_shared<RVMStringTable>();
-    program.StringTable = stringTable;
-
     std::string line;
 
     while (std::getline(is, line)) {
         line = trim(line);
         if (line.empty())
             continue;
-
-        // Check for string table
-        if (line == "[[strings]]") {
-            // Read string table entries
-            while (std::getline(is, line)) {
-                line = trim(line);
-                if (line.empty())
-                    break;
-
-                if (line.rfind("#str", 0) == 0 && line.find('=') != std::string::npos) {
-                    size_t eqPos         = line.find('=');
-                    std::string idStr    = trim(line.substr(0, eqPos));
-                    std::string valueStr = trim(line.substr(eqPos + 1));
-
-                    if (valueStr.front() == '"' && valueStr.back() == '"') {
-                        std::string value = unescapeString(valueStr.substr(1, valueStr.size() - 2));
-                        // Store in string table (id will be assigned in order)
-                        stringTable->addString(value);
-                    }
-                }
-            }
-            continue;
-        }
 
         // Parse instruction
         auto instr = readInstruction(line);

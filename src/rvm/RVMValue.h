@@ -30,8 +30,8 @@ public:
     static RVMValue Constant(Integer v);
     static RVMValue Constant(Number v);
 
-    // String reference (index into string table)
-    static RVMValue StringRef(uint32_t strId, const type::Type& type);
+    // String reference
+    static RVMValue StringRef(uint32_t strId);
 
     [[nodiscard]] Kind kind() const { return mKind; }
     [[nodiscard]] const type::Type& type() const { return mType; }

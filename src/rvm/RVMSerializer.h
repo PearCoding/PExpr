@@ -69,6 +69,7 @@ private:
     static void writeReturn(std::ostream& os, const RVMInstrReturn& instr);
     static void writePushFrame(std::ostream& os, const RVMInstrPushFrame& instr);
     static void writePopFrame(std::ostream& os, const RVMInstrPopFrame& instr);
+    static void writeStringLiteral(std::ostream& os, const RVMInstrStringLiteral& instr);
 
     // Internal helper functions for reading/parsing
     static std::vector<RVMValue> parseValueList(const std::string& str);
