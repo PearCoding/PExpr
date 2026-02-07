@@ -151,18 +151,11 @@ private:
 /// Return instruction
 class RVMInstrReturn : public RVMInstr {
 public:
-    RVMInstrReturn(std::optional<RVMValue> retVal);
+    RVMInstrReturn();
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::RET; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
-    [[nodiscard]] std::vector<RVMValue> srcs() const override
-    {
-        return mRetVal ? std::vector<RVMValue>{ *mRetVal } : std::vector<RVMValue>{};
-    }
-    [[nodiscard]] std::optional<RVMValue> returnValue() const { return mRetVal; }
-
-private:
-    std::optional<RVMValue> mRetVal;
+    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
 };
 
 /// Push frame instruction - saves registers %r1 to %r{count}

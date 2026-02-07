@@ -153,12 +153,8 @@ int main(int argc, char** argv)
             std::cerr << "Can't skip optimization when emitting RVM" << std::endl;
             return 1;
         }
-        if (!optimizationOptions.ForceInlineFunctions) {
-            std::cout << "Enabled '--opt-force-inline-functions' for RVM" << std::endl;
-            optimizationOptions.ForceInlineFunctions = true;
-        }
         if (!optimizationOptions.DissolveTuples) {
-            std::cout << "Enabled '--opt-dissolve-tuples' for RVM" << std::endl;
+            // std::cout << "Enabled '--opt-dissolve-tuples' for RVM" << std::endl;
             optimizationOptions.DissolveTuples = true;
         }
     }

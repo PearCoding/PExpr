@@ -507,24 +507,6 @@ TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
         REQUIRE_FALSE(instr->dst().has_value());
         REQUIRE(instr->functionName() == "void_func");
     }
-
-    SECTION("Return instruction with value")
-    {
-        RVMValue retVal = RVMValue::Constant(Integer(42));
-        auto instr      = std::make_shared<RVMInstrReturn>(retVal);
-
-        REQUIRE(instr->opcode() == Opcode::RET);
-        REQUIRE(instr->returnValue().has_value());
-        REQUIRE(instr->returnValue().value() == retVal);
-    }
-
-    SECTION("Return instruction without value")
-    {
-        auto instr = std::make_shared<RVMInstrReturn>(std::nullopt);
-
-        REQUIRE(instr->opcode() == Opcode::RET);
-        REQUIRE_FALSE(instr->returnValue().has_value());
-    }
 }
 
 TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")

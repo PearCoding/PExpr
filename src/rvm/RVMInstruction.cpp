@@ -74,8 +74,7 @@ RVMInstrInternalCall::RVMInstrInternalCall(const std::string& funcName)
 {
 }
 
-RVMInstrReturn::RVMInstrReturn(std::optional<RVMValue> retVal)
-    : mRetVal(retVal)
+RVMInstrReturn::RVMInstrReturn()
 {
 }
 

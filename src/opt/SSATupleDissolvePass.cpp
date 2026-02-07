@@ -109,6 +109,8 @@ bool SSATupleDissolvePass::dissolveInstructions(SSAContext* context, Instruction
                         // Don't emit the access instruction itself
                         continue;
                     }
+                } else {
+                    PEXPR_ASSERT(false, "Ill-configured access SSA instruction detected");
                 }
             } else if (assign->Operator == SSAInstrAssign::OpKind::Unary
                        && assign->Operands.size() == 1 && assign->Operands[0].type().isTuple()) {

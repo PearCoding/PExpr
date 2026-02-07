@@ -286,11 +286,8 @@ void RVMSerializer::writeCall(std::ostream& os, const RVMInstrInternalCall& inst
 
 void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
 {
+    PEXPR_UNUSED(instr);
     os << "ret";
-    if (instr.returnValue().has_value()) {
-        os << " ";
-        write(os, instr.returnValue().value());
-    }
 }
 
 void RVMSerializer::writePushFrame(std::ostream& os, const RVMInstrPushFrame& instr)
@@ -633,17 +630,8 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
     }
 
     // Check for return
-    if (trimmed.rfind("ret", 0) == 0) {
-        if (trimmed.size() == 3) {
-            return std::make_shared<RVMInstrReturn>(std::nullopt);
-        } else {
-            std::string valueStr = trim(trimmed.substr(4));
-            RVMValue value;
-            if (!parseValue(valueStr, value))
-                return nullptr;
-            return std::make_shared<RVMInstrReturn>(value);
-        }
-    }
+    if (trimmed.rfind("ret", 0) == 0)
+        return std::make_shared<RVMInstrReturn>();
 
     // Check for assignment instructions (dst = op ...)
     size_t eqPos = trimmed.find('=');
@@ -710,12 +698,10 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         if (rest.rfind("load_string ", 0) == 0) {
             // Format: dst = load_string "string_value"
             std::string stringLiteral = trim(rest.substr(12));
-            
+
             // Check if it's a quoted string
-            if (stringLiteral.size() >= 2 && 
-                stringLiteral.front() == '"' && 
-                stringLiteral.back() == '"') {
-                std::string escapedString = stringLiteral.substr(1, stringLiteral.size() - 2);
+            if (stringLiteral.size() >= 2 && stringLiteral.front() == '"' && stringLiteral.back() == '"') {
+                std::string escapedString   = stringLiteral.substr(1, stringLiteral.size() - 2);
                 std::string unescapedString = unescapeString(escapedString);
                 return std::make_shared<RVMInstrStringLiteral>(dst, unescapedString);
             }
