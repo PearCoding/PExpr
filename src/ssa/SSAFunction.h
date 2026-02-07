@@ -8,7 +8,7 @@ namespace PExpr::ssa {
 class SSAFunction {
 public:
     std::string Name;
-    std::vector<std::string> Parameters;
+    std::vector<ssa::SSAValue> Parameters;
     std::vector<std::shared_ptr<SSAInstr>> Body;
     type::Type ReturnType = type::Type(type::TypeKind::Unspecified);
 

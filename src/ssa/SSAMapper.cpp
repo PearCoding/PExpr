@@ -635,7 +635,7 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         func.Name = f->mangledName();
         func.Parameters.reserve(f->parameters().size());
         for (const auto& p : f->parameters())
-            func.Parameters.push_back(p->uniqueName());
+            func.Parameters.push_back(SSAValue::Named(mContext.fresh(p->uniqueName(), true), p->type()));
         func.ReturnType    = f->functionReturnType();
         func.External      = f->isExtern();
         func.HasSideEffect = f->hasSideEffects();

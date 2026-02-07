@@ -99,7 +99,7 @@ TEST_CASE("SSASerializer: round-trip with external function", "[serializer]")
     extFunc.Name          = "_Z8external_P_L5C0";
     extFunc.External      = true;
     extFunc.HasSideEffect = true;
-    extFunc.Parameters    = { "x" };
+    extFunc.Parameters    = { SSAValue::Named("x", Type(TypeKind::Integer)) };
     extFunc.ReturnType    = Type(TypeKind::Integer);
 
     // Add a call to the external function
@@ -204,7 +204,7 @@ endfn
         REQUIRE(prog.Functions.size() == 1);
         REQUIRE(prog.Functions[0].Name == "test_func");
         REQUIRE(prog.Functions[0].Parameters.size() == 1);
-        REQUIRE(prog.Functions[0].Parameters[0] == "a");
+        REQUIRE(prog.Functions[0].Parameters[0].name() == "a");
 
         // Reserialize and ensure comments are stripped
         std::string reserialized = SSASerializer::serialize(prog);

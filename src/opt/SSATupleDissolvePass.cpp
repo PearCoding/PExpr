@@ -22,7 +22,6 @@ bool SSATupleDissolvePass::dissolve(SSAContext* context, SSAProgram& program)
         bool changedList = false;
         size_t i         = 0;
         while (true) {
-
             bool changedBlock = dissolveInstructions(context, instructions);
 
             changedList |= changedBlock;
@@ -45,8 +44,13 @@ bool SSATupleDissolvePass::dissolve(SSAContext* context, SSAProgram& program)
     handleInstructions(program.Body);
 
     // Dissolve tuples in all functions
-    for (auto& func : program.Functions)
+    for (auto& func : program.Functions) {
+        // Handle tuple parameters
+        for(const auto& param: func.Parameters) {
+            // param
+        }
         handleInstructions(func.Body);
+    }
 
     if (!converged)
         PEXPR_LOG_WARNING << "[Optimization] SSATupleDissolvePass did not converge" << std::endl;

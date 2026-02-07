@@ -84,7 +84,7 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
 
     // Map parameters to arguments
     for (size_t i = 0; i < func.Parameters.size(); ++i)
-        valueMap[func.Parameters[i]] = call->Arguments[i];
+        valueMap[func.Parameters[i].name()] = call->Arguments[i];
 
     // Lambda to map and rename a value, generating fresh names for non-parameter variables
     auto mapAndRenameValue = [&](SSAValue& val) {

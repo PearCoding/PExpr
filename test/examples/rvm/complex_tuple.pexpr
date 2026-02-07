@@ -1,0 +1,35 @@
+fn returns_nested(a: int, b: [bool, num]) -> [int, [bool, num]] = {
+    [a, b]
+};
+
+fn main() -> int = {
+    let k = [true, 3.14];
+    let x = returns_nested(42, k);
+    let *[a, [b, c]] = x;
+    a
+};
+
+main()
+
+// fn _Z14returns_nested_PiT2bn(a_L1C19, b_L1C27) : [int, [bool, num]]
+//   %.1:[int, [bool, num]] = tuple[2](a_L1C19:int, b_L1C27:[bool, num])
+//   return %.1:[int, [bool, num]]
+// endfn
+
+// fn _Z4main_P() : int
+//   %.2:[bool, num] = tuple[2](true:bool, 3.14:num)
+//   k_L6C9.1:[bool, num] = assign(%.2:[bool, num])
+//   %.3:[int, [bool, num]] = call[_Z14returns_nested_PiT2bn](42:int, k_L6C9.1:[bool, num])
+//   x_L7C9.1:[int, [bool, num]] = assign(%.3:[int, [bool, num]])
+//   %.4:int = access(x_L7C9.1:[int, [bool, num]], 0:int)
+//   a_L8C11.1:int = assign(%.4:int)
+//   %.5:[bool, num] = access(x_L7C9.1:[int, [bool, num]], 1:int)
+//   %.6:bool = access(%.5:[bool, num], 0:int)
+//   b_L8C15.1:bool = assign(%.6:bool)
+//   %.7:num = access(%.5:[bool, num], 1:int)
+//   c_L8C18.1:num = assign(%.7:num)
+//   return a_L8C11.1:int
+// endfn
+
+// %.8:int = call[_Z4main_P]()
+// return %.8:int

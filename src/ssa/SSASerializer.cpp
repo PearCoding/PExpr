@@ -232,7 +232,7 @@ void SSASerializer::write(std::ostream& os, const SSAFunction& func)
     for (size_t i = 0; i < func.Parameters.size(); ++i) {
         if (i)
             os << ", ";
-        os << func.Parameters[i];
+        write(os, func.Parameters[i]);
     }
     os << ") : " << func.ReturnType.toString() << std::endl;
 
@@ -774,11 +774,10 @@ SSAProgram SSASerializer::read(std::istream& is)
             if (!paramsStr.empty()) {
                 std::vector<std::string> params = split(paramsStr, ',');
                 for (const auto& param : params) {
-                    // Parameter format: name or name:type
-                    if (size_t colon = param.find(':'); colon != std::string::npos)
-                        currentFunction->Parameters.push_back(param.substr(0, colon));
-                    else
-                        currentFunction->Parameters.push_back(param);
+                    // Parameter format: name:type
+                    SSAValue paramVal;
+                    if (parseValue(param, paramVal))
+                        currentFunction->Parameters.push_back(paramVal);
                 }
             }
 

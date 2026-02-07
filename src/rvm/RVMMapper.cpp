@@ -582,7 +582,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
             for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
                 if (i > 0)
                     comment += ", ";
-                comment += ssaFunc.Parameters[i];
+                comment += ssaFunc.Parameters[i].name() + ":" + ssaFunc.Parameters[i].type().toString();
             }
             comment += ") : " + ssaFunc.ReturnType.toString();
 
@@ -606,7 +606,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
             for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
                 if (i > 0)
                     signature += ", ";
-                signature += ssaFunc.Parameters[i];
+                signature += ssaFunc.Parameters[i].name() + ":" + ssaFunc.Parameters[i].type().toString();
             }
             signature += ") : " + ssaFunc.ReturnType.toString();
             rvmProgram.push_back(std::make_shared<RVMInstrComment>(signature));

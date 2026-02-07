@@ -5,17 +5,12 @@ using namespace ssa;
 
 void SSCPSideEffectAnalyzer::propagateSideEffects(const SSAProgram& program)
 {
-    // Build helper maps: known functions and their parameter sets.
-    std::unordered_map<std::string, std::unordered_set<std::string>> funcParams;
+    // Build helper maps: known functions and their parameter sets. 
     std::unordered_set<std::string> knownFunctions;
     mSideEffectFunctions.clear();
 
     for (const auto& f : program.Functions) {
         knownFunctions.insert(f.Name);
-        std::unordered_set<std::string> params;
-        for (const auto& p : f.Parameters)
-            params.insert(p);
-        funcParams[f.Name] = std::move(params);
         if (f.External && f.HasSideEffect)
             mSideEffectFunctions.insert(f.Name);
     }
@@ -50,4 +45,4 @@ bool SSCPSideEffectAnalyzer::functionHasSideEffects(const std::string& functionN
     return mSideEffectFunctions.find(functionName) != mSideEffectFunctions.end();
 }
 
-} // namespace PExpr::ssa
+} // namespace PExpr::opt
