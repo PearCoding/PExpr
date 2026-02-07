@@ -175,6 +175,8 @@ Opcode RVMSerializer::stringToOpcode(const std::string& str)
         return Opcode::PUSH_FRAME;
     if (str == "pop_frame")
         return Opcode::POP_FRAME;
+    if (str == "load_string")
+        return Opcode::LOAD_STRING;
 
     return Opcode::ADD; // Default
 }
@@ -353,9 +355,6 @@ std::string RVMSerializer::serialize(const RVMProgram& program)
     write(oss, program);
     return oss.str();
 }
-
-// Note: Deserialization implementation would be more complex
-// and require parsing logic similar to SSASerializer
 
 std::string RVMSerializer::escapeString(const std::string& str)
 {
@@ -565,8 +564,6 @@ std::vector<RVMValue> RVMSerializer::parseValueList(const std::string& str)
 
 std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line)
 {
-    // TODO: load_string
-    
     std::string trimmed = trim(line);
     if (trimmed.empty())
         return nullptr;
@@ -707,6 +704,21 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         if (rest.rfind("call_internal ", 0) == 0) {
             std::string funcName = trim(rest.substr(15));
             return std::make_shared<RVMInstrInternalCall>(funcName);
+        }
+
+        // Check for load_string
+        if (rest.rfind("load_string ", 0) == 0) {
+            // Format: dst = load_string "string_value"
+            std::string stringLiteral = trim(rest.substr(12));
+            
+            // Check if it's a quoted string
+            if (stringLiteral.size() >= 2 && 
+                stringLiteral.front() == '"' && 
+                stringLiteral.back() == '"') {
+                std::string escapedString = stringLiteral.substr(1, stringLiteral.size() - 2);
+                std::string unescapedString = unescapeString(escapedString);
+                return std::make_shared<RVMInstrStringLiteral>(dst, unescapedString);
+            }
         }
     }
 

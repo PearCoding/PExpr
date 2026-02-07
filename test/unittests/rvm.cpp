@@ -720,3 +720,115 @@ TEST_CASE("RVMSerializer: frame instruction deserialization", "[rvm][serializer]
         REQUIRE(pushFrame->registerCount() == 0);
     }
 }
+
+TEST_CASE("RVMSerializer: load_string instruction support", "[rvm][serializer][load_string]")
+{
+    SECTION("LOAD_STRING opcode conversion")
+    {
+        REQUIRE(RVMSerializer::opcodeToString(Opcode::LOAD_STRING) == "load_string");
+        REQUIRE(RVMSerializer::stringToOpcode("load_string") == Opcode::LOAD_STRING);
+    }
+
+    SECTION("String literal instruction creation")
+    {
+        RVMValue dst = RVMValue::StringRef(0);
+        auto instr = std::make_shared<RVMInstrStringLiteral>(dst, "Hello, World!");
+
+        REQUIRE(instr->opcode() == Opcode::LOAD_STRING);
+        REQUIRE(instr->dst().has_value());
+        REQUIRE(instr->dst().value() == dst);
+        REQUIRE(instr->stringValue() == "Hello, World!");
+        REQUIRE(instr->srcs().empty());
+    }
+
+    SECTION("String literal instruction serialization")
+    {
+        RVMValue dst = RVMValue::StringRef(0);
+        auto instr = std::make_shared<RVMInstrStringLiteral>(dst, "Hello, World!");
+
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *instr);
+        std::string instrStr = oss.str();
+
+        REQUIRE(instrStr.find("load_string") != std::string::npos);
+        REQUIRE(instrStr.find("#str0:str") != std::string::npos);
+        REQUIRE(instrStr.find("Hello, World!") != std::string::npos);
+    }
+
+    SECTION("String literal instruction with escaped characters")
+    {
+        RVMValue dst = RVMValue::StringRef(1);
+        auto instr = std::make_shared<RVMInstrStringLiteral>(dst, "He said: \"Hello!\"");
+
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *instr);
+        std::string instrStr = oss.str();
+
+        REQUIRE(instrStr.find("load_string") != std::string::npos);
+        REQUIRE(instrStr.find("#str1:str") != std::string::npos);
+        REQUIRE(instrStr.find("He said: \\\"Hello!\\\"") != std::string::npos);
+    }
+
+    SECTION("String literal instruction deserialization")
+    {
+        std::string line = "#str0:str = load_string \"Hello, World!\"";
+        auto instr = RVMSerializer::readInstruction(line);
+
+        REQUIRE(instr != nullptr);
+        auto* strInstr = dynamic_cast<RVMInstrStringLiteral*>(instr.get());
+        REQUIRE(strInstr != nullptr);
+        REQUIRE(strInstr->opcode() == Opcode::LOAD_STRING);
+        
+        auto dstOpt = strInstr->dst();
+        REQUIRE(dstOpt.has_value());
+        REQUIRE(dstOpt.value().isStringRef());
+        REQUIRE(dstOpt.value().stringId() == 0);
+        REQUIRE(dstOpt.value().type() == Type(TypeKind::String));
+        
+        REQUIRE(strInstr->stringValue() == "Hello, World!");
+    }
+
+    SECTION("String literal instruction with escaped characters deserialization")
+    {
+        std::string line = "#str1:str = load_string \"He said: \\\"Hello!\\\"\"";
+        auto instr = RVMSerializer::readInstruction(line);
+
+        REQUIRE(instr != nullptr);
+        auto* strInstr = dynamic_cast<RVMInstrStringLiteral*>(instr.get());
+        REQUIRE(strInstr != nullptr);
+        REQUIRE(strInstr->opcode() == Opcode::LOAD_STRING);
+        
+        auto dstOpt = strInstr->dst();
+        REQUIRE(dstOpt.has_value());
+        REQUIRE(dstOpt.value().isStringRef());
+        REQUIRE(dstOpt.value().stringId() == 1);
+        REQUIRE(dstOpt.value().type() == Type(TypeKind::String));
+        
+        REQUIRE(strInstr->stringValue() == "He said: \"Hello!\"");
+    }
+
+    SECTION("String literal instruction roundtrip serialization/deserialization")
+    {
+        RVMValue dst = RVMValue::StringRef(2);
+        std::string testString = "Test\nstring\twith\\escapes\"and quotes\"";
+        auto originalInstr = std::make_shared<RVMInstrStringLiteral>(dst, testString);
+
+        // Serialize
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *originalInstr);
+        std::string serialized = oss.str();
+
+        // Deserialize
+        auto deserializedInstr = RVMSerializer::readInstruction(serialized);
+        REQUIRE(deserializedInstr != nullptr);
+        
+        auto* strInstr = dynamic_cast<RVMInstrStringLiteral*>(deserializedInstr.get());
+        REQUIRE(strInstr != nullptr);
+        
+        // Verify properties match
+        REQUIRE(strInstr->opcode() == Opcode::LOAD_STRING);
+        REQUIRE(strInstr->dst().has_value());
+        REQUIRE(strInstr->dst().value() == dst);
+        REQUIRE(strInstr->stringValue() == testString);
+    }
+}
