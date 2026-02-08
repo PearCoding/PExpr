@@ -2,6 +2,7 @@
 #include "SSAOptimizer.h"
 #include "ssa/SSAContext.h"
 
+#include <queue>
 #include <ranges>
 
 namespace PExpr::opt {
@@ -11,20 +12,41 @@ void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
 {
     mCallCounts.clear();
 
+    std::queue<std::string> mentionedFunctions;
+
     // Count all calls to functions
     auto countCallsInBody = [&](const InstructionList& body) {
-        std::ranges::for_each(body, [this](const auto& instrPtr) {
-            if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
+        std::ranges::for_each(body, [&](const auto& instrPtr) {
+            if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+                mentionedFunctions.push(call->FunctionName);
                 ++mCallCounts[call->FunctionName];
+            }
         });
     };
 
     // Count in main body
     countCallsInBody(program.Body);
 
-    // Count in function bodies
-    for (const auto& func : program.Functions)
-        countCallsInBody(func.Body);
+    // Go over all mentioned functions
+    // -> This works correctly with recursive functions
+    std::unordered_set<std::string> handledFunctions;
+    while (!mentionedFunctions.empty()) {
+        std::string funcName = mentionedFunctions.front();
+        mentionedFunctions.pop();
+
+        // Check if we already checked the function?
+        if (handledFunctions.contains(funcName))
+            continue;
+        handledFunctions.insert(funcName);
+
+        // Count in the given function body
+        for (const auto& func : program.Functions) {
+            if (func.Name == funcName) {
+                countCallsInBody(func.Body);
+                break;
+            }
+        }
+    }
 }
 
 bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func)
