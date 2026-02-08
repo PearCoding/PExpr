@@ -272,7 +272,7 @@ PExpr is designed to be embedded in other C++ projects:
 
 ```cpp
 #include "Environment.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "ssa/SSAMapper.h"
 
 using namespace PExpr;

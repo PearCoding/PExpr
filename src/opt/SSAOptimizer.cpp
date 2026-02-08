@@ -1,4 +1,4 @@
-#include "Optimizer.h"
+#include "SSAOptimizer.h"
 
 #include "SSATupleDissolvePass.h"
 #include "SSCPCommonSubexpressionEliminator.h"
@@ -17,7 +17,7 @@ namespace intrinsics {
 extern void setupIntrinsics(SSCPFunctionInliner& inliner);
 }
 
-Optimizer::Optimizer(const OptimizerOptions& opts)
+SSAOptimizer::SSAOptimizer(const OptimizerOptions& opts)
     : mOptions(opts)
     , mContext(std::make_unique<ssa::SSAContext>())
     , mConstantFolder(std::make_unique<SSCPConstantFolder>())
@@ -34,11 +34,11 @@ Optimizer::Optimizer(const OptimizerOptions& opts)
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
 
-Optimizer::~Optimizer() = default;
+SSAOptimizer::~SSAOptimizer() = default;
 
-void Optimizer::Run(const OptimizerOptions& opts, ssa::SSAProgram& program)
+void SSAOptimizer::Run(const OptimizerOptions& opts, ssa::SSAProgram& program)
 {
-    Optimizer sscp(opts);
+    SSAOptimizer sscp(opts);
 
     // 0) Analyze body to update SSA context with current variable counters
     sscp.mContext->reset();
@@ -47,9 +47,9 @@ void Optimizer::Run(const OptimizerOptions& opts, ssa::SSAProgram& program)
     sscp.runProgram(program);
 }
 
-void Optimizer::Run(const OptimizerOptions& opts, InstructionList& body)
+void SSAOptimizer::Run(const OptimizerOptions& opts, InstructionList& body)
 {
-    Optimizer sscp(opts);
+    SSAOptimizer sscp(opts);
 
     // 0) Analyze body to update SSA context with current variable counters
     sscp.mContext->reset();
@@ -61,7 +61,7 @@ void Optimizer::Run(const OptimizerOptions& opts, InstructionList& body)
         changed = sscp.processBody(body);
 }
 
-void Optimizer::runProgram(ssa::SSAProgram& program)
+void SSAOptimizer::runProgram(ssa::SSAProgram& program)
 {
     mSideEffectAnalyzer->propagateSideEffects(program);
     mTupleDissolvePass->clear();
@@ -96,7 +96,7 @@ void Optimizer::runProgram(ssa::SSAProgram& program)
         changed |= mTupleDissolvePass->dissolve(mContext.get(), program);
 }
 
-bool Optimizer::processBody(InstructionList& body)
+bool SSAOptimizer::processBody(InstructionList& body)
 {
     if (body.empty())
         return false;

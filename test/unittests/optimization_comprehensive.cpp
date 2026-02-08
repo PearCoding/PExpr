@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "Environment.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
 
@@ -17,7 +17,7 @@ using namespace PExpr::ssa;
     return opts;
 }
 
-TEST_CASE("Optimizer: control flow simplification with constant conditions", "[sscp][controlflow]")
+TEST_CASE("SSAOptimizer: control flow simplification with constant conditions", "[sscp][controlflow]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -37,7 +37,7 @@ TEST_CASE("Optimizer: control flow simplification with constant conditions", "[s
     REQUIRE(before.find("phi[") != std::string::npos);
 
     // Run full optimization
-    opt::Optimizer::Run(MakeFullOptimization(), prog);
+    opt::SSAOptimizer::Run(MakeFullOptimization(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -48,7 +48,7 @@ TEST_CASE("Optimizer: control flow simplification with constant conditions", "[s
     REQUIRE(after.find("42") != std::string::npos);
 }
 
-TEST_CASE("Optimizer: dead code elimination with unused branches", "[sscp][deadcode][controlflow]")
+TEST_CASE("SSAOptimizer: dead code elimination with unused branches", "[sscp][deadcode][controlflow]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -77,7 +77,7 @@ TEST_CASE("Optimizer: dead code elimination with unused branches", "[sscp][deadc
     // Run optimization with dead code elimination
     auto opts           = opt::OptimizerOptions::None();
     opts.RemoveDeadCode = true;
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -90,7 +90,7 @@ TEST_CASE("Optimizer: dead code elimination with unused branches", "[sscp][deadc
     REQUIRE(after.find("add(") != std::string::npos);
 }
 
-TEST_CASE("Optimizer: trigonometric identities simplification", "[sscp][identities]")
+TEST_CASE("SSAOptimizer: trigonometric identities simplification", "[sscp][identities]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -142,7 +142,7 @@ TEST_CASE("Optimizer: trigonometric identities simplification", "[sscp][identiti
 
     // Run full optimization with trigonometric identities
     auto opts = opt::OptimizerOptions::High();
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -180,7 +180,7 @@ TEST_CASE("Optimizer: trigonometric identities simplification", "[sscp][identiti
     REQUIRE(acos_count_after < acos_count_before);
 }
 
-TEST_CASE("Optimizer: math identities simplification", "[sscp][identities]")
+TEST_CASE("SSAOptimizer: math identities simplification", "[sscp][identities]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -239,7 +239,7 @@ TEST_CASE("Optimizer: math identities simplification", "[sscp][identities]")
 
     // Run full optimization with math identities
     auto opts = opt::OptimizerOptions::High();
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -284,7 +284,7 @@ TEST_CASE("Optimizer: math identities simplification", "[sscp][identities]")
     REQUIRE(neg_count_after < neg_count_before);
 }
 
-TEST_CASE("Optimizer: repeated addition identities", "[sscp][identities]")
+TEST_CASE("SSAOptimizer: repeated addition identities", "[sscp][identities]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -327,7 +327,7 @@ TEST_CASE("Optimizer: repeated addition identities", "[sscp][identities]")
 
     // Run full optimization with math identities
     auto opts = opt::OptimizerOptions::High();
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -359,7 +359,7 @@ TEST_CASE("Optimizer: repeated addition identities", "[sscp][identities]")
     REQUIRE(after.find(" 5:num") != std::string::npos);
 }
 
-TEST_CASE("Optimizer: vector constant folding", "[sscp][constantfolding]")
+TEST_CASE("SSAOptimizer: vector constant folding", "[sscp][constantfolding]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -382,7 +382,7 @@ TEST_CASE("Optimizer: vector constant folding", "[sscp][constantfolding]")
     opts.EnableConstantFolding       = true;
     opts.EnableConstantFoldingNumber = true;
     opts.RemoveDeadCode              = true;
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -393,7 +393,7 @@ TEST_CASE("Optimizer: vector constant folding", "[sscp][constantfolding]")
     REQUIRE(after.find("10") != std::string::npos);
 }
 
-TEST_CASE("Optimizer: function inlining with small functions", "[sscp][inlining]")
+TEST_CASE("SSAOptimizer: function inlining with small functions", "[sscp][inlining]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -419,7 +419,7 @@ TEST_CASE("Optimizer: function inlining with small functions", "[sscp][inlining]
     auto opts            = opt::OptimizerOptions::None();
     opts.InlineFunctions = true;
     opts.RemoveDeadCode  = true;
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -429,7 +429,7 @@ TEST_CASE("Optimizer: function inlining with small functions", "[sscp][inlining]
     REQUIRE(after.find("add(") != std::string::npos); // Should have additions
 }
 
-TEST_CASE("Optimizer: interaction between multiple optimizations", "[sscp][integration]")
+TEST_CASE("SSAOptimizer: interaction between multiple optimizations", "[sscp][integration]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -486,7 +486,7 @@ TEST_CASE("Optimizer: interaction between multiple optimizations", "[sscp][integ
     }
 
     // Run ALL optimizations
-    opt::Optimizer::Run(opt::OptimizerOptions::High(), prog);
+    opt::SSAOptimizer::Run(opt::OptimizerOptions::High(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -529,7 +529,7 @@ TEST_CASE("Optimizer: interaction between multiple optimizations", "[sscp][integ
     REQUIRE(cos_count_after < cos_count_before);
 }
 
-TEST_CASE("Optimizer: force function inlining", "[sscp][inlining][force]")
+TEST_CASE("SSAOptimizer: force function inlining", "[sscp][inlining][force]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -564,7 +564,7 @@ TEST_CASE("Optimizer: force function inlining", "[sscp][inlining][force]")
     auto opts            = opt::OptimizerOptions::None();
     opts.InlineFunctions = true;
     opts.RemoveDeadCode  = true;
-    opt::Optimizer::Run(opts, prog);
+    opt::SSAOptimizer::Run(opts, prog);
 
     auto afterRegular = SSASerializer::serialize(prog);
 
@@ -584,7 +584,7 @@ TEST_CASE("Optimizer: force function inlining", "[sscp][inlining][force]")
     auto optsForce                 = opt::OptimizerOptions::None();
     optsForce.ForceInlineFunctions = true;
     optsForce.RemoveDeadCode       = true;
-    opt::Optimizer::Run(optsForce, prog);
+    opt::SSAOptimizer::Run(optsForce, prog);
 
     auto afterForce = SSASerializer::serialize(prog);
 

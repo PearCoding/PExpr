@@ -5,7 +5,7 @@
 #include <CLI/CLI.hpp>
 
 #include "Environment.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "rvm/RVMMapper.h"
 #include "rvm/RVMOptimizer.h"
 #include "rvm/RVMSerializer.h"
@@ -223,7 +223,7 @@ int main(int argc, char** argv)
 
     if (!skipOptimizationPass) {
         // Optimize
-        opt::Optimizer::Run(optimizationOptions, program);
+        opt::SSAOptimizer::Run(optimizationOptions, program);
 
         if (!ssa::SSAValidator::checkIfTyped(&program)) {
             PEXPR_LOG_ERROR << "Computed SSA is invalid due to unspecified typing!" << std::endl;

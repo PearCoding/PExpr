@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "Environment.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "rvm/RVMMapper.h"
 #include "rvm/RVMSerializer.h"
 #include "ssa/SSASerializer.h"

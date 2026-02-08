@@ -1,6 +1,6 @@
 #include "Environment.h"
 #include "ast/Expression.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "parser/Parser.h"
 #include "ssa/SSAMapper.h"
 #include "type/Mangler.h"
@@ -88,7 +88,7 @@ ssa::SSAProgram Environment::map(const Ptr<ast::Closure>& closure)
 
 bool Environment::optimize(ssa::SSAProgram& program, const opt::OptimizerOptions& options)
 {
-    opt::Optimizer::Run(options, program);
+    opt::SSAOptimizer::Run(options, program);
     return true;
 }
 } // namespace PExpr

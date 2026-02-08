@@ -23,7 +23,7 @@ class SSCPTailCallOptimizer;
 class SSATupleDissolvePass;
 
 /// Optimizer containing multiple optimization passes for the SSA IR.
-class Optimizer {
+class SSAOptimizer {
 public:
     using InstructionList = std::vector<std::shared_ptr<ssa::SSAInstr>>;
 
@@ -35,8 +35,8 @@ public:
     static void Run(const OptimizerOptions& opts, InstructionList& body);
 
 private:
-    Optimizer(const OptimizerOptions& opts);
-    ~Optimizer();
+    SSAOptimizer(const OptimizerOptions& opts);
+    ~SSAOptimizer();
 
     /// Run the pass on a program. Modifies the program in-place.
     void runProgram(ssa::SSAProgram& program);

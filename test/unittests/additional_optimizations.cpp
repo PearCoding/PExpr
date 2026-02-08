@@ -3,7 +3,7 @@
 #include <string>
 
 #include "Environment.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
 
@@ -15,7 +15,7 @@ using namespace PExpr::ssa;
     return opt::OptimizerOptions::High();
 }
 
-TEST_CASE("Optimizer: constant propagation through branches", "[sscp][constantprop]")
+TEST_CASE("SSAOptimizer: constant propagation through branches", "[sscp][constantprop]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -37,7 +37,7 @@ TEST_CASE("Optimizer: constant propagation through branches", "[sscp][constantpr
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -45,7 +45,7 @@ TEST_CASE("Optimizer: constant propagation through branches", "[sscp][constantpr
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: loop invariant code motion", "[sscp][licm]")
+TEST_CASE("SSAOptimizer: loop invariant code motion", "[sscp][licm]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -67,7 +67,7 @@ TEST_CASE("Optimizer: loop invariant code motion", "[sscp][licm]")
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -75,7 +75,7 @@ TEST_CASE("Optimizer: loop invariant code motion", "[sscp][licm]")
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: strength reduction", "[sscp][strength]")
+TEST_CASE("SSAOptimizer: strength reduction", "[sscp][strength]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -97,7 +97,7 @@ TEST_CASE("Optimizer: strength reduction", "[sscp][strength]")
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -105,7 +105,7 @@ TEST_CASE("Optimizer: strength reduction", "[sscp][strength]")
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: algebraic simplifications", "[sscp][algebraic]")
+TEST_CASE("SSAOptimizer: algebraic simplifications", "[sscp][algebraic]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -126,7 +126,7 @@ TEST_CASE("Optimizer: algebraic simplifications", "[sscp][algebraic]")
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -134,7 +134,7 @@ TEST_CASE("Optimizer: algebraic simplifications", "[sscp][algebraic]")
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: conditional constant propagation", "[sscp][condconst]")
+TEST_CASE("SSAOptimizer: conditional constant propagation", "[sscp][condconst]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -152,7 +152,7 @@ TEST_CASE("Optimizer: conditional constant propagation", "[sscp][condconst]")
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -160,7 +160,7 @@ TEST_CASE("Optimizer: conditional constant propagation", "[sscp][condconst]")
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: function specialization", "[sscp][specialization]")
+TEST_CASE("SSAOptimizer: function specialization", "[sscp][specialization]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -176,7 +176,7 @@ TEST_CASE("Optimizer: function specialization", "[sscp][specialization]")
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -184,7 +184,7 @@ TEST_CASE("Optimizer: function specialization", "[sscp][specialization]")
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: tail recursion optimization", "[sscp][tailrec]")
+TEST_CASE("SSAOptimizer: tail recursion optimization", "[sscp][tailrec]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -198,7 +198,7 @@ TEST_CASE("Optimizer: tail recursion optimization", "[sscp][tailrec]")
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 
@@ -207,7 +207,7 @@ TEST_CASE("Optimizer: tail recursion optimization", "[sscp][tailrec]")
     REQUIRE(!dumped.empty());
 }
 
-TEST_CASE("Optimizer: common expression elimination across functions", "[sscp][interprocedural]")
+TEST_CASE("SSAOptimizer: common expression elimination across functions", "[sscp][interprocedural]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -229,7 +229,7 @@ TEST_CASE("Optimizer: common expression elimination across functions", "[sscp][i
     auto prog = env.map(ast);
 
     // Run optimization
-    opt::Optimizer::Run(MakeAllOptimizations(), prog);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
 
     auto dumped = SSASerializer::serialize(prog);
 

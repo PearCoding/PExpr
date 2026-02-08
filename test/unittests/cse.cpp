@@ -3,7 +3,7 @@
 #include <string>
 
 #include "Environment.h"
-#include "opt/Optimizer.h"
+#include "opt/SSAOptimizer.h"
 #include "ssa/SSAMapper.h"
 #include "ssa/SSASerializer.h"
 
@@ -19,7 +19,7 @@ using namespace PExpr::ssa;
     return options;
 }
 
-TEST_CASE("Optimizer: common subexpression elimination basic", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination basic", "[sscp][cse]")
 {
     std::stringstream stream("let a = 2.0; let b = 3.0; let x = a * b; let y = a * b; x + y");
     Environment env;
@@ -37,7 +37,7 @@ TEST_CASE("Optimizer: common subexpression elimination basic", "[sscp][cse]")
     }
 
     // Run SSCP pass
-    opt::Optimizer::Run(MakeCSEOnlyOption(), prog);
+    opt::SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -55,7 +55,7 @@ TEST_CASE("Optimizer: common subexpression elimination basic", "[sscp][cse]")
     REQUIRE(mul_count_after >= 1);
 }
 
-TEST_CASE("Optimizer: common subexpression elimination with constants", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination with constants", "[sscp][cse]")
 {
     std::stringstream stream("[[extern, pure]] fn sin(a:num)->num; [[extern, pure]] fn cos(a:num)->num; let a = 5.0; let x = sin(a) * cos(a); let y = sin(a) * cos(a); x + y");
     Environment env;
@@ -66,7 +66,7 @@ TEST_CASE("Optimizer: common subexpression elimination with constants", "[sscp][
     auto before = SSASerializer::serialize(prog);
 
     // Run SSCP pass
-    opt::Optimizer::Run(MakeCSEOnlyOption(), prog);
+    opt::SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after = SSASerializer::serialize(prog);
 
@@ -113,7 +113,7 @@ TEST_CASE("Optimizer: common subexpression elimination with constants", "[sscp][
     REQUIRE(mul_count_after < mul_count_before);
 }
 
-TEST_CASE("Optimizer: common subexpression elimination with different names", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination with different names", "[sscp][cse]")
 {
     // Same computation with different variable names should still be eliminated
     Environment env;
@@ -130,7 +130,7 @@ TEST_CASE("Optimizer: common subexpression elimination with different names", "[
     }
 
     // Run SSCP pass
-    opt::Optimizer::Run(MakeCSEOnlyOption(), prog);
+    opt::SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after             = SSASerializer::serialize(prog);
     size_t add_count_after = 0;
@@ -144,7 +144,7 @@ TEST_CASE("Optimizer: common subexpression elimination with different names", "[
     REQUIRE(add_count_after < add_count_before);
 }
 
-TEST_CASE("Optimizer: common subexpression elimination preserves side effects", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination preserves side effects", "[sscp][cse]")
 {
     // Functions with side effects should not be eliminated
     Environment env;
@@ -166,7 +166,7 @@ TEST_CASE("Optimizer: common subexpression elimination preserves side effects", 
     }
 
     // Run SSCP pass
-    opt::Optimizer::Run(MakeCSEOnlyOption(), prog);
+    opt::SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after                     = SSASerializer::serialize(prog);
     size_t side_effect_count_after = 0;
@@ -180,7 +180,7 @@ TEST_CASE("Optimizer: common subexpression elimination preserves side effects", 
     REQUIRE(side_effect_count_after == side_effect_count_before);
 }
 
-TEST_CASE("Optimizer: common subexpression elimination complex pattern", "[sscp][cse]")
+TEST_CASE("SSAOptimizer: common subexpression elimination complex pattern", "[sscp][cse]")
 {
     Environment env;
     auto ast = env.parse(R"(
@@ -209,7 +209,7 @@ TEST_CASE("Optimizer: common subexpression elimination complex pattern", "[sscp]
     }
 
     // Run SSCP pass
-    opt::Optimizer::Run(MakeCSEOnlyOption(), prog);
+    opt::SSAOptimizer::Run(MakeCSEOnlyOption(), prog);
 
     auto after             = SSASerializer::serialize(prog);
     size_t add_count_after = 0, mul_count_after = 0;
