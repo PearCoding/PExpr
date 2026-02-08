@@ -60,8 +60,12 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure)
         if (expr->type() == ExpressionType::FunctionDeclaration) {
             // Pre-register a provisional function definition
             const auto funcStmt = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr);
-            if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
-                mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+            if (funcStmt->isExtern() && funcStmt->isUnspecified()) {
+                mReporter.errorf(funcStmt->location(), "External function '%s' has no return type defined", funcStmt->name().c_str());
+            } else {
+                if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
+                    mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+            }
         }
     }
 
@@ -139,8 +143,11 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
     // Setup conditionals
     bool hadError = false;
     for (auto& branch : expr->branches()) {
-        handleNode(closure, branch.Condition);
-        branch.Condition = injectCastIfNeeded(branch.Condition, Type(TypeKind::Boolean), &hadError);
+        const auto condRetType = handleNode(closure, branch.Condition);
+        if (condRetType.isSpecified())
+            branch.Condition = injectCastIfNeeded(branch.Condition, Type(TypeKind::Boolean), &hadError);
+        else
+            mReporter.errorf(branch.Condition->location(), "Could not determine type for conditional");
     }
 
     // Determine the type of the expression
@@ -171,8 +178,17 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
         }
     }
 
+    if (!returnType.isSpecified()) {
+        mReporter.errorf(expr->location(), "Could not determine the type of the if expression");
+        return Type::Error();
+    }
+
     // Inject casts if necessary
-    if (expr->elseClosure()) {
+    if (expr->elseClosure() && expr->elseClosure()->hasFinalExpression()) {
+        // The else case might still be unspecified
+        if (!expr->elseClosure()->finalExpression()->returnType().isSpecified())
+            expr->elseClosure()->finalExpression()->setReturnType(returnType);
+
         expr->elseClosure()->finalExpressionMut() = injectCastIfNeeded(expr->elseClosure()->finalExpression(), returnType, &hadError);
         for (auto& branch : expr->branches())
             branch.Body->finalExpressionMut() = injectCastIfNeeded(branch.Body->finalExpression(), returnType, &hadError);

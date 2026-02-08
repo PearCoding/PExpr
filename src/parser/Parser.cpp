@@ -126,13 +126,13 @@ private:
 
     inline Ptr<Closure> p_closure()
     {
-        if (P.cur().Type == TokenType::Eof)
-            return nullptr;
-
         Ptr<Closure> closure = std::make_shared<Closure>(P.cur().Location, mCurrentClosure);
         mCurrentClosure      = closure.get();
         if (mCurrentClosure->isTranslationUnit())
             mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
+
+        if (P.cur().Type == TokenType::Eof)
+            return closure;
 
         while (true) {
             // Check for attributes before statements/expressions
@@ -670,15 +670,18 @@ private:
             if (P.accept(TokenType::OpenSquareBracket)) {
                 size_t index     = 0;
                 const auto token = P.cur();
-                P.accept(TokenType::IntegerLiteral);
-                const Integer i = std::get<Integer>(token.Value);
-                if (i < 0)
-                    P.mReporter.errorf(token.Location, "Negative index given for vector lookup");
-                else
-                    index = (size_t)i;
-                P.expect(TokenType::ClosedSquareBracket);
+                if (P.accept(TokenType::IntegerLiteral)) {
+                    const Integer i = std::get<Integer>(token.Value);
+                    if (i < 0)
+                        P.mReporter.errorf(token.Location, "Negative index given for vector lookup");
+                    else
+                        index = (size_t)i;
+                    P.expect(TokenType::ClosedSquareBracket);
 
-                expr = std::make_shared<AccessExpression>(token.Location, expr, index);
+                    expr = std::make_shared<AccessExpression>(token.Location, expr, index);
+                } else {
+                    expr = std::make_shared<ErrorExpression>(token.Location);
+                }
                 continue;
             }
 
