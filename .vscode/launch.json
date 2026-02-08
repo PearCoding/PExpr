@@ -4,137 +4,182 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    {
-        "name": "Unit Tests",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexpr_tests.exe",
-        "args": [],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc --emit-ast",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["--emit-ast", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc No Opt",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["--skip-optimization", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O0",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O0", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O0 TupleDissolve",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O0", "--opt-dissolve-tuples", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O3 TupleDissolve",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O3", "--opt-dissolve-tuples", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O1",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O1", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O2",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O2", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O3",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O3", "--std-output", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O0 RVM",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O0", "--std-output", "--emit-rvm", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "pexprc -O3 RVM",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
-        "args": ["-O3", "--std-output", "--emit-rvm", "${file}"],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    },
-    {
-        "name": "Fuzzy",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${command:cmake.buildDirectory}/bin/pexpr_fuzzy_tests.exe",
-        "args": [],
-        "stopAtEntry": false,
-        "cwd": "${command:cmake.buildDirectory}",
-        "environment": [],
-        "console": "integratedTerminal"
-    }
+        {
+            "name": "Unit Tests",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexpr_tests.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc --emit-ast",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "--emit-ast",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc No Opt",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "--skip-optimization",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O0",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O0",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O0 TupleDissolve",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O0",
+                "--opt-dissolve-tuples",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O3 TupleDissolve",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O3",
+                "--opt-dissolve-tuples",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O1",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O1",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O2",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O2",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O3",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O3",
+                "--std-output",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O0 RVM",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O0",
+                "--std-output",
+                "--emit-rvm",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O3 RVM",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O3",
+                "--std-output",
+                "--emit-rvm",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Fuzzy",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexpr_fuzzy_tests.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "autoAttachChildProcess": true,
+        }
     ]
 }

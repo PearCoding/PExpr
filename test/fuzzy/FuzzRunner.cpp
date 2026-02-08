@@ -1,4 +1,5 @@
 #include "FuzzRunner.h"
+#include "ExternalProcess.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -386,17 +387,18 @@ FuzzRunner::TestResult FuzzRunner::testCompilerWithOptions(const std::string& in
             }
 
             // Build command line
-            std::stringstream command;
-            command << pexprcPath << " " << tempFilename;
+            std::vector<std::string> arguments = {
+                tempFilename,
+                "-o",
+                "fuzz_test_output.tmp"
+            };
 
             for (const auto& opt : result.options)
-                command << " " << opt;
-
-            // Add output file
-            command << " -o fuzz_test_output.tmp";
+                arguments.push_back(opt);
 
             // Execute command
-            int exitCode = std::system(command.str().c_str());
+            ExternalProcess process(pexprcPath, arguments);
+            int exitCode = process.run();
 
             // Check exit code
             if (exitCode != 0) // Non-zero exit code is acceptable for invalid inputs
