@@ -26,10 +26,6 @@
 namespace PExpr {
 
 #ifdef PEXPR_OS_LINUX
-constexpr int InvalidPipe = -1;
-constexpr int PipeRead    = 0;
-constexpr int PipeWrite   = 1;
-
 class ExternalProcessInternal {
 public:
     const std::filesystem::path exePath;
@@ -93,29 +89,6 @@ public:
     inline int exitCode() const
     {
         return exit_code;
-    }
-
-    inline bool isRunning() const
-    {
-        if (pid == -1)
-            return false;
-
-        int status;
-        int result = waitpid(pid, &status, WNOHANG);
-
-        if (result < 0) {
-            if (errno != ECHILD)
-                PEXPR_LOG_ERROR << "waitpid for " << exePath << " (" << pid << ") failed: " << std::strerror(errno) << std::endl;
-            return false;
-        } else {
-            if (result == 0) {
-                return true;
-            } else {
-                if (WIFEXITED(status))
-                    exit_code = WEXITSTATUS(status);
-                return false;
-            }
-        }
     }
 
     inline void waitForFinish()
@@ -229,11 +202,6 @@ public:
             return -1;
         }
         return exit_code;
-    }
-
-    inline bool isRunning() const
-    {
-        return exitCode() == STILL_ACTIVE;
     }
 
     inline void waitForFinish()
