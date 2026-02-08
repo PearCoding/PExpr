@@ -7,6 +7,7 @@
 #include "Environment.h"
 #include "opt/Optimizer.h"
 #include "rvm/RVMMapper.h"
+#include "rvm/RVMMoveSimplifier.h"
 #include "rvm/RVMSerializer.h"
 #include "rvm/RVMValidator.h"
 #include "ssa/SSAMapper.h"
@@ -117,6 +118,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
     app.add_flag("--opt-dissolve-tuples,!--no-opt-dissolve-tuples", optimizationOptions.DissolveTuples, "Dissolve tuples");
+    app.add_flag("--opt-rvm-moves,!--no-opt-rvm-moves", optimizationOptions.OptimizeMoveChains, "Optimize RVM move instructions (identity mov elimination)");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
@@ -238,6 +240,10 @@ int main(int argc, char** argv)
 
     if (!rvm::RVMValidator::checkIfElementary(rvmProgram))
         PEXPR_LOG_WARNING << "Constructed RVM program is invalid due to non-elementary types in registers" << std::endl;
+
+    // Apply RVM move optimization if enabled
+    if (optimizationOptions.OptimizeMoveChains)
+        rvm::RVMMoveSimplifier::simplify(rvmProgram);
 
     dumpOutput(rvm::RVMSerializer::serialize(rvmProgram));
 

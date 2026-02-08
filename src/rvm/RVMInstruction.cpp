@@ -4,24 +4,20 @@ namespace PExpr::rvm {
 
 void RVMInstr::forEachValue(const std::function<void(RVMValue&)>& visitor)
 {
-    if (auto d = dst()) {
+    if (auto d = dst())
         visitor(*d);
-    }
     auto srcValues = srcs();
-    for (auto& src : srcValues) {
+    for (auto& src : srcValues)
         visitor(src);
-    }
 }
 
 void RVMInstr::forEachValue(const std::function<void(const RVMValue&)>& visitor) const
 {
-    if (auto d = dst()) {
+    if (auto d = dst())
         visitor(*d);
-    }
     auto srcValues = srcs();
-    for (const auto& src : srcValues) {
+    for (const auto& src : srcValues)
         visitor(src);
-    }
 }
 
 RVMInstr2Op::RVMInstr2Op(Opcode op, RVMValue dst, RVMValue src)
