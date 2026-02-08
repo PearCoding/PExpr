@@ -31,16 +31,38 @@ std::vector<type::Type> RVMMapper::dissolveTupleType(const type::Type& type)
     return result;
 }
 
+static void dissolveConstantTuple(const Tuple& tuple, std::vector<RVMValue>& constants)
+{
+    for (const auto& elem : tuple->elements) {
+        if (const bool* valB = std::get_if<bool>(&elem)) {
+            constants.push_back(RVMValue::Constant(*valB));
+        } else if (const Integer* valI = std::get_if<Integer>(&elem)) {
+            constants.push_back(RVMValue::Constant(*valI));
+        } else if (const Number* valN = std::get_if<Number>(&elem)) {
+            constants.push_back(RVMValue::Constant(*valN));
+        } else if (const Tuple* nestedTuple = std::get_if<Tuple>(&elem)) {
+            dissolveConstantTuple(*nestedTuple, constants);
+        } else {
+            PEXPR_ASSERT(false, "Invalid constant in tuple");
+        }
+    }
+}
+
 // Dissolve tuple value into elementary registers
 std::vector<RVMValue> RVMMapper::mapTupleValues(const ssa::SSAValue& value)
 {
     if (value.type().isTuple()) {
-        PEXPR_ASSERT(!value.isConstant(), "Can't deal with constant tuple values!");
-        if (auto it = mTupleMap.find(value); it != mTupleMap.end())
+        if (auto it = mTupleMap.find(value); it != mTupleMap.end()) {
             return it->second;
-        else
+        } else if (value.isConstant()) {
+            std::vector<RVMValue> constants;
+            const auto& tuple = value.valueAs<Tuple>();
+            dissolveConstantTuple(tuple, constants);
+            return constants;
+        } else {
             PEXPR_ASSERT(false, "Invalid SSA with incomplete tuple graph!");
-        return {};
+            return {};
+        }
     } else {
         // Elementary type
         return { mapValue(value) };
@@ -402,6 +424,16 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
             // Dissolved tuple, flat it out
             for (size_t i = 0; i < it->second.size(); ++i) {
                 RVMValue src = it->second[i];
+                RVMValue dst = RVMValue::Register(i, src.type()); // %r0, %r1, %r2, ...
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+            }
+        } else if (instr.Value.isConstant() && instr.Value.type().isTuple()) {
+            // Tuple return value: move to %r0
+            // but it is constant -> map to multiple as above
+            const auto tupleValues = mapTupleValues(instr.Value);
+
+            for (size_t i = 0; i < tupleValues.size(); ++i) {
+                RVMValue src = tupleValues[i];
                 RVMValue dst = RVMValue::Register(i, src.type()); // %r0, %r1, %r2, ...
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
             }
