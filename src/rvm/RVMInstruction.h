@@ -27,6 +27,10 @@ public:
     /// Visit all RVMValues in this instruction
     void forEachValue(const std::function<void(RVMValue&)>& visitor);
     void forEachValue(const std::function<void(const RVMValue&)>& visitor) const;
+
+    /// Visit all source RVMValues in this instruction
+    void forEachSource(const std::function<void(RVMValue&)>& visitor);
+    void forEachSource(const std::function<void(const RVMValue&)>& visitor) const;
 };
 
 /// 2-operand instruction: dst = op src (unary ops, conversions)

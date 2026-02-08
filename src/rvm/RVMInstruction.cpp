@@ -6,17 +6,25 @@ void RVMInstr::forEachValue(const std::function<void(RVMValue&)>& visitor)
 {
     if (auto d = dst())
         visitor(*d);
-    auto srcValues = srcs();
-    for (auto& src : srcValues)
-        visitor(src);
+    forEachSource(visitor);
 }
 
 void RVMInstr::forEachValue(const std::function<void(const RVMValue&)>& visitor) const
 {
     if (auto d = dst())
         visitor(*d);
-    auto srcValues = srcs();
-    for (const auto& src : srcValues)
+    forEachSource(visitor);
+}
+
+void RVMInstr::forEachSource(const std::function<void(RVMValue&)>& visitor)
+{
+    for (auto& src : srcs())
+        visitor(src);
+}
+
+void RVMInstr::forEachSource(const std::function<void(const RVMValue&)>& visitor) const
+{
+    for (const auto& src : srcs())
         visitor(src);
 }
 

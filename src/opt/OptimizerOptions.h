@@ -16,9 +16,10 @@ struct OptimizerOptions {
     bool OptimizeTailCalls             = false; // < Tail call optimization
     bool DissolveTuples                = false; // < Dissolve tuples to elementary types (except call and returns). Not recommended, but necessary for RVM
 
-    bool OptimizeMoveChains = false; // < Optimize move chains in RVM
+    bool OptimizeMoveChains     = false; // < Optimize move chains in RVM
+    bool OptimizeRedundantMoves = false; // < Eliminate redundant MOV instructions in RVM
 
-    /// No option is enabled. Using --no-optimization
+    /// No option is enabled. This is -O0.
     [[nodiscard]] inline static OptimizerOptions None()
     {
         return OptimizerOptions{};
@@ -32,6 +33,7 @@ struct OptimizerOptions {
         opts.EnableConstantFolding         = true;
         opts.EliminateCommonSubexpressions = true;
         opts.OptimizeMoveChains            = true;
+        opts.OptimizeRedundantMoves        = true;
         return opts;
     }
 
