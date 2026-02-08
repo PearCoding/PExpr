@@ -646,10 +646,12 @@ private:
                 const auto loc = P.cur().Location;
                 auto swizzle   = p_swizzle();
 
-                if (!checkSwizzle(swizzle))
+                if (!checkSwizzle(swizzle)) {
                     P.mReporter.errorf(loc, "Given access '%s' is invalid", std::string(swizzle).c_str());
-
-                expr = std::make_shared<SwizzleExpression>(loc, expr, swizzle);
+                    expr = std::make_shared<ErrorExpression>(loc);
+                } else {
+                    expr = std::make_shared<SwizzleExpression>(loc, expr, swizzle);
+                }
                 continue;
             }
 
