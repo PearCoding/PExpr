@@ -7,21 +7,11 @@
 #include <iostream>
 #include <sstream>
 
-#ifdef PEXPR_OS_WINDOWS
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
 namespace PExpr::fuzzy {
 
 FuzzRunner::FuzzRunner()
     : mGenerator(mSeed)
 {
-#ifdef PEXPR_OS_WINDOWS
-    // Enable Unicode output on Windows
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-#endif
 }
 
 FuzzRunner::TestResult FuzzRunner::runParserFuzzing()
