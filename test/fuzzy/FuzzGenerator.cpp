@@ -39,24 +39,27 @@ std::string FuzzGenerator::generateRandomProgram(size_t maxDepth)
     int numStatements = randomInt(1, 10);
 
     // Add some type aliases
-    if (randomBool(0.3)) {
+    if (randomBool(0.3))
         ss << "using " << randomIdentifier() << " = " << randomType() << ";\n";
-    }
 
     // Add some external functions
     if (randomBool(0.2)) {
-        ss << "[[extern]] fn " << randomIdentifier() << "(x:" << randomType() << ") -> " << randomType() << ";\n";
+        if (randomBool(0.6))
+            ss << "[[extern]]";
+        else
+            ss << "[[extern, pure]]";
+
+        ss << " fn " << randomIdentifier() << "(x:" << randomType() << ") -> " << randomType() << ";\n";
     }
 
     // Generate statements
     for (int i = 0; i < numStatements; ++i) {
-        if (randomBool(0.7)) {
+        if (randomBool(0.7))
             ss << generateLetDeclaration(maxDepth - 1) << ";\n";
-        } else if (randomBool(0.5)) {
+        else if (randomBool(0.5))
             ss << generateFnDeclaration(maxDepth - 1) << ";\n";
-        } else {
+        else
             ss << generateRandomExpression(maxDepth - 1) << ";\n";
-        }
     }
 
     // Final expression
@@ -69,7 +72,7 @@ std::string FuzzGenerator::generateRandomExpression(size_t maxDepth)
 {
     if (maxDepth == 0) {
         // Base case: literals or identifiers
-        switch (randomInt(0, 5)) {
+        switch (randomInt(0, 3)) {
         case 0:
             return randomNumber();
         case 1:
@@ -78,10 +81,6 @@ std::string FuzzGenerator::generateRandomExpression(size_t maxDepth)
             return randomStringLiteral();
         case 3:
             return randomIdentifier();
-        case 4:
-            return generateVectorExpression(0);
-        case 5:
-            return generateTupleExpression(0);
         default:
             return "0";
         }
