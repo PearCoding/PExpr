@@ -961,9 +961,8 @@ TEST_CASE("RVMRedundantMoveEliminator: redundant mov elimination", "[rvm][move][
         int movCount = 0;
         for (const auto& instr : program) {
             if (auto* mov = dynamic_cast<RVMInstr2Op*>(instr.get())) {
-                if (mov->opcode() == Opcode::MOV) {
+                if (mov->opcode() == Opcode::MOV)
                     movCount++;
-                }
             }
         }
         REQUIRE(movCount == 1); // Only one MOV should remain
@@ -1019,9 +1018,8 @@ TEST_CASE("RVMRedundantMoveEliminator: redundant mov elimination", "[rvm][move][
         int movCount = 0;
         for (const auto& instr : program) {
             if (auto* mov = dynamic_cast<RVMInstr2Op*>(instr.get())) {
-                if (mov->opcode() == Opcode::MOV) {
+                if (mov->opcode() == Opcode::MOV)
                     movCount++;
-                }
             }
         }
         REQUIRE(movCount == 2); // Both remaining instructions are MOVs

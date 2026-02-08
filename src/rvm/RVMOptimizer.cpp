@@ -1,6 +1,7 @@
 #include "RVMOptimizer.h"
 #include "RVMMoveSimplifier.h"
 #include "RVMRedundantMoveEliminator.h"
+#include "RVMRegisterAllocator.h"
 
 namespace PExpr::rvm {
 
@@ -25,6 +26,10 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
         if (!changed)
             break;
     }
+
+    // Apply register allocation after optimizations
+    if (options.EnableRegisterAllocation)
+        changedAtAll |= RVMRegisterAllocator::allocate(program);
 
     return changedAtAll;
 }

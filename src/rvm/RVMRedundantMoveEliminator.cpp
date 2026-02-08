@@ -91,16 +91,15 @@ void RVMRedundantMoveEliminator::analyzeBlock(
                 readSinceLastDef[srcVal.regId()] = true;
         });
 
-        // Get destination register (if any)
-        auto dstReg = instr->dst();
-
         // Process destination write
-        if (dstReg && dstReg->isRegister()) {
-            RegId reg = dstReg->regId();
+        instr->forDestination([&](const RVMValue& dstVal) {
+            if (!dstVal.isRegister())
+                return;
+
+            RegId reg = dstVal.regId();
 
             // Check if this register was previously defined
-            auto it = lastDefIndex.find(reg);
-            if (it != lastDefIndex.end()) {
+            if (auto it = lastDefIndex.find(reg); it != lastDefIndex.end()) {
                 size_t prevDefIndex = it->second;
 
                 // Check if the previous definition was a MOV instruction
@@ -114,7 +113,7 @@ void RVMRedundantMoveEliminator::analyzeBlock(
             // Update last definition index and reset read flag
             lastDefIndex[reg]     = i;
             readSinceLastDef[reg] = false;
-        }
+        });
     }
 }
 

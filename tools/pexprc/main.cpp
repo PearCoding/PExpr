@@ -120,6 +120,7 @@ int main(int argc, char** argv)
     app.add_flag("--opt-dissolve-tuples,!--no-opt-dissolve-tuples", optimizationOptions.DissolveTuples, "Dissolve tuples");
     app.add_flag("--opt-rvm-moves,!--no-opt-rvm-moves", optimizationOptions.OptimizeMoveChains, "Optimize RVM move instructions (identity mov elimination)");
     app.add_flag("--opt-rvm-redundant-moves,!--no-opt-rvm-redundant-moves", optimizationOptions.OptimizeRedundantMoves, "Eliminate redundant MOV instructions in RVM");
+    app.add_flag("--opt-register-allocation,!--no-opt-register-allocation", optimizationOptions.EnableRegisterAllocation, "Enable register allocation to minimize register count");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");

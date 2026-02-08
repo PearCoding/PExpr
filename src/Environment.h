@@ -35,7 +35,7 @@ public:
 
     [[nodiscard]] ssa::SSAProgram map(const Ptr<ast::Closure>& closure);
 
-    [[nodiscard]] bool optimize(ssa::SSAProgram& program, const opt::OptimizerOptions& options);
+    bool optimize(ssa::SSAProgram& program, const opt::OptimizerOptions& options);
 
     [[nodiscard]] inline const utils::Reporter& reporter() const { return mReporter; }
     [[nodiscard]] inline utils::Reporter& reporter() { return mReporter; }

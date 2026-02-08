@@ -2,32 +2,6 @@
 
 namespace PExpr::rvm {
 
-void RVMInstr::forEachValue(const std::function<void(RVMValue&)>& visitor)
-{
-    if (auto d = dst())
-        visitor(*d);
-    forEachSource(visitor);
-}
-
-void RVMInstr::forEachValue(const std::function<void(const RVMValue&)>& visitor) const
-{
-    if (auto d = dst())
-        visitor(*d);
-    forEachSource(visitor);
-}
-
-void RVMInstr::forEachSource(const std::function<void(RVMValue&)>& visitor)
-{
-    for (auto& src : srcs())
-        visitor(src);
-}
-
-void RVMInstr::forEachSource(const std::function<void(const RVMValue&)>& visitor) const
-{
-    for (const auto& src : srcs())
-        visitor(src);
-}
-
 RVMInstr2Op::RVMInstr2Op(Opcode op, RVMValue dst, RVMValue src)
     : mOpcode(op)
     , mDst(dst)

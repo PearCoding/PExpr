@@ -25,12 +25,25 @@ public:
     [[nodiscard]] virtual std::vector<RVMValue> srcs() const = 0;
 
     /// Visit all RVMValues in this instruction
-    void forEachValue(const std::function<void(RVMValue&)>& visitor);
-    void forEachValue(const std::function<void(const RVMValue&)>& visitor) const;
+    inline void forEachValue(const std::function<void(RVMValue&)>& visitor)
+    {
+        forDestination(visitor);
+        forEachSource(visitor);
+    }
+
+    inline void forEachValue(const std::function<void(const RVMValue&)>& visitor) const
+    {
+        forDestination(visitor);
+        forEachSource(visitor);
+    }
+
+    /// Visit destination RVMValue in this instruction
+    virtual void forDestination(const std::function<void(RVMValue&)>& visitor) { PEXPR_UNUSED(visitor); }
+    virtual void forDestination(const std::function<void(const RVMValue&)>& visitor) const { PEXPR_UNUSED(visitor); }
 
     /// Visit all source RVMValues in this instruction
-    void forEachSource(const std::function<void(RVMValue&)>& visitor);
-    void forEachSource(const std::function<void(const RVMValue&)>& visitor) const;
+    virtual void forEachSource(const std::function<void(RVMValue&)>& visitor) { PEXPR_UNUSED(visitor); }
+    virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const { PEXPR_UNUSED(visitor); }
 };
 
 /// 2-operand instruction: dst = op src (unary ops, conversions)
@@ -41,6 +54,11 @@ public:
     [[nodiscard]] Opcode opcode() const override { return mOpcode; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return { mSrc }; }
+
+    virtual void forDestination(const std::function<void(RVMValue&)>& visitor) override { visitor(mDst); }
+    virtual void forDestination(const std::function<void(const RVMValue&)>& visitor) const override { visitor(mDst); }
+    virtual void forEachSource(const std::function<void(RVMValue&)>& visitor) override { visitor(mSrc); }
+    virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const override { visitor(mSrc); }
 
 private:
     Opcode mOpcode;
@@ -56,6 +74,20 @@ public:
     [[nodiscard]] Opcode opcode() const override { return mOpcode; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return { mSrc1, mSrc2 }; }
+
+    virtual void forDestination(const std::function<void(RVMValue&)>& visitor) override { visitor(mDst); }
+    virtual void forDestination(const std::function<void(const RVMValue&)>& visitor) const override { visitor(mDst); }
+
+    virtual void forEachSource(const std::function<void(RVMValue&)>& visitor) override
+    {
+        visitor(mSrc1);
+        visitor(mSrc2);
+    }
+    virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const override
+    {
+        visitor(mSrc1);
+        visitor(mSrc2);
+    }
 
 private:
     Opcode mOpcode;
@@ -74,10 +106,13 @@ public:
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return { mSrc }; }
     [[nodiscard]] const std::string& targetLabel() const { return mTargetLabel; }
 
+    virtual void forEachSource(const std::function<void(RVMValue&)>& visitor) override { visitor(mSrc); }
+    virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const override { visitor(mSrc); }
+
 private:
     Opcode mCond; // BR, BRZ, BRNZ
     RVMValue mSrc;
-    std::string mTargetLabel; // Label name (will be resolved to offset in later pass)
+    std::string mTargetLabel; // Label name
 };
 
 /// Jump instruction
@@ -91,7 +126,7 @@ public:
     [[nodiscard]] const std::string& targetLabel() const { return mTargetLabel; }
 
 private:
-    std::string mTargetLabel; // Label name (will be resolved to offset in later pass)
+    std::string mTargetLabel; // Label name
 };
 
 /// Comment instruction (just a friendly comment for the reader)
@@ -132,6 +167,28 @@ public:
     [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return mArgs; }
     [[nodiscard]] const std::string& functionName() const { return mFuncName; }
+
+    virtual void forDestination(const std::function<void(RVMValue&)>& visitor) override
+    {
+        if (mDst.has_value())
+            visitor(mDst.value());
+    }
+    virtual void forDestination(const std::function<void(const RVMValue&)>& visitor) const override
+    {
+        if (mDst.has_value())
+            visitor(mDst.value());
+    }
+
+    virtual void forEachSource(const std::function<void(RVMValue&)>& visitor) override
+    {
+        for (auto& val : mArgs)
+            visitor(val);
+    }
+    virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const override
+    {
+        for (auto& val : mArgs)
+            visitor(val);
+    }
 
 private:
     std::optional<RVMValue> mDst;
@@ -199,6 +256,9 @@ public:
     [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
     [[nodiscard]] const std::string& stringValue() const { return mString; }
+
+    virtual void forDestination(const std::function<void(RVMValue&)>& visitor) override { visitor(mDst); }
+    virtual void forDestination(const std::function<void(const RVMValue&)>& visitor) const override { visitor(mDst); }
 
 private:
     RVMValue mDst;
