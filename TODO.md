@@ -41,3 +41,4 @@
 - [x] Split the call of functions in RVM into two cases: "call_external" as the way we handled calls for now and "call_internal" which uses a standard order of registers (saved via push_frame) to call.
 - [x] There is no need to have 'tuple' and 'assign' for SSA. Merge 'tuple' functionality to 'assign'.
 - [ ] RedundantMoveEliminator would profit from knowing expected return values of functions or the global closure to remove more redundant 'mov' instructions.
+- [ ] Fix some corner cases in the register allocator.
