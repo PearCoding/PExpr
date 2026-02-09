@@ -49,7 +49,7 @@ struct OptimizerOptions {
         return opts;
     }
 
-    /// Some large optimizations. Ignores IEEE-754 compiliance.
+    /// Some large optimizations. Ignores IEEE-754 compliance.
     /// This is -O3 (and resembles --fast-math in some other compilers)
     [[nodiscard]] inline static OptimizerOptions High()
     {
