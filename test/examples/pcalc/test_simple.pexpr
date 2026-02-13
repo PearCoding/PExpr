@@ -1,0 +1,4 @@
+// Simple test for pcalc
+let a = 5 + 3 * 2;
+let b = a / 2.0;
+b - 1

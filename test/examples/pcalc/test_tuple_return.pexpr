@@ -1,0 +1,11 @@
+// Test function returning tuple
+fn make_tuple(a: int, b: num) -> [int, num] = {
+    [a, b]
+};
+
+fn main() = {
+    let t = make_tuple(5, 3.14);
+    t
+};
+
+main()

@@ -1,0 +1,5 @@
+// Test mixed-type tuple
+let t = [42, 3.14, true];
+let x = t[0] + t[1];
+let b = t[2];
+if b { x } else { 0 }

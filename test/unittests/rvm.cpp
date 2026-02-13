@@ -538,7 +538,7 @@ TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][ca
 {
     SECTION("Internal call instruction")
     {
-        auto instr = std::make_shared<RVMInstrInternalCall>("my_function");
+        auto instr = std::make_shared<RVMInstrInternalCall>(0, 0, "my_function");
 
         REQUIRE(instr->opcode() == Opcode::CALL_INTERNAL);
         REQUIRE(instr->functionName() == "my_function");
@@ -548,7 +548,7 @@ TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][ca
 
     SECTION("Internal call serialization")
     {
-        auto instr = std::make_shared<RVMInstrInternalCall>("test_func");
+        auto instr = std::make_shared<RVMInstrInternalCall>(0, 0, "test_func");
 
         std::ostringstream oss;
         RVMSerializer::write(oss, *instr);
