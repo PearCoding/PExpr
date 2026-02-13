@@ -198,14 +198,19 @@ private:
 
 class RVMInstrInternalCall : public RVMInstr {
 public:
-    RVMInstrInternalCall(const std::string& funcName);
+    RVMInstrInternalCall(size_t numParams, size_t numReturns, const std::string& funcName);
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::CALL_INTERNAL; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
     [[nodiscard]] const std::string& functionName() const { return mFuncName; }
 
+    [[nodiscard]] inline size_t parameterCount() const { return mParameterCount; }
+    [[nodiscard]] inline size_t returnCount() const { return mReturnCount; }
+
 private:
+    size_t mParameterCount;
+    size_t mReturnCount;
     std::string mFuncName;
 };
 

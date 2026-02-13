@@ -265,7 +265,7 @@ void RVMSerializer::writeCall(std::ostream& os, const RVMInstrExternalCall& inst
 
 void RVMSerializer::writeCall(std::ostream& os, const RVMInstrInternalCall& instr)
 {
-    os << "call_internal " << instr.functionName();
+    os << "call_internal " << instr.parameterCount() << " " << instr.returnCount() << " " << instr.functionName();
 }
 
 void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
@@ -680,8 +680,16 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
 
         // Check for call_internal
         if (rest.rfind("call_internal ", 0) == 0) {
-            std::string funcName = trim(rest.substr(15));
-            return std::make_shared<RVMInstrInternalCall>(funcName);
+            const auto afterInstr = trim(rest.substr(15));
+            size_t offset         = 0;
+            size_t paramCount     = std::stoull(afterInstr, &offset);
+
+            const auto afterParamCount = trim(rest.substr(offset + 1));
+            offset                     = 0;
+            size_t returnCount         = std::stoull(afterParamCount, &offset);
+
+            std::string funcName = trim(afterParamCount.substr(offset + 1));
+            return std::make_shared<RVMInstrInternalCall>(paramCount, returnCount, funcName);
         }
 
         // Check for load_string

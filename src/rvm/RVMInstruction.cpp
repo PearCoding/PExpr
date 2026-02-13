@@ -47,8 +47,10 @@ RVMInstrExternalCall::RVMInstrExternalCall(std::optional<RVMValue> dst, const st
 {
 }
 
-RVMInstrInternalCall::RVMInstrInternalCall(const std::string& funcName)
-    : mFuncName(funcName)
+RVMInstrInternalCall::RVMInstrInternalCall(size_t numParams, size_t numReturns, const std::string& funcName)
+    : mParameterCount(numParams)
+    , mReturnCount(numReturns)
+    , mFuncName(funcName)
 {
 }
 

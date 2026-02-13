@@ -372,7 +372,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         }
 
         // 5. Call internal function
-        result.push_back(std::make_shared<RVMInstrInternalCall>(instr.FunctionName));
+        result.push_back(std::make_shared<RVMInstrInternalCall>(numArgRegs, numReturnRegs, instr.FunctionName));
 
         // 6. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
         if (!instr.Target.type().isVoid()) {

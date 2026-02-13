@@ -86,6 +86,20 @@ std::vector<RVMRegisterAllocator::LiveInterval> RVMRegisterAllocator::analyzeLiv
     std::unordered_map<RegId, LiveInterval> intervalMap;
     std::unordered_map<RegId, size_t> lastUsePos;
 
+    auto useReg = [&](RegId reg, size_t index) {
+        lastUsePos[reg] = index; // Update last use position
+        // Ensure interval exists (register might be used before defined, e.g., parameters)
+        if (!intervalMap.contains(reg))
+            intervalMap[reg] = LiveInterval(reg, 0, index); // Start at 0, will be updated if defined later
+    };
+
+    auto modifyReg = [&](RegId reg, size_t index) {
+        if (!intervalMap.contains(reg)) // First definition
+            intervalMap[reg] = LiveInterval(reg, index, index);
+        else if (index < intervalMap[reg].start) //< Update start if earlier (shouldn't happen in SSA but just in case)
+            intervalMap[reg].start = index;
+    };
+
     // Track definition positions
     for (size_t i = 0; i < program.size(); ++i) {
         const auto& instr = program[i];
@@ -103,25 +117,42 @@ std::vector<RVMRegisterAllocator::LiveInterval> RVMRegisterAllocator::analyzeLiv
 
         // Track last use positions for all source registers
         instr->forEachSource([&](const RVMValue& srcVal) {
-            if (srcVal.isRegister()) {
-                RegId reg       = srcVal.regId();
-                lastUsePos[reg] = i; // Update last use position
-
-                // Ensure interval exists (register might be used before defined, e.g., parameters)
-                if (!intervalMap.contains(reg))
-                    intervalMap[reg] = LiveInterval(reg, 0, i); // Start at 0, will be updated if defined later
-            }
+            if (srcVal.isRegister())
+                useReg(srcVal.regId(), i);
         });
 
         // Return instruction is a use-position for the n-count registers
         if (auto ret = dynamic_cast<RVMInstrReturn*>(instr.get())) {
-            for (RegId reg = 0; reg < ret->returnCount(); ++reg) {
-                lastUsePos[reg] = i;
+            for (RegId reg = 0; reg < ret->returnCount(); ++reg)
+                useReg(reg, i);
+        }
 
-                // Ensure interval exists (should never happen in a return, only if previous errors propagated until here)
-                if (!intervalMap.contains(reg))
-                    intervalMap[reg] = LiveInterval(reg, 0, i); // Start at 0, will be updated if defined later
-            }
+        // External call instruction uses and modifies registers
+        if (auto external_call = dynamic_cast<RVMInstrExternalCall*>(instr.get())) {
+            for (RegId reg = 0; reg < external_call->srcs().size(); ++reg)
+                useReg(reg, i);
+            if (external_call->dst().has_value())
+                modifyReg(0, i);
+        }
+
+        // Internal call instruction uses and modifies registers
+        if (auto internal_call = dynamic_cast<RVMInstrInternalCall*>(instr.get())) {
+            for (RegId reg = 0; reg < internal_call->parameterCount(); ++reg)
+                useReg(reg, i);
+            for (RegId reg = 0; reg < internal_call->returnCount(); ++reg)
+                modifyReg(reg, i);
+        }
+
+        // Push frame 'uses' n registers
+        if (auto push_frame = dynamic_cast<RVMInstrPushFrame*>(instr.get())) {
+            for (RegId reg = 0; reg < push_frame->registerCount(); ++reg)
+                useReg(reg, i);
+        }
+
+        // Pop frame 'modifies' n registers
+        if (auto pop_frame = dynamic_cast<RVMInstrPopFrame*>(instr.get())) {
+            for (RegId reg = 0; reg < pop_frame->registerCount(); ++reg)
+                modifyReg(reg, i);
         }
     }
 
