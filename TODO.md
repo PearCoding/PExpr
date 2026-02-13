@@ -1,5 +1,5 @@
 - [x] SSA generation
-- [ ] Register allocation
+- [x] Register allocation
 - [x] Constant folding
 - [x] Dead-code elimination
 - [x] Global value numbering

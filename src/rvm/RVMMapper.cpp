@@ -304,14 +304,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
             castOp = Opcode::I2F;
         else if (srcType.kind() == type::TypeKind::Number && dstType.kind() == type::TypeKind::Integer)
             castOp = Opcode::F2I;
-        else if (srcType.kind() == type::TypeKind::Boolean && dstType.kind() == type::TypeKind::Integer)
-            castOp = Opcode::B2I;
-        else if (srcType.kind() == type::TypeKind::Integer && dstType.kind() == type::TypeKind::Boolean)
-            castOp = Opcode::I2B;
-        else if (srcType.kind() == type::TypeKind::Number && dstType.kind() == type::TypeKind::Boolean)
-            castOp = Opcode::F2B;
-        else if (srcType.kind() == type::TypeKind::Boolean && dstType.kind() == type::TypeKind::Number)
-            castOp = Opcode::B2F;
 
         result.push_back(std::make_shared<RVMInstr2Op>(castOp, dst, src));
 

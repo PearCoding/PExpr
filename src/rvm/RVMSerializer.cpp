@@ -56,14 +56,6 @@ std::string RVMSerializer::opcodeToString(Opcode op)
         return "i2f";
     case Opcode::F2I:
         return "f2i";
-    case Opcode::B2I:
-        return "b2i";
-    case Opcode::I2B:
-        return "i2b";
-    case Opcode::F2B:
-        return "f2b";
-    case Opcode::B2F:
-        return "b2f";
 
     // Memory/Data operations
     case Opcode::MOV:
@@ -144,14 +136,6 @@ Opcode RVMSerializer::stringToOpcode(const std::string& str)
         return Opcode::I2F;
     if (str == "f2i")
         return Opcode::F2I;
-    if (str == "b2i")
-        return Opcode::B2I;
-    if (str == "i2b")
-        return Opcode::I2B;
-    if (str == "f2b")
-        return Opcode::F2B;
-    if (str == "b2f")
-        return Opcode::B2F;
 
     if (str == "mov")
         return Opcode::MOV;

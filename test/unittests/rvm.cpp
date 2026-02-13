@@ -409,17 +409,9 @@ TEST_CASE("RVMSerializer: type conversion opcodes", "[rvm][serializer]")
     {
         REQUIRE(RVMSerializer::opcodeToString(Opcode::I2F) == "i2f");
         REQUIRE(RVMSerializer::opcodeToString(Opcode::F2I) == "f2i");
-        REQUIRE(RVMSerializer::opcodeToString(Opcode::B2I) == "b2i");
-        REQUIRE(RVMSerializer::opcodeToString(Opcode::I2B) == "i2b");
-        REQUIRE(RVMSerializer::opcodeToString(Opcode::F2B) == "f2b");
-        REQUIRE(RVMSerializer::opcodeToString(Opcode::B2F) == "b2f");
 
         REQUIRE(RVMSerializer::stringToOpcode("i2f") == Opcode::I2F);
         REQUIRE(RVMSerializer::stringToOpcode("f2i") == Opcode::F2I);
-        REQUIRE(RVMSerializer::stringToOpcode("b2i") == Opcode::B2I);
-        REQUIRE(RVMSerializer::stringToOpcode("i2b") == Opcode::I2B);
-        REQUIRE(RVMSerializer::stringToOpcode("f2b") == Opcode::F2B);
-        REQUIRE(RVMSerializer::stringToOpcode("b2f") == Opcode::B2F);
     }
 }
 

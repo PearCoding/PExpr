@@ -44,10 +44,6 @@ enum class Opcode : uint8_t {
     // Conversions
     I2F, // Integer to Float
     F2I, // Float to Integer
-    B2I, // Boolean to Integer
-    I2B, // Integer to Boolean
-    F2B, // Float to Boolean
-    B2F, // Boolean to Float
 
     // Control flow
     BR,            // Branch conditional
