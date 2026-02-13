@@ -204,6 +204,20 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "pcalc",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pcalc.exe",
+            "args": [
+                "-v",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Fuzzy",
             "type": "cppvsdbg",
             "request": "launch",
