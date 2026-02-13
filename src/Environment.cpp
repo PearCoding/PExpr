@@ -13,31 +13,12 @@ using namespace ast;
 using namespace type;
 
 Environment::Environment()
-    : mGlobals()
-    , mReporter()
+    : mReporter()
 {
-    mGlobals.addDefaultTypeAliases();
 }
 
 Environment::~Environment()
 {
-}
-
-void Environment::registerVariable(const std::string& name, const Type& type)
-{
-    mGlobals.addVariable(std::make_shared<VariableDef>(name, type, false, parser::Location(0)));
-}
-
-void Environment::registerFunction(const std::string& name, const std::vector<Type>& parameterTypes, const Type& returnType, bool hasSideEffect)
-{
-    // Build a ParameterList using default parameter names p0, p1, ...
-    ParameterList params;
-    params.reserve(parameterTypes.size());
-    for (size_t i = 0; i < parameterTypes.size(); ++i)
-        params.push_back(std::make_shared<VariableDef>("p" + std::to_string(i), parameterTypes[i], false, parser::Location(0)));
-
-    const std::string mangledName = makeMangledNameFromTypes(name, parameterTypes, nullptr);
-    mGlobals.addFunction(FunctionDef(name, mangledName, std::move(params), returnType, true, hasSideEffect));
 }
 
 Ptr<Closure> Environment::parse(std::istream& stream, const std::filesystem::path& filename)
@@ -45,7 +26,9 @@ Ptr<Closure> Environment::parse(std::istream& stream, const std::filesystem::pat
     parser::Lexer lexer(stream, mReporter, filename);
     parser::Parser parser(lexer, mReporter);
 
-    auto expr = parser.parse(&mGlobals);
+    SymbolTable globals;
+    globals.addDefaultTypeAliases();
+    auto expr = parser.parse(&globals);
 
     if (!expr)
         return nullptr;
