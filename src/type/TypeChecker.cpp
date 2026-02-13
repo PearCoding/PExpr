@@ -279,7 +279,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
             if (!hadCastError)
                 expr->setReturnType(rightType);
         } else if (isConvertible(rightType, leftType)) {
-            expr->rightMut() = injectCastIfNeeded(expr->left(), leftType, &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), leftType, &hadCastError);
             if (!hadCastError)
                 expr->setReturnType(leftType);
         }
@@ -293,7 +293,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
             if (!hadCastError)
                 expr->setReturnType(rightType);
         } else if (leftType.isArithmetic() && isConvertible(rightType, leftType)) { // < f * i
-            expr->rightMut() = injectCastIfNeeded(expr->left(), leftType, &hadCastError);
+            expr->rightMut() = injectCastIfNeeded(expr->right(), leftType, &hadCastError);
             if (!hadCastError)
                 expr->setReturnType(leftType);
         } else if (leftType.isTuple() && isConvertible(leftType, Type::AsVector(leftType.size())) && isConvertible(rightType, TypeKind::Number)) { // < v * f, v * i
