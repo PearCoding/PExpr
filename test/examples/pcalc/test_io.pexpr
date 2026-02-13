@@ -1,5 +1,5 @@
 // Test I/O functions
 let x = readDouble();
 let y = readInt();
-let k = print(x + y);
+print(x + y);
 x * 2
