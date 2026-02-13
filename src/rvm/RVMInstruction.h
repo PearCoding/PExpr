@@ -212,39 +212,44 @@ private:
 /// Return instruction
 class RVMInstrReturn : public RVMInstr {
 public:
-    RVMInstrReturn();
+    RVMInstrReturn(size_t numReturns);
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::RET; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
+
+    [[nodiscard]] inline size_t returnCount() const { return mReturnCount; }
+
+private:
+    size_t mReturnCount;
 };
 
 /// Push frame instruction - saves registers %r1 to %r{count}
 class RVMInstrPushFrame : public RVMInstr {
 public:
-    RVMInstrPushFrame(uint32_t registerCount);
+    RVMInstrPushFrame(size_t registerCount);
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::PUSH_FRAME; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
-    [[nodiscard]] uint32_t registerCount() const { return mRegisterCount; }
+    [[nodiscard]] size_t registerCount() const { return mRegisterCount; }
 
 private:
-    uint32_t mRegisterCount; // Number of registers to save, starting from %r1
+    size_t mRegisterCount; // Number of registers to save, starting from %r1
 };
 
 /// Pop frame instruction - restores registers %r1 to %r{count}
 class RVMInstrPopFrame : public RVMInstr {
 public:
-    RVMInstrPopFrame(uint32_t registerCount);
+    RVMInstrPopFrame(size_t registerCount);
 
     [[nodiscard]] Opcode opcode() const override { return Opcode::POP_FRAME; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
-    [[nodiscard]] uint32_t registerCount() const { return mRegisterCount; }
+    [[nodiscard]] size_t registerCount() const { return mRegisterCount; }
 
 private:
-    uint32_t mRegisterCount; // Number of registers to restore, starting from %r1
+    size_t mRegisterCount; // Number of registers to restore, starting from %r1
 };
 
 /// String literal instruction - loads a string literal into a register

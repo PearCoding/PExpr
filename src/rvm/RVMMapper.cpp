@@ -440,7 +440,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
     }
 
     // Add the actual return instruction
-    result.push_back(std::make_shared<RVMInstrReturn>());
+    result.push_back(std::make_shared<RVMInstrReturn>(result.size()));
 
     return result;
 }

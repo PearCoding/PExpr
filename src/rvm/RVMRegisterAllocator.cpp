@@ -112,6 +112,17 @@ std::vector<RVMRegisterAllocator::LiveInterval> RVMRegisterAllocator::analyzeLiv
                     intervalMap[reg] = LiveInterval(reg, 0, i); // Start at 0, will be updated if defined later
             }
         });
+
+        // Return instruction is a use-position for the n-count registers
+        if (auto ret = dynamic_cast<RVMInstrReturn*>(instr.get())) {
+            for (RegId reg = 0; reg < ret->returnCount(); ++reg) {
+                lastUsePos[reg] = i;
+
+                // Ensure interval exists (should never happen in a return, only if previous errors propagated until here)
+                if (!intervalMap.contains(reg))
+                    intervalMap[reg] = LiveInterval(reg, 0, i); // Start at 0, will be updated if defined later
+            }
+        }
     }
 
     // Second pass: update end positions from last uses

@@ -270,8 +270,7 @@ void RVMSerializer::writeCall(std::ostream& os, const RVMInstrInternalCall& inst
 
 void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
 {
-    PEXPR_UNUSED(instr);
-    os << "ret";
+    os << "ret " << instr.returnCount();
 }
 
 void RVMSerializer::writePushFrame(std::ostream& os, const RVMInstrPushFrame& instr)
@@ -551,7 +550,7 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
 
     // Check for push/pop frame
     if (trimmed.rfind("push_frame ", 0) == 0 || trimmed == "push_frame") {
-        uint32_t count = 0;
+        size_t count = 0;
         if (trimmed.size() > 11) {
             try {
                 count = std::stoul(trimmed.substr(11));
@@ -562,7 +561,7 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         return std::make_shared<RVMInstrPushFrame>(count);
     }
     if (trimmed.rfind("pop_frame ", 0) == 0 || trimmed == "pop_frame") {
-        uint32_t count = 0;
+        size_t count = 0;
         if (trimmed.size() > 10) {
             try {
                 count = std::stoul(trimmed.substr(10));
@@ -614,8 +613,15 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
     }
 
     // Check for return
-    if (trimmed.rfind("ret", 0) == 0)
-        return std::make_shared<RVMInstrReturn>();
+    if (trimmed.rfind("ret ", 0) == 0) {
+        size_t count = 0;
+        try {
+            count = std::stoul(trimmed.substr(4));
+        } catch (...) {
+            count = 0;
+        }
+        return std::make_shared<RVMInstrReturn>(count);
+    }
 
     // Check for assignment instructions (dst = op ...)
     size_t eqPos = trimmed.find('=');

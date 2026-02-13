@@ -52,16 +52,17 @@ RVMInstrInternalCall::RVMInstrInternalCall(const std::string& funcName)
 {
 }
 
-RVMInstrReturn::RVMInstrReturn()
+RVMInstrReturn::RVMInstrReturn(size_t returnCount)
+    : mReturnCount(returnCount)
 {
 }
 
-RVMInstrPushFrame::RVMInstrPushFrame(uint32_t registerCount)
+RVMInstrPushFrame::RVMInstrPushFrame(size_t registerCount)
     : mRegisterCount(registerCount)
 {
 }
 
-RVMInstrPopFrame::RVMInstrPopFrame(uint32_t registerCount)
+RVMInstrPopFrame::RVMInstrPopFrame(size_t registerCount)
     : mRegisterCount(registerCount)
 {
 }
