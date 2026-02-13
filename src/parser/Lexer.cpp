@@ -234,9 +234,8 @@ Token Lexer::parseNumber()
     auto invalid_digit    = [=](char c) { return c - '0' >= base; };
 
     // Check digits
-    if (base < 10 && std::find_if(digit_ptr, last_ptr, invalid_digit) != last_ptr) {
+    if (base < 10 && std::find_if(digit_ptr, last_ptr, invalid_digit) != last_ptr)
         mReporter.errorf(startLoc, "Invalid literal '%s'", mTemp.c_str());
-    }
 
     if (exp || fractional)
         return Token(startLoc, TokenType::NumberLiteral).With(Number(std::strtod(digit_ptr, nullptr)));
