@@ -558,6 +558,7 @@ ValueVariant io_print(const std::vector<ValueVariant>& args)
 }
 
 static const char* SRC_HEADER = R"(
+//!location 1 "Header"
 [[extern, pure]] fn sqrt(x:num) -> num;
 [[extern, pure]] fn sin(x:num) -> num;
 [[extern, pure]] fn cos(x:num) -> num;
@@ -600,14 +601,16 @@ int main(int argc, char** argv)
     // Read input
     std::ifstream file(inputFile);
     std::stringstream buffer;
-    buffer << file.rdbuf();
+    buffer << SRC_HEADER << std::endl
+           << "//!location 1 \"" << inputFile.generic_string() << "\"" << std::endl
+           << file.rdbuf();
     std::string source = buffer.str();
 
     RVMProgram rvmProgram;
     type::Type returnType = type::Type(type::TypeKind::Unspecified);
 
     Environment env;
-    auto ast = env.parse(SRC_HEADER + source, inputFile);
+    auto ast = env.parse(source, inputFile);
 
     if (!ast) {
         std::cerr << "Parse error" << std::endl;

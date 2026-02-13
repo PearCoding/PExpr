@@ -187,10 +187,103 @@ void Lexer::eatComments(bool multiline)
                 break;
         }
     } else {
+        // Check if this is a lexer instruction (//!)
+        if (accept('!')) {
+            parseLexerInstruction();
+        } else {
+            // Regular single-line comment
+            while (!eof() && peek() != '\n')
+                eat();
+            if (!eof())
+                eat(); // eat the newline character
+        }
+    }
+}
+
+void Lexer::parseLexerInstruction()
+{
+    // Skip whitespace after '!'
+    while (!eof() && std::isspace(peek()))
+        eat();
+
+    if (eof())
+        return;
+
+    // Read the instruction keyword
+    mTemp.clear();
+    while (!eof() && !std::isspace(peek()) && peek() != '\n')
+        append();
+
+    if (mTemp == "location") {
+        // Parse location instruction: line filename
+
+        // Skip whitespace
+        while (!eof() && std::isspace(peek()) && peek() != '\n')
+            eat();
+
+        if (eof() || peek() == '\n') {
+            mReporter.errorf(mLocation, "Expected line number after 'location'");
+            return;
+        }
+
+        // Parse line number
+        mTemp.clear();
+        while (!eof() && std::isdigit(peek()))
+            append();
+        if (mTemp.empty()) {
+            mReporter.errorf(mLocation, "Invalid line number");
+            return;
+        }
+        size_t line = std::stoull(mTemp);
+
+        // Skip whitespace
+        while (!eof() && std::isspace(peek()) && peek() != '\n')
+            eat();
+
+        if (eof() || peek() == '\n') {
+            mReporter.errorf(mLocation, "Expected filename after line number");
+            return;
+        }
+
+        // Parse filename (may be quoted)
+        mTemp.clear();
+        std::string filename;
+        if (peek() == '"' || peek() == '\'') {
+            uint8_t quote = peek();
+            eat(); // consume quote
+            while (!eof() && peek() != quote && peek() != '\n')
+                append();
+            if (eof() || peek() != quote) {
+                mReporter.errorf(mLocation, "Unterminated filename string");
+                return;
+            }
+            eat(); // consume closing quote
+            filename = mTemp;
+        } else {
+            // Unquoted filename
+            mTemp.clear();
+            while (!eof() && !std::isspace(peek()) && peek() != '\n')
+                append();
+            filename = mTemp;
+        }
+
+        // Skip rest of the line and then set the location
+        while (!eof() && peek() != '\n')
+            eat();
+
+        if (!eof())
+            eat(); // eat the newline character
+
+        // Set new location
+        mLocation = Location(line, 0, filename);
+    } else {
+        // Unknown lexer instruction - ignore (maybe warn in the future)
+
+        // Skip rest of the line
         while (!eof() && peek() != '\n')
             eat();
         if (!eof())
-            eat();
+            eat(); // eat the newline character
     }
 }
 

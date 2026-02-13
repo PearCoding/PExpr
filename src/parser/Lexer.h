@@ -19,6 +19,7 @@ private:
     void eat();
     void eatSpaces();
     void eatComments(bool multiline);
+    void parseLexerInstruction();
     [[nodiscard]] Token parseNumber();
     [[nodiscard]] Token parseString(uint8_t mark);
 
