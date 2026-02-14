@@ -168,7 +168,7 @@ void SSASerializer::writeLabel(std::ostream& os, const SSAInstrLabel& instr)
 
 void SSASerializer::writeBranch(std::ostream& os, const SSAInstrBranch& instr)
 {
-    os << "br ";
+    os << "branch ";
     write(os, instr.Condition);
     os << " -> " << instr.TargetLabel;
 }
@@ -517,8 +517,8 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
     }
 
     // Check for branch instruction
-    if (line.find("br ") == 0) {
-        // Format: br cond:bool -> lbl
+    if (line.find("branch ") == 0) {
+        // Format: branch cond:bool -> lbl
         size_t arrow = line.find("->");
         if (arrow == std::string::npos)
             return nullptr;

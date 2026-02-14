@@ -67,7 +67,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.pexprir",
-                    "match": "\\b(fn|endfn|return|goto|br)\\b"
+                    "match": "\\b(fn|endfn|return|goto|branch)\\b"
                 },
                 {
                     "name": "keyword.operator.pexprir",
