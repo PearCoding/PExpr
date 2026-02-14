@@ -111,6 +111,8 @@ public:
                 labelMap[label->labelName()] = i;
         }
 
+        std::vector<size_t> returnStack;
+
         size_t pc = 0;
         while (pc < program.size()) {
             auto& instr = program[pc];
@@ -120,8 +122,14 @@ public:
                 continue;
             }
 
-            if (dynamic_cast<RVMInstrReturn*>(instr.get()))
-                break;
+            if (dynamic_cast<RVMInstrReturn*>(instr.get())) {
+                if (returnStack.empty())
+                    break;
+                pc = returnStack.back();
+                returnStack.pop_back();
+                pc++;
+                continue;
+            }
 
             if (auto* branch = dynamic_cast<RVMInstrBranch*>(instr.get())) {
                 auto cond         = evaluateValue(branch->srcs()[0]);
@@ -179,18 +187,30 @@ public:
                 continue;
             }
 
-            if (auto* call = dynamic_cast<RVMInstrExternalCall*>(instr.get())) {
+            if (auto* internal_call = dynamic_cast<RVMInstrInternalCall*>(instr.get())) {
+                // A call is just an annotated jump
+                auto it = labelMap.find(internal_call->functionName());
+                if (it != labelMap.end()) {
+                    returnStack.push_back(pc);
+                    pc = it->second;
+                    continue;
+                }
+                pc++;
+                continue;
+            }
+
+            if (auto* external_call = dynamic_cast<RVMInstrExternalCall*>(instr.get())) {
                 std::vector<ValueVariant> args;
-                for (const auto& arg : call->srcs())
+                for (const auto& arg : external_call->srcs())
                     args.push_back(evaluateValue(arg));
 
-                auto it = externalFunctions.find(call->functionName());
+                auto it = externalFunctions.find(external_call->functionName());
                 if (it != externalFunctions.end()) {
                     ValueVariant result = it->second(args);
-                    if (call->dst().has_value())
-                        setRegister(call->dst().value(), result);
+                    if (external_call->dst().has_value())
+                        setRegister(external_call->dst().value(), result);
                 } else {
-                    std::cerr << "Error: Unknown external function '" << call->functionName() << "'" << std::endl;
+                    std::cerr << "Error: Unknown external function '" << external_call->functionName() << "'" << std::endl;
                 }
                 pc++;
                 continue;
@@ -514,19 +534,17 @@ ValueVariant math_exp(const std::vector<ValueVariant>& args)
     return ValueVariant{ Number(std::exp(val)) };
 }
 
-ValueVariant io_readInt(const std::vector<ValueVariant>& args)
+ValueVariant io_readInteger(const std::vector<ValueVariant>& args)
 {
     PEXPR_UNUSED(args);
-    std::cout << "Enter an integer: ";
     Integer val;
     std::cin >> val;
     return ValueVariant{ val };
 }
 
-ValueVariant io_readDouble(const std::vector<ValueVariant>& args)
+ValueVariant io_readNumber(const std::vector<ValueVariant>& args)
 {
     PEXPR_UNUSED(args);
-    std::cout << "Enter a number: ";
     Number val;
     std::cin >> val;
     return ValueVariant{ val };
@@ -535,7 +553,6 @@ ValueVariant io_readDouble(const std::vector<ValueVariant>& args)
 ValueVariant io_readString(const std::vector<ValueVariant>& args)
 {
     PEXPR_UNUSED(args);
-    std::cout << "Enter a string: ";
     std::string val;
     std::cin.ignore();
     std::getline(std::cin, val);
@@ -546,8 +563,8 @@ ValueVariant io_print(const std::vector<ValueVariant>& args)
 {
     for (const auto& arg : args)
         printValueVariant(arg);
-    std::cout << std::endl;
-    return ValueVariant{ Integer(0) };
+
+    return ValueVariant{};
 }
 
 static const char* SRC_HEADER = R"(
@@ -558,10 +575,12 @@ static const char* SRC_HEADER = R"(
 [[extern, pure]] fn tan(x:num) -> num;
 [[extern, pure]] fn log(x:num) -> num;
 [[extern, pure]] fn exp(x:num) -> num;
-[[extern]] fn readInt() -> int;
-[[extern]] fn readDouble() -> num;
+[[extern]] fn readInteger() -> int;
+[[extern]] fn readNumber() -> num;
 [[extern]] fn readString() -> str;
-[[extern]] fn print(n: num) -> int;
+[[extern]] fn print(b: bool) -> void;
+[[extern]] fn print(n: num) -> void;
+[[extern]] fn print(s: str) -> void;
 let Pi = 3.141592;
 )";
 
@@ -656,21 +675,25 @@ int main(int argc, char** argv)
     interpreter.registerExternalFunction(mangleFunction("exp", { type::Type(type::TypeKind::Number) }), math_exp);
 
     // I/O functions
-    interpreter.registerExternalFunction(mangleFunction("readInt", {}), io_readInt);
-    interpreter.registerExternalFunction(mangleFunction("readDouble", {}), io_readDouble);
+    interpreter.registerExternalFunction(mangleFunction("readInteger", {}), io_readInteger);
+    interpreter.registerExternalFunction(mangleFunction("readNumber", {}), io_readNumber);
     interpreter.registerExternalFunction(mangleFunction("readString", {}), io_readString);
+    interpreter.registerExternalFunction(mangleFunction("print", { type::Type(type::TypeKind::Boolean) }), io_print);
     interpreter.registerExternalFunction(mangleFunction("print", { type::Type(type::TypeKind::Number) }), io_print);
+    interpreter.registerExternalFunction(mangleFunction("print", { type::Type(type::TypeKind::String) }), io_print);
 
     // Execute
     try {
         ValueVariant result = interpreter.execute(rvmProgram, returnType);
 
-        // Print result
-        if (verbose)
-            std::cout << "=== Result ===" << std::endl;
+        if (!returnType.isVoid()) {
+            // Print result
+            if (verbose)
+                std::cout << "=== Result ===" << std::endl;
 
-        printValueVariant(result);
-        std::cout << std::endl;
+            printValueVariant(result);
+            std::cout << std::endl;
+        }
     } catch (const std::exception& e) {
         std::cerr << "Error during execution: " << e.what() << std::endl;
         return EXIT_FAILURE;
