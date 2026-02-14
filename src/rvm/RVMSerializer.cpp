@@ -1,4 +1,5 @@
 #include "RVMSerializer.h"
+#include "utils/StringUtils.h"
 #include <algorithm>
 #include <cctype>
 #include <ranges>
@@ -176,7 +177,7 @@ void RVMSerializer::write(std::ostream& os, const ValueVariant& value)
         } else if constexpr (std::is_same_v<T, Number>) {
             os << arg;
         } else if constexpr (std::is_same_v<T, std::string>) {
-            os << "\"" << escapeString(arg) << "\"";
+            os << "\"" << utils::escapeString(arg) << "\"";
         } else {
             // Note: Tuples should be dissolved before reaching RVM IR
             // so we don't handle Tuple type here
@@ -286,7 +287,7 @@ void RVMSerializer::writePopFrame(std::ostream& os, const RVMInstrPopFrame& inst
 void RVMSerializer::writeStringLiteral(std::ostream& os, const RVMInstrStringLiteral& instr)
 {
     write(os, instr.dst().value());
-    os << " = load_string \"" << escapeString(instr.stringValue()) << "\"";
+    os << " = load_string \"" << utils::escapeString(instr.stringValue()) << "\"";
 }
 
 void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
@@ -334,77 +335,6 @@ std::string RVMSerializer::serialize(const RVMProgram& program)
     std::ostringstream oss;
     write(oss, program);
     return oss.str();
-}
-
-std::string RVMSerializer::escapeString(const std::string& str)
-{
-    std::string result;
-    result.reserve(str.size());
-
-    for (char c : str) {
-        switch (c) {
-        case '\"':
-            result += "\\\"";
-            break;
-        case '\\':
-            result += "\\\\";
-            break;
-        case '\n':
-            result += "\\n";
-            break;
-        case '\r':
-            result += "\\r";
-            break;
-        case '\t':
-            result += "\\t";
-            break;
-        default:
-            result += c;
-            break;
-        }
-    }
-
-    return result;
-}
-
-std::string RVMSerializer::unescapeString(const std::string& str)
-{
-    std::string result;
-    result.reserve(str.size());
-
-    for (size_t i = 0; i < str.size(); ++i) {
-        if (str[i] == '\\' && i + 1 < str.size()) {
-            switch (str[i + 1]) {
-            case '\"':
-                result += '\"';
-                ++i;
-                break;
-            case '\\':
-                result += '\\';
-                ++i;
-                break;
-            case 'n':
-                result += '\n';
-                ++i;
-                break;
-            case 'r':
-                result += '\r';
-                ++i;
-                break;
-            case 't':
-                result += '\t';
-                ++i;
-                break;
-            default:
-                result += str[i];
-                break;
-            }
-        } else {
-            result += str[i];
-        }
-    }
-
-    return result;
 }
 
 Type RVMSerializer::parseType(const std::string& typeStr)
@@ -700,7 +630,7 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             // Check if it's a quoted string
             if (stringLiteral.size() >= 2 && stringLiteral.front() == '"' && stringLiteral.back() == '"') {
                 std::string escapedString   = stringLiteral.substr(1, stringLiteral.size() - 2);
-                std::string unescapedString = unescapeString(escapedString);
+                std::string unescapedString = utils::unescapeString(escapedString);
                 return std::make_shared<RVMInstrStringLiteral>(dst, unescapedString);
             }
         }

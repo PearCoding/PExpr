@@ -147,19 +147,6 @@ TEST_CASE("SSASerializer: parseType handles vector types", "[serializer]")
     REQUIRE(vec4.size() == 4);
 }
 
-TEST_CASE("SSASerializer: escapeString and unescapeString", "[serializer]")
-{
-    std::string original  = "Hello\nWorld\t\"Quote\"\\Backslash";
-    std::string escaped   = SSASerializer::escapeString(original);
-    std::string unescaped = SSASerializer::unescapeString(escaped);
-
-    REQUIRE(escaped.find("\\n") != std::string::npos);
-    REQUIRE(escaped.find("\\t") != std::string::npos);
-    REQUIRE(escaped.find("\\\"") != std::string::npos);
-    REQUIRE(escaped.find("\\\\") != std::string::npos);
-    REQUIRE(unescaped == original);
-}
-
 TEST_CASE("SSASerializer: handles empty program", "[serializer]")
 {
     SSAProgram prog;

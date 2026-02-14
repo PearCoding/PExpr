@@ -1,5 +1,9 @@
 // Test I/O functions
-let x = readDouble();
-let y = readInt();
+// -> Only works with pcalc
+print("X = ");
+let x = readNumber();
+print("Y = ");
+let y = readInteger();
+print("X + Y = ");
 print(x + y);
-x * 2
+print("\n")

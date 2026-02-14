@@ -1,5 +1,6 @@
 #include "SSASerializer.h"
 #include "ast/Enums.h"
+#include "utils/StringUtils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -77,7 +78,7 @@ void SSASerializer::write(std::ostream& os, const Type& type, const ValueVariant
         os << *n;
     } else if (const auto* s = std::get_if<std::string>(&value)) {
         PEXPR_ASSERT(type.kind() == TypeKind::String, "Expected variant to have a string value");
-        os << "\"" << *s << "\"";
+        os << "\"" << utils::escapeString(*s) << "\"";
     } else if (const auto* tp = std::get_if<Tuple>(&value)) {
         PEXPR_ASSERT(type.kind() == TypeKind::Tuple, "Expected variant to have a Tuple value");
         const auto& t = *tp;
@@ -426,8 +427,7 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
     // String constant (quoted)
     if (name.front() == '"' && name.back() == '"') {
         std::string content = name.substr(1, name.size() - 2);
-        // TODO: unescape?
-        outValue = SSAValue::Constant(content);
+        outValue            = SSAValue::Constant(utils::unescapeString(content));
         return true;
     }
 
@@ -803,77 +803,6 @@ SSAProgram SSASerializer::deserialize(const std::string& str)
 {
     std::istringstream iss(str);
     return read(iss);
-}
-
-std::string SSASerializer::escapeString(const std::string& str)
-{
-    std::string result;
-    result.reserve(str.size());
-
-    for (char c : str) {
-        switch (c) {
-        case '\"':
-            result += "\\\"";
-            break;
-        case '\\':
-            result += "\\\\";
-            break;
-        case '\n':
-            result += "\\n";
-            break;
-        case '\r':
-            result += "\\r";
-            break;
-        case '\t':
-            result += "\\t";
-            break;
-        default:
-            result += c;
-            break;
-        }
-    }
-
-    return result;
-}
-
-std::string SSASerializer::unescapeString(const std::string& str)
-{
-    std::string result;
-    result.reserve(str.size());
-
-    for (size_t i = 0; i < str.size(); ++i) {
-        if (str[i] == '\\' && i + 1 < str.size()) {
-            switch (str[i + 1]) {
-            case '\"':
-                result += '\"';
-                ++i;
-                break;
-            case '\\':
-                result += '\\';
-                ++i;
-                break;
-            case 'n':
-                result += '\n';
-                ++i;
-                break;
-            case 'r':
-                result += '\r';
-                ++i;
-                break;
-            case 't':
-                result += '\t';
-                ++i;
-                break;
-            default:
-                result += str[i];
-                break;
-            }
-        } else {
-            result += str[i];
-        }
-    }
-
-    return result;
 }
 
 } // namespace PExpr::ssa

@@ -275,43 +275,6 @@ TEST_CASE("RVMSerializer: basic serialization", "[rvm][serializer]")
     }
 }
 
-TEST_CASE("RVMSerializer: string escape/unescape", "[rvm][serializer]")
-{
-    SECTION("Escape basic strings")
-    {
-        REQUIRE(RVMSerializer::escapeString("hello") == "hello");
-        REQUIRE(RVMSerializer::escapeString("he\"llo") == "he\\\"llo");
-        REQUIRE(RVMSerializer::escapeString("he\nllo") == "he\\nllo");
-        REQUIRE(RVMSerializer::escapeString("he\\llo") == "he\\\\llo");
-    }
-
-    SECTION("Unescape basic strings")
-    {
-        REQUIRE(RVMSerializer::unescapeString("hello") == "hello");
-        REQUIRE(RVMSerializer::unescapeString("he\\\"llo") == "he\"llo");
-        REQUIRE(RVMSerializer::unescapeString("he\\nllo") == "he\nllo");
-        REQUIRE(RVMSerializer::unescapeString("he\\\\llo") == "he\\llo");
-    }
-
-    SECTION("Round-trip escape/unescape")
-    {
-        std::string testStrings[] = {
-            "hello world",
-            "he\"llo\"world",
-            "line1\nline2\nline3",
-            "tab\ttab\ttab",
-            "back\\slash",
-            "mixed\"quotes\nand\ttabs\\slashes"
-        };
-
-        for (const auto& original : testStrings) {
-            std::string escaped   = RVMSerializer::escapeString(original);
-            std::string unescaped = RVMSerializer::unescapeString(escaped);
-            REQUIRE(unescaped == original);
-        }
-    }
-}
-
 TEST_CASE("RVMSerializer: type parsing", "[rvm][serializer]")
 {
     SECTION("Basic types")

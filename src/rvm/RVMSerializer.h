@@ -35,12 +35,6 @@ public:
     /// Helper: Deserialize an RVMProgram from a string (convenience wrapper)
     [[nodiscard]] static RVMProgram deserialize(const std::string& str);
 
-    /// Escape special characters in a string for serialization
-    static std::string escapeString(const std::string& str);
-
-    /// Unescape special characters in a string after deserialization
-    static std::string unescapeString(const std::string& str);
-
     /// Parse a type string to Type
     static type::Type parseType(const std::string& typeStr);
 
