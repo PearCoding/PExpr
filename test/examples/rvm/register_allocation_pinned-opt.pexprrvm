@@ -1,0 +1,12 @@
+// The optimal version (without inlining) of 'register_allocation_pinned.pexprrvm'
+%r0:int = mov 42:int        // Just a basic constant saved in %r0
+call_internal 1 1 test_func // Call 'test_func' with a single input parameter in %r0 and a single return value back in %r0
+ret 1                       // Return to the host with return value in %r0
+
+test_func:
+%r0:int = add %r0:int %r0:int // Add the function parameter together
+ret 1                         // We have a single return value in %r0
+
+// With function inlining (done in SSA) this would collapse to a simple:
+//   %r0:int = mov 84:int
+//   ret 1

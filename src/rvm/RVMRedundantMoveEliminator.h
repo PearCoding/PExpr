@@ -22,9 +22,6 @@ private:
     /// Process a single basic block
     [[nodiscard]] static bool eliminateInBlock(std::vector<std::shared_ptr<RVMInstr>>& block);
 
-    /// Check if an instruction is a MOV instruction
-    [[nodiscard]] static bool isMovInstruction(const RVMInstr* instr);
-
     /// Analyze a block to find redundant MOVs
     static void analyzeBlock(const std::vector<std::shared_ptr<RVMInstr>>& block, std::unordered_set<size_t>& redundantIndices);
 };

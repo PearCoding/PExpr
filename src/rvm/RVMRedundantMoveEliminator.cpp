@@ -1,5 +1,9 @@
 #include "RVMRedundantMoveEliminator.h"
 #include "RVMBasicBlockAnalyzer.h"
+#include "RVMLiveAnalyzer.h"
+
+#include <algorithm>
+#include <unordered_map>
 
 namespace PExpr::rvm {
 
@@ -37,7 +41,7 @@ bool RVMRedundantMoveEliminator::eliminateInBlock(std::vector<std::shared_ptr<RV
     do {
         anyChange = false;
 
-        // Find indices of redundant MOV instructions
+        // Find indices of redundant MOV instructions using live interval analysis
         std::unordered_set<size_t> redundantIndices;
         analyzeBlock(block, redundantIndices);
 
@@ -63,57 +67,72 @@ bool RVMRedundantMoveEliminator::eliminateInBlock(std::vector<std::shared_ptr<RV
     return changed;
 }
 
-bool RVMRedundantMoveEliminator::isMovInstruction(const RVMInstr* instr)
-{
-    if (auto* instr2op = dynamic_cast<const RVMInstr2Op*>(instr))
-        return instr2op->opcode() == Opcode::MOV;
-    return false;
-}
-
-void RVMRedundantMoveEliminator::analyzeBlock(
-    const std::vector<std::shared_ptr<RVMInstr>>& block,
-    std::unordered_set<size_t>& redundantIndices)
+void RVMRedundantMoveEliminator::analyzeBlock(const std::vector<std::shared_ptr<RVMInstr>>& block, std::unordered_set<size_t>& redundantIndices)
 {
     redundantIndices.clear();
 
-    // For each register, track:
-    // - Last definition index (where it was written)
-    // - Whether it has been read since last definition
-    std::unordered_map<RegId, size_t> lastDefIndex;
-    std::unordered_map<RegId, bool> readSinceLastDef;
+    // Get live intervals for this block from RVMLiveAnalyzer
+    auto intervals = RVMLiveAnalyzer::analyzeBlock(block);
 
+    // For each instruction that is a MOV
     for (size_t i = 0; i < block.size(); ++i) {
         const auto& instr = block[i];
 
-        // Process source reads first
-        instr->forEachSource([&](const RVMValue& srcVal) {
-            if (srcVal.isRegister()) //< Mark this register as read since its last definition
-                readSinceLastDef[srcVal.regId()] = true;
+        // Check if it's a MOV instruction
+        if (auto* instr2op = dynamic_cast<const RVMInstr2Op*>(instr.get())) {
+            if (instr2op->opcode() != Opcode::MOV)
+                continue;
+        } else {
+            continue; // Not a 2-operand instruction
+        }
+
+        // Get the destination register
+        RegId destReg = 0;
+        bool hasDest  = false;
+        instr->forDestination([&](const RVMValue& dstVal) {
+            if (dstVal.isRegister()) {
+                destReg = dstVal.regId();
+                hasDest = true;
+            }
         });
 
-        // Process destination write
-        instr->forDestination([&](const RVMValue& dstVal) {
-            if (!dstVal.isRegister())
-                return;
+        if (!hasDest)
+            continue;
 
-            RegId reg = dstVal.regId();
+        // Find the interval that starts at this instruction
+        const RVMLiveAnalyzer::LiveInterval* currentInterval = nullptr;
+        for (const auto& interval : intervals) {
+            if (interval.reg == destReg && interval.start == i) {
+                currentInterval = &interval;
+                break;
+            }
+        }
 
-            // Check if this register was previously defined
-            if (auto it = lastDefIndex.find(reg); it != lastDefIndex.end()) {
-                size_t prevDefIndex = it->second;
+        if (!currentInterval)
+            continue;
 
-                // Check if the previous definition was a MOV instruction
-                if (prevDefIndex < i && isMovInstruction(block[prevDefIndex].get())) {
-                    // Check if the register was read between the previous definition and now
-                    if (!readSinceLastDef[reg]) //< The previous MOV is redundant - its result is overwritten before being read
-                        redundantIndices.insert(prevDefIndex);
+        // A MOV is redundant if:
+        // 1. The register is defined here (start == i)
+        // 2. The register is not used after this definition (interval.isRedundant() means start == end)
+        // 3. AND there is a later definition of the same register
+
+        if (currentInterval->isRedundant()) {
+            // Check if there's any later definition of this register
+            // Look through intervals for the same register with later start
+            bool hasLaterDefinition = false;
+            for (const auto& interval : intervals) {
+                if (interval.reg == destReg && interval.start > i) {
+                    hasLaterDefinition = true;
+                    break;
                 }
             }
 
-            // Update last definition index and reset read flag
-            lastDefIndex[reg]     = i;
-            readSinceLastDef[reg] = false;
-        });
+            // Only mark as redundant if there's definitely a later definition
+            // This handles the case where a MOV result is dead (never used)
+            // but not overwritten - we leave those for dead code elimination
+            if (hasLaterDefinition)
+                redundantIndices.insert(i);
+        }
     }
 }
 

@@ -214,7 +214,7 @@ void RVMSerializer::write3Op(std::ostream& os, const RVMInstr3Op& instr)
     if (srcs.size() >= 1)
         write(os, srcs[0]);
     if (srcs.size() >= 2) {
-        os << ", ";
+        os << " ";
         write(os, srcs[1]);
     }
 }
@@ -371,6 +371,15 @@ static std::vector<std::string> split(const std::string& str, char delimiter)
     return tokens;
 }
 
+static std::string eatComments(const std::string& str)
+{
+    // TODO: This does not work when strings are used. E.g., "//fff" will be cut
+    size_t start = str.find("//");
+    if (start == std::string::npos)
+        return str;
+    return str.substr(0, start);
+}
+
 bool RVMSerializer::parseValue(const std::string& str, RVMValue& outValue)
 {
     // Format: value:type or %rN:type or #strN:type
@@ -470,12 +479,12 @@ std::vector<RVMValue> RVMSerializer::parseValueList(const std::string& str)
 
 std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line)
 {
-    std::string trimmed = trim(line);
+    std::string trimmed = trim(eatComments(line));
     if (trimmed.empty())
         return nullptr;
 
     // Check for push/pop frame
-    if (trimmed.rfind("push_frame ", 0) == 0 || trimmed == "push_frame") {
+    if (trimmed.rfind("push_frame ", 0) == 0) {
         size_t count = 0;
         if (trimmed.size() > 11) {
             try {
@@ -486,7 +495,8 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         }
         return std::make_shared<RVMInstrPushFrame>(count);
     }
-    if (trimmed.rfind("pop_frame ", 0) == 0 || trimmed == "pop_frame") {
+
+    if (trimmed.rfind("pop_frame ", 0) == 0) {
         size_t count = 0;
         if (trimmed.size() > 10) {
             try {
@@ -496,12 +506,6 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             }
         }
         return std::make_shared<RVMInstrPopFrame>(count);
-    }
-
-    // Check for comments (format: // ...)
-    if (trimmed.rfind("//", 0) == 0) {
-        std::string message = trim(trimmed.substr(2));
-        return std::make_shared<RVMInstrComment>(message);
     }
 
     // Check for label (format: labelname:)
@@ -549,6 +553,38 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         return std::make_shared<RVMInstrReturn>(count);
     }
 
+    // Check for call_external (void return)
+    if (trimmed.rfind("call_external ", 0) == 0) {
+        size_t parenStart = trimmed.find('(');
+        size_t parenEnd   = trimmed.find(')', parenStart);
+        if (parenStart == std::string::npos || parenEnd == std::string::npos)
+            return nullptr;
+
+        std::string funcName = trim(trimmed.substr(15, parenStart - 5));
+        std::string argsStr  = trimmed.substr(parenStart + 1, parenEnd - parenStart - 1);
+
+        std::vector<RVMValue> args = parseValueList(argsStr);
+        return std::make_shared<RVMInstrExternalCall>(std::nullopt, funcName, args);
+    }
+
+    // Check for call_internal
+    if (trimmed.rfind("call_internal ", 0) == 0) {
+        try {
+            const auto afterInstr = trim(trimmed.substr(14));
+            size_t offset         = 0;
+            size_t paramCount     = std::stoull(afterInstr, &offset);
+
+            const auto afterParamCount = trim(afterInstr.substr(offset + 1));
+            offset                     = 0;
+            size_t returnCount         = std::stoull(afterParamCount, &offset);
+
+            std::string funcName = trim(afterParamCount.substr(offset + 1));
+            return std::make_shared<RVMInstrInternalCall>(paramCount, returnCount, funcName);
+        } catch (...) {
+            return nullptr;
+        }
+    }
+
     // Check for assignment instructions (dst = op ...)
     size_t eqPos = trimmed.find('=');
     if (eqPos != std::string::npos) {
@@ -575,7 +611,7 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             std::string argsStr   = trim(rest.substr(space + 1));
 
             Opcode op                          = stringToOpcode(opcodeStr);
-            std::vector<std::string> argTokens = split(argsStr, ',');
+            std::vector<std::string> argTokens = split(argsStr, ' ');
 
             if (argTokens.size() == 1) {
                 // 2-operand instruction: dst = op src
@@ -604,20 +640,6 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             return std::make_shared<RVMInstrExternalCall>(dst, funcName, args);
         }
 
-        // Check for call_internal
-        if (rest.rfind("call_internal ", 0) == 0) {
-            const auto afterInstr = trim(rest.substr(15));
-            size_t offset         = 0;
-            size_t paramCount     = std::stoull(afterInstr, &offset);
-
-            const auto afterParamCount = trim(rest.substr(offset + 1));
-            offset                     = 0;
-            size_t returnCount         = std::stoull(afterParamCount, &offset);
-
-            std::string funcName = trim(afterParamCount.substr(offset + 1));
-            return std::make_shared<RVMInstrInternalCall>(paramCount, returnCount, funcName);
-        }
-
         // Check for load_string
         if (rest.rfind("load_string ", 0) == 0) {
             // Format: dst = load_string "string_value"
@@ -641,10 +663,6 @@ RVMProgram RVMSerializer::read(std::istream& is)
     std::string line;
 
     while (std::getline(is, line)) {
-        line = trim(line);
-        if (line.empty())
-            continue;
-
         // Parse instruction
         auto instr = readInstruction(line);
         if (instr)

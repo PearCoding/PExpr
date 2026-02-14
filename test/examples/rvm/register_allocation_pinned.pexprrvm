@@ -1,0 +1,14 @@
+%r2:int = mov 42:int        // Just a basic constant saved in %r2
+push_frame 1                // We will override %r0, so save it.
+%r0:int = mov %r2:int       // We move the call parameter to %r0
+call_internal 1 1 test_func // Call 'test_func' with a single input parameter and a single return value
+%r4:int = mov %r0:int       // The return value is in %r0. Save it
+pop_frame 1                 // Restore %r0 from the frame stack (which is redundant in this example)
+%r0:int = mov %r4:int       // We return a single value from the main/body program to the host. The value is returned via %r0
+ret 1
+
+test_func:
+%r4:int = mov %r0:int         // The parameter is in %r0
+%r3:int = add %r4:int %r4:int // Add the function parameter together
+%r0:int = mov %r3:int         // Return values are in %r0 and upwards
+ret 1                         // We have a single return value. Mark it

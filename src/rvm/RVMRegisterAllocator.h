@@ -1,6 +1,8 @@
 #pragma once
 
+#include "RVMBasicBlockAnalyzer.h"
 #include "RVMInstruction.h"
+#include "RVMLiveAnalyzer.h"
 #include "RVMProgram.h"
 
 #include <unordered_map>
@@ -17,37 +19,19 @@ public:
     static bool allocate(RVMProgram& program);
 
     /// Get maximum register count in program (for debugging)
-    static size_t getMaxRegisterCount(const RVMProgram& program);
+    [[nodiscard]] static size_t getMaxRegisterCount(const RVMProgram& program);
 
     /// Get maximum allocated register count after allocation (for debugging)
-    static size_t getAllocatedRegisterCount(const RVMProgram& program);
+    [[nodiscard]] static size_t getAllocatedRegisterCount(const RVMProgram& program);
 
 private:
-    /// Live interval for a register
-    struct LiveInterval {
-        RegId originalReg = 0;
-        size_t start      = 0; // Instruction index where defined
-        size_t end        = 0; // Instruction index of last use
-
-        // For linear scan
-        RegId allocatedReg = 0;
-
-        LiveInterval() = default;
-
-        LiveInterval(RegId reg, size_t s, size_t e)
-            : originalReg(reg)
-            , start(s)
-            , end(e)
-            , allocatedReg(reg)
-        {
-        }
+    struct InternalLiveInterval {
+        RVMLiveAnalyzer::LiveInterval Interval;
+        RegId AllocatedRegister;
     };
 
-    /// Analyze live ranges of all registers in program
-    static std::vector<LiveInterval> analyzeLiveRanges(const RVMProgram& program);
-
     /// Perform linear scan allocation on intervals
-    static void linearScanAllocate(std::vector<LiveInterval>& intervals);
+    static void linearScanAllocate(std::vector<InternalLiveInterval>& intervals);
 
     /// Rewrite program with new register assignments
     static void rewriteProgram(RVMProgram& program, const std::unordered_map<RegId, RegId>& regMap);
@@ -56,7 +40,7 @@ private:
     static std::unordered_set<RegId> collectRegisters(const RVMProgram& program);
 
     /// Create register mapping from intervals
-    static std::unordered_map<RegId, RegId> createRegisterMap(const std::vector<LiveInterval>& intervals);
+    static std::unordered_map<RegId, RegId> createRegisterMap(const std::vector<InternalLiveInterval>& intervals);
 };
 
 } // namespace PExpr::rvm

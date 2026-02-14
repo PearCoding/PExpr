@@ -204,6 +204,43 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "pexprc -O0 Input RVM",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O0",
+                "--std-output",
+                "--input-rvm",
+                "--emit-rvm",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pexprc -O3 Input RVM",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/pexprc.exe",
+            "args": [
+                "-O3",
+                "--std-output",
+                "--input-rvm",
+                "--emit-rvm",
+                "--no-opt-rvm-moves",
+                // "--no-opt-rvm-redundant-moves",
+                "--no-opt-register-allocation",
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "pcalc",
             "type": "cppvsdbg",
             "request": "launch",

@@ -59,6 +59,9 @@ int main(int argc, char** argv)
     bool readSSAIR = false;
     app.add_flag("--input-ir", readSSAIR, "Read SSA IR produced by a previous run instead of a file with PExpr syntax");
 
+    bool readRVMIR = false;
+    app.add_flag("--input-rvm", readRVMIR, "Read RVM IR produced by a previous run instead of a file with PExpr syntax");
+
     uint32_t warningFlags = RT_WARNING_DEFAULT;
     bool warningAsError   = false;
 
@@ -147,8 +150,13 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    if (readSSAIR && emitAST) {
+    if (readSSAIR & emitAST) {
         std::cerr << "Can't read SSA IR and emit AST afterwards" << std::endl;
+        return 1;
+    }
+
+    if (readRVMIR & (emitAST || !emitRVM)) {
+        std::cerr << "Can't read RVM IR and emit AST or SSA IR afterwards" << std::endl;
         return 1;
     }
 
@@ -193,52 +201,57 @@ int main(int argc, char** argv)
     Environment env;
     env.reporter().setOutputMask(warningFlags);
 
-    ssa::SSAProgram program;
-    if (!readSSAIR) {
-        auto ast = env.parse(sourceFile, std::filesystem::absolute(inputFile));
+    rvm::RVMProgram rvmProgram;
+    if (!readRVMIR) {
+        ssa::SSAProgram ssaProgram;
+        if (!readSSAIR) {
+            auto ast = env.parse(sourceFile, std::filesystem::absolute(inputFile));
 
-        if (ast == nullptr)
-            return env.reporter().errorCount();
+            if (ast == nullptr)
+                return env.reporter().errorCount();
 
-        if (warningAsError && env.reporter().warningCount() > 0) {
-            PEXPR_LOG_ERROR << "Terminating as a warning was generated" << std::endl;
-            return env.reporter().warningCount();
+            if (warningAsError && env.reporter().warningCount() > 0) {
+                PEXPR_LOG_ERROR << "Terminating as a warning was generated" << std::endl;
+                return env.reporter().warningCount();
+            }
+
+            if (emitAST) {
+                dumpOutput(StringVisitor::visit(ast) + "\n");
+                return env.reporter().errorCount();
+            }
+
+            // Map to IR
+            ssaProgram = env.map(ast);
+        } else {
+            ssaProgram = ssa::SSASerializer::read(sourceFile);
         }
 
-        if (emitAST) {
-            dumpOutput(StringVisitor::visit(ast) + "\n");
-            return env.reporter().errorCount();
-        }
-
-        // Map to IR
-        program = env.map(ast);
-    } else {
-        program = ssa::SSASerializer::read(sourceFile);
-    }
-
-    if (!ssa::SSAValidator::checkIfTyped(&program)) {
-        PEXPR_LOG_ERROR << "The SSA will be invalid due to unspecified typing!" << std::endl;
-        dumpOutput(ssa::SSASerializer::serialize(program));
-        return env.reporter().errorCount() + 1;
-    }
-
-    if (!skipOptimizationPass) {
-        // Optimize
-        opt::SSAOptimizer::Run(optimizationOptions, program);
-
-        if (!ssa::SSAValidator::checkIfTyped(&program)) {
-            PEXPR_LOG_ERROR << "Computed SSA is invalid due to unspecified typing!" << std::endl;
+        if (!ssa::SSAValidator::checkIfTyped(&ssaProgram)) {
+            PEXPR_LOG_ERROR << "The SSA will be invalid due to unspecified typing!" << std::endl;
+            dumpOutput(ssa::SSASerializer::serialize(ssaProgram));
             return env.reporter().errorCount() + 1;
         }
-    }
 
-    if (!emitRVM) {
-        dumpOutput(ssa::SSASerializer::serialize(program));
-        return env.reporter().errorCount();
-    }
+        if (!skipOptimizationPass) {
+            // Optimize
+            opt::SSAOptimizer::Run(optimizationOptions, ssaProgram);
 
-    rvm::RVMMapper mapper;
-    auto rvmProgram = mapper.mapProgram(program);
+            if (!ssa::SSAValidator::checkIfTyped(&ssaProgram)) {
+                PEXPR_LOG_ERROR << "Computed SSA is invalid due to unspecified typing!" << std::endl;
+                return env.reporter().errorCount() + 1;
+            }
+        }
+
+        if (!emitRVM) {
+            dumpOutput(ssa::SSASerializer::serialize(ssaProgram));
+            return env.reporter().errorCount();
+        }
+
+        rvm::RVMMapper mapper;
+        rvmProgram = mapper.mapProgram(ssaProgram);
+    } else {
+        rvmProgram = rvm::RVMSerializer::read(sourceFile);
+    }
 
     if (!rvm::RVMValidator::checkIfElementary(rvmProgram))
         PEXPR_LOG_WARNING << "Constructed RVM program is invalid due to non-elementary types in registers" << std::endl;
