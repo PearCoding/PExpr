@@ -1,4 +1,5 @@
 #include "StringVisitor.h"
+#include "StringUtils.h"
 
 #include <functional>
 
@@ -165,7 +166,7 @@ std::string StringVisitor::dump(size_t, const Ptr<LiteralExpression>& expr)
     if (expr->returnType().kind() == type::TypeKind::Number)
         return std::to_string(expr->getNumber());
     if (expr->returnType().kind() == type::TypeKind::String)
-        return "\"" + expr->getString() + "\"";
+        return "\"" + escapeString(expr->getString()) + "\"";
     return "UNKNOWN";
 }
 
