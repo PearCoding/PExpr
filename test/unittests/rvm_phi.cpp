@@ -43,8 +43,8 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         // Verify RVM program has conditional branches for phi
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
 
-        // Should have conditional branches (brz) for phi resolution
-        REQUIRE(rvmStr.find("brz") != std::string::npos);
+        // Should have conditional branches (jz) for phi resolution
+        REQUIRE(rvmStr.find("jz") != std::string::npos);
         // Should have labels for phi resolution
         REQUIRE((rvmStr.find("phi_end_") != std::string::npos || rvmStr.find("phi_next_") != std::string::npos));
     }
@@ -108,7 +108,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         REQUIRE(!rvmStr.empty());
 
         // Should have conditional branch for the single condition
-        REQUIRE(rvmStr.find("brz") != std::string::npos);
+        REQUIRE(rvmStr.find("jz") != std::string::npos);
     }
 
     SECTION("Phi with multiple conditions")
@@ -140,10 +140,10 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         // Verify RVM program has multiple conditional branches
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
 
-        // Count brz instructions (should be at least 3 for the 3 conditions)
+        // Count ji instructions (should be at least 3 for the 3 conditions)
         size_t brzCount = 0;
         size_t pos      = 0;
-        while ((pos = rvmStr.find("brz", pos)) != std::string::npos) {
+        while ((pos = rvmStr.find("ji", pos)) != std::string::npos) {
             brzCount++;
             pos += 3;
         }

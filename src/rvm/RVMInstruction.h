@@ -110,7 +110,7 @@ public:
     virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const override { visitor(mSrc); }
 
 private:
-    Opcode mCond; // BR, BRZ, BRNZ
+    Opcode mCond; // JZ, JNZ
     RVMValue mSrc;
     std::string mTargetLabel; // Label name
 };

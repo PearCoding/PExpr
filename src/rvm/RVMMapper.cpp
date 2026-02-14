@@ -451,7 +451,7 @@ std::shared_ptr<RVMInstr> RVMMapper::mapBranch(const ssa::SSAInstrBranch& instr)
     RVMValue cond = mapValue(instr.Condition);
 
     // Branch if not zero (condition is true)
-    return std::make_shared<RVMInstrBranch>(Opcode::BRNZ, cond, instr.TargetLabel);
+    return std::make_shared<RVMInstrBranch>(Opcode::JNZ, cond, instr.TargetLabel);
 }
 
 // Map SSA goto instruction
@@ -536,7 +536,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
                 std::string nextLabel = "phi_next_" + std::to_string(result.size()) + "_" + std::to_string(i);
 
                 // Branch if condition is zero (false) to next condition
-                result.push_back(std::make_shared<RVMInstrBranch>(Opcode::BRZ, cond, nextLabel));
+                result.push_back(std::make_shared<RVMInstrBranch>(Opcode::JZ, cond, nextLabel));
 
                 // Condition is true: move branch value to destination
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
@@ -615,6 +615,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
     }
 
     // (3) Map main program body
+    rvmProgram.push_back(std::make_shared<RVMInstrComment>("Main Body:"));
     auto mainInstructions = mapInstructions(ssaProgram.Body, ssaProgram);
     rvmProgram.insert(rvmProgram.end(), mainInstructions.begin(), mainInstructions.end());
 

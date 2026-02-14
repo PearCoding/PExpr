@@ -63,12 +63,10 @@ std::string RVMSerializer::opcodeToString(Opcode op)
         return "mov";
 
     // Control flow
-    case Opcode::BR:
-        return "br";
-    case Opcode::BRZ:
-        return "brz";
-    case Opcode::BRNZ:
-        return "brnz";
+    case Opcode::JZ:
+        return "jz";
+    case Opcode::JNZ:
+        return "jnz";
     case Opcode::JMP:
         return "jmp";
     case Opcode::CALL_EXTERNAL:
@@ -141,12 +139,10 @@ Opcode RVMSerializer::stringToOpcode(const std::string& str)
     if (str == "mov")
         return Opcode::MOV;
 
-    if (str == "br")
-        return Opcode::BR;
-    if (str == "brz")
-        return Opcode::BRZ;
-    if (str == "brnz")
-        return Opcode::BRNZ;
+    if (str == "jz")
+        return Opcode::JZ;
+    if (str == "jnz")
+        return Opcode::JNZ;
     if (str == "jmp")
         return Opcode::JMP;
     if (str == "call_external")

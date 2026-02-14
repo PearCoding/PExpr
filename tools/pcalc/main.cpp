@@ -135,11 +135,9 @@ public:
                 auto cond         = evaluateValue(branch->srcs()[0]);
                 bool shouldBranch = false;
 
-                if (branch->opcode() == Opcode::BR)
-                    shouldBranch = std::get<bool>(cond);
-                else if (branch->opcode() == Opcode::BRZ)
+                if (branch->opcode() == Opcode::JZ)
                     shouldBranch = isZero(cond);
-                else if (branch->opcode() == Opcode::BRNZ)
+                else if (branch->opcode() == Opcode::JNZ)
                     shouldBranch = !isZero(cond);
 
                 if (shouldBranch) {

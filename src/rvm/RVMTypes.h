@@ -46,9 +46,8 @@ enum class Opcode : uint8_t {
     F2I, // Float to Integer
 
     // Control flow
-    BR,            // Branch conditional
-    BRZ,           // Branch if zero
-    BRNZ,          // Branch if not zero
+    JZ,            // Branch if zero
+    JNZ,           // Branch if not zero
     JMP,           // Unconditional jump
     CALL_EXTERNAL, // Function call to an external function (host)
     CALL_INTERNAL, // Function call to an internal function (PExpr)

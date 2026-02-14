@@ -174,9 +174,9 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
     SECTION("Branch instruction")
     {
         RVMValue src = RVMValue::Constant(true);
-        auto instr   = std::make_shared<RVMInstrBranch>(Opcode::BRZ, src, "target_label");
+        auto instr   = std::make_shared<RVMInstrBranch>(Opcode::JZ, src, "target_label");
 
-        REQUIRE(instr->opcode() == Opcode::BRZ);
+        REQUIRE(instr->opcode() == Opcode::JZ);
         REQUIRE_FALSE(instr->dst().has_value());
 
         auto srcs = instr->srcs();

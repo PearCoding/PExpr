@@ -46,11 +46,11 @@
             "patterns": [
                 {
                     "name": "keyword.control.pexprrvm",
-                    "match": "\\b(br|brz|brnz|jmp|ret|call_external|call_internal|push_frame|pop_frame|load_string)\\b"
+                    "match": "\\b(jz|jnz|jmp|ret|call_external|call_internal|push_frame|pop_frame|load_string)\\b"
                 },
                 {
                     "name": "keyword.operator.pexprrvm",
-                    "match": "\\b(mov|add|sub|mul|div|mod|pow|and|or|xor|shl|shr|cmp_eq|cmp_ne|cmp_lt|cmp_le|cmp_gt|cmp_ge|i2f|f2i|b2i|i2b|f2b|b2f)\\b"
+                    "match": "\\b(mov|add|sub|mul|div|mod|pow|and|or|xor|shl|shr|cmp_eq|cmp_ne|cmp_lt|cmp_le|cmp_gt|cmp_ge|i2f|f2i)\\b"
                 },
                 {
                     "name": "constant.language.boolean.pexprrvm",
