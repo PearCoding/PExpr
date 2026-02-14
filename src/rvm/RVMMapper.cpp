@@ -595,7 +595,6 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
     }
 
     // (2) External functions - they become comments in the body
-    bool hadExternal = false;
     for (const auto& ssaFunc : ssaProgram.Functions) {
         if (ssaFunc.External) {
             // Create a comment for external function declaration
@@ -612,12 +611,8 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
             comment += ") : " + ssaFunc.ReturnType.toString();
 
             rvmProgram.push_back(std::make_shared<RVMInstrComment>(comment));
-            hadExternal = true;
         }
     }
-
-    if (hadExternal) //< Add an empty line after external function declarations
-        rvmProgram.push_back(std::make_shared<RVMInstrComment>(""));
 
     // (3) Map main program body
     auto mainInstructions = mapInstructions(ssaProgram.Body, ssaProgram);
