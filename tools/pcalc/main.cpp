@@ -248,11 +248,12 @@ public:
             pc++;
         }
 
-        // Debug: print register contents
         if (returnType.isTuple()) {
             // Reconstruct tuple from linearized registers
             size_t regIndex = 0;
             return reconstructTuple(returnType, regIndex);
+        } else if (returnType.isVoid()) {
+            return ValueVariant{};
         } else {
             // Single value return
             if (registers.find(0) != registers.end())
@@ -617,7 +618,7 @@ int main(int argc, char** argv)
     std::string source = buffer.str();
 
     RVMProgram rvmProgram;
-    type::Type returnType = type::Type(type::TypeKind::Unspecified);
+    type::Type returnType = type::Type(type::TypeKind::Void);
 
     Environment env;
     auto ast = env.parse(source, inputFile);
