@@ -161,9 +161,20 @@ private:
                 // We are not the translation unit and want to close out the expression. Do it!
                 break;
             } else {
-                closure->addExpression(p_expression());
-                if (!P.accept(TokenType::Semicolon))
+                const auto expr = p_expression();
+                closure->addExpression(expr);
+
+                // Block expressions, statements above and the final expression (when return a value) are allowed to skip the semicolon
+                const bool isBlockExpression = expr->type() == ExpressionType::Closure || expr->type() == ExpressionType::Branch;
+
+                // If we have a block expression, do not stop even when we parse a semicolon
+                const auto semicolonLoc = P.cur().Location;
+                if (P.accept(TokenType::Semicolon)) {
+                    if (isBlockExpression)
+                        P.mReporter.warningf(utils::RT_WARNING_TRAILING_SEMICOLON, semicolonLoc, "Trailing '%s' at the end of an block expression", Token::toString(TokenType::Semicolon).data());
+                } else if (!isBlockExpression) {
                     break;
+                }
             }
         }
 
