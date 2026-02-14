@@ -67,6 +67,24 @@ TEST_CASE("Parser: function declaration and call", "[parser]")
     REQUIRE(out.find("f(") != std::string::npos);
 }
 
+TEST_CASE("Parser: function declaration with closure", "[parser]")
+{
+    auto ast = parseOnly("fn f(a:int) = { a }; f(1)");
+
+    const std::string out = StringVisitor::visit(ast);
+    REQUIRE(out.find("fn f(") != std::string::npos);
+    REQUIRE(out.find("f(") != std::string::npos);
+}
+
+TEST_CASE("Parser: function declaration with braces", "[parser]")
+{
+    auto ast = parseOnly("fn f(a:int) { a } f(1)");
+
+    const std::string out = StringVisitor::visit(ast);
+    REQUIRE(out.find("fn f(") != std::string::npos);
+    REQUIRE(out.find("f(") != std::string::npos);
+}
+
 TEST_CASE("Parser: branch expression (if/else)", "[parser]")
 {
     auto ast = parseOnly("if true { 1 } else { 2 }");

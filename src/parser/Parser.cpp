@@ -145,7 +145,7 @@ private:
                 P.expect(TokenType::ClosedSquareBracket);
             }
 
-            if (P.accept(TokenType::Let)) {
+            if (P.accept(TokenType::Let)) { //< Declaration Statement
                 // Could be regular variable or destructuring declaration
                 if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
                     // Destructuring declaration: let *[pattern] = expr;
@@ -154,10 +154,10 @@ private:
                     // Regular variable declaration
                     closure->addExpression(p_variable_statement(true, attrs));
                 }
-            } else if (P.accept(TokenType::Function)) {
+            } else if (P.accept(TokenType::Function)) { //< Declaration Statement
                 // Function
                 closure->addExpression(p_function_statement(attrs));
-            } else if (P.accept(TokenType::Using)) {
+            } else if (P.accept(TokenType::Using)) { //< Declaration Statement
                 // Type alias
                 closure->addExpression(p_type_alias_statement(attrs));
             } else if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
@@ -518,10 +518,18 @@ private:
                     P.mReporter.errorf(p->location(), "Parameter '%s' with the same name already exists", p->name().c_str());
             }
 
-            P.expect(TokenType::Assign);
-            Ptr<Expression> expr = p_expression();
-            closure->addExpression(expr);
-            P.expect(TokenType::Semicolon);
+            Ptr<Expression> expr;
+            if (P.accept(TokenType::Assign)) {
+                expr = p_expression();
+                closure->addExpression(expr);
+                P.expect(TokenType::Semicolon);
+            } else if (P.accept(TokenType::OpenBraces)) {
+                expr = p_expression();
+                closure->addExpression(expr);
+                P.expect(TokenType::ClosedBraces);
+            } else {
+                P.error(std::to_array<TokenType>({ TokenType::Assign, TokenType::OpenBraces }));
+            }
 
             mCurrentClosure = closure->parent();
 

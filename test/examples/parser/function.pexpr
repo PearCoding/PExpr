@@ -1,7 +1,13 @@
 // Function
-fn foo(x: int) = {
+fn foo_a(x: int) = {
     let y = x * 2;
     y + 1
 };
 
-foo(5)
+fn foo_b(x: int) = x*4;
+
+fn foo_c(x: int) {
+    x * 78
+}
+
+foo_a(5) + foo_b(2) + foo_c(4)

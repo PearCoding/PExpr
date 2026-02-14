@@ -110,6 +110,11 @@ fn complexOperation(x: num) -> num = {
     let intermediate = x * 2.0;
     intermediate + 1.0
 };
+
+fn complexOperation2(x: num) -> num {
+    let intermediate = x * 2.0;
+    intermediate + 1.0
+}
 ```
 
 ### Control Flow
