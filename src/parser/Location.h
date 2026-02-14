@@ -68,6 +68,13 @@ public:
         return a.column() <=> b.column();
     }
 
+    [[nodiscard]] inline std::string toString() const
+    {
+        std::stringstream stream;
+        stream << *this;
+        return stream.str();
+    }
+
 private:
     std::filesystem::path mFilename; //< Only used for diagnosis and error/warning reports. Never included in the file itself
     size_t mColumn;

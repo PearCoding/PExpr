@@ -19,8 +19,9 @@ enum ReportType {
     RT_WARNING_PURE_INTERNAL_FUNCTIONS = 0x800,  ///< Warn when internal functions are marked as pure (which they are by default)
     RT_WARNING_SHADOWED_PARAMETER      = 0x1000, ///< Warn when a parameter gets shadowed inside the very first closure
     RT_WARNING_UNUSED_CLOSURE_RETURN   = 0x2000, ///< Warn when a closure returns a value which will not be used
+    RT_WARNING_FUNCTION_REDEFINITION   = 0x4000, ///< Warn when the exact same function is redefined in the exact same scope
 
-    RT_WARNING_DEFAULT = RT_WARNING_TRAILING_SEMICOLON | RT_WARNING_PURE_INTERNAL_FUNCTIONS | RT_WARNING_SHADOWED_PARAMETER,
+    RT_WARNING_DEFAULT = RT_WARNING_TRAILING_SEMICOLON | RT_WARNING_PURE_INTERNAL_FUNCTIONS | RT_WARNING_SHADOWED_PARAMETER | RT_WARNING_FUNCTION_REDEFINITION,
     RT_WARNING_ALL     = RT_WARNING_DEFAULT | RT_WARNING_IMPLICIT_CAST | RT_WARNING_UNUSED_CLOSURE_RETURN,
 };
 

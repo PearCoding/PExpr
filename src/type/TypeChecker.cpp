@@ -63,8 +63,19 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure)
             if (funcStmt->isExtern() && funcStmt->isUnspecified()) {
                 mReporter.errorf(funcStmt->location(), "External function '%s' has no return type defined", funcStmt->name().c_str());
             } else {
-                if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects(), funcStmt->location())))
-                    mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+                auto funcDef = FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects(), funcStmt->location());
+                if (!closure->symbols().addFunction(std::move(funcDef))) {
+                    std::vector<Type> funcTypes;
+                    funcTypes.reserve(funcStmt->parameters().size());
+                    for (auto p : funcStmt->parameters())
+                        funcTypes.push_back(p->type());
+
+                    auto prevFunc = closure->symbols().lookupFunction(funcStmt->location(), funcStmt->name(), funcTypes, true);
+                    if (prevFunc)
+                        mReporter.warningf(utils::RT_WARNING_FUNCTION_REDEFINITION, funcStmt->location(), "Function '%s' already defined at %s", funcStmt->name().c_str(), prevFunc->location().toString().c_str());
+                    else
+                        mReporter.warningf(utils::RT_WARNING_FUNCTION_REDEFINITION, funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
+                }
             }
         }
     }

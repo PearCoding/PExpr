@@ -874,8 +874,10 @@ private:
 
         // Register the type alias in the current symbol table
         if (mCurrentClosure) {
-            if (!mCurrentClosure->symbols().addTypeAlias(aliasName, aliasedType))
+            if (!mCurrentClosure->symbols().addTypeAlias(aliasName, aliasedType)) {
+                // TODO: Get location of the previous type alias
                 P.mReporter.errorf(loc, "Type alias '%s' already defined in the current scope", aliasName.c_str());
+            }
         }
 
         return std::make_shared<TypeAliasStatement>(loc, aliasName, aliasedType);
