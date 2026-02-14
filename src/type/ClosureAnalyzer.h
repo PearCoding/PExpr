@@ -29,11 +29,11 @@ public:
 private:
     utils::Reporter& mReporter;
 
-    /// Collect mutable assignments from a pattern (for variable assignment statements)
-    void collectMutableAssignmentsFromPattern(const ast::Closure* focusedClosure, const ast::Closure* currentClosure,
-                                              const Ptr<ast::Pattern>& pattern,
-                                              std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
-                                              std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
+    /// Collect mutable assignments from an expression (for assignment expressions like [a, b] = ... or c = f)
+    void collectMutableAssignmentsFromExpression(const ast::Closure* focusedClosure, const ast::Closure* currentClosure,
+                                                 const Ptr<ast::Expression>& expr,
+                                                 std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                                 std::map<std::string, Ptr<VariableDef>>& outCapturedMutable);
 
     const bool mCaptureUsage;
     const bool mCaptureModification;

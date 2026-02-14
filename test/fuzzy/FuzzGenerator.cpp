@@ -140,7 +140,7 @@ std::string FuzzGenerator::generateMalformedSyntax()
     case 8:
         return "fn f(x:int -> int = x;"; // Missing closing paren
     case 9:
-        return "*[x, y] = [1, 2"; // Missing closing bracket
+        return "[x, y] = [1, 2"; // Missing closing bracket
     default:
         return "";
     }

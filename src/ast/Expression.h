@@ -285,6 +285,29 @@ private:
     size_t mIndex;
 };
 
+/// Assignment expression like a = b or [x, y] = [1, 2]
+class AssignmentExpression : public Expression {
+public:
+    inline AssignmentExpression(const parser::Location& loc,
+                                const Ptr<Expression>& lvalue,
+                                const Ptr<Expression>& rvalue)
+        : Expression(loc, ExpressionType::Assignment)
+        , mLValue(lvalue)
+        , mRValue(rvalue)
+    {
+        PEXPR_ASSERT(lvalue != nullptr && rvalue != nullptr, "Expected valid expressions for assignment");
+    }
+
+    [[nodiscard]] inline Ptr<Expression> lvalue() const { return mLValue; }
+    [[nodiscard]] inline Ptr<Expression>& lvalueMut() & { return mLValue; }
+    [[nodiscard]] inline Ptr<Expression> rvalue() const { return mRValue; }
+    [[nodiscard]] inline Ptr<Expression>& rvalueMut() & { return mRValue; }
+
+private:
+    Ptr<Expression> mLValue;
+    Ptr<Expression> mRValue;
+};
+
 class Closure;
 /// Basic closure embedded in braces {}
 class ClosureExpression : public Expression {

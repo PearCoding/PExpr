@@ -147,26 +147,16 @@ private:
 
             if (P.accept(TokenType::Let)) { //< Declaration Statement
                 // Could be regular variable or destructuring declaration
-                if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
-                    // Destructuring declaration: let *[pattern] = expr;
-                    closure->addExpression(p_destructuring_statement(true, attrs));
-                } else {
-                    // Regular variable declaration
-                    closure->addExpression(p_variable_statement(true, attrs));
-                }
+                if (P.cur(0).Type == TokenType::OpenSquareBracket) //< Destructuring declaration: let [pattern] = expr;
+                    closure->addExpression(p_destructuring_declaration(attrs));
+                else //< Regular variable declaration
+                    closure->addExpression(p_variable_declaration(attrs));
             } else if (P.accept(TokenType::Function)) { //< Declaration Statement
                 // Function
                 closure->addExpression(p_function_statement(attrs));
             } else if (P.accept(TokenType::Using)) { //< Declaration Statement
                 // Type alias
                 closure->addExpression(p_type_alias_statement(attrs));
-            } else if (P.cur(0).Type == TokenType::Mul && P.cur(1).Type == TokenType::OpenSquareBracket) {
-                // Destructuring assignment: *[pattern] = expr;
-                closure->addExpression(p_destructuring_statement(false, attrs));
-            } else if (P.cur(0).Type == TokenType::Identifier
-                       && (P.cur(1).Type == TokenType::Assign || P.cur(1).Type == TokenType::PlusAssign || P.cur(1).Type == TokenType::MinusAssign || P.cur(1).Type == TokenType::MulAssign || P.cur(1).Type == TokenType::DivAssign)) {
-                // Regular variable assignment
-                closure->addExpression(p_variable_statement(false, attrs));
             } else if (P.cur(0).Type == TokenType::ClosedBraces && mCurrentClosure->parent()) {
                 // We are not the translation unit and want to close out the expression. Do it!
                 break;
@@ -188,15 +178,13 @@ private:
     }
 
     // Unified variable statement (single identifier or pattern)
-    inline Ptr<Expression> p_variable_statement(bool is_declaration, const AttributeList& attrs)
+    inline Ptr<Expression> p_variable_declaration(const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
 
         const auto loc = P.cur().Location;
 
-        bool is_mutable = false;
-        if (is_declaration)
-            is_mutable = P.accept(TokenType::Mutable);
+        const bool is_mutable = P.accept(TokenType::Mutable);
 
         const auto idLoc          = P.cur().Location;
         const std::string varName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
@@ -204,7 +192,7 @@ private:
 
         // Optional explicit type annotation for declarations: ': TYPE'
         Type declaredType = Type(TypeKind::Unspecified);
-        if (is_declaration && P.accept(TokenType::Colon))
+        if (P.accept(TokenType::Colon))
             declaredType = p_type();
 
         // Get the assignment operator (could be =, +=, -=, *=, /=)
@@ -220,81 +208,33 @@ private:
         P.expect(TokenType::Semicolon);
 
         // Create a pattern with a single simple binding
-        if (is_declaration) {
-            auto variableDef = std::make_shared<type::VariableDef>(varName, declaredType, is_mutable, idLoc);
+        auto variableDef = std::make_shared<type::VariableDef>(varName, declaredType, is_mutable, idLoc);
 
-            if (!mCurrentClosure->symbols().addVariable(variableDef))
-                P.mReporter.errorf(idLoc, "Variable '%s' already exists in the current scope", variableDef->name().c_str());
+        if (!mCurrentClosure->symbols().addVariable(variableDef))
+            P.mReporter.errorf(idLoc, "Variable '%s' already exists in the current scope", variableDef->name().c_str());
 
-            Pattern::ElementList elements;
-            elements.push_back(PatternElement::makeSimple(idLoc, variableDef));
-            auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
+        Pattern::ElementList elements;
+        elements.push_back(PatternElement::makeSimple(idLoc, variableDef));
+        auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
 
-            // For declarations, only simple assignment is allowed
-            if (assignOp != TokenType::Assign) {
-                P.mReporter.errorf(idLoc, "Compound assignment operators are not allowed in declarations");
-                return std::make_shared<ErrorExpression>(loc);
-            }
-
-            return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(rightExpr));
-        } else {
-            if (auto lkp = mCurrentClosure->symbols().lookupVariable(idLoc, varName)) {
-                Pattern::ElementList elements;
-                elements.push_back(PatternElement::makeSimple(idLoc, lkp));
-                auto pattern = std::make_shared<Pattern>(loc, std::move(elements));
-
-                Ptr<Expression> assignmentExpr = rightExpr;
-
-                // Transform compound assignments to binary operations
-                if (assignOp != TokenType::Assign) {
-                    // Map token type to binary operation
-                    BinaryOperation binOp;
-                    switch (assignOp) {
-                    case TokenType::PlusAssign:
-                        binOp = BinaryOperation::Add;
-                        break;
-                    case TokenType::MinusAssign:
-                        binOp = BinaryOperation::Sub;
-                        break;
-                    case TokenType::MulAssign:
-                        binOp = BinaryOperation::Mul;
-                        break;
-                    case TokenType::DivAssign:
-                        binOp = BinaryOperation::Div;
-                        break;
-                    default:
-                        PEXPR_ASSERT(false, "Unhandled compound assignment operator");
-                        binOp = BinaryOperation::Add;
-                        break;
-                    }
-
-                    // Create variable expression for the left side
-                    auto varExpr = std::make_shared<VariableExpression>(idLoc, lkp);
-
-                    // Create binary expression: left op right
-                    assignmentExpr = std::make_shared<BinaryExpression>(loc, binOp, varExpr, rightExpr);
-                }
-
-                return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(assignmentExpr));
-            } else {
-                P.mReporter.errorf(idLoc, "Unknown variable '%s' in the current scope", varName.c_str());
-                return std::make_shared<ErrorExpression>(loc);
-            }
+        // For declarations, only simple assignment is allowed
+        if (assignOp != TokenType::Assign) {
+            P.mReporter.errorf(idLoc, "Compound assignment operators are not allowed in declarations");
+            return std::make_shared<ErrorExpression>(loc);
         }
+
+        return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(rightExpr));
     }
 
     // Destructuring statement (pattern)
-    inline Ptr<Expression> p_destructuring_statement(bool is_declaration, const AttributeList& attrs)
+    inline Ptr<Expression> p_destructuring_declaration(const AttributeList& attrs)
     {
         PEXPR_UNUSED(attrs);
 
         const auto loc = P.cur().Location;
 
-        // Patterns need a * before [
-        P.expect(TokenType::Mul);
-
-        // Parse pattern (allow mut/type annotations only for declarations)
-        auto pattern = p_pattern(is_declaration);
+        // Parse pattern
+        auto pattern = p_pattern_declaration();
         if (!pattern)
             return std::make_shared<ErrorExpression>(loc);
 
@@ -316,10 +256,7 @@ private:
 
         P.expect(TokenType::Semicolon);
 
-        if (is_declaration)
-            return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(expr));
-        else
-            return std::make_shared<VariableAssignmentStatement>(loc, pattern, std::move(expr));
+        return std::make_shared<VariableDeclarationStatement>(loc, pattern, std::move(expr));
     }
 
     inline ParameterList p_parameter_def_list()
@@ -343,7 +280,8 @@ private:
         return list;
     }
 
-    inline Ptr<Pattern> p_pattern(bool is_declaration)
+    // Pattern for declaration (aka, variable/tuple expression with declaration stuff)
+    inline Ptr<Pattern> p_pattern_declaration()
     {
         const auto loc = P.cur().Location;
         P.expect(TokenType::OpenSquareBracket);
@@ -356,47 +294,34 @@ private:
                 // Check if this is a nested pattern (starts with '[') or a simple binding
                 if (P.cur().Type == TokenType::OpenSquareBracket) {
                     // Nested pattern
-                    auto nestedPattern = p_pattern(is_declaration);
+                    auto nestedPattern = p_pattern_declaration();
                     if (!nestedPattern)
                         return nullptr;
                     elements.push_back(PatternElement::makeNested(elemLoc, nestedPattern));
                 } else {
                     // Simple binding
 
-                    // Check for 'mut' keyword (only allowed in declarations)
-                    bool isMutable = false;
-                    if (is_declaration && P.accept(TokenType::Mutable))
-                        isMutable = true;
+                    // Check for 'mut' keyword
+                    const bool isMutable = P.accept(TokenType::Mutable);
 
                     // Expect identifier
                     const std::string elemName = P.cur().Type == TokenType::Identifier ? std::get<std::string>(P.cur().Value) : "_unknown_";
                     P.expect(TokenType::Identifier);
 
-                    // Optional type annotation (only allowed in declarations)
+                    // Optional type annotation
                     Type declaredType = Type(TypeKind::Unspecified);
                     if (P.accept(TokenType::Colon)) {
-                        if (is_declaration) {
-                            declaredType = p_type();
-                            if (declaredType.isVoid())
-                                P.mReporter.errorf(elemLoc, "Declared variable '%s' can not be of type 'void'", elemName.c_str());
-                        } else {
-                            P.mReporter.errorf(P.cur().Location, "Type annotations are not allowed in destructuring assignments");
-                        }
+                        declaredType = p_type();
+                        if (declaredType.isVoid())
+                            P.mReporter.errorf(elemLoc, "Declared variable '%s' can not be of type 'void'", elemName.c_str());
                     }
 
-                    if (is_declaration) {
-                        auto variableDef = std::make_shared<type::VariableDef>(elemName, declaredType, isMutable, elemLoc);
+                    auto variableDef = std::make_shared<type::VariableDef>(elemName, declaredType, isMutable, elemLoc);
 
-                        if (!mCurrentClosure->symbols().addVariable(variableDef))
-                            P.mReporter.errorf(elemLoc, "Variable '%s' already exists in the current scope", variableDef->name().c_str());
+                    if (!mCurrentClosure->symbols().addVariable(variableDef))
+                        P.mReporter.errorf(elemLoc, "Variable '%s' already exists in the current scope", variableDef->name().c_str());
 
-                        elements.push_back(PatternElement::makeSimple(elemLoc, variableDef));
-                    } else {
-                        if (auto lkp = mCurrentClosure->symbols().lookupVariable(elemLoc, elemName))
-                            elements.push_back(PatternElement::makeSimple(elemLoc, lkp));
-                        else
-                            P.mReporter.errorf(elemLoc, "Unknown variable '%s' in the current scope", elemName.c_str());
-                    }
+                    elements.push_back(PatternElement::makeSimple(elemLoc, variableDef));
                 }
             } while (P.accept(TokenType::Comma));
         }
@@ -529,6 +454,8 @@ private:
                 P.expect(TokenType::ClosedBraces);
             } else {
                 P.error(std::to_array<TokenType>({ TokenType::Assign, TokenType::OpenBraces }));
+                mCurrentClosure = mCurrentClosure->parent();
+                return std::make_shared<ErrorExpression>(loc);
             }
 
             mCurrentClosure = closure->parent();
@@ -551,7 +478,7 @@ private:
                     closure = innerClosure;
                     closure->setParent(mCurrentClosure);
 
-                    // Readd the parameters for the later passes as the previous one got removed
+                    // Re-add the parameters for the later passes as the previous one got removed
                     for (const auto& p : parameters) {
                         if (!closure->symbols().addVariable(p))
                             P.mReporter.errorf(p->location(), "Parameter '%s' with the same name already exists", p->name().c_str()); //< This should never happen, but better be safe
@@ -571,7 +498,65 @@ private:
     // Expressions
     inline Ptr<Expression> p_expression()
     {
-        return p_binary_expression();
+        return p_assignment_expression();
+    }
+
+    inline Ptr<Expression> p_assignment_expression()
+    {
+        // Parse left-hand side
+        auto lvalue = p_binary_expression();
+
+        // Check for assignment operator
+        if (isAssignmentOperator(P.cur().Type)) {
+            const auto loc           = P.cur().Location;
+            const TokenType assignOp = P.cur().Type;
+            P.next(); // Consume the assignment operator
+
+            // Parse right-hand side (recursive for chained assignments like a = b = c)
+            auto rvalue = p_assignment_expression();
+
+            // Check if LHS is valid for assignment
+            if (lvalue->type() != ExpressionType::Variable && lvalue->type() != ExpressionType::Tuple) {
+                P.mReporter.errorf(lvalue->location(), "Left-hand side of assignment must be a variable or tuple pattern");
+                return std::make_shared<ErrorExpression>(loc);
+            }
+
+            // Handle compound assignments as syntactic sugar: a += b -> a = (a + b)
+            if (assignOp != TokenType::Assign) {
+                // Map token type to binary operation
+                BinaryOperation binOp;
+                switch (assignOp) {
+                case TokenType::PlusAssign:
+                    binOp = BinaryOperation::Add;
+                    break;
+                case TokenType::MinusAssign:
+                    binOp = BinaryOperation::Sub;
+                    break;
+                case TokenType::MulAssign:
+                    binOp = BinaryOperation::Mul;
+                    break;
+                case TokenType::DivAssign:
+                    binOp = BinaryOperation::Div;
+                    break;
+                default:
+                    PEXPR_ASSERT(false, "Unhandled compound assignment operator");
+                    binOp = BinaryOperation::Add;
+                    break;
+                }
+
+                // Create binary expression: (lvalue op rvalue)
+                rvalue = std::make_shared<BinaryExpression>(loc, binOp, lvalue, rvalue);
+            }
+
+            return std::make_shared<AssignmentExpression>(loc, lvalue, rvalue);
+        }
+
+        return lvalue;
+    }
+
+    static inline bool isAssignmentOperator(TokenType type)
+    {
+        return type == TokenType::Assign || type == TokenType::PlusAssign || type == TokenType::MinusAssign || type == TokenType::MulAssign || type == TokenType::DivAssign;
     }
 
     static inline std::pair<BinaryOperation, int> binaryOpFromToken(TokenType type)

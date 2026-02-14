@@ -14,13 +14,13 @@ outer() // = should be 2
 //     [x, x]
 //   };
 //   [{
-//     let *[__result:int, x__new:int] = inner(x);
+//     let [__result:int, x__new:int] = inner(x);
 //     x = x__new;
 //     __result
 //   }, x]
 // };
 // {
-//   let *[__result:int, x__new:int] = outer(x);
+//   let [__result:int, x__new:int] = outer(x);
 //   x = x__new;
 //   __result
 // }

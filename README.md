@@ -154,16 +154,16 @@ let x = point[0];
 let y = point[1];
 
 // Destructuring declaration
-let *[a, b, c] = point;
+let [a, b, c] = point;
 
 // Nested destructuring
 let nested = [[1, 2], [3, 4]];
-let *[[x1, y1], [x2, y2]] = nested;
+let [[x1, y1], [x2, y2]] = nested;
 
 // Destructuring assignment
 let mut p = 0;
 let mut q = 0;
-*[p, q] = [5, 10];
+[p, q] = [5, 10];
 ```
 
 ### Vector Operations

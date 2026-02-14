@@ -84,7 +84,7 @@ TEST_CASE("UpliftPass: destructuring assignment with mutable capture", "[uplift]
 {
     Environment env;
     // Destructuring assignment with mutable capture
-    auto ast = env.parse("let mut a = 1; let mut b = 2; fn update() = { *[a, b] = [b, a]; 0 }; update()");
+    auto ast = env.parse("let mut a = 1; let mut b = 2; fn update() = { [a, b] = [b, a]; 0 }; update()");
     REQUIRE(ast != nullptr);
 
     const std::string out = utils::StringVisitor::visit(ast);

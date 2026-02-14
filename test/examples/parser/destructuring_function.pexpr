@@ -1,4 +1,4 @@
 // Test with function returning tuple
 fn foo() -> [int, int] = [5, 6];
-let *[p, q] = foo();
+let [p, q] = foo();
 p * q

@@ -26,7 +26,6 @@ private:
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::Closure>& closure);
 
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::VariableDeclarationStatement>& statement);
-    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::VariableAssignmentStatement>& statement);
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::FunctionDeclarationStatement>& statement);
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::TypeAliasStatement>& statement);
 
@@ -41,6 +40,7 @@ private:
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::ClosureExpression>& expr);
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::BranchExpression>& expr);
     [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::TupleExpression>& expr);
+    [[nodiscard]] static std::string dump(size_t level, const Ptr<ast::AssignmentExpression>& expr);
 };
 
 } // namespace PExpr::utils

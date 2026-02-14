@@ -559,71 +559,92 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
             processPattern(*pattern, rhs, tupleType);
         }
     } break;
-    case ExpressionType::VariableAssignment: {
-        auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
-        auto mapped     = mapExpression(program, assignStmt->expression());
-        PEXPR_ASSERT(mapped.has_value(), "Expected variable assignment expression to produce a value");
-        SSAValue rhs        = *mapped;
-        const auto& pattern = assignStmt->pattern();
+    case ExpressionType::Assignment: {
+        auto assignExpr = std::reinterpret_pointer_cast<AssignmentExpression>(expr);
+        auto rhsMapped  = mapExpression(program, assignExpr->rvalue());
+        PEXPR_ASSERT(rhsMapped.has_value(), "Expected RHS of assignment expression to produce a value");
+        SSAValue rhs = *rhsMapped;
 
-        // TODO: Rework this
-        // Check if pattern is a single simple binding (i.e., regular variable assignment)
-        if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-            const auto varDef = pattern->elements()[0].simpleBinding();
+        // Handle LHS based on its type
+        const auto lhs = assignExpr->lvalue();
+
+        if (lhs->type() == ExpressionType::Variable) {
+            // Simple variable assignment: x = expr
+            auto varExpr  = std::reinterpret_pointer_cast<VariableExpression>(lhs);
+            auto variable = varExpr->variable();
 
             // Cast if needed
-            SSAValue finalVal = castIfNeeded(program, pattern->elements()[0].location(), rhs, varDef->type());
+            SSAValue finalVal = castIfNeeded(program, lhs->location(), rhs, variable->type());
 
             // Assign to variable (fresh version for assignment)
             SSAInstrAssign asg;
-            SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
+            SSAValue tgt = SSAValue::Named(mContext.fresh(variable->uniqueName(), true), finalVal.type());
             asg.Target   = tgt;
             asg.Operator = SSAInstrAssign::OpKind::Assign;
             asg.Operands = { finalVal };
             program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
-        } else {
-            // Destructuring pattern: RHS must be a tuple
-            // Helper function to recursively process pattern elements for assignment
-            std::function<void(const Pattern&, SSAValue)> processPattern =
-                [&](const Pattern& pattern, SSAValue tupleValue) -> void {
+
+            // The assignment expression itself returns the RHS value
+            result = tgt;
+        } else if (lhs->type() == ExpressionType::Tuple) {
+            // Destructuring tuple assignment: [x, y] = expr
+            auto tupleExpr         = std::reinterpret_pointer_cast<TupleExpression>(lhs);
+            const auto& lhsEntries = tupleExpr->entries();
+
+            // Helper function to recursively process tuple assignments
+            std::function<void(const std::vector<Ptr<Expression>>&, SSAValue, size_t&)> processTupleAssignment =
+                [&](const std::vector<Ptr<Expression>>& entries, SSAValue tupleValue, size_t& index) -> void {
                 PEXPR_ASSERT(tupleValue.type().isTuple(), "Expected tuple type for destructuring");
                 const auto& components = tupleValue.type().components();
-                for (size_t i = 0; i < pattern.size(); ++i) {
-                    const auto& elem     = pattern.elements()[i];
+
+                for (size_t i = 0; i < entries.size(); ++i) {
+                    const auto& elem     = entries[i];
                     const Type& elemType = components.at(i);
 
                     // Extract tuple element using Access operation
-                    SSAValue index   = SSAValue::Constant((Integer)i);
-                    SSAValue elemVal = SSAValue::Named(mContext.fresh("%"), elemType);
+                    SSAValue elemIndex = SSAValue::Constant((Integer)index);
+                    SSAValue elemVal   = SSAValue::Named(mContext.fresh("%"), elemType);
                     {
                         SSAInstrAssign access;
                         access.Target   = elemVal;
                         access.Operator = SSAInstrAssign::OpKind::Access;
-                        access.Operands = { tupleValue, index };
+                        access.Operands = { tupleValue, elemIndex };
                         program.Body.push_back(std::make_shared<SSAInstrAssign>(access));
                     }
 
-                    if (elem.isSimpleBinding()) {
-                        const auto varDef = elem.simpleBinding();
+                    if (elem->type() == ExpressionType::Variable) {
+                        auto varExpr  = std::reinterpret_pointer_cast<VariableExpression>(elem);
+                        auto variable = varExpr->variable();
 
-                        // Cast if needed (can't be really handled in the TypeChecker)
-                        SSAValue finalVal = castIfNeeded(program, elem.location(), elemVal, varDef->type());
+                        // Cast if needed
+                        SSAValue finalVal = castIfNeeded(program, elem->location(), elemVal, variable->type());
 
                         // Assign to variable (fresh version for assignment)
                         SSAInstrAssign asg;
-                        SSAValue tgt = SSAValue::Named(mContext.fresh(varDef->uniqueName(), true), finalVal.type());
+                        SSAValue tgt = SSAValue::Named(mContext.fresh(variable->uniqueName(), true), finalVal.type());
                         asg.Target   = tgt;
                         asg.Operator = SSAInstrAssign::OpKind::Assign;
                         asg.Operands = { finalVal };
                         program.Body.push_back(std::make_shared<SSAInstrAssign>(asg));
+                    } else if (elem->type() == ExpressionType::Tuple) {
+                        // Nested tuple - recurse
+                        auto nestedTupleExpr = std::reinterpret_pointer_cast<TupleExpression>(elem);
+                        processTupleAssignment(nestedTupleExpr->entries(), elemVal, index);
                     } else {
-                        // Nested pattern - recurse
-                        processPattern(*elem.nestedPattern(), elemVal);
+                        PEXPR_ASSERT(false, "Unsupported LHS expression type in tuple assignment");
                     }
+
+                    index++;
                 }
             };
 
-            processPattern(*pattern, rhs);
+            size_t startIndex = 0;
+            processTupleAssignment(lhsEntries, rhs, startIndex);
+
+            // The assignment expression itself returns the RHS value
+            result = rhs;
+        } else {
+            PEXPR_ASSERT(false, "Unsupported LHS expression type in assignment");
         }
     } break;
     case ExpressionType::FunctionDeclaration: {

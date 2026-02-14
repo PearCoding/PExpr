@@ -32,7 +32,6 @@ enum class BinaryOperation {
 enum class ExpressionType {
     Error,               /// Internally used expression type.
     VariableDeclaration, /// New declaration of a variable (single or destructuring) [statement -> void]
-    VariableAssignment,  /// Update of a variable (single or destructuring)          [statement -> void]
     FunctionDeclaration, /// New declaration of a function                           [statement -> void]
     TypeAlias,           /// Type alias declaration using 'using'                    [statement -> void]
     Variable,            /// A standard variable access.
@@ -46,6 +45,7 @@ enum class ExpressionType {
     Closure,             /// An enclosed closure
     Branch,              /// If, elif and else block
     Tuple,               /// Vector [x,y,z,w]
+    Assignment,          /// Assignment expression like a = b or [x, y] = [1, 2]
 };
 
 /// Returns printable representation of the given operation.

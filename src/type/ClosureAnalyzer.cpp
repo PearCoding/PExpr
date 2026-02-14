@@ -38,45 +38,43 @@ void ClosureAnalyzer::analyzeClosure(const Closure* focusedClosure,
         Visitor::forEachExpression(focusedClosure, captureUsage);
 
     auto captureMutable = [&](const Closure* closure, const Expression* expr) {
-        const auto assignExpr = dynamic_cast<const VariableAssignmentStatement*>(expr);
-        if (assignExpr)
-            collectMutableAssignmentsFromPattern(focusedClosure, closure, assignExpr->pattern(), outCapturedUsage, outCapturedMutable);
+        // Handle destructuring assignment expressions like [a, b] = [b, a]
+        if (const auto assignExpr = dynamic_cast<const AssignmentExpression*>(expr))
+            collectMutableAssignmentsFromExpression(focusedClosure, closure, assignExpr->lvalue(), outCapturedUsage, outCapturedMutable);
     };
     if (mCaptureModification)
         Visitor::forEachExpression(focusedClosure, captureMutable);
 }
 
-void ClosureAnalyzer::collectMutableAssignmentsFromPattern(const Closure* focusedClosure, const Closure* currentClosure,
-                                                           const Ptr<Pattern>& pattern,
-                                                           std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
-                                                           std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
+void ClosureAnalyzer::collectMutableAssignmentsFromExpression(const Closure* focusedClosure, const Closure* currentClosure,
+                                                              const Ptr<Expression>& expr,
+                                                              std::map<std::string, Ptr<VariableDef>>& outCapturedUsage,
+                                                              std::map<std::string, Ptr<VariableDef>>& outCapturedMutable)
 {
-    if (!pattern)
+    if (!expr)
         return;
 
-    for (const auto& elem : pattern->elements()) {
-        if (elem.isSimpleBinding()) {
-            const auto binding     = elem.simpleBinding();
-            const SymbolTable* tbl = nullptr;
-            if (auto def = currentClosure->symbols().lookupVariable(elem.location(), binding->name(), &tbl); def && def->isMutable()) {
-                // Go up the ladder until we find the top focusedClosure or end up in global
-                while (tbl && tbl != &focusedClosure->symbols())
-                    tbl = tbl->parent();
+    if (const auto tupleExpr = std::dynamic_pointer_cast<const TupleExpression>(expr)) { //< Handle tuple expressions like [a, b]
+        for (const auto& entry : tupleExpr->entries())
+            collectMutableAssignmentsFromExpression(focusedClosure, currentClosure, entry, outCapturedUsage, outCapturedMutable);
+    } else if (const auto varExpr = std::dynamic_pointer_cast<const VariableExpression>(expr)) { //< Handle variable expressions like a or b
+        const SymbolTable* tbl = nullptr;
+        if (auto def = currentClosure->symbols().lookupVariable(varExpr->location(), varExpr->variable()->name(), &tbl); def && def->isMutable()) {
+            // Go up the ladder until we find the top focusedClosure or end up in global
+            while (tbl && tbl != &focusedClosure->symbols())
+                tbl = tbl->parent();
 
-                if (!tbl) { //< captured (above the focusedClosure)
-                    if (mCaptureUsage)
-                        outCapturedUsage.emplace(binding->name(), binding);
-                    if (mCaptureModification)
-                        outCapturedMutable.emplace(binding->name(), binding);
-                }
-            } else {
-                mReporter.errorf(elem.location(), "Unknown variable '%s' found during capture mutable detection", binding->name().c_str());
+            if (!tbl) { //< captured (above the focusedClosure)
+                if (mCaptureUsage)
+                    outCapturedUsage.emplace(def->name(), def);
+                if (mCaptureModification)
+                    outCapturedMutable.emplace(def->name(), def);
             }
         } else {
-            // Recursively traverse nested patterns
-            collectMutableAssignmentsFromPattern(focusedClosure, currentClosure, elem.nestedPattern(), outCapturedUsage, outCapturedMutable);
+            mReporter.errorf(varExpr->location(), "Unknown variable '%s' found during capture mutable detection", varExpr->variable()->name().c_str());
         }
     }
+    // Other expression types don't represent mutable assignments
 }
 
 } // namespace PExpr::type

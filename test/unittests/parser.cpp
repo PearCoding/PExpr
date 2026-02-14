@@ -205,40 +205,35 @@ TEST_CASE("Parser: destructuring declarations and assignments", "[parser]")
 {
     SECTION("Simple destructuring declaration")
     {
-        auto ast              = parseOnly("let *[a, b] = [1, 2]; a + b");
+        auto ast              = parseOnly("let [a, b] = [1, 2]; a + b");
         const std::string out = StringVisitor::visit(ast);
-        REQUIRE(out.find("let *[a, b] = [1, 2];") != std::string::npos);
+        REQUIRE(out.find("let [a, b] = [1, 2];") != std::string::npos);
     }
 
     SECTION("Destructuring declaration with type annotations")
     {
-        auto ast              = parseOnly("let *[a:vec2, mut b:num] = [[1,2], 3.0]; a");
+        auto ast              = parseOnly("let [a:vec2, mut b:num] = [[1,2], 3.0]; a");
         const std::string out = StringVisitor::visit(ast);
-        REQUIRE(out.find("let *[a:vec2, mut b:num] = [") != std::string::npos);
+        REQUIRE(out.find("let [a:vec2, mut b:num] = [") != std::string::npos);
     }
 
     SECTION("Destructuring assignment")
     {
-        auto ast              = parseOnly("let mut x = 1; let mut y = 2; *[x, y] = [3, 4]; x + y");
+        auto ast              = parseOnly("let mut x = 1; let mut y = 2; [x, y] = [3, 4]; x + y");
         const std::string out = StringVisitor::visit(ast);
-        REQUIRE(out.find("*[x, y] = [3, 4];") != std::string::npos);
+        REQUIRE(out.find("([x, y]) = ([3, 4]);") != std::string::npos);
     }
 
     SECTION("Destructuring assignment should not allow mut or type annotations")
     {
-        parseOnly("*[mut x, y:num] = [1, 2]; x", false); // mut not allowed in assignment
-        parseOnly("*[x:int, y] = [1, 2]; x", false);     // type annotation not allowed in assignment
-    }
-
-    SECTION("Destructuring assignment without * prefix should fail")
-    {
-        parseOnly("[x, y] = [1, 2]; x", false); // Missing * prefix
+        parseOnly("[mut x, y:num] = [1, 2]; x", false); // mut not allowed in assignment
+        parseOnly("[x:int, y] = [1, 2]; x", false);     // type annotation not allowed in assignment
     }
 
     SECTION("Nested destructuring")
     {
-        auto ast              = parseOnly("let *[[a, b], c] = [[1, 2], 3]; a + b + c");
+        auto ast              = parseOnly("let [[a, b], c] = [[1, 2], 3]; a + b + c");
         const std::string out = StringVisitor::visit(ast);
-        REQUIRE(out.find("let *[[a, b], c] = [") != std::string::npos);
+        REQUIRE(out.find("let [[a, b], c] = [") != std::string::npos);
     }
 }

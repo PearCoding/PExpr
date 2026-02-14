@@ -7,32 +7,11 @@
 
 namespace PExpr::ast {
 /// Unified declaration statement for both single variable and destructuring patterns
-/// Example: "let a:num = 5;" or "let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
+/// Example: "let a:num = 5;" or "let [a:vec2, b, mut c:num] = [[2,4], true, 2.0];"
 class VariableDeclarationStatement : public Expression {
 public:
     VariableDeclarationStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
         : Expression(loc, ExpressionType::VariableDeclaration)
-        , mPattern(pattern)
-        , mExpression(expr)
-    {
-        setReturnType(type::Type::Void());
-    }
-
-    [[nodiscard]] inline Ptr<Pattern> pattern() const { return mPattern; }
-    [[nodiscard]] inline Ptr<Expression> expression() const { return mExpression; }
-    [[nodiscard]] inline Ptr<Expression>& expressionMut() & { return mExpression; }
-
-private:
-    Ptr<Pattern> mPattern;
-    Ptr<Expression> mExpression;
-};
-
-/// Unified assignment statement for both single variable and destructuring patterns
-/// Example: "a = 5;" or "*[c, d] = foo();"
-class VariableAssignmentStatement : public Expression {
-public:
-    VariableAssignmentStatement(const parser::Location& loc, const Ptr<Pattern>& pattern, const Ptr<Expression>& expr)
-        : Expression(loc, ExpressionType::VariableAssignment)
         , mPattern(pattern)
         , mExpression(expr)
     {

@@ -40,8 +40,8 @@ std::string StringVisitor::visit(size_t level, const Ptr<Expression>& expr)
         return dump(level, std::reinterpret_pointer_cast<BranchExpression>(expr));
     case ExpressionType::VariableDeclaration:
         return dump(level, std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr));
-    case ExpressionType::VariableAssignment:
-        return dump(level, std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr));
+    case ExpressionType::Assignment:
+        return dump(level, std::reinterpret_pointer_cast<AssignmentExpression>(expr));
     case ExpressionType::FunctionDeclaration:
         return dump(level, std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr));
     case ExpressionType::TypeAlias:
@@ -113,47 +113,6 @@ std::string StringVisitor::dump(size_t level, const Ptr<VariableDeclarationState
         stream << "]";
     };
 
-    stream << "*";
-    dumpPattern(*pattern);
-    stream << " = " << visit(level, statement->expression());
-    return stream.str();
-}
-
-std::string StringVisitor::dump(size_t level, const Ptr<VariableAssignmentStatement>& statement)
-{
-    const auto& pattern = statement->pattern();
-
-    // Check if pattern is a single simple binding (i.e., "a = ...")
-    if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-        const auto varDef = pattern->elements()[0].simpleBinding();
-        std::stringstream stream;
-        stream << varDef->name();
-        stream << " = " << visit(level, statement->expression());
-        return stream.str();
-    }
-
-    // Otherwise, treat as destructuring pattern
-    std::stringstream stream;
-
-    // Helper function to recursively dump pattern elements
-    std::function<void(const Pattern&)> dumpPattern = [&](const Pattern& pattern) {
-        stream << "[";
-        for (size_t i = 0; i < pattern.elements().size(); ++i) {
-            const auto& elem = pattern.elements()[i];
-            if (elem.isSimpleBinding()) {
-                const auto varDef = elem.simpleBinding();
-                stream << varDef->name();
-            } else {
-                // Nested pattern
-                dumpPattern(*elem.nestedPattern());
-            }
-            if (i < pattern.elements().size() - 1)
-                stream << ", ";
-        }
-        stream << "]";
-    };
-
-    stream << "*";
     dumpPattern(*pattern);
     stream << " = " << visit(level, statement->expression());
     return stream.str();
@@ -292,6 +251,11 @@ std::string StringVisitor::dump(size_t level, const Ptr<TupleExpression>& expr)
 
     stream << "]";
     return stream.str();
+}
+
+std::string StringVisitor::dump(size_t level, const Ptr<AssignmentExpression>& expr)
+{
+    return "(" + visit(level, expr->lvalue()) + ") = (" + visit(level, expr->rvalue()) + ")";
 }
 
 std::string StringVisitor::dump(size_t, const Ptr<TypeAliasStatement>& statement)

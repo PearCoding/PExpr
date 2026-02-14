@@ -222,13 +222,13 @@ Examples
    `x as int` // converts number x to integer
 
 6. Destructuring declarations:
-   `let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];`
-   `let *[[r, s], t] = [[7, 8], 9];`
+   `let [a:vec2, b, mut c:num] = [[2,4], true, 2.0];`
+   `let [[r, s], t] = [[7, 8], 9];`
 
 7. Destructuring assignments:
-   `let mut x = 1; let mut y = 2; *[x, y] = [3, 4];`
-   `let mut a = 1; let mut b = 2; let mut c = 3; *[[a, b], c] = [[10, 20], 30];`
+   `let mut x = 1; let mut y = 2; [x, y] = [3, 4];`
+   `let mut a = 1; let mut b = 2; let mut c = 3; [[a, b], c] = [[10, 20], 30];`
 
 8. Function returning tuple with destructuring:
    `fn foo() -> [int, int] = [5, 6];`
-   `let *[p, q] = foo();`
+   `let [p, q] = foo();`

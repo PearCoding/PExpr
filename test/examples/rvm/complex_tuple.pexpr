@@ -5,7 +5,7 @@ fn returns_nested(a: int, b: [bool, num]) -> [int, [bool, num]] = {
 fn main() -> int = {
     let k = [true, 3.14];
     let x = returns_nested(42, k);
-    let *[a, [b, c]] = x;
+    let [a, [b, c]] = x;
     a
 };
 

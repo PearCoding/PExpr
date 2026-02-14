@@ -111,10 +111,10 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<Expression>&
         return handleNode(closure, std::reinterpret_pointer_cast<ClosureExpression>(expr));
     case ExpressionType::Branch:
         return handleNode(closure, std::reinterpret_pointer_cast<BranchExpression>(expr));
+    case ExpressionType::Assignment:
+        return handleNode(closure, std::reinterpret_pointer_cast<AssignmentExpression>(expr));
     case ExpressionType::VariableDeclaration:
         return handleNode(closure, std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr));
-    case ExpressionType::VariableAssignment:
-        return handleNode(closure, std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr));
     case ExpressionType::FunctionDeclaration:
         return handleNode(closure, std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr));
     case ExpressionType::TypeAlias:
@@ -652,100 +652,6 @@ Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::Va
     }
 }
 
-Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableAssignmentStatement>& expr)
-{
-    // Type-check the RHS expression
-    const auto rhsType = handleNode(closure, expr->expression());
-    if (rhsType.isError())
-        return rhsType;
-
-    // TODO: Rework this
-    // Check if pattern is a single simple binding (i.e., regular variable assignment)
-    auto pattern = expr->pattern();
-    if (pattern->size() == 1 && pattern->elements()[0].isSimpleBinding()) {
-        auto binding = pattern->elements()[0].simpleBinding();
-
-        if (!binding->isMutable()) {
-            mReporter.errorf(expr->location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
-            return Type::Error();
-        }
-
-        // Check type compatibility
-        const auto& varType = binding->type();
-        if (varType.isVoid()) {
-            mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", binding->name().c_str());
-            return Type::Error();
-        }
-
-        if (!isConvertible(rhsType, varType)) {
-            mReporter.errorf(expr->location(), "Cannot convert from '%s' to '%s' for variable '%s'",
-                             rhsType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
-            return Type::Error();
-        }
-
-        return Type::Void();
-    } else {
-        // Destructuring pattern: RHS must be a tuple
-        if (!rhsType.isTuple()) {
-            mReporter.errorf(expr->location(), "Destructuring requires a tuple expression on the right-hand side");
-            return Type::Error();
-        }
-
-        // Helper function to recursively process pattern elements for assignment
-        std::function<bool(Pattern&, const Type&)> processPattern =
-            [&](Pattern& pattern, const Type& type) -> bool {
-            if (!type.isTuple()) {
-                mReporter.errorf(pattern.location(), "Nested pattern requires a tuple type");
-                return false;
-            }
-
-            const auto& components = type.components();
-            if (pattern.size() != components.size()) {
-                mReporter.errorf(pattern.location(), "Pattern size %zu does not match tuple size %zu", pattern.size(), components.size());
-                return false;
-            }
-
-            for (size_t i = 0; i < pattern.size(); ++i) {
-                auto& elem           = pattern.elements()[i];
-                const auto& elemType = components.at(i);
-
-                if (elem.isSimpleBinding()) {
-                    auto binding = elem.simpleBinding();
-
-                    if (!binding->isMutable()) {
-                        mReporter.errorf(elem.location(), "Cannot assign to immutable variable '%s'", binding->name().c_str());
-                        return false;
-                    }
-
-                    // Check type compatibility
-                    const auto& varType = binding->type();
-                    if (varType.isVoid()) {
-                        mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", binding->name().c_str());
-                        return false;
-                    }
-
-                    if (!isConvertible(elemType, varType)) {
-                        mReporter.errorf(elem.location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
-                                         elemType.toString().c_str(), varType.toString().c_str(), binding->name().c_str());
-                        return false;
-                    }
-                } else {
-                    // Nested pattern - recurse
-                    if (!processPattern(*elem.nestedPattern(), elemType))
-                        return false;
-                }
-            }
-
-            return true;
-        };
-
-        if (processPattern(*pattern, rhsType))
-            return Type::Void(); //< In contrary to C/C++ we do not allow 'let k = (a = 44) * 4;' type of expressions.
-        else
-            return Type::Error();
-    }
-}
-
 Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::FunctionDeclarationStatement>& expr)
 {
     if (expr->isExtern() || !expr->closure()) {
@@ -768,6 +674,132 @@ Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::Fu
             expr->closure()->finalExpressionMut() = injectCastIfNeeded(expr->closure()->finalExpression(), expr->functionReturnType(), nullptr);
     }
     return Type::Void();
+}
+
+Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::AssignmentExpression>& expr)
+{
+    // Type-check the RHS expression
+    const auto rhsType = handleNode(closure, expr->rvalue());
+    if (rhsType.isError())
+        return Type::Error();
+
+    // Check LHS type
+    const auto lhs = expr->lvalue();
+
+    if (lhs->type() == ExpressionType::Variable) {
+        // Simple variable assignment: x = expr
+        auto varExpr  = std::reinterpret_pointer_cast<VariableExpression>(lhs);
+        auto variable = varExpr->variable();
+
+        if (!variable->isMutable()) {
+            mReporter.errorf(expr->location(), "Cannot assign to immutable variable '%s'", variable->name().c_str());
+            return Type::Error();
+        }
+
+        // Check type compatibility
+        const auto& varType = variable->type();
+        if (varType.isVoid()) {
+            mReporter.errorf(expr->location(), "Cannot assign a 'void' to variable '%s'", variable->name().c_str());
+            return Type::Error();
+        }
+
+        if (!isConvertible(rhsType, varType)) {
+            mReporter.errorf(expr->location(), "Cannot convert from '%s' to '%s' for variable '%s'",
+                             rhsType.toString().c_str(), varType.toString().c_str(), variable->name().c_str());
+            return Type::Error();
+        }
+
+        // Assignment expressions return the RHS type (like in C/C++)
+        expr->setReturnType(rhsType);
+        return rhsType;
+    } else if (lhs->type() == ExpressionType::Tuple) {
+        // Destructuring tuple assignment: [a, b] = expr
+        auto tupleExpr = std::reinterpret_pointer_cast<TupleExpression>(lhs);
+
+        // Destructuring assignment: RHS must be a tuple
+        if (!rhsType.isTuple()) {
+            mReporter.errorf(expr->location(), "Destructuring requires a tuple expression on the right-hand side");
+            return Type::Error();
+        }
+
+        // Helper function to recursively check nested tuple assignments
+        std::function<bool(const Ptr<Expression>&, const Type&)> checkTupleAssignment =
+            [&](const Ptr<Expression>& lhsElem, const Type& rhsElemType) -> bool {
+            if (lhsElem->type() == ExpressionType::Variable) {
+                // Simple variable in tuple: [x, y] = [1, 2]
+                auto varExpr  = std::reinterpret_pointer_cast<VariableExpression>(lhsElem);
+                auto variable = varExpr->variable();
+
+                if (!variable->isMutable()) {
+                    mReporter.errorf(lhsElem->location(), "Cannot assign to immutable variable '%s'", variable->name().c_str());
+                    return false;
+                }
+
+                // Check type compatibility
+                const auto& varType = variable->type();
+                if (varType.isVoid()) {
+                    mReporter.errorf(lhsElem->location(), "Cannot assign a 'void' to variable '%s'", variable->name().c_str());
+                    return false;
+                }
+
+                if (!isConvertible(rhsElemType, varType)) {
+                    mReporter.errorf(lhsElem->location(), "Cannot convert tuple element from '%s' to '%s' for variable '%s'",
+                                     rhsElemType.toString().c_str(), varType.toString().c_str(), variable->name().c_str());
+                    return false;
+                }
+                return true;
+            } else if (lhsElem->type() == ExpressionType::Tuple) {
+                // Nested tuple in tuple: [[x, y], z] = [[1, 2], 3]
+                auto nestedTupleExpr = std::reinterpret_pointer_cast<TupleExpression>(lhsElem);
+
+                if (!rhsElemType.isTuple()) {
+                    mReporter.errorf(lhsElem->location(), "Nested tuple destructuring requires a tuple type");
+                    return false;
+                }
+
+                const auto& nestedLhsEntries    = nestedTupleExpr->entries();
+                const auto& nestedRhsComponents = rhsElemType.components();
+
+                if (nestedLhsEntries.size() != nestedRhsComponents.size()) {
+                    mReporter.errorf(lhsElem->location(), "Nested tuple size %zu does not match tuple size %zu",
+                                     nestedLhsEntries.size(), nestedRhsComponents.size());
+                    return false;
+                }
+
+                // Recursively check each nested element
+                for (size_t j = 0; j < nestedLhsEntries.size(); ++j) {
+                    if (!checkTupleAssignment(nestedLhsEntries[j], nestedRhsComponents[j]))
+                        return false;
+                }
+                return true;
+            } else {
+                mReporter.errorf(lhsElem->location(), "Left-hand side of tuple assignment must be a variable or tuple");
+                return false;
+            }
+        };
+
+        // Check that tuple sizes match
+        const auto& lhsEntries    = tupleExpr->entries();
+        const auto& rhsComponents = rhsType.components();
+
+        if (lhsEntries.size() != rhsComponents.size()) {
+            mReporter.errorf(expr->location(), "Tuple size %zu does not match tuple size %zu", lhsEntries.size(), rhsComponents.size());
+            return Type::Error();
+        }
+
+        // Check each element in the tuple LHS
+        for (size_t i = 0; i < lhsEntries.size(); ++i) {
+            if (!checkTupleAssignment(lhsEntries[i], rhsComponents[i]))
+                return Type::Error();
+        }
+
+        // Assignment expressions return the RHS type (like in C/C++)
+        expr->setReturnType(rhsType);
+        return rhsType;
+    } else {
+        mReporter.errorf(lhs->location(), "Left-hand side of assignment must be a variable or tuple");
+        return Type::Error();
+    }
 }
 
 } // namespace PExpr::type

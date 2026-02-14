@@ -23,7 +23,7 @@ c /= 5;       // c = 63
 // Test error: compound assignment with destructuring (should fail)
 // let mut e = 10;
 // let mut f = 20;
-// *[e, f] += [1, 2];  // Not allowed
+// [e, f] += [1, 2];  // Not allowed
 
 // Final expression to return
 a + b + c

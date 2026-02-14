@@ -32,8 +32,8 @@ private:
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::AccessExpression>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::CastExpression>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::TupleExpression>& expr);
+    Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::AssignmentExpression>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableDeclarationStatement>& expr);
-    Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::VariableAssignmentStatement>& expr);
     Type handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::FunctionDeclarationStatement>& expr);
 
     [[nodiscard]] Ptr<ast::Expression> injectCastIfNeeded(const Ptr<ast::Expression>& origExpression, const Type& toType, bool* hadError);

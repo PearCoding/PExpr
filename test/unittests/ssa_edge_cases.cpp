@@ -106,18 +106,18 @@ TEST_CASE("SSAMapper: destructuring with pattern matching", "[ssamapper][destruc
     auto ast = env.parse(R"(
         // Complex destructuring patterns
         let tuple = [1, 2.0, [3, 4]];
-        let *[a, b, [c, d]] = tuple;
+        let [a, b, [c, d]] = tuple;
         
         // Nested destructuring in function parameters
         fn process(pair:[int, num]) -> num = {
-            let *[x, y] = pair;
+            let [x, y] = pair;
             x + y
         };
         
         // Destructuring assignment with swap
         let mut m = 1;
         let mut n = 2;
-        *[n, m] = [m, n];
+        [n, m] = [m, n];
         
         a + b + c + d + process([5, 6.0]) + m + n
     )");

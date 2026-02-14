@@ -54,7 +54,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - nested tuple arguments", "[tuple_di
 {
     const char* source = R"(
         fn process(pair:[int, num]) -> num = {
-            let *[x, y] = pair;
+            let [x, y] = pair;
             x + y
         };
         let t = [5, 2.5];
@@ -261,7 +261,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - function returning tuple", "[tuple_
         };
         
         fn use_pair(pair:[int, num]) -> num = {
-            let *[x, y] = pair;
+            let [x, y] = pair;
             x + y
         };
         

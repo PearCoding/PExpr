@@ -196,16 +196,16 @@ void UpliftPass::updateCallsInExpression(ast::Closure* currentClosure, Ptr<Expre
                     const std::string varName = kv.first;
 
                     // Create assignment pattern
-                    auto assignPattern = std::make_shared<ast::Pattern>(c->location(), std::vector<ast::PatternElement>{ ast::PatternElement::makeSimple(c->location(), kv.second) });
+                    auto lhsValueExpr = std::make_shared<ast::VariableExpression>(c->location(), kv.second);
 
                     // Create variable expression for the new value
                     auto newValueExpr = std::make_shared<ast::VariableExpression>(c->location(), patternElements.at(i).simpleBinding());
                     newValueExpr->setReturnType(kv.second->type());
 
                     // Create assignment statement
-                    auto assignStmt = std::make_shared<ast::VariableAssignmentStatement>(c->location(), assignPattern, newValueExpr);
+                    auto assignExpr = std::make_shared<ast::AssignmentExpression>(c->location(), lhsValueExpr, newValueExpr);
 
-                    closure->addExpression(assignStmt);
+                    closure->addExpression(assignExpr);
                     ++i;
                 }
 
@@ -272,9 +272,10 @@ void UpliftPass::updateCallsInExpression(ast::Closure* currentClosure, Ptr<Expre
         auto declStmt = std::reinterpret_pointer_cast<VariableDeclarationStatement>(expr);
         updateCallsInExpression(currentClosure, declStmt->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
     } break;
-    case ExpressionType::VariableAssignment: {
-        auto assignStmt = std::reinterpret_pointer_cast<VariableAssignmentStatement>(expr);
-        updateCallsInExpression(currentClosure, assignStmt->expressionMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
+    case ExpressionType::Assignment: {
+        auto assignExpr = std::reinterpret_pointer_cast<AssignmentExpression>(expr);
+        updateCallsInExpression(currentClosure, assignExpr->lvalueMut(), oldDef, newDef, parameterToCaptured, mutableCaptures); //< Really the lvalue?
+        updateCallsInExpression(currentClosure, assignExpr->rvalueMut(), oldDef, newDef, parameterToCaptured, mutableCaptures);
     } break;
     case ExpressionType::FunctionDeclaration: {
         const auto f = std::reinterpret_pointer_cast<FunctionDeclarationStatement>(expr);
@@ -350,26 +351,6 @@ void UpliftPass::updateVariables(ast::Closure* closure,
                 auto v = dynamic_cast<VariableExpression*>(expr);
                 if (capturedToParameter.contains(v->variable()))
                     v->setVariable(capturedToParameter.at(v->variable()));
-            } else if (expr->type() == ExpressionType::VariableAssignment) {
-                auto assignStmt = dynamic_cast<VariableAssignmentStatement*>(expr);
-
-                // Update the assignment if it is on a captured one
-                std::function<void(Pattern&)> processPattern =
-                    [&](Pattern& pattern) -> void {
-                    for (size_t i = 0; i < pattern.size(); ++i) {
-                        auto& elem = pattern.elements()[i];
-
-                        if (elem.isSimpleBinding()) {
-                            if (capturedToParameter.contains(elem.simpleBinding()))
-                                elem.setAsSimpleBinding(capturedToParameter.at(elem.simpleBinding()));
-                        } else {
-                            // Nested pattern - recurse
-                            processPattern(*elem.nestedPattern());
-                        }
-                    }
-                };
-
-                processPattern(*assignStmt->pattern());
             }
         });
 }

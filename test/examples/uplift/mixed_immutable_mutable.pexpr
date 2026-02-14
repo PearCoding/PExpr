@@ -12,7 +12,7 @@ mixed()
 //   [x, x]
 // };
 // {
-//   let *[__result:int, x__new:int] = mixed(x,y);
+//   let [__result:int, x__new:int] = mixed(x,y);
 //   x = x__new;
 //   __result
 // }

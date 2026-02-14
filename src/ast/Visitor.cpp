@@ -237,21 +237,6 @@ public:
             }
             break;
         }
-        case ExpressionType::VariableAssignment: {
-            auto assign = dynamic_cast<const VariableAssignmentStatement*>(expression);
-            if (assign && assign->expression()) {
-                if constexpr (CallFirst) {
-                    if (callbackExpr)
-                        callbackExpr(context, assign->expression().get());
-                }
-                forEachOnExpression(assign->expression().get(), context, callbackExpr, callbackClosure);
-                if constexpr (!CallFirst) {
-                    if (callbackExpr)
-                        callbackExpr(context, assign->expression().get());
-                }
-            }
-            break;
-        }
         case ExpressionType::FunctionDeclaration: {
             auto func = dynamic_cast<const FunctionDeclarationStatement*>(expression);
             if (func && func->closure()) {
@@ -264,6 +249,26 @@ public:
                 if constexpr (!CallFirst) {
                     if (callbackClosure)
                         callbackClosure(func->closure().get());
+                }
+            }
+            break;
+        }
+        case ExpressionType::Assignment: {
+            auto assign = dynamic_cast<const AssignmentExpression*>(expression);
+            if (assign && assign->lvalue() && assign->rvalue()) {
+                if constexpr (CallFirst) {
+                    if (callbackExpr) {
+                        callbackExpr(context, assign->lvalue().get());
+                        callbackExpr(context, assign->rvalue().get());
+                    }
+                }
+                forEachOnExpression(assign->lvalue().get(), context, callbackExpr, callbackClosure);
+                forEachOnExpression(assign->rvalue().get(), context, callbackExpr, callbackClosure);
+                if constexpr (!CallFirst) {
+                    if (callbackExpr) {
+                        callbackExpr(context, assign->lvalue().get());
+                        callbackExpr(context, assign->rvalue().get());
+                    }
                 }
             }
             break;

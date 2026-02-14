@@ -11,7 +11,7 @@ x
 //   [x, x]
 // };
 // let k:int = {
-//   let *[__result:int, x__new:int] = increment(x);
+//   let [__result:int, x__new:int] = increment(x);
 //   x = x__new;
 //   __result
 // };

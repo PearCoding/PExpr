@@ -1,5 +1,5 @@
 // Test destructuring declarations
-let *[a:vec2, b, mut c:num] = [[2,4], true, 2.0];
+let [a:vec2, b, mut c:num] = [[2,4], true, 2.0];
 [a, c]
 
 // %.2:[[int, int], bool, num] = tuple[3]([2:num, 4:num]:vec2, true:bool, 2:num)
