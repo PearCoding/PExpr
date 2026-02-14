@@ -563,6 +563,11 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         }
     }
 
+    // If no instruction was emitted, or the last instruction is NOT a return (e.g., void).
+    // Inject a zero return.
+    if (result.empty() || dynamic_cast<RVMInstrReturn*>(result.back().get()) == nullptr)
+        result.push_back(std::make_shared<RVMInstrReturn>(0));
+
     return result;
 }
 
