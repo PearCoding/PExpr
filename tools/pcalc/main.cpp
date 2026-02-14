@@ -232,13 +232,6 @@ public:
 
         // Debug: print register contents
         if (returnType.isTuple()) {
-            std::cout << "DEBUG: Registers after execution (tuple return):" << std::endl;
-            for (const auto& [regId, regValue] : registers) {
-                std::cout << "  %r" << regId << ": ";
-                printValueVariant(regValue.value);
-                std::cout << std::endl;
-            }
-
             // Reconstruct tuple from linearized registers
             size_t regIndex = 0;
             return reconstructTuple(returnType, regIndex);
