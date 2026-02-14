@@ -131,10 +131,7 @@ private:
         if (mCurrentClosure->isTranslationUnit())
             mCurrentClosure->symbols().setParent(mGlobals); // Inject the global symbol table
 
-        if (P.cur().Type == TokenType::Eof)
-            return closure;
-
-        while (true) {
+        while (P.cur().Type != TokenType::Eof) {
             // Check for attributes before statements/expressions
             AttributeList attrs;
             if (P.cur(0).Type == TokenType::OpenSquareBracket && P.cur(1).Type == TokenType::OpenSquareBracket) {
