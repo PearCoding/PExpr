@@ -174,7 +174,8 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
             } else if (isConvertible(returnType, bodyType)) {
                 returnType = bodyType;
             } else {
-                mReporter.errorf(branch.Body->location(), "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
+                mReporter.errorf(branch.Body->hasFinalExpression() ? branch.Body->finalExpression()->location() : branch.Body->location(),
+                                 "Expected all branch bodies to evaluate to the type '%s'", returnType.toString().data());
                 return Type::Error();
             }
         }
