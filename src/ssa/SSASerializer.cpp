@@ -523,7 +523,7 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
         if (arrow == std::string::npos)
             return nullptr;
 
-        std::string condStr  = trim(line.substr(3, arrow - 3));
+        std::string condStr  = trim(line.substr(6, arrow - 6));
         std::string labelStr = trim(line.substr(arrow + 2));
 
         SSAValue cond;
