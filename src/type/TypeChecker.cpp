@@ -63,7 +63,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure)
             if (funcStmt->isExtern() && funcStmt->isUnspecified()) {
                 mReporter.errorf(funcStmt->location(), "External function '%s' has no return type defined", funcStmt->name().c_str());
             } else {
-                if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects())))
+                if (!closure->symbols().addFunction(FunctionDef(funcStmt->name(), funcStmt->mangledName(), funcStmt->parameters(), funcStmt->functionReturnType(), funcStmt->isExtern(), funcStmt->hasSideEffects(), funcStmt->location())))
                     mReporter.errorf(funcStmt->location(), "Function '%s' already defined in the current scope", funcStmt->name().c_str());
             }
         }
@@ -144,10 +144,12 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BranchExpres
     bool hadError = false;
     for (auto& branch : expr->branches()) {
         const auto condRetType = handleNode(closure, branch.Condition);
-        if (condRetType.isSpecified())
+        if (condRetType.isSpecified()) {
             branch.Condition = injectCastIfNeeded(branch.Condition, Type(TypeKind::Boolean), &hadError);
-        else
+        } else {
             mReporter.errorf(branch.Condition->location(), "Could not determine type for conditional");
+            hadError = true;
+        }
     }
 
     // Determine the type of the expression
@@ -376,14 +378,27 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
     return expr->returnType();
 }
 
+inline std::string printArgs(const ParameterList& args)
+{
+    std::stringstream stream;
+
+    for (size_t i = 0; i < args.size(); ++i) {
+        if (i)
+            stream << ", ";
+        stream << args[i]->name() << ":" << args[i]->type().toString();
+    }
+
+    return stream.str();
+}
+
 inline std::string printArgs(const std::vector<Type>& args)
 {
     std::stringstream stream;
 
     for (size_t i = 0; i < args.size(); ++i) {
-        stream << args[i].toString();
-        if (i != args.size() - 1)
+        if (i)
             stream << ", ";
+        stream << args[i].toString();
     }
 
     return stream.str();
@@ -425,7 +440,19 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<CallExpressi
             expr->setReturnType(Type::Error());
         expr->setMangledName(def->mangledName());
     } else {
-        mReporter.errorf(expr->location(), "Function '%s(%s)' is unknown or ambiguous", expr->name().c_str(), printArgs(fromArgs).c_str());
+        auto availableFunctions = closure->symbols().getFunctions(expr->name());
+        if (availableFunctions.empty()) {
+            mReporter.errorf(expr->location(), "Call to an undeclared function '%s(%s)' found", expr->name().c_str(), printArgs(fromArgs).c_str());
+        } else {
+            std::stringstream stream;
+            stream << "Call to function '" << expr->name() << "(" << printArgs(fromArgs) << ")' does not match. The following functions are available:";
+            for (const auto& avlFunc : availableFunctions)
+                stream << std::endl
+                       << "  | " << expr->name() << "(" << printArgs(avlFunc.parameters()) << ") -> " << avlFunc.returnType().toString() << " [" << avlFunc.location() << "]";
+
+            mReporter.error(expr->location(), stream.str());
+        }
+        expr->setReturnType(Type::Error());
         return Type::Error();
     }
 
@@ -565,8 +592,6 @@ Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::Va
 {
     // Type-check the RHS expression
     const auto rhsType = handleNode(closure, expr->expression());
-    if (rhsType.isError())
-        return Type::Error();
 
     // TODO: Rework this
     // Check if pattern is a single simple binding (i.e., regular variable declaration)
@@ -669,7 +694,7 @@ Type TypeChecker::handleNode(const Ptr<ast::Closure>& closure, const Ptr<ast::Fu
             return Type::Error();
         }
 
-        closure->symbols().replaceFunction(FunctionDef(expr->name(), expr->mangledName(), expr->parameters(), expr->functionReturnType(), expr->isExtern(), expr->hasSideEffects()));
+        closure->symbols().replaceFunction(FunctionDef(expr->name(), expr->mangledName(), expr->parameters(), expr->functionReturnType(), expr->isExtern(), expr->hasSideEffects(), expr->location()));
         if (closure->hasFinalExpression())
             expr->closure()->finalExpressionMut() = injectCastIfNeeded(expr->closure()->finalExpression(), expr->functionReturnType(), nullptr);
     }

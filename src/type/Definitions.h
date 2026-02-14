@@ -56,26 +56,28 @@ using ParameterList = std::vector<Ptr<VariableDef>>;
 class FunctionDef {
 public:
     /// Construct a function definition with a given name and a ParameterList.
-    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, const Type& retType, bool isExtern, bool hasSideEffects)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, const ParameterList& params, const Type& retType, bool isExtern, bool hasSideEffects, const parser::Location& loc)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
         , mParameters(params)
         , mIsExtern(isExtern)
         , mHasSideEffects(hasSideEffects)
+        , mLocation(loc)
     {
         PEXPR_ASSERT(!isExtern || retType.kind() != TypeKind::Unspecified, "Expected a specified type for an external definition");
         PEXPR_ASSERT(isExtern || !hasSideEffects, "Only external functions can be marked side-effect free");
     }
 
     /// Construct a function definition with a given name and a ParameterList (rvalue)
-    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, const Type& retType, bool isExtern, bool hasSideEffects)
+    inline FunctionDef(const std::string& name, const std::string& mangledName, ParameterList&& params, const Type& retType, bool isExtern, bool hasSideEffects, const parser::Location& loc)
         : mName(name)
         , mMangledName(mangledName)
         , mReturnType(retType)
         , mParameters(std::move(params))
         , mIsExtern(isExtern)
         , mHasSideEffects(hasSideEffects)
+        , mLocation(loc)
     {
         PEXPR_ASSERT(!isExtern || retType.kind() != TypeKind::Unspecified, "Expected a specified type for an external definition");
         PEXPR_ASSERT(isExtern || !hasSideEffects, "Only external functions can be marked side-effect free");
@@ -95,6 +97,9 @@ public:
     [[nodiscard]] inline bool isExtern() const { return mIsExtern; }
     [[nodiscard]] inline bool hasSideEffects() const { return isExtern() && mHasSideEffects; }
 
+    /// Return the location where this function was declared.
+    [[nodiscard]] inline const parser::Location& location() const { return mLocation; }
+
 private:
     std::string mName;
     std::string mMangledName;
@@ -102,6 +107,7 @@ private:
     ParameterList mParameters;
     bool mIsExtern;
     bool mHasSideEffects;
+    parser::Location mLocation = parser::Location(0);
 };
 
 } // namespace PExpr::type

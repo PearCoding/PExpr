@@ -150,6 +150,23 @@ public:
         return std::nullopt;
     }
 
+    /// @brief Return all functions with a specific name
+    /// @param name
+    /// @return
+    [[nodiscard]] inline std::vector<FunctionDef> getFunctions(const std::string& name) const
+    {
+        std::vector<FunctionDef> functions;
+        const auto range = mFunctions.equal_range(name);
+        for (auto it = range.first; it != range.second; ++it)
+            functions.push_back(it->second);
+
+        if (mParent) {
+            auto parentFuncs = mParent->getFunctions(name);
+            functions.insert(functions.end(), parentFuncs.begin(), parentFuncs.end());
+        }
+        return functions;
+    }
+
     inline const SymbolTable* parent() const { return mParent; }
     inline void setParent(const SymbolTable* tbl) { mParent = tbl; }
 

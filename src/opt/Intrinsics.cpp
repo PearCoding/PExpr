@@ -12,7 +12,7 @@ void setupIntrinsics(SSCPFunctionInliner& inliner)
         inliner.addIntrinsic(FunctionDef(name,
                                          makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number) }), nullptr),
                                          { std::make_shared<VariableDef>("p0", Type(TypeKind::Number), false, parser::Location(0)) },
-                                         Type(TypeKind::Number), true, false),
+                                         Type(TypeKind::Number), true, false, parser::Location(0)),
                              [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0))); });
     };
 
@@ -21,7 +21,7 @@ void setupIntrinsics(SSCPFunctionInliner& inliner)
                                          makeMangledNameFromTypes(name, std::to_array({ Type(TypeKind::Number), Type(TypeKind::Number) }), nullptr),
                                          { std::make_shared<VariableDef>("p0", Type(TypeKind::Number), false, parser::Location(0)),
                                            std::make_shared<VariableDef>("p1", Type(TypeKind::Number), false, parser::Location(0)) },
-                                         Type(TypeKind::Number), true, false),
+                                         Type(TypeKind::Number), true, false, parser::Location(0)),
                              [callback](const std::vector<ValueVariant>& args) -> ValueVariant { return callback(std::get<Number>(args.at(0)), std::get<Number>(args.at(1))); });
     };
 

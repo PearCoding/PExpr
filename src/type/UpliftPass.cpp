@@ -75,8 +75,8 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
             const std::string newMangled = makeMangledNameFromTypes(f->name(), newParams, closure);
 
             // Update local symbol table: replace function entry
-            const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->functionReturnType(), f->isExtern(), f->hasSideEffects());
-            const auto newDef = FunctionDef(f->name(), newMangled, newParams, newReturnType, f->isExtern(), f->hasSideEffects());
+            const auto oldDef = FunctionDef(f->name(), oldMangled, f->parameters(), f->functionReturnType(), f->isExtern(), f->hasSideEffects(), f->location());
+            const auto newDef = FunctionDef(f->name(), newMangled, newParams, newReturnType, f->isExtern(), f->hasSideEffects(), f->location());
 
             closure->symbols().removeFunction(oldDef);
             closure->symbols().replaceFunction(FunctionDef(newDef));
