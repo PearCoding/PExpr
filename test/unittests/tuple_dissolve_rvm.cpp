@@ -121,7 +121,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple in phi node", "[tuple_dissolv
     // Should have proper RVM code (phi nodes may be optimized away)
     REQUIRE_FALSE(rvmCode.empty());
     // Check that we have some form of conditional logic
-    REQUIRE(rvmCode.find("br") != std::string::npos);
+    REQUIRE(rvmCode.find("jnz") != std::string::npos);
 }
 
 TEST_CASE("Tuple dissolve with RVM mapping - complex nested tuple", "[tuple_dissolve][rvm]")

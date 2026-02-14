@@ -140,15 +140,15 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         // Verify RVM program has multiple conditional branches
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
 
-        // Count ji instructions (should be at least 3 for the 3 conditions)
-        size_t brzCount = 0;
+        // Count jz instructions (should be at least 3 for the 3 conditions)
+        size_t jmpCount = 0;
         size_t pos      = 0;
-        while ((pos = rvmStr.find("ji", pos)) != std::string::npos) {
-            brzCount++;
+        while ((pos = rvmStr.find("jz", pos)) != std::string::npos) {
+            jmpCount++;
             pos += 3;
         }
 
-        REQUIRE(brzCount >= 3);
+        REQUIRE(jmpCount >= 3);
     }
 
     SECTION("Phi with boolean condition values")
