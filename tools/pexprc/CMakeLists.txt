@@ -1,10 +1,3 @@
-CPMAddPackage(
-    NAME cli11
-    GITHUB_REPOSITORY CLIUtils/CLI11
-    GIT_TAG main
-    DOWNLOAD_ONLY YES
-)
-
 file(GLOB_RECURSE SRC CONFIGURE_DEPENDS "*.cpp")
 
 add_executable(pexprc ${SRC})
