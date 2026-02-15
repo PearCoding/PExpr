@@ -2,12 +2,16 @@
 #include "RVMMoveSimplifier.h"
 #include "RVMRedundantMoveEliminator.h"
 #include "RVMRegisterAllocator.h"
+#include "RVMRegisterLinearizer.h"
 
 namespace PExpr::rvm {
 
 bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& program)
 {
     bool changedAtAll = false;
+
+    // Apply register linearization first (syntax-only pass)
+    changedAtAll |= RVMRegisterLinearizer::linearize(program);
 
     // Repeat until no changes are made
     while (true) {
@@ -30,6 +34,9 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
     // Apply register allocation after optimizations
     if (options.EnableRegisterAllocation)
         changedAtAll |= RVMRegisterAllocator::allocate(program);
+
+    // Apply register linearization at the end (syntax-only pass)
+    changedAtAll |= RVMRegisterLinearizer::linearize(program);
 
     return changedAtAll;
 }
