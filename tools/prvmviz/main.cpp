@@ -38,6 +38,7 @@ std::string regName(RegId reg)
 
 // Visualize live intervals in ASCII with rows as instructions and columns as registers
 void visualizeLiveIntervals(const std::vector<std::shared_ptr<RVMInstr>>& program,
+                            const RVMBasicBlockAnalyzer::BlockList& blocks,
                             const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
 {
     if (program.empty()) {
@@ -49,9 +50,6 @@ void visualizeLiveIntervals(const std::vector<std::shared_ptr<RVMInstr>>& progra
     RegId maxReg = 0;
     for (const auto& interval : intervals)
         maxReg = std::max(maxReg, interval.Register);
-
-    // Split into basic blocks
-    const auto blocks = RVMBasicBlockAnalyzer::splitIntoBlocks(program);
 
     // Find max instruction index
     size_t maxIdx = program.size();
@@ -242,22 +240,7 @@ int main(int argc, char** argv)
 
     // Split into basic blocks and analyze live intervals per block
     const auto blocks = RVMBasicBlockAnalyzer::splitIntoBlocks(program);
-    std::vector<RVMLiveAnalyzer::LiveInterval> allIntervals;
-
-    size_t blockStartOffset = 0;
-    for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
-        const auto& block   = blocks[blockIdx];
-        auto blockIntervals = RVMLiveAnalyzer::analyzeBlock(block);
-
-        // Adjust interval positions to global instruction indices
-        for (auto& interval : blockIntervals) {
-            interval.Start += blockStartOffset;
-            interval.End += blockStartOffset;
-            allIntervals.push_back(interval);
-        }
-
-        blockStartOffset += block.size();
-    }
+    auto allIntervals = RVMLiveAnalyzer::analyzeProgram(program);
 
     // Sort intervals
     if (sortByStart) {
@@ -275,14 +258,14 @@ int main(int argc, char** argv)
     if (showTable)
         printIntervalTable(allIntervals);
     else
-        visualizeLiveIntervals(program, allIntervals);
+        visualizeLiveIntervals(program, blocks, allIntervals);
 
     // Display results
     std::cout << "General Statistics:" << std::endl
               << "===================" << std::endl
-              << "Instructions: " << program.size() << std::endl
-              << "Basic blocks: " << blocks.size() << std::endl
-              << "Live intervals: " << allIntervals.size() << std::endl;
+              << "Instructions:     " << program.size() << std::endl
+              << "Basic blocks:     " << blocks.size() << std::endl
+              << "Live intervals:   " << allIntervals.size() << std::endl;
 
     // Count pinned intervals
     size_t pinnedCount = 0;
@@ -322,8 +305,7 @@ int main(int argc, char** argv)
     // Print per-block statistics
     std::cout << std::endl
               << "Per-Block Statistics:" << std::endl
-              << "===================" << std::endl;
-    blockStartOffset = 0;
+              << "=====================" << std::endl;
     for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
         const auto& block   = blocks[blockIdx];
         auto blockIntervals = RVMLiveAnalyzer::analyzeBlock(block);
@@ -345,8 +327,6 @@ int main(int argc, char** argv)
         if (blockRegisterUsage.empty())
             std::cout << "none";
         std::cout << std::endl;
-
-        blockStartOffset += block.size();
     }
 
     return EXIT_SUCCESS;

@@ -17,8 +17,8 @@ bool RVMRegisterAllocator::allocate(RVMProgram& program)
     if (originalMax <= 1) // Already minimal or no registers
         return false;
 
-    // Analyze live ranges using the live analyzer for the entire program at once
-    auto intervals = RVMLiveAnalyzer::analyzeBlock(program);
+    // Analyze live ranges using the live analyzer for the entire program with control flow
+    auto intervals = RVMLiveAnalyzer::analyzeProgram(program);
     if (intervals.empty())
         return false;
 

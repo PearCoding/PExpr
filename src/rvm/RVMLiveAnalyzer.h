@@ -1,11 +1,15 @@
 #pragma once
 
 #include "RVMInstruction.h"
+#include "RVMProgram.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace PExpr::rvm {
+
+class RVMBasicBlockAnalyzer;
 
 /// Analyzes live intervals within a list of instructions
 class RVMLiveAnalyzer {
@@ -35,6 +39,12 @@ public:
     /// There might be multiple intervals for a single register as each new definition starts a new interval.
     /// Returns a vector of intervals sorted by start position
     static std::vector<LiveInterval> analyzeBlock(const std::vector<std::shared_ptr<RVMInstr>>& block);
+
+    /// Analyze live intervals for registers in an entire program with control flow.
+    /// This performs global liveness analysis across basic blocks, respecting jumps,
+    /// branches, calls, and returns.
+    /// Returns a vector of intervals sorted by start position (global instruction index)
+    static std::vector<LiveInterval> analyzeProgram(const RVMProgram& program);
 
 private:
     /// Process a single instruction for live interval analysis
