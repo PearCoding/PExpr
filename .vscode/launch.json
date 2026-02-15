@@ -255,6 +255,19 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "prvmviz",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/prvmviz.exe",
+            "args": [
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Fuzzy",
             "type": "cppvsdbg",
             "request": "launch",
