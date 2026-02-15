@@ -1,0 +1,10 @@
+mov %r1:int %r0:int
+mov %r2:int %r1:int
+mov %r3:int %r2:int
+add %r0:int %r3:int %r0:int
+
+// Could be simplified to:
+//  mov %r3:int %r0:int
+//  add %r0:int %r3:int %r0:int
+// or even
+//  add %r0:int %r0:int %r0:int

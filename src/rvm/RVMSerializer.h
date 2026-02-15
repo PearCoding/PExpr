@@ -42,7 +42,7 @@ public:
     static std::string opcodeToString(Opcode op);
 
     /// Convert string to opcode
-    static Opcode stringToOpcode(const std::string& str);
+    static std::optional<Opcode> stringToOpcode(const std::string& str);
 
     /// Parse an instruction from a line of text (used for testing)
     static std::shared_ptr<RVMInstr> readInstruction(const std::string& line);

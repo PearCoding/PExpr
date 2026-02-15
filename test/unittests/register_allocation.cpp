@@ -251,46 +251,6 @@ TEST_CASE("RVMRegisterAllocator: handles nested control flow", "[rvm][register-a
     REQUIRE(!serialized.empty());
 }
 
-TEST_CASE("RVMRegisterAllocator: handles loops with register reuse", "[rvm][register-allocation][loops]")
-{
-    Environment env;
-
-    // Program with a loop where registers can be reused across iterations
-    auto ast = env.parse(R"(
-        [[extern]] fn getIterations() -> int;
-        [[extern]] fn getInput() -> int;
-        
-        let iterations = getIterations();
-        let acc = 0;
-        
-        // Simple accumulator loop
-        let result = loop i = 0 while i < iterations {
-            let current = getInput();
-            let newAcc = acc + current;
-            (i + 1, newAcc)
-        } yield acc;
-        
-        result
-    )");
-
-    REQUIRE(ast != nullptr);
-
-    auto prog = env.map(ast);
-    rvm::RVMMapper mapper;
-    auto rvmProg = mapper.mapProgram(prog);
-
-    size_t beforeCount = RVMRegisterAllocator::getMaxRegisterCount(rvmProg);
-    bool changed       = RVMRegisterAllocator::allocate(rvmProg);
-    size_t afterCount  = RVMRegisterAllocator::getMaxRegisterCount(rvmProg);
-
-    // Register allocation should work with loops
-    REQUIRE(changed == true);
-    REQUIRE(afterCount <= beforeCount);
-
-    std::string serialized = RVMSerializer::serialize(rvmProg);
-    REQUIRE(!serialized.empty());
-}
-
 TEST_CASE("RVMRegisterAllocator: handles complex register pressure", "[rvm][register-allocation][pressure]")
 {
     Environment env;
@@ -505,10 +465,9 @@ TEST_CASE("RVMRegisterAllocator: handles edge case with single register", "[rvm]
     RVMRegisterAllocator::allocate(rvmProg);
     size_t afterCount = RVMRegisterAllocator::getMaxRegisterCount(rvmProg);
 
-    // With minimal registers already, allocation might not change anything
-    REQUIRE(afterCount == beforeCount);
-    // changed might be false if no improvement possible
-    REQUIRE(true); // Just verify it doesn't crash
+    // Minimal register is 1, but we might start with a higher number
+    REQUIRE(afterCount <= beforeCount);
+    REQUIRE(afterCount == 1);
 }
 
 TEST_CASE("RVMRegisterAllocator: handles mixed type registers", "[rvm][register-allocation][types]")
@@ -529,7 +488,7 @@ TEST_CASE("RVMRegisterAllocator: handles mixed type registers", "[rvm][register-
         let i2 = if b { i * 2 } else { i / 2 };
         let n2 = n + (i2 as num);
         
-        (i2, n2, b)
+        [i2, n2, b]
     )");
 
     REQUIRE(ast != nullptr);

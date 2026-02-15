@@ -123,15 +123,15 @@
                 {
                     "name": "variable.register.pexprrvm",
                     "match": "\\%r[0-9]+:(bool|int|num|str)\\b"
+                },
+                {
+                    "name": "variable.stringref.pexprrvm",
+                    "match": "#str[0-9]+:(str)\\b"
                 }
             ]
         },
         "strings": {
             "patterns": [
-                {
-                    "name": "constant.stringref.pexprrvm",
-                    "match": "#str[0-9]+:(str)\\b"
-                },
                 {
                     "name": "string.quoted.double.pexprrvm",
                     "begin": "\"",

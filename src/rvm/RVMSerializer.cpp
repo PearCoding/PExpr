@@ -91,7 +91,7 @@ std::string RVMSerializer::opcodeToString(Opcode op)
     }
 }
 
-Opcode RVMSerializer::stringToOpcode(const std::string& str)
+std::optional<Opcode> RVMSerializer::stringToOpcode(const std::string& str)
 {
     // Map string back to opcode
     if (str == "add")
@@ -159,7 +159,40 @@ Opcode RVMSerializer::stringToOpcode(const std::string& str)
     if (str == "load_string")
         return Opcode::LOAD_STRING;
 
-    return Opcode::ADD; // Default
+    return std::nullopt;
+}
+
+static inline int opcodeNumSources(Opcode op)
+{
+    switch (op) {
+    // Arithmetic operations
+    case Opcode::ADD:
+    case Opcode::SUB:
+    case Opcode::MUL:
+    case Opcode::DIV:
+    case Opcode::MOD:
+    case Opcode::POW:
+    case Opcode::AND:
+    case Opcode::OR:
+    case Opcode::XOR:
+    case Opcode::SHL:
+    case Opcode::SHR:
+    case Opcode::CMP_EQ:
+    case Opcode::CMP_NE:
+    case Opcode::CMP_LT:
+    case Opcode::CMP_LE:
+    case Opcode::CMP_GT:
+    case Opcode::CMP_GE:
+        return 2;
+
+    case Opcode::I2F:
+    case Opcode::F2I:
+    case Opcode::MOV:
+        return 1;
+
+    default:
+        return -1;
+    }
 }
 
 void RVMSerializer::write(std::ostream& os, const ValueVariant& value)
@@ -197,8 +230,9 @@ void RVMSerializer::write(std::ostream& os, const RVMValue& value)
 
 void RVMSerializer::write2Op(std::ostream& os, const RVMInstr2Op& instr)
 {
+    os << opcodeToString(instr.opcode()) << " ";
     write(os, instr.dst().value());
-    os << " = " << opcodeToString(instr.opcode()) << " ";
+    os << " ";
 
     auto srcs = instr.srcs();
     if (!srcs.empty())
@@ -207,8 +241,9 @@ void RVMSerializer::write2Op(std::ostream& os, const RVMInstr2Op& instr)
 
 void RVMSerializer::write3Op(std::ostream& os, const RVMInstr3Op& instr)
 {
+    os << opcodeToString(instr.opcode()) << " ";
     write(os, instr.dst().value());
-    os << " = " << opcodeToString(instr.opcode()) << " ";
+    os << " ";
 
     auto srcs = instr.srcs();
     if (srcs.size() >= 1)
@@ -222,15 +257,15 @@ void RVMSerializer::write3Op(std::ostream& os, const RVMInstr3Op& instr)
 void RVMSerializer::writeBranch(std::ostream& os, const RVMInstrBranch& instr)
 {
     os << opcodeToString(instr.opcode()) << " ";
+    os << instr.targetLabel() << " ";
     auto srcs = instr.srcs();
     if (!srcs.empty())
         write(os, srcs[0]);
-    os << " -> " << instr.targetLabel();
 }
 
 void RVMSerializer::writeJump(std::ostream& os, const RVMInstrJump& instr)
 {
-    os << "jmp -> " << instr.targetLabel();
+    os << "jmp " << instr.targetLabel();
 }
 
 void RVMSerializer::writeComment(std::ostream& os, const RVMInstrComment& instr)
@@ -282,8 +317,9 @@ void RVMSerializer::writePopFrame(std::ostream& os, const RVMInstrPopFrame& inst
 
 void RVMSerializer::writeStringLiteral(std::ostream& os, const RVMInstrStringLiteral& instr)
 {
+    os << "load_string ";
     write(os, instr.dst().value());
-    os << " = load_string \"" << utils::escapeString(instr.stringValue()) << "\"";
+    os << " \"" << utils::escapeString(instr.stringValue()) << "\"";
 }
 
 void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
@@ -351,10 +387,10 @@ Type RVMSerializer::parseType(const std::string& typeStr)
 // Helper functions for parsing
 static std::string trim(const std::string& str)
 {
-    size_t start = str.find_first_not_of(" \t");
+    size_t start = str.find_first_not_of(" \t\n");
     if (start == std::string::npos)
         return std::string();
-    size_t end = str.find_last_not_of(" \t");
+    size_t end = str.find_last_not_of(" \t\n");
     return str.substr(start, end - start + 1);
 }
 
@@ -514,32 +550,40 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         return std::make_shared<RVMInstrLabel>(labelName);
     }
 
-    // Check for jump (format: jmp -> labelname)
-    if (trimmed.rfind("jmp -> ", 0) == 0) {
-        std::string labelName = trimmed.substr(7);
+    // Check for jump (format: jmp labelname)
+    if (trimmed.rfind("jmp ", 0) == 0) {
+        std::string labelName = trim(trimmed.substr(4));
         return std::make_shared<RVMInstrJump>(labelName);
     }
 
-    // Check for branch (format: opcode value -> labelname)
-    if (trimmed.find(" -> ") != std::string::npos) {
-        size_t arrow       = trimmed.find(" -> ");
-        std::string before = trim(trimmed.substr(0, arrow));
-        std::string after  = trim(trimmed.substr(arrow + 4));
-
-        // Parse opcode and value
-        size_t space = before.find(' ');
-        if (space == std::string::npos)
+    // Check for branch (format: opcode label value)
+    // First check if it's a branch instruction (jz, jnz)
+    if (trimmed.rfind("jz ", 0) == 0 || trimmed.rfind("jnz ", 0) == 0) {
+        // Format: opcode label value
+        size_t firstSpace = trimmed.find(' ');
+        if (firstSpace == std::string::npos)
             return nullptr;
 
-        std::string opcodeStr = trim(before.substr(0, space));
-        std::string valueStr  = trim(before.substr(space + 1));
+        std::string opcodeStr = trim(trimmed.substr(0, firstSpace));
+        std::string rest      = trim(trimmed.substr(firstSpace + 1));
+
+        // Find second space separating label from value
+        size_t secondSpace = rest.find(' ');
+        if (secondSpace == std::string::npos)
+            return nullptr;
+
+        std::string labelStr = trim(rest.substr(0, secondSpace));
+        std::string valueStr = trim(rest.substr(secondSpace + 1));
 
         RVMValue value;
         if (!parseValue(valueStr, value))
             return nullptr;
 
-        Opcode op = stringToOpcode(opcodeStr);
-        return std::make_shared<RVMInstrBranch>(op, value, after);
+        auto op = stringToOpcode(opcodeStr);
+        if (op)
+            return std::make_shared<RVMInstrBranch>(*op, value, labelStr);
+        else
+            return nullptr;
     }
 
     // Check for return
@@ -560,7 +604,7 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         if (parenStart == std::string::npos || parenEnd == std::string::npos)
             return nullptr;
 
-        std::string funcName = trim(trimmed.substr(15, parenStart - 5));
+        std::string funcName = trim(trimmed.substr(14, parenStart - 14));
         std::string argsStr  = trimmed.substr(parenStart + 1, parenEnd - parenStart - 1);
 
         std::vector<RVMValue> args = parseValueList(argsStr);
@@ -585,72 +629,109 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         }
     }
 
-    // Check for assignment instructions (dst = op ...)
-    size_t eqPos = trimmed.find('=');
-    if (eqPos != std::string::npos) {
-        std::string dstStr = trim(trimmed.substr(0, eqPos));
-        std::string rest   = trim(trimmed.substr(eqPos + 1));
+    // Check for load_string instruction (format: load_string dst "string")
+    if (trimmed.rfind("load_string ", 0) == 0) {
+        std::string rest = trim(trimmed.substr(12));
+        size_t space     = rest.find(' ');
+        if (space == std::string::npos)
+            return nullptr;
+
+        std::string dstStr        = trim(rest.substr(0, space));
+        std::string stringLiteral = trim(rest.substr(space + 1));
 
         RVMValue dst;
         if (!parseValue(dstStr, dst))
             return nullptr;
 
-        // Check for mov
-        if (rest.rfind("mov ", 0) == 0) {
-            std::string srcStr = trim(rest.substr(4));
-            RVMValue src;
-            if (!parseValue(srcStr, src))
-                return nullptr;
-            return std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src);
+        // Check if it's a quoted string
+        if (stringLiteral.size() >= 2 && stringLiteral.front() == '"' && stringLiteral.back() == '"') {
+            std::string escapedString   = stringLiteral.substr(1, stringLiteral.size() - 2);
+            std::string unescapedString = utils::unescapeString(escapedString);
+            return std::make_shared<RVMInstrStringLiteral>(dst, unescapedString);
         }
+        return nullptr;
+    }
 
-        // Check for 2-operand or 3-operand instruction
-        size_t space = rest.find(' ');
-        if (space != std::string::npos) {
-            std::string opcodeStr = trim(rest.substr(0, space));
-            std::string argsStr   = trim(rest.substr(space + 1));
+    // Check for 2-operand instructions (format: op dst src)
+    // First, try to parse as op dst src
+    size_t firstSpace = trimmed.find(' ');
+    if (firstSpace != std::string::npos) {
+        std::string opcodeStr = trim(trimmed.substr(0, firstSpace));
+        std::string rest      = trim(trimmed.substr(firstSpace + 1));
 
-            Opcode op                          = stringToOpcode(opcodeStr);
-            std::vector<std::string> argTokens = split(argsStr, ' ');
+        // Check if it's a valid opcode
+        auto op = stringToOpcode(opcodeStr);
+        if (op) {
+            // Try to parse as 2-operand instruction: op dst src
+            size_t secondSpace = rest.find(' ');
+            if (secondSpace != std::string::npos) {
+                std::string dstStr = trim(rest.substr(0, secondSpace));
+                std::string srcStr = trim(rest.substr(secondSpace + 1));
 
-            if (argTokens.size() == 1) {
-                // 2-operand instruction: dst = op src
-                RVMValue src;
-                if (parseValue(argTokens[0], src))
-                    return std::make_shared<RVMInstr2Op>(op, dst, src);
-            } else if (argTokens.size() == 2) {
-                // 3-operand instruction: dst = op src1, src2
-                RVMValue src1, src2;
-                if (parseValue(argTokens[0], src1) && parseValue(argTokens[1], src2))
-                    return std::make_shared<RVMInstr3Op>(op, dst, src1, src2);
+                RVMValue dst, src;
+                if (parseValue(dstStr, dst) && parseValue(srcStr, src)) {
+                    // Check if it's a 2-op instruction
+                    if (opcodeNumSources(*op) == 1)
+                        return std::make_shared<RVMInstr2Op>(*op, dst, src);
+                    else
+                        return nullptr;
+                }
+            }
+
+            // Check if it's a 3-op instruction
+            if (opcodeNumSources(*op) == 2) {
+                // Try to parse as 3-operand instruction: op dst src1 src2
+                // Split by spaces
+                std::vector<std::string> tokens = split(rest, ' ');
+                if (tokens.size() == 3) {
+                    std::string dstStr  = tokens[0];
+                    std::string src1Str = tokens[1];
+                    std::string src2Str = tokens[2];
+
+                    RVMValue dst, src1, src2;
+                    if (parseValue(dstStr, dst) && parseValue(src1Str, src1) && parseValue(src2Str, src2))
+                        return std::make_shared<RVMInstr3Op>(*op, dst, src1, src2);
+                }
             }
         }
+    }
 
-        // Check for call_external
-        if (rest.rfind("call_external ", 0) == 0) {
-            size_t parenStart = rest.find('(');
-            size_t parenEnd   = rest.find(')', parenStart);
+    // Check for call_external (void return) - format: call_external funcName(arg1, arg2)
+    if (trimmed.rfind("call_external ", 0) == 0) {
+        size_t parenStart = trimmed.find('(');
+        size_t parenEnd   = trimmed.find(')', parenStart);
+        if (parenStart == std::string::npos || parenEnd == std::string::npos)
+            return nullptr;
+
+        std::string funcName = trim(trimmed.substr(14, parenStart - 14));
+        std::string argsStr  = trimmed.substr(parenStart + 1, parenEnd - parenStart - 1);
+
+        std::vector<RVMValue> args = parseValueList(argsStr);
+        return std::make_shared<RVMInstrExternalCall>(std::nullopt, funcName, args);
+    }
+
+    // Check for call_external with return value (format: dst = call_external funcName(arg1, arg2))
+    // This is kept for backward compatibility
+    size_t eqPos = trimmed.find('=');
+    if (eqPos != std::string::npos) {
+        std::string beforeEq = trim(trimmed.substr(0, eqPos));
+        std::string afterEq  = trim(trimmed.substr(eqPos + 1));
+
+        if (afterEq.rfind("call_external ", 0) == 0) {
+            size_t parenStart = afterEq.find('(');
+            size_t parenEnd   = afterEq.find(')', parenStart);
             if (parenStart == std::string::npos || parenEnd == std::string::npos)
                 return nullptr;
 
-            std::string funcName = trim(rest.substr(15, parenStart - 5));
-            std::string argsStr  = rest.substr(parenStart + 1, parenEnd - parenStart - 1);
+            std::string funcName = trim(afterEq.substr(14, parenStart - 14));
+            std::string argsStr  = afterEq.substr(parenStart + 1, parenEnd - parenStart - 1);
+
+            RVMValue dst;
+            if (!parseValue(beforeEq, dst))
+                return nullptr;
 
             std::vector<RVMValue> args = parseValueList(argsStr);
             return std::make_shared<RVMInstrExternalCall>(dst, funcName, args);
-        }
-
-        // Check for load_string
-        if (rest.rfind("load_string ", 0) == 0) {
-            // Format: dst = load_string "string_value"
-            std::string stringLiteral = trim(rest.substr(12));
-
-            // Check if it's a quoted string
-            if (stringLiteral.size() >= 2 && stringLiteral.front() == '"' && stringLiteral.back() == '"') {
-                std::string escapedString   = stringLiteral.substr(1, stringLiteral.size() - 2);
-                std::string unescapedString = utils::unescapeString(escapedString);
-                return std::make_shared<RVMInstrStringLiteral>(dst, unescapedString);
-            }
         }
     }
 
