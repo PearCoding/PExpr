@@ -52,16 +52,6 @@ RVMInstrReturn::RVMInstrReturn(size_t returnCount)
 {
 }
 
-RVMInstrPushFrame::RVMInstrPushFrame(size_t registerCount)
-    : mRegisterCount(registerCount)
-{
-}
-
-RVMInstrPopFrame::RVMInstrPopFrame(size_t registerCount)
-    : mRegisterCount(registerCount)
-{
-}
-
 RVMInstrStringLiteral::RVMInstrStringLiteral(RVMValue dst, const std::string& str)
     : mDst(dst)
     , mString(str)

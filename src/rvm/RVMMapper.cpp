@@ -113,7 +113,7 @@ RVMValue RVMMapper::mapValue(const ssa::SSAValue& ssaValue)
     }
 
     // Register/named value - allocate register and store mapping
-    RegId reg         = mContext.allocateRegister(ssaValue.type());
+    RegId reg         = mContext.allocateRegister();
     RVMValue rvmValue = RVMValue::Register(reg, ssaValue.type());
 
     // Store the mapping for future reference
@@ -162,7 +162,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
                         PEXPR_ASSERT(!dstType.isTuple(), "Undetected tuple found during tuple dissolving");
 
                         RVMValue src = mapValue(instr.Operands[i]);
-                        RVMValue dst = RVMValue::Register(mContext.allocateRegister(dstType), dstType);
+                        RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstType);
 
                         elements.push_back(dst);
                         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
@@ -328,6 +328,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         }
     }
 
+    std::unordered_map<RegId, RVMValue> savedRegisters;
+
     // Internal call: use calling convention with registers
     // 1. Get flat call arguments
     std::vector<RVMValue> arguments;
@@ -340,13 +342,34 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
     auto returnTypes       = dissolveTupleType(instr.Target.type());
     uint32_t numReturnRegs = returnTypes.empty() || instr.Target.type().isVoid() ? 0 : static_cast<uint32_t>(returnTypes.size());
     uint32_t numArgRegs    = static_cast<uint32_t>(arguments.size());
-    uint32_t registerCount = std::max(numReturnRegs, numArgRegs);
 
-    // 3. Push frame to save register context
-    if (registerCount > 0)
-        result.push_back(std::make_shared<RVMInstrPushFrame>(registerCount));
+    // 3. Save frame
+    //  Parameters
+    for (size_t i = 0; i < arguments.size(); ++i) {
+        RVMValue src = arguments[i];
+        if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
+            continue;
+        if (!mContext.isRegisterUsed(i))
+            continue;
 
-    // 4. Move arguments to registers %r0, %r1, %r2, etc.
+        RVMValue dst    = RVMValue::Register(i, arguments[i].type()); // %r0, %r1, %r2, ...
+        RVMValue tmpDst = RVMValue::Register(mContext.allocateRegister(), arguments[i].type());
+        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
+        savedRegisters[dst.regId()] = tmpDst;
+    }
+    //  Return values
+    for (size_t i = 0; i < returnTypes.size(); ++i) {
+        RVMValue dst = RVMValue::Register(i, returnTypes[i]); // %r0, %r1, %r2, ...
+        if (dst.isRegister() || dst.regId() == i)             //< Only move if destination is not already the correct one
+            continue;
+        if (!mContext.isRegisterUsed(i) || savedRegisters.contains(dst.regId()))
+            continue;
+        RVMValue tmpDst = RVMValue::Register(mContext.allocateRegister(), returnTypes[i]);
+        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
+        savedRegisters[dst.regId()] = tmpDst;
+    }
+
+    // 4. Move arguments to registers %r0, %r1, %r2, etc. and save previous content
     for (size_t i = 0; i < arguments.size(); ++i) {
         RVMValue src = arguments[i];
         if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
@@ -357,6 +380,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
     }
 
     // 5. Call internal function
+    // Note: It is the job of the host to ensure register changes inside functions do not change this context
     result.push_back(std::make_shared<RVMInstrCall>(isExternal, numArgRegs, numReturnRegs, instr.FunctionName));
 
     // 6. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
@@ -365,7 +389,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
             // Multiple return values. Essentially a virtual tuple instruction
             std::vector<RVMValue> values;
             for (size_t i = 0; i < returnTypes.size(); ++i) {
-                RVMValue dst = RVMValue::Register(mContext.allocateRegister(returnTypes[i]), returnTypes[i]);
+                RVMValue dst = RVMValue::Register(mContext.allocateRegister(), returnTypes[i]);
                 if (!dst.isRegister() || dst.regId() != i) {              //< Only move if destination is not already %r0
                     RVMValue src = RVMValue::Register(i, returnTypes[i]); // %r0 holds return value
                     result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
@@ -383,9 +407,9 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         }
     }
 
-    // 7. Pop frame to restore register context
-    if (registerCount > 0)
-        result.push_back(std::make_shared<RVMInstrPopFrame>(registerCount));
+    // 7. Restore frame to for original register context
+    for (const auto& [dstId, tmpDst] : savedRegisters)
+        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, RVMValue::Register(dstId, tmpDst.type()), tmpDst));
 
     return result;
 }
@@ -633,7 +657,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
                     std::vector<RVMValue> values;
                     for (size_t i = 0; i < innerTypes.size(); ++i) {
                         size_t srcRegId = paramIndex++;
-                        RVMValue dst    = RVMValue::Register(mContext.allocateRegister(innerTypes[i]), innerTypes[i]);
+                        RVMValue dst    = RVMValue::Register(mContext.allocateRegister(), innerTypes[i]);
                         if (!dst.isRegister() || dst.regId() != srcRegId) {             //< Only move if destination is not already the correct one
                             RVMValue src = RVMValue::Register(srcRegId, innerTypes[i]); // %rI holds return value
                             rvmProgram.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));

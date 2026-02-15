@@ -87,37 +87,13 @@ TEST_CASE("RVMContext: register management", "[rvm][context]")
 
     SECTION("Register allocation")
     {
-        RegId reg1 = context.allocateRegister(Type(TypeKind::Integer));
-        RegId reg2 = context.allocateRegister(Type(TypeKind::Number));
-        RegId reg3 = context.allocateRegister(Type(TypeKind::Boolean));
+        RegId reg1 = context.allocateRegister();
+        RegId reg2 = context.allocateRegister();
+        RegId reg3 = context.allocateRegister();
 
         REQUIRE(reg1 == 0u);
         REQUIRE(reg2 == 1u);
         REQUIRE(reg3 == 2u);
-    }
-
-    SECTION("Register type tracking")
-    {
-        RegId reg1 = context.allocateRegister(Type(TypeKind::Integer));
-        RegId reg2 = context.allocateRegister(Type(TypeKind::Number));
-
-        REQUIRE(context.getRegisterType(reg1) == Type(TypeKind::Integer));
-        REQUIRE(context.getRegisterType(reg2) == Type(TypeKind::Number));
-    }
-
-    SECTION("Register freeing and reset")
-    {
-        RegId reg1 = context.allocateRegister(Type(TypeKind::Integer));
-        PEXPR_UNUSED(reg1);
-
-        RegId reg2 = context.allocateRegister(Type(TypeKind::Number));
-
-        context.freeRegister(reg2);
-        context.reset();
-
-        // After reset, allocation should start from 0 again
-        RegId reg4 = context.allocateRegister(Type(TypeKind::Integer));
-        REQUIRE(reg4 == 0u);
     }
 }
 
@@ -153,22 +129,6 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         auto srcs = instr->srcs();
         REQUIRE(srcs.size() == 1);
         REQUIRE(srcs[0] == src);
-    }
-
-    SECTION("Frame instructions")
-    {
-        auto pushInstr = std::make_shared<RVMInstrPushFrame>(3);
-        auto popInstr  = std::make_shared<RVMInstrPopFrame>(3);
-
-        REQUIRE(pushInstr->opcode() == Opcode::PUSH_FRAME);
-        REQUIRE_FALSE(pushInstr->dst().has_value());
-        REQUIRE(pushInstr->srcs().empty());
-        REQUIRE(pushInstr->registerCount() == 3);
-
-        REQUIRE(popInstr->opcode() == Opcode::POP_FRAME);
-        REQUIRE_FALSE(popInstr->dst().has_value());
-        REQUIRE(popInstr->srcs().empty());
-        REQUIRE(popInstr->registerCount() == 3);
     }
 
     SECTION("Branch instruction")
@@ -499,56 +459,6 @@ TEST_CASE("RVMInstructions: call instructions", "[rvm][instructions][calling]")
     }
 }
 
-TEST_CASE("RVMInstructions: frame instructions with register counts", "[rvm][instructions][calling]")
-{
-    SECTION("Push frame with register count")
-    {
-        auto pushInstr = std::make_shared<RVMInstrPushFrame>(5);
-
-        REQUIRE(pushInstr->opcode() == Opcode::PUSH_FRAME);
-        REQUIRE(pushInstr->registerCount() == 5);
-
-        std::ostringstream oss;
-        RVMSerializer::write(oss, *pushInstr);
-        std::string instrStr = oss.str();
-
-        REQUIRE(instrStr.find("push_frame") != std::string::npos);
-        REQUIRE(instrStr.find("5") != std::string::npos);
-    }
-
-    SECTION("Pop frame with register count")
-    {
-        auto popInstr = std::make_shared<RVMInstrPopFrame>(3);
-
-        REQUIRE(popInstr->opcode() == Opcode::POP_FRAME);
-        REQUIRE(popInstr->registerCount() == 3);
-
-        std::ostringstream oss;
-        RVMSerializer::write(oss, *popInstr);
-        std::string instrStr = oss.str();
-
-        REQUIRE(instrStr.find("pop_frame") != std::string::npos);
-        REQUIRE(instrStr.find("3") != std::string::npos);
-    }
-
-    SECTION("Frame instruction serialization roundtrip")
-    {
-        auto pushInstr = std::make_shared<RVMInstrPushFrame>(7);
-
-        std::ostringstream oss;
-        RVMSerializer::write(oss, *pushInstr);
-        std::string serialized = oss.str();
-
-        // Parse it back
-        auto parsed = RVMSerializer::readInstruction(serialized);
-        REQUIRE(parsed != nullptr);
-
-        auto* pushParsed = dynamic_cast<RVMInstrPushFrame*>(parsed.get());
-        REQUIRE(pushParsed != nullptr);
-        REQUIRE(pushParsed->registerCount() == 7);
-    }
-}
-
 TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper][tuple]")
 {
     SECTION("Simple tuple with 2 elements")
@@ -598,31 +508,6 @@ TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper][tuple]")
 
         REQUIRE(dissolved.size() == 1);
         REQUIRE(dissolved[0].kind() == TypeKind::Integer);
-    }
-}
-
-TEST_CASE("RVMSerializer: frame instruction deserialization", "[rvm][serializer][calling]")
-{
-    SECTION("Deserialize push_frame with count")
-    {
-        std::string line = "push_frame 4";
-        auto instr       = RVMSerializer::readInstruction(line);
-
-        REQUIRE(instr != nullptr);
-        auto* pushFrame = dynamic_cast<RVMInstrPushFrame*>(instr.get());
-        REQUIRE(pushFrame != nullptr);
-        REQUIRE(pushFrame->registerCount() == 4);
-    }
-
-    SECTION("Deserialize pop_frame with count")
-    {
-        std::string line = "pop_frame 2";
-        auto instr       = RVMSerializer::readInstruction(line);
-
-        REQUIRE(instr != nullptr);
-        auto* popFrame = dynamic_cast<RVMInstrPopFrame*>(instr.get());
-        REQUIRE(popFrame != nullptr);
-        REQUIRE(popFrame->registerCount() == 2);
     }
 }
 
@@ -1074,38 +959,6 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::RET);
         REQUIRE(parsedInstr->returnCount() == returnCount);
-    }
-
-    SECTION("Push frame instruction roundtrip")
-    {
-        size_t registerCount = 5;
-        
-        auto original = std::make_shared<RVMInstrPushFrame>(registerCount);
-        std::string serialized = RVMSerializer::serialize({original});
-        
-        auto parsed = RVMSerializer::readInstruction(serialized);
-        REQUIRE(parsed != nullptr);
-        
-        auto* parsedInstr = dynamic_cast<RVMInstrPushFrame*>(parsed.get());
-        REQUIRE(parsedInstr != nullptr);
-        REQUIRE(parsedInstr->opcode() == Opcode::PUSH_FRAME);
-        REQUIRE(parsedInstr->registerCount() == registerCount);
-    }
-
-    SECTION("Pop frame instruction roundtrip")
-    {
-        size_t registerCount = 3;
-        
-        auto original = std::make_shared<RVMInstrPopFrame>(registerCount);
-        std::string serialized = RVMSerializer::serialize({original});
-        
-        auto parsed = RVMSerializer::readInstruction(serialized);
-        REQUIRE(parsed != nullptr);
-        
-        auto* parsedInstr = dynamic_cast<RVMInstrPopFrame*>(parsed.get());
-        REQUIRE(parsedInstr != nullptr);
-        REQUIRE(parsedInstr->opcode() == Opcode::POP_FRAME);
-        REQUIRE(parsedInstr->registerCount() == registerCount);
     }
 
     SECTION("Call instruction roundtrip")

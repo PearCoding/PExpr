@@ -4,26 +4,21 @@
 
 namespace PExpr::rvm {
 
-/// RVM context for register management
+/// RVM context for linear register management
 class RVMContext {
 public:
     RVMContext();
 
-    /// Allocate a new register with given type
-    [[nodiscard]] RegId allocateRegister(const type::Type& type);
-
-    /// Get type of a register
-    [[nodiscard]] const type::Type& getRegisterType(RegId reg) const;
-
-    /// Free a register (mark as available)
-    void freeRegister(RegId reg);
+    /// Allocate a new register
+    [[nodiscard]] inline RegId allocateRegister() { return mNextRegId++; }
 
     /// Reset all registers
-    void reset();
+    inline void reset() { mNextRegId = 0; }
+
+    [[nodiscard]] inline bool isRegisterUsed(RegId id) const { return id < mNextRegId; }
 
 private:
     RegId mNextRegId = 0;
-    std::unordered_map<RegId, type::Type> mRegisterTypes;
 };
 
 } // namespace PExpr::rvm

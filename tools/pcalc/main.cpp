@@ -111,8 +111,6 @@ public:
                 labelMap[label->labelName()] = i;
         }
 
-        std::vector<size_t> returnStack;
-
         size_t pc = 0;
         while (pc < program.size()) {
             auto& instr = program[pc];
@@ -122,11 +120,10 @@ public:
                 continue;
             }
 
-            if (dynamic_cast<RVMInstrReturn*>(instr.get())) {
-                if (returnStack.empty())
+            if (auto ret = dynamic_cast<RVMInstrReturn*>(instr.get())) {
+                if (callStack.empty())
                     break;
-                pc = returnStack.back();
-                returnStack.pop_back();
+                pc = popCallFrame(ret->returnCount());
                 pc++;
                 continue;
             }
@@ -161,33 +158,8 @@ public:
                 continue;
             }
 
-            if (auto* pushFrame = dynamic_cast<RVMInstrPushFrame*>(instr.get())) {
-                // Save registers to stack
-                for (uint32_t i = 1; i <= pushFrame->registerCount(); ++i) {
-                    RegId reg = i - 1;
-                    if (registers.find(reg) != registers.end())
-                        registerStack.push_back({ reg, registers[reg] });
-                }
-                pc++;
-                continue;
-            }
-
-            if (auto* popFrame = dynamic_cast<RVMInstrPopFrame*>(instr.get())) {
-                // Restore registers from stack
-                for (uint32_t i = popFrame->registerCount(); i >= 1; --i) {
-                    RegId reg = i - 1;
-                    if (!registerStack.empty() && registerStack.back().first == reg) {
-                        registers[reg] = registerStack.back().second;
-                        registerStack.pop_back();
-                    }
-                }
-                pc++;
-                continue;
-            }
-
             if (auto* call = dynamic_cast<RVMInstrCall*>(instr.get())) {
                 if (call->isExternal()) {
-
                     auto it = externalFunctions.find(call->functionName());
                     if (it != externalFunctions.end()) {
                         std::vector<ValueVariant> args;
@@ -204,7 +176,8 @@ public:
                     // A call is just an annotated jump
                     auto it = labelMap.find(call->functionName());
                     if (it != labelMap.end()) {
-                        returnStack.push_back(pc);
+                        // Save registers to stack
+                        pushCallFrame(pc);
                         pc = it->second;
                         continue;
                     }
@@ -264,8 +237,30 @@ public:
 private:
     std::unordered_map<RegId, RegisterValue> registers;
     std::unordered_map<uint32_t, std::string> stringTable;
-    std::vector<std::pair<RegId, RegisterValue>> registerStack;
+    struct CallFrame {
+        std::unordered_map<RegId, RegisterValue> Registers;
+        size_t ReturnPC;
+    };
+    std::vector<CallFrame> callStack;
     std::unordered_map<std::string, std::function<ValueVariant(const std::vector<ValueVariant>&)>> externalFunctions;
+
+    void pushCallFrame(size_t pc)
+    {
+        callStack.push_back({ registers, pc });
+    }
+
+    size_t popCallFrame(size_t retCount)
+    {
+        auto cf = callStack.back();
+        callStack.pop_back();
+
+        for (const auto& [reg, val] : cf.Registers) {
+            // Only restore registers not used for return values
+            if (reg >= retCount)
+                registers[reg] = val;
+        }
+        return cf.ReturnPC;
+    }
 
     ValueVariant evaluateValue(const RVMValue& value)
     {

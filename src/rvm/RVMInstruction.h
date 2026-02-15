@@ -193,34 +193,6 @@ private:
     size_t mReturnCount;
 };
 
-/// Push frame instruction - saves registers %r1 to %r{count}
-class RVMInstrPushFrame : public RVMInstr {
-public:
-    RVMInstrPushFrame(size_t registerCount);
-
-    [[nodiscard]] Opcode opcode() const override { return Opcode::PUSH_FRAME; }
-    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
-    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
-    [[nodiscard]] size_t registerCount() const { return mRegisterCount; }
-
-private:
-    size_t mRegisterCount; // Number of registers to save, starting from %r1
-};
-
-/// Pop frame instruction - restores registers %r1 to %r{count}
-class RVMInstrPopFrame : public RVMInstr {
-public:
-    RVMInstrPopFrame(size_t registerCount);
-
-    [[nodiscard]] Opcode opcode() const override { return Opcode::POP_FRAME; }
-    [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
-    [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
-    [[nodiscard]] size_t registerCount() const { return mRegisterCount; }
-
-private:
-    size_t mRegisterCount; // Number of registers to restore, starting from %r1
-};
-
 /// String literal instruction - loads a string literal into a register
 class RVMInstrStringLiteral : public RVMInstr {
 public:

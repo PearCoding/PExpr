@@ -76,12 +76,6 @@ std::string RVMSerializer::opcodeToString(Opcode op)
     case Opcode::RET:
         return "ret";
 
-    // Register frame operations
-    case Opcode::PUSH_FRAME:
-        return "push_frame";
-    case Opcode::POP_FRAME:
-        return "pop_frame";
-
     // String literal
     case Opcode::LOAD_STRING:
         return "load_string";
@@ -152,10 +146,6 @@ std::optional<Opcode> RVMSerializer::stringToOpcode(const std::string& str)
     if (str == "ret")
         return Opcode::RET;
 
-    if (str == "push_frame")
-        return Opcode::PUSH_FRAME;
-    if (str == "pop_frame")
-        return Opcode::POP_FRAME;
     if (str == "load_string")
         return Opcode::LOAD_STRING;
 
@@ -292,16 +282,6 @@ void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
     os << "ret " << instr.returnCount();
 }
 
-void RVMSerializer::writePushFrame(std::ostream& os, const RVMInstrPushFrame& instr)
-{
-    os << "push_frame " << instr.registerCount();
-}
-
-void RVMSerializer::writePopFrame(std::ostream& os, const RVMInstrPopFrame& instr)
-{
-    os << "pop_frame " << instr.registerCount();
-}
-
 void RVMSerializer::writeStringLiteral(std::ostream& os, const RVMInstrStringLiteral& instr)
 {
     os << "load_string ";
@@ -327,10 +307,6 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
         writeCall(os, *call);
     else if (const auto* ret = dynamic_cast<const RVMInstrReturn*>(&instr))
         writeReturn(os, *ret);
-    else if (const auto* pushFrame = dynamic_cast<const RVMInstrPushFrame*>(&instr))
-        writePushFrame(os, *pushFrame);
-    else if (const auto* popFrame = dynamic_cast<const RVMInstrPopFrame*>(&instr))
-        writePopFrame(os, *popFrame);
     else if (const auto* strLit = dynamic_cast<const RVMInstrStringLiteral*>(&instr))
         writeStringLiteral(os, *strLit);
     else {
@@ -503,31 +479,6 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
     std::string trimmed = trim(eatComments(line));
     if (trimmed.empty())
         return nullptr;
-
-    // Check for push/pop frame
-    if (trimmed.rfind("push_frame ", 0) == 0) {
-        size_t count = 0;
-        if (trimmed.size() > 11) {
-            try {
-                count = std::stoul(trimmed.substr(11));
-            } catch (...) {
-                count = 0;
-            }
-        }
-        return std::make_shared<RVMInstrPushFrame>(count);
-    }
-
-    if (trimmed.rfind("pop_frame ", 0) == 0) {
-        size_t count = 0;
-        if (trimmed.size() > 10) {
-            try {
-                count = std::stoul(trimmed.substr(10));
-            } catch (...) {
-                count = 0;
-            }
-        }
-        return std::make_shared<RVMInstrPopFrame>(count);
-    }
 
     // Check for label (format: labelname:)
     if (trimmed.back() == ':' && trimmed.find('=') == std::string::npos) {

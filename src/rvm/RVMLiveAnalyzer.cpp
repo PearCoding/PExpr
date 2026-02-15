@@ -66,18 +66,6 @@ void RVMLiveAnalyzer::processInstruction(
         for (RegId reg = 0; reg < call->returnCount(); ++reg)
             processRegDef(reg, index, activeIntervals, allIntervals, true);
     }
-
-    // Push frame 'uses' n registers
-    if (auto push_frame = dynamic_cast<RVMInstrPushFrame*>(instr.get())) {
-        for (RegId reg = 0; reg < push_frame->registerCount(); ++reg)
-            processRegUse(reg, index, activeIntervals, true);
-    }
-
-    // Pop frame 'modifies' n registers
-    if (auto pop_frame = dynamic_cast<RVMInstrPopFrame*>(instr.get())) {
-        for (RegId reg = 0; reg < pop_frame->registerCount(); ++reg)
-            processRegDef(reg, index, activeIntervals, allIntervals, true);
-    }
 }
 
 void RVMLiveAnalyzer::processRegUse(RegId reg, size_t index,

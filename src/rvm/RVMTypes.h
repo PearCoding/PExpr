@@ -53,10 +53,6 @@ enum class Opcode : uint8_t {
     CALL_INTERNAL, // Function call to an internal function (PExpr)
     RET,           // Return
 
-    // Register frame operations
-    PUSH_FRAME, // Push register frame onto stack
-    POP_FRAME,  // Pop register frame from stack
-
     // String literal
     LOAD_STRING, // Load string literal
 };
