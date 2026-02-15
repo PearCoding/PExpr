@@ -41,10 +41,6 @@ bool RVMBasicBlockAnalyzer::startsNewBlock(const RVMInstr* instr)
     if (dynamic_cast<const RVMInstrLabel*>(instr) != nullptr)
         return true;
 
-    // Control flow instructions start new blocks (they're also end blocks)
-    if (isControlFlow(instr))
-        return true;
-
     return false;
 }
 
