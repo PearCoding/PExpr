@@ -25,7 +25,7 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeBlock(const s
     // Sort by start position
     std::sort(allIntervals.begin(), allIntervals.end(),
               [](const LiveInterval& a, const LiveInterval& b) {
-                  return a.start < b.start;
+                  return a.Start < b.Start;
               });
 
     return allIntervals;
@@ -41,7 +41,7 @@ void RVMLiveAnalyzer::processInstruction(
     instr->forDestination([&](const RVMValue& dstVal) {
         if (dstVal.isRegister()) {
             RegId reg = dstVal.regId();
-            processRegDef(reg, index, activeIntervals, allIntervals);
+            processRegDef(reg, index, activeIntervals, allIntervals, false);
         }
     });
 
@@ -49,66 +49,61 @@ void RVMLiveAnalyzer::processInstruction(
     instr->forEachSource([&](const RVMValue& srcVal) {
         if (srcVal.isRegister()) {
             RegId reg = srcVal.regId();
-            processRegUse(reg, index, activeIntervals);
+            processRegUse(reg, index, activeIntervals, false);
         }
     });
 
     // Return instruction is a use-position for the n-count registers
     if (auto ret = dynamic_cast<RVMInstrReturn*>(instr.get())) {
         for (RegId reg = 0; reg < ret->returnCount(); ++reg)
-            processRegUse(reg, index, activeIntervals);
+            processRegUse(reg, index, activeIntervals, true);
     }
 
-    // External call instruction uses and modifies registers
-    if (auto external_call = dynamic_cast<RVMInstrExternalCall*>(instr.get())) {
-        for (RegId reg = 0; reg < external_call->srcs().size(); ++reg)
-            processRegUse(reg, index, activeIntervals);
-        if (external_call->dst().has_value())
-            processRegDef(0, index, activeIntervals, allIntervals);
-    }
-
-    // Internal call instruction uses and modifies registers
-    if (auto internal_call = dynamic_cast<RVMInstrInternalCall*>(instr.get())) {
-        for (RegId reg = 0; reg < internal_call->parameterCount(); ++reg)
-            processRegUse(reg, index, activeIntervals);
-        for (RegId reg = 0; reg < internal_call->returnCount(); ++reg)
-            processRegDef(reg, index, activeIntervals, allIntervals);
+    // Call instruction uses and modifies registers
+    if (auto call = dynamic_cast<RVMInstrCall*>(instr.get())) {
+        for (RegId reg = 0; reg < call->parameterCount(); ++reg)
+            processRegUse(reg, index, activeIntervals, true);
+        for (RegId reg = 0; reg < call->returnCount(); ++reg)
+            processRegDef(reg, index, activeIntervals, allIntervals, true);
     }
 
     // Push frame 'uses' n registers
     if (auto push_frame = dynamic_cast<RVMInstrPushFrame*>(instr.get())) {
         for (RegId reg = 0; reg < push_frame->registerCount(); ++reg)
-            processRegUse(reg, index, activeIntervals);
+            processRegUse(reg, index, activeIntervals, true);
     }
 
     // Pop frame 'modifies' n registers
     if (auto pop_frame = dynamic_cast<RVMInstrPopFrame*>(instr.get())) {
         for (RegId reg = 0; reg < pop_frame->registerCount(); ++reg)
-            processRegDef(reg, index, activeIntervals, allIntervals);
+            processRegDef(reg, index, activeIntervals, allIntervals, true);
     }
 }
 
 void RVMLiveAnalyzer::processRegUse(RegId reg, size_t index,
-                                    std::unordered_map<RegId, LiveInterval>& activeIntervals)
+                                    std::unordered_map<RegId, LiveInterval>& activeIntervals,
+                                    bool pin)
 {
     if (auto it = activeIntervals.find(reg); it != activeIntervals.end()) {
-        it->second.end = std::max(it->second.end, index);   //< Update end of the interval
+        it->second.End = std::max(it->second.End, index); //< Update end of the interval
+        it->second.HasPinned |= pin;
     } else {
         // Register used before definition (e.g., function parameter)
         // Create an interval that starts at 0 (block beginning)
         // When a definition comes later, it will create a new interval
-        activeIntervals[reg] = LiveInterval(reg, 0, index);
+        activeIntervals[reg] = LiveInterval(reg, 0, index, pin);
     }
 }
 
 void RVMLiveAnalyzer::processRegDef(RegId reg, size_t index,
                                     std::unordered_map<RegId, LiveInterval>& activeIntervals,
-                                    std::vector<LiveInterval>& allIntervals)
+                                    std::vector<LiveInterval>& allIntervals,
+                                    bool pin)
 {
     if (auto it = activeIntervals.find(reg); it != activeIntervals.end())
         allIntervals.push_back(it->second);
 
-    activeIntervals[reg] = LiveInterval(reg, index, index);
+    activeIntervals[reg] = LiveInterval(reg, index, index, pin);
 }
 
 } // namespace PExpr::rvm

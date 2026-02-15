@@ -12,19 +12,22 @@ class RVMLiveAnalyzer {
 public:
     /// Live interval of a register
     struct LiveInterval {
-        RegId reg    = 0;
-        size_t start = 0; // Instruction index where defined (or block start if live-in)
-        size_t end   = 0; // Instruction index of last use
+        RegId Register = 0;
+        size_t Start   = 0;     // Instruction index where defined (or block start if live-in)
+        size_t End     = 0;     // Instruction index of last use
+        bool HasPinned = false; // Is the register inside this interval pinned?
 
         LiveInterval() = default;
-        LiveInterval(RegId r, size_t s, size_t e)
-            : reg(r)
-            , start(s)
-            , end(e)
+        LiveInterval(RegId r, size_t s, size_t e, bool pinned)
+            : Register(r)
+            , Start(s)
+            , End(e)
+            , HasPinned(pinned)
         {
         }
 
-        [[nodiscard]] inline bool isRedundant() const { return start == end; }
+        /// Returns true when the interval is not used and is not associated with a pinned register
+        [[nodiscard]] inline bool isRedundant() const { return Start == End && !HasPinned; }
     };
 
     /// Analyze live intervals for registers in a block.
@@ -42,12 +45,14 @@ private:
 
     /// Process register use (read)
     static void processRegUse(RegId reg, size_t index,
-                              std::unordered_map<RegId, LiveInterval>& activeIntervals);
+                              std::unordered_map<RegId, LiveInterval>& activeIntervals,
+                              bool pin);
 
     /// Process register definition (write)
     static void processRegDef(RegId reg, size_t index,
                               std::unordered_map<RegId, LiveInterval>& activeIntervals,
-                              std::vector<LiveInterval>& allIntervals);
+                              std::vector<LiveInterval>& allIntervals,
+                              bool pin);
 };
 
 } // namespace PExpr::rvm

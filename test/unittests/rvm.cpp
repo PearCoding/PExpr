@@ -431,41 +431,6 @@ TEST_CASE("RVMMapper: tuple type dissolution", "[rvm][mapper]")
     }
 }
 
-TEST_CASE("RVMInstructions: call and return", "[rvm][instructions]")
-{
-    SECTION("Call instruction with arguments")
-    {
-        RVMValue dst               = RVMValue::Register(0, Type(TypeKind::Number));
-        std::vector<RVMValue> args = {
-            RVMValue::Constant(Integer(5)),
-            RVMValue::Constant(Number(3.14))
-        };
-
-        auto instr = std::make_shared<RVMInstrExternalCall>(dst, "test_func", args);
-
-        REQUIRE(instr->opcode() == Opcode::CALL_EXTERNAL);
-        REQUIRE(instr->dst().has_value());
-        REQUIRE(instr->dst().value() == dst);
-        REQUIRE(instr->functionName() == "test_func");
-
-        auto srcs = instr->srcs();
-        REQUIRE(srcs.size() == 2);
-    }
-
-    SECTION("Call instruction without return value")
-    {
-        std::vector<RVMValue> args = {
-            RVMValue::Constant(Integer(42))
-        };
-
-        auto instr = std::make_shared<RVMInstrExternalCall>(std::nullopt, "void_func", args);
-
-        REQUIRE(instr->opcode() == Opcode::CALL_EXTERNAL);
-        REQUIRE_FALSE(instr->dst().has_value());
-        REQUIRE(instr->functionName() == "void_func");
-    }
-}
-
 TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")
 {
     RVMValue dst  = RVMValue::Register(0, Type(TypeKind::Number));
@@ -497,11 +462,11 @@ TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")
     }
 }
 
-TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][calling]")
+TEST_CASE("RVMInstructions: call instructions", "[rvm][instructions][calling]")
 {
     SECTION("Internal call instruction")
     {
-        auto instr = std::make_shared<RVMInstrInternalCall>(0, 0, "my_function");
+        auto instr = std::make_shared<RVMInstrCall>(false, 0, 0, "my_function");
 
         REQUIRE(instr->opcode() == Opcode::CALL_INTERNAL);
         REQUIRE(instr->functionName() == "my_function");
@@ -511,13 +476,25 @@ TEST_CASE("RVMInstructions: internal call instructions", "[rvm][instructions][ca
 
     SECTION("Internal call serialization")
     {
-        auto instr = std::make_shared<RVMInstrInternalCall>(0, 0, "test_func");
+        auto instr = std::make_shared<RVMInstrCall>(false, 0, 0, "test_func");
 
         std::ostringstream oss;
         RVMSerializer::write(oss, *instr);
         std::string instrStr = oss.str();
 
         REQUIRE(instrStr.find("call_internal") != std::string::npos);
+        REQUIRE(instrStr.find("test_func") != std::string::npos);
+    }
+
+    SECTION("External call serialization")
+    {
+        auto instr = std::make_shared<RVMInstrCall>(true, 0, 0, "test_func");
+
+        std::ostringstream oss;
+        RVMSerializer::write(oss, *instr);
+        std::string instrStr = oss.str();
+
+        REQUIRE(instrStr.find("call_external") != std::string::npos);
         REQUIRE(instrStr.find("test_func") != std::string::npos);
     }
 }
@@ -1131,71 +1108,24 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
         REQUIRE(parsedInstr->registerCount() == registerCount);
     }
 
-    SECTION("Internal call instruction roundtrip")
+    SECTION("Call instruction roundtrip")
     {
         size_t paramCount = 2;
         size_t returnCount = 1;
         std::string funcName = "test_func";
         
-        auto original = std::make_shared<RVMInstrInternalCall>(paramCount, returnCount, funcName);
+        auto original = std::make_shared<RVMInstrCall>(false, paramCount, returnCount, funcName);
         std::string serialized = RVMSerializer::serialize({original});
         
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
         
-        auto* parsedInstr = dynamic_cast<RVMInstrInternalCall*>(parsed.get());
+        auto* parsedInstr = dynamic_cast<RVMInstrCall*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::CALL_INTERNAL);
         REQUIRE(parsedInstr->functionName() == funcName);
         REQUIRE(parsedInstr->parameterCount() == paramCount);
         REQUIRE(parsedInstr->returnCount() == returnCount);
-    }
-
-    SECTION("External call instruction roundtrip")
-    {
-        RVMValue dst = RVMValue::Register(0, Type(TypeKind::Integer));
-        std::vector<RVMValue> args = {
-            RVMValue::Constant(Integer(5)),
-            RVMValue::Constant(Number(3.14))
-        };
-        std::string funcName = "external_func";
-        
-        auto original = std::make_shared<RVMInstrExternalCall>(dst, funcName, args);
-        std::string serialized = RVMSerializer::serialize({original});
-        
-        auto parsed = RVMSerializer::readInstruction(serialized);
-        REQUIRE(parsed != nullptr);
-        
-        auto* parsedInstr = dynamic_cast<RVMInstrExternalCall*>(parsed.get());
-        REQUIRE(parsedInstr != nullptr);
-        REQUIRE(parsedInstr->opcode() == Opcode::CALL_EXTERNAL);
-        REQUIRE(parsedInstr->functionName() == funcName);
-        REQUIRE(parsedInstr->dst().value() == dst);
-        REQUIRE(parsedInstr->srcs().size() == 2);
-        REQUIRE(parsedInstr->srcs()[0] == args[0]);
-        REQUIRE(parsedInstr->srcs()[1] == args[1]);
-    }
-
-    SECTION("External call without return value roundtrip")
-    {
-        std::vector<RVMValue> args = {
-            RVMValue::Constant(Integer(42))
-        };
-        std::string funcName = "void_func";
-        
-        auto original = std::make_shared<RVMInstrExternalCall>(std::nullopt, funcName, args);
-        std::string serialized = RVMSerializer::serialize({original});
-        
-        auto parsed = RVMSerializer::readInstruction(serialized);
-        REQUIRE(parsed != nullptr);
-        
-        auto* parsedInstr = dynamic_cast<RVMInstrExternalCall*>(parsed.get());
-        REQUIRE(parsedInstr != nullptr);
-        REQUIRE(parsedInstr->opcode() == Opcode::CALL_EXTERNAL);
-        REQUIRE(parsedInstr->functionName() == funcName);
-        REQUIRE_FALSE(parsedInstr->dst().has_value());
-        REQUIRE(parsedInstr->srcs().size() == 1);
-        REQUIRE(parsedInstr->srcs()[0] == args[0]);
     }
 
     SECTION("All opcode types roundtrip")

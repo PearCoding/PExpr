@@ -278,26 +278,13 @@ void RVMSerializer::writeLabel(std::ostream& os, const RVMInstrLabel& instr)
     os << instr.labelName() << ":";
 }
 
-void RVMSerializer::writeCall(std::ostream& os, const RVMInstrExternalCall& instr)
+void RVMSerializer::writeCall(std::ostream& os, const RVMInstrCall& instr)
 {
-    if (instr.dst().has_value()) {
-        write(os, instr.dst().value());
-        os << " = ";
-    }
-    os << "call_external " << instr.functionName() << "(";
-
-    auto srcs = instr.srcs();
-    for (size_t i = 0; i < srcs.size(); ++i) {
-        if (i > 0)
-            os << ", ";
-        write(os, srcs[i]);
-    }
-    os << ")";
-}
-
-void RVMSerializer::writeCall(std::ostream& os, const RVMInstrInternalCall& instr)
-{
-    os << "call_internal " << instr.parameterCount() << " " << instr.returnCount() << " " << instr.functionName();
+    if (instr.isExternal())
+        os << "call_external ";
+    else
+        os << "call_internal ";
+    os << instr.parameterCount() << " " << instr.returnCount() << " " << instr.functionName();
 }
 
 void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
@@ -336,10 +323,8 @@ void RVMSerializer::write(std::ostream& os, const RVMInstr& instr)
         writeBranch(os, *branch);
     else if (const auto* jump = dynamic_cast<const RVMInstrJump*>(&instr))
         writeJump(os, *jump);
-    else if (const auto* callE = dynamic_cast<const RVMInstrExternalCall*>(&instr))
-        writeCall(os, *callE);
-    else if (const auto* callI = dynamic_cast<const RVMInstrInternalCall*>(&instr))
-        writeCall(os, *callI);
+    else if (const auto* call = dynamic_cast<const RVMInstrCall*>(&instr))
+        writeCall(os, *call);
     else if (const auto* ret = dynamic_cast<const RVMInstrReturn*>(&instr))
         writeReturn(os, *ret);
     else if (const auto* pushFrame = dynamic_cast<const RVMInstrPushFrame*>(&instr))
@@ -597,23 +582,10 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         return std::make_shared<RVMInstrReturn>(count);
     }
 
-    // Check for call_external (void return)
-    if (trimmed.rfind("call_external ", 0) == 0) {
-        size_t parenStart = trimmed.find('(');
-        size_t parenEnd   = trimmed.find(')', parenStart);
-        if (parenStart == std::string::npos || parenEnd == std::string::npos)
-            return nullptr;
-
-        std::string funcName = trim(trimmed.substr(14, parenStart - 14));
-        std::string argsStr  = trimmed.substr(parenStart + 1, parenEnd - parenStart - 1);
-
-        std::vector<RVMValue> args = parseValueList(argsStr);
-        return std::make_shared<RVMInstrExternalCall>(std::nullopt, funcName, args);
-    }
-
     // Check for call_internal
-    if (trimmed.rfind("call_internal ", 0) == 0) {
+    if (trimmed.rfind("call_internal ", 0) == 0 || trimmed.rfind("call_external ", 0) == 0) {
         try {
+            bool isExternal       = trimmed.rfind("call_external ", 0) == 0;
             const auto afterInstr = trim(trimmed.substr(14));
             size_t offset         = 0;
             size_t paramCount     = std::stoull(afterInstr, &offset);
@@ -623,7 +595,7 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
             size_t returnCount         = std::stoull(afterParamCount, &offset);
 
             std::string funcName = trim(afterParamCount.substr(offset + 1));
-            return std::make_shared<RVMInstrInternalCall>(paramCount, returnCount, funcName);
+            return std::make_shared<RVMInstrCall>(isExternal, paramCount, returnCount, funcName);
         } catch (...) {
             return nullptr;
         }
@@ -693,45 +665,6 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
                         return std::make_shared<RVMInstr3Op>(*op, dst, src1, src2);
                 }
             }
-        }
-    }
-
-    // Check for call_external (void return) - format: call_external funcName(arg1, arg2)
-    if (trimmed.rfind("call_external ", 0) == 0) {
-        size_t parenStart = trimmed.find('(');
-        size_t parenEnd   = trimmed.find(')', parenStart);
-        if (parenStart == std::string::npos || parenEnd == std::string::npos)
-            return nullptr;
-
-        std::string funcName = trim(trimmed.substr(14, parenStart - 14));
-        std::string argsStr  = trimmed.substr(parenStart + 1, parenEnd - parenStart - 1);
-
-        std::vector<RVMValue> args = parseValueList(argsStr);
-        return std::make_shared<RVMInstrExternalCall>(std::nullopt, funcName, args);
-    }
-
-    // Check for call_external with return value (format: dst = call_external funcName(arg1, arg2))
-    // This is kept for backward compatibility
-    size_t eqPos = trimmed.find('=');
-    if (eqPos != std::string::npos) {
-        std::string beforeEq = trim(trimmed.substr(0, eqPos));
-        std::string afterEq  = trim(trimmed.substr(eqPos + 1));
-
-        if (afterEq.rfind("call_external ", 0) == 0) {
-            size_t parenStart = afterEq.find('(');
-            size_t parenEnd   = afterEq.find(')', parenStart);
-            if (parenStart == std::string::npos || parenEnd == std::string::npos)
-                return nullptr;
-
-            std::string funcName = trim(afterEq.substr(14, parenStart - 14));
-            std::string argsStr  = afterEq.substr(parenStart + 1, parenEnd - parenStart - 1);
-
-            RVMValue dst;
-            if (!parseValue(beforeEq, dst))
-                return nullptr;
-
-            std::vector<RVMValue> args = parseValueList(argsStr);
-            return std::make_shared<RVMInstrExternalCall>(dst, funcName, args);
         }
     }
 

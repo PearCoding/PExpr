@@ -158,60 +158,24 @@ private:
 };
 
 /// Call instruction
-class RVMInstrExternalCall : public RVMInstr {
+class RVMInstrCall : public RVMInstr {
 public:
-    RVMInstrExternalCall(std::optional<RVMValue> dst, const std::string& funcName,
-                         const std::vector<RVMValue>& args);
+    RVMInstrCall(bool isExternal, size_t numParams, size_t numReturns, const std::string& funcName);
 
-    [[nodiscard]] Opcode opcode() const override { return Opcode::CALL_EXTERNAL; }
-    [[nodiscard]] std::optional<RVMValue> dst() const override { return mDst; }
-    [[nodiscard]] std::vector<RVMValue> srcs() const override { return mArgs; }
-    [[nodiscard]] const std::string& functionName() const { return mFuncName; }
-
-    virtual void forDestination(const std::function<void(RVMValue&)>& visitor) override
-    {
-        if (mDst.has_value())
-            visitor(mDst.value());
-    }
-    virtual void forDestination(const std::function<void(const RVMValue&)>& visitor) const override
-    {
-        if (mDst.has_value())
-            visitor(mDst.value());
-    }
-
-    virtual void forEachSource(const std::function<void(RVMValue&)>& visitor) override
-    {
-        for (auto& val : mArgs)
-            visitor(val);
-    }
-    virtual void forEachSource(const std::function<void(const RVMValue&)>& visitor) const override
-    {
-        for (auto& val : mArgs)
-            visitor(val);
-    }
-
-private:
-    std::optional<RVMValue> mDst;
-    std::string mFuncName;
-    std::vector<RVMValue> mArgs;
-};
-
-class RVMInstrInternalCall : public RVMInstr {
-public:
-    RVMInstrInternalCall(size_t numParams, size_t numReturns, const std::string& funcName);
-
-    [[nodiscard]] Opcode opcode() const override { return Opcode::CALL_INTERNAL; }
+    [[nodiscard]] Opcode opcode() const override { return mIsExternal ? Opcode::CALL_EXTERNAL : Opcode::CALL_INTERNAL; }
     [[nodiscard]] std::optional<RVMValue> dst() const override { return std::nullopt; }
     [[nodiscard]] std::vector<RVMValue> srcs() const override { return {}; }
     [[nodiscard]] const std::string& functionName() const { return mFuncName; }
 
     [[nodiscard]] inline size_t parameterCount() const { return mParameterCount; }
     [[nodiscard]] inline size_t returnCount() const { return mReturnCount; }
+    [[nodiscard]] inline bool isExternal() const { return mIsExternal; }
 
 private:
     size_t mParameterCount;
     size_t mReturnCount;
     std::string mFuncName;
+    bool mIsExternal;
 };
 
 /// Return instruction

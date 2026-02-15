@@ -102,7 +102,7 @@ void RVMRedundantMoveEliminator::analyzeBlock(const std::vector<std::shared_ptr<
         // Find the interval that starts at this instruction
         const RVMLiveAnalyzer::LiveInterval* currentInterval = nullptr;
         for (const auto& interval : intervals) {
-            if (interval.reg == destReg && interval.start == i) {
+            if (interval.Register == destReg && interval.Start == i) {
                 currentInterval = &interval;
                 break;
             }
@@ -114,25 +114,9 @@ void RVMRedundantMoveEliminator::analyzeBlock(const std::vector<std::shared_ptr<
         // A MOV is redundant if:
         // 1. The register is defined here (start == i)
         // 2. The register is not used after this definition (interval.isRedundant() means start == end)
-        // 3. AND there is a later definition of the same register
 
-        if (currentInterval->isRedundant()) {
-            // Check if there's any later definition of this register
-            // Look through intervals for the same register with later start
-            bool hasLaterDefinition = false;
-            for (const auto& interval : intervals) {
-                if (interval.reg == destReg && interval.start > i) {
-                    hasLaterDefinition = true;
-                    break;
-                }
-            }
-
-            // Only mark as redundant if there's definitely a later definition
-            // This handles the case where a MOV result is dead (never used)
-            // but not overwritten - we leave those for dead code elimination
-            if (hasLaterDefinition)
-                redundantIndices.insert(i);
-        }
+        if (currentInterval->isRedundant())
+            redundantIndices.insert(i);
     }
 }
 

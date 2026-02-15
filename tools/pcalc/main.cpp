@@ -185,30 +185,29 @@ public:
                 continue;
             }
 
-            if (auto* internal_call = dynamic_cast<RVMInstrInternalCall*>(instr.get())) {
-                // A call is just an annotated jump
-                auto it = labelMap.find(internal_call->functionName());
-                if (it != labelMap.end()) {
-                    returnStack.push_back(pc);
-                    pc = it->second;
-                    continue;
-                }
-                pc++;
-                continue;
-            }
+            if (auto* call = dynamic_cast<RVMInstrCall*>(instr.get())) {
+                if (call->isExternal()) {
 
-            if (auto* external_call = dynamic_cast<RVMInstrExternalCall*>(instr.get())) {
-                std::vector<ValueVariant> args;
-                for (const auto& arg : external_call->srcs())
-                    args.push_back(evaluateValue(arg));
-
-                auto it = externalFunctions.find(external_call->functionName());
-                if (it != externalFunctions.end()) {
-                    ValueVariant result = it->second(args);
-                    if (external_call->dst().has_value())
-                        setRegister(external_call->dst().value(), result);
+                    auto it = externalFunctions.find(call->functionName());
+                    if (it != externalFunctions.end()) {
+                        std::vector<ValueVariant> args;
+                        args.reserve(call->parameterCount());
+                        for (size_t i = 0; i < call->parameterCount(); ++i)
+                            args.push_back(registers[i].value);
+                        ValueVariant result = it->second(args);
+                        if (call->dst().has_value())
+                            registers[0] = { result, call->dst()->type() };
+                    } else {
+                        std::cerr << "Error: Unknown external function '" << call->functionName() << "'" << std::endl;
+                    }
                 } else {
-                    std::cerr << "Error: Unknown external function '" << external_call->functionName() << "'" << std::endl;
+                    // A call is just an annotated jump
+                    auto it = labelMap.find(call->functionName());
+                    if (it != labelMap.end()) {
+                        returnStack.push_back(pc);
+                        pc = it->second;
+                        continue;
+                    }
                 }
                 pc++;
                 continue;

@@ -26,7 +26,7 @@ bool RVMRegisterAllocator::allocate(RVMProgram& program)
     std::vector<InternalLiveInterval> internalIntervals;
     internalIntervals.reserve(intervals.size());
     for (const auto& interval : intervals)
-        internalIntervals.push_back(InternalLiveInterval{ .Interval = interval, .AllocatedRegister = interval.reg });
+        internalIntervals.push_back(InternalLiveInterval{ .Interval = interval, .AllocatedRegister = interval.Register });
 
     // Perform linear scan allocation
     linearScanAllocate(internalIntervals);
@@ -98,17 +98,21 @@ void RVMRegisterAllocator::linearScanAllocate(std::vector<InternalLiveInterval>&
     RegId nextReg = 0;
 
     for (auto& interval : intervals) {
+        // If the register is pinned inside the interval, we can't do much
+        if (interval.Interval.HasPinned)
+            continue;
+
         // Expire old intervals (end <= start means interval is no longer live)
         active.erase(std::remove_if(active.begin(), active.end(),
                                     [&interval](InternalLiveInterval* activeInterval) {
-                                        return activeInterval->Interval.end <= interval.Interval.start;
+                                        return activeInterval->Interval.End <= interval.Interval.Start;
                                     }),
                      active.end());
 
         // Sort active by end position for spill selection
         std::sort(active.begin(), active.end(),
                   [](const InternalLiveInterval* a, const InternalLiveInterval* b) {
-                      return a->Interval.end < b->Interval.end;
+                      return a->Interval.End < b->Interval.End;
                   });
 
         // Try to find free register
@@ -174,7 +178,7 @@ std::unordered_map<RegId, RegId> RVMRegisterAllocator::createRegisterMap(const s
     std::unordered_map<RegId, RegId> regMap;
 
     for (const auto& interval : intervals)
-        regMap[interval.Interval.reg] = interval.AllocatedRegister;
+        regMap[interval.Interval.Register] = interval.AllocatedRegister;
 
     return regMap;
 }

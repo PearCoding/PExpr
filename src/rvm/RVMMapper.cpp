@@ -328,80 +328,64 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         }
     }
 
-    if (isExternal) {
-        // External call: pass arguments as part of the call instruction
-        std::vector<RVMValue> args;
-        args.reserve(instr.Arguments.size());
+    // Internal call: use calling convention with registers
+    // 1. Get flat call arguments
+    std::vector<RVMValue> arguments;
+    for (const auto& arg : instr.Arguments) {
+        const auto types = mapTupleValues(arg);
+        arguments.insert(arguments.end(), types.begin(), types.end());
+    }
 
-        for (const auto& arg : instr.Arguments)
-            args.push_back(mapValue(arg));
+    // 2. Determine number of registers to save (max of args and return values)
+    auto returnTypes       = dissolveTupleType(instr.Target.type());
+    uint32_t numReturnRegs = returnTypes.empty() || instr.Target.type().isVoid() ? 0 : static_cast<uint32_t>(returnTypes.size());
+    uint32_t numArgRegs    = static_cast<uint32_t>(arguments.size());
+    uint32_t registerCount = std::max(numReturnRegs, numArgRegs);
 
-        // TODO: Tuple returns!?
-        std::optional<RVMValue> dst;
-        if (!instr.Target.type().isVoid())
-            dst = mapValue(instr.Target);
+    // 3. Push frame to save register context
+    if (registerCount > 0)
+        result.push_back(std::make_shared<RVMInstrPushFrame>(registerCount));
 
-        result.push_back(std::make_shared<RVMInstrExternalCall>(dst, instr.FunctionName, args));
-    } else {
-        // Internal call: use calling convention with registers
-        // 1. Get flat call arguments
-        std::vector<RVMValue> arguments;
-        for (const auto& arg : instr.Arguments) {
-            const auto types = mapTupleValues(arg);
-            arguments.insert(arguments.end(), types.begin(), types.end());
-        }
+    // 4. Move arguments to registers %r0, %r1, %r2, etc.
+    for (size_t i = 0; i < arguments.size(); ++i) {
+        RVMValue src = arguments[i];
+        if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
+            continue;
 
-        // 2. Determine number of registers to save (max of args and return values)
-        auto returnTypes       = dissolveTupleType(instr.Target.type());
-        uint32_t numReturnRegs = returnTypes.empty() || instr.Target.type().isVoid() ? 0 : static_cast<uint32_t>(returnTypes.size());
-        uint32_t numArgRegs    = static_cast<uint32_t>(arguments.size());
-        uint32_t registerCount = std::max(numReturnRegs, numArgRegs);
+        RVMValue dst = RVMValue::Register(i, arguments[i].type()); // %r0, %r1, %r2, ...
+        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+    }
 
-        // 3. Push frame to save register context
-        if (registerCount > 0)
-            result.push_back(std::make_shared<RVMInstrPushFrame>(registerCount));
+    // 5. Call internal function
+    result.push_back(std::make_shared<RVMInstrCall>(isExternal, numArgRegs, numReturnRegs, instr.FunctionName));
 
-        // 4. Move arguments to registers %r0, %r1, %r2, etc.
-        for (size_t i = 0; i < arguments.size(); ++i) {
-            RVMValue src = arguments[i];
-            if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
-                continue;
-
-            RVMValue dst = RVMValue::Register(i, arguments[i].type()); // %r0, %r1, %r2, ...
-            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-        }
-
-        // 5. Call internal function
-        result.push_back(std::make_shared<RVMInstrInternalCall>(numArgRegs, numReturnRegs, instr.FunctionName));
-
-        // 6. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
-        if (!instr.Target.type().isVoid()) {
-            if (instr.Target.type().isTuple()) {
-                // Multiple return values. Essentially a virtual tuple instruction
-                std::vector<RVMValue> values;
-                for (size_t i = 0; i < returnTypes.size(); ++i) {
-                    RVMValue dst = RVMValue::Register(mContext.allocateRegister(returnTypes[i]), returnTypes[i]);
-                    if (!dst.isRegister() || dst.regId() != i) {              //< Only move if destination is not already %r0
-                        RVMValue src = RVMValue::Register(i, returnTypes[i]); // %r0 holds return value
-                        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-                    }
-                    values.push_back(dst); // %r0, %r1, %r2, ...
-                }
-                mTupleMap[instr.Target] = std::move(values);
-            } else {
-                // Single return value
-                RVMValue dst = mapValue(instr.Target);
-                if (!dst.isRegister() || dst.regId() != 0) {                   //< Only move if destination is not already %r0
-                    RVMValue src = RVMValue::Register(0, instr.Target.type()); // %r0 holds return value
+    // 6. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
+    if (!instr.Target.type().isVoid()) {
+        if (instr.Target.type().isTuple()) {
+            // Multiple return values. Essentially a virtual tuple instruction
+            std::vector<RVMValue> values;
+            for (size_t i = 0; i < returnTypes.size(); ++i) {
+                RVMValue dst = RVMValue::Register(mContext.allocateRegister(returnTypes[i]), returnTypes[i]);
+                if (!dst.isRegister() || dst.regId() != i) {              //< Only move if destination is not already %r0
+                    RVMValue src = RVMValue::Register(i, returnTypes[i]); // %r0 holds return value
                     result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
                 }
+                values.push_back(dst); // %r0, %r1, %r2, ...
+            }
+            mTupleMap[instr.Target] = std::move(values);
+        } else {
+            // Single return value
+            RVMValue dst = mapValue(instr.Target);
+            if (!dst.isRegister() || dst.regId() != 0) {                   //< Only move if destination is not already %r0
+                RVMValue src = RVMValue::Register(0, instr.Target.type()); // %r0 holds return value
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
             }
         }
-
-        // 7. Pop frame to restore register context
-        if (registerCount > 0)
-            result.push_back(std::make_shared<RVMInstrPopFrame>(registerCount));
     }
+
+    // 7. Pop frame to restore register context
+    if (registerCount > 0)
+        result.push_back(std::make_shared<RVMInstrPopFrame>(registerCount));
 
     return result;
 }
