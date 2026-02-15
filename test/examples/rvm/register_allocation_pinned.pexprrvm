@@ -1,9 +1,9 @@
 mov %r2:int 42:int          // Just a basic constant saved in %r2
-push_frame 1                // We will override %r0, so save it.
+mov %r1:int %r0:int         // We are using %r0 as a parameter register. So save it. (Unnecessary here, as %r0 is not used before)
 mov %r0:int %r2:int         // We move the call parameter to %r0
-call_internal 1 1 test_func // Call 'test_func' with a single input parameter and a single return value
+call_internal 1 1 test_func // Call 'test_func' with a single input parameter and a single return value. It is the job of the host to ensure the register state (except for return registers) is restored
 mov %r4:int %r0:int         // The return value is in %r0. Save it
-pop_frame 1                 // Restore %r0 from the frame stack (which is redundant in this example)
+mov %r0:int %r1:int         // Restore %r0 (which is redundant in this example)
 mov %r0:int %r4:int         // We return a single value from the main/body program to the host. The value is returned via %r0
 ret 1
 
