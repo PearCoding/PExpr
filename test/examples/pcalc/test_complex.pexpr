@@ -1,0 +1,41 @@
+// Complex algorithm
+
+// The following is implemented in pcalc and exposed in the internal header.
+// Therefore, these will trigger a warning when the file is read. Ignore it.
+[[extern]] fn readInteger() -> int;
+[[extern]] fn print(n: num) -> void;
+[[extern]] fn print(s: str) -> void;
+
+fn gcd(a:int, b:int) -> int = if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
+    };
+
+fn fibonacci(a:int) -> int = if a <= 1 { a } else { fibonacci(a - 1) + fibonacci(a - 2) };
+
+print("Pick algorithm [0 = GCD, 1 = Fibonacci]\n");
+print("> ");
+let p = readInteger();
+
+if p == 0 {
+    print("GCD\n");
+    print("A = ");
+    let a = readInteger();
+    print("B = ");
+    let b = readInteger();
+    let r = gcd(a, b);
+    print("R = ");
+    print(r);
+    print("\n");
+} elif p == 1 {
+    print("Fibonacci\n");
+    print("A = ");
+    let a = readInteger();
+    let r = fibonacci(a);
+    print("R = ");
+    print(r);
+    print("\n");
+} else {
+    print("Unknown algorithm picked\n")
+}
