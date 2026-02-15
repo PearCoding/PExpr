@@ -8,15 +8,16 @@ namespace PExpr::fuzzy {
 
 // Static constants
 const std::vector<std::string> FuzzGenerator::KEYWORDS = {
-    "let", "mut", "fn", "if", "elif", "else", "using", "extern", "pure", "true", "false"
+    "let", "mut", "fn", "if", "elif", "else", "using", "extern", "pure", "true", "false", "as"
 };
 
 const std::vector<std::string> FuzzGenerator::OPERATORS = {
-    "+", "-", "*", "/", "%", "^", "==", "!=", "<", ">", "<=", ">=", "&&", "||"
+    "+", "-", "*", "/", "%", "^", "==", "!=", "<", ">", "<=", ">=", "&&", "||",
+    "+=", "-=", "*=", "/="
 };
 
 const std::vector<std::string> FuzzGenerator::TYPES = {
-    "int", "num", "bool", "vec2", "vec3", "vec4", "string"
+    "int", "num", "bool", "str", "vec2", "vec3", "vec4"
 };
 
 const std::vector<std::string> FuzzGenerator::BUILTIN_FUNCTIONS = {
@@ -86,7 +87,7 @@ std::string FuzzGenerator::generateRandomExpression(size_t maxDepth)
         }
     }
 
-    switch (randomInt(0, 7)) {
+    switch (randomInt(0, 9)) {
     case 0:
         return generateBinaryExpression(maxDepth - 1);
     case 1:
@@ -96,13 +97,19 @@ std::string FuzzGenerator::generateRandomExpression(size_t maxDepth)
     case 3:
         return "(" + generateRandomExpression(maxDepth - 1) + ")";
     case 4:
-        return randomIdentifier() + "." + randomChoice<std::string>({ "x", "y", "z", "w", "xy", "xyz", "yx" });
+        return randomIdentifier() + "." + randomChoice<std::string>({ "x", "y", "z", "w", "xy", "xyz", "yx", "r", "g", "b", "a", "rg", "rgb", "rgba" });
     case 5:
         return generateVectorExpression(maxDepth - 1);
     case 6:
         return generateTupleExpression(maxDepth - 1);
     case 7:
         return randomNumber();
+    case 8:
+        // Compound assignment expression (only for mutable variables)
+        return randomIdentifier() + " " + randomChoice<std::string>({ "+=", "-=", "*=", "/=" }) + " " + generateRandomExpression(maxDepth - 1);
+    case 9:
+        // Cast expression
+        return generateRandomExpression(maxDepth - 1) + " as " + randomType();
     default:
         return "0";
     }
