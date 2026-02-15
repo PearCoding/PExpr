@@ -11,13 +11,14 @@ TokenType enum defines all possible tokens:
 - Operators: Plus (+), Minus (-), Mul (*), Div (/), Mod (%), Pow (^), Dot (.), 
              And (&&), Or (||), Less (<), Greater (>), LessEqual (<=), GreaterEqual (>=),
              Equal (==), NotEqual (!=), ExclamationMark (!)
+- Compound Assignment Operators: PlusAssign (+=), MinusAssign (-=), MulAssign (*=), DivAssign (/=)
 - Punctuation: Comma (,), Colon (:), Semicolon (;), Assign (=), ArrowRight (->),
                OpenParentheses ((), ClosedParentheses ()), OpenBraces ({), ClosedBraces (}),
                OpenSquareBracket ([), ClosedSquareBracket (])
 - Keywords: If, Elif, Else, As, Let, Mutable, Function (fn), Using
-- Predefined type names: bool, int, num, str, vec2, vec3, vec4
 
 Comments: Line comments start with `//`, block comments are `/* ... */`
+Lexer Instructions: `//!` followed by instruction (e.g., `//! location 1 "filename"`)
 
 Top-level
 ---------
@@ -87,12 +88,16 @@ parameter_def_list (for function declarations)
 parameter_def_list ::= /* empty */ 
                      | param ( ',' param )*
 
-param ::= Identifier [ ':' type ]
+param ::= [ 'mut' ] Identifier ':' type
 
 Expressions
 -----------
 
-expression ::= binary_expression
+expression ::= assignment_expression
+
+assignment_expression ::= binary_expression [ assignment_op assignment_expression ]
+
+assignment_op ::= '=' | '+=' | '-=' | '*=' | '/='
 
 Binary expressions use precedence climbing. The binary operators and their precedences (higher number => lower binding) are:
 
@@ -135,18 +140,18 @@ call_expression ::= Identifier '(' [ parameter_list ] ')'
 
 parameter_list ::= expression (',' expression)*
 
+if_expression (conditional expression)
+--------------------------------------
+if_expression ::= 'if' expression '{' closure '}' 
+               { 'elif' expression '{' closure '}' }* 
+               'else' '{' closure '}'
+
 enclosed_expression ::= 
     if_expression
   | '{' closure '}'
   | '(' expression ')'
   | '[' tuple_expression ']'
   | primary_expression
-
-if_expression (conditional expression)
---------------------------------------
-if_expression ::= 'if' expression '{' closure '}' 
-               { 'elif' expression '{' closure '}' }* 
-               'else' '{' closure '}'
 
 tuple_expression
 ----------------
@@ -190,12 +195,12 @@ Additional parser behavior notes
 - Call expressions require the callee to be an Identifier immediately followed by '('
 - Closures (block expressions) are delimited by '{' '}' and return an expression as their body, plus optional statements inside
 - Function declarations:
-  - Internal: 'fn name(params) = expression;' or 'fn name(params) -> type = expression;'
+  - Internal: 'fn name(params) = expression;' or 'fn name(params) -> type = expression;' or 'fn name(params) { closure }'
   - External: '[[extern]] fn name(params) -> type;' (requires explicit return type)
 - Variable declarations:
   - Immutable: 'let name = expression;' or 'let name: type = expression;'
   - Mutable: 'let mut name = expression;' or 'let mut name: type = expression;'
-  - Assignment (to previously declared mutable variable): 'name = expression;'
+  - Assignment (to previously declared mutable variable): 'name = expression;' or compound assignments
 - Destructuring declarations and assignments:
   - Declaration: 'let *[pattern] = expression;' where pattern can include type annotations and 'mut' qualifiers
   - Assignment: '*[pattern] = expression;' where pattern can only contain identifiers
@@ -213,6 +218,7 @@ Examples
 3. Function with attributes:
    `[[extern]] fn sqrt(x: num) -> num;`
    `[[pure]] fn add(x: int, y: int) -> int = x + y;`
+   `fn add(x: int, y: int) { x + y }`
 
 4. Swizzle expressions:
    `v.xy`     // vec2 from first two components of v (assumed vec3 or vec4)
@@ -232,3 +238,29 @@ Examples
 8. Function returning tuple with destructuring:
    `fn foo() -> [int, int] = [5, 6];`
    `let [p, q] = foo();`
+
+9. Compound assignments:
+   `let mut a = 5; a += 3; a *= 2;`
+   `let mut b = 10.0; b /= 2.0;`
+
+10. Lexer instruction:
+    `//! location 42 "otherfile.pexpr"`
+
+================================================================================
+
+Separate IR Grammar Files
+-------------------------
+
+The grammar for SSA IR and RVM IR can be found in the following separated files:
+
+- **SSA IR Grammar**: See [SSAIRGrammar.md](SSAIRGrammar.md)
+- **RVM IR Grammar**: See [RVMIRGrammar.md](RVMIRGrammar.md)
+
+These files provide detailed grammar specifications, examples, and implementation notes
+for the intermediate representations used by the PExpr compiler.
+
+File Extensions
+---------------
+- PExpr source files: `.pexpr`
+- SSA IR files: `.pexprir`
+- RVM IR files: `.pexprrvm`
