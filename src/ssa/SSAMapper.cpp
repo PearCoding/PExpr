@@ -337,10 +337,10 @@ std::optional<SSAValue> SSAMapper::mapExpression(SSAProgram& program, const Ptr<
         std::vector<std::string> branchLabels;
         branchLabels.reserve(br->branches().size() + 1);
         for (size_t i = 0; i < br->branches().size(); ++i)
-            branchLabels.push_back(mContext.fresh("lbl"));
+            branchLabels.push_back(mContext.fresh("branch"));
         if (hasElseCase)
-            branchLabels.push_back(mContext.fresh("lbl")); // Else
-        std::string joinLabel = mContext.fresh("lbl");
+            branchLabels.push_back(mContext.fresh("else")); // Else
+        std::string joinLabel = mContext.fresh("join");
 
         // Emit conditional branches for each branch condition that jump to their label
         std::vector<SSAValue> conditionVals;

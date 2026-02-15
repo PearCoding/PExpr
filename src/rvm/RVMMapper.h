@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 namespace PExpr::rvm {
 
@@ -43,12 +44,19 @@ private:
 
     RVMValue accessTuple(const ssa::SSAValue& value, Integer idx);
 
+    // Helper to insert phi updates for a newly defined value
+    void insertPhiUpdatesForValue(const ssa::SSAValue& definedValue,
+                                  std::vector<std::shared_ptr<RVMInstr>>& result);
+
     // Member variables
     RVMContext mContext;
     std::unordered_map<std::string, RVMValue> mSSAtoRVMMap;
     std::unordered_map<std::string, RVMValue> mStringMap;
     std::unordered_map<ssa::SSAValue, std::vector<RVMValue>> mTupleMap;
     std::unordered_map<ssa::SSAValue, std::pair<ssa::SSAValue, Integer>> mAccessMap;
+
+    // Phi value to targets mapping
+    std::unordered_map<ssa::SSAValue, std::vector<ssa::SSAValue>> mPhiValueToTargets;
 };
 
 } // namespace PExpr::rvm

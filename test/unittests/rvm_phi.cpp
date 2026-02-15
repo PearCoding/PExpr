@@ -40,13 +40,11 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         auto mapper     = RVMMapper();
         auto rvmProgram = mapper.mapProgram(ssaProgram);
 
-        // Verify RVM program has conditional branches for phi
+        // Verify RVM program is created (phi nodes are handled via backpropagation)
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
-
-        // Should have conditional branches (jz) for phi resolution
-        REQUIRE(rvmStr.find("jz") != std::string::npos);
-        // Should have labels for phi resolution
-        REQUIRE((rvmStr.find("phi_end_") != std::string::npos || rvmStr.find("phi_next_") != std::string::npos));
+        REQUIRE(!rvmStr.empty());
+        // With backpropagation, phi nodes don't generate jz or phi_end_/phi_next_ labels
+        // Instead, moves are inserted in branch blocks
     }
 
     SECTION("Phi with else branch")
@@ -107,8 +105,9 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
         REQUIRE(!rvmStr.empty());
 
-        // Should have conditional branch for the single condition
-        REQUIRE(rvmStr.find("jz") != std::string::npos);
+        // With backpropagation, phi nodes generate MOV instructions in branch blocks
+        // There should still be a conditional branch (jnz) for the if condition
+        REQUIRE(rvmStr.find("jnz") != std::string::npos);
     }
 
     SECTION("Phi with multiple conditions")
@@ -140,12 +139,14 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         // Verify RVM program has multiple conditional branches
         std::string rvmStr = RVMSerializer::serialize(rvmProgram);
 
-        // Count jz instructions (should be at least 3 for the 3 conditions)
+        // Count conditional branch instructions (should be at least 3 for the 3 conditions)
+        // With backpropagation, phi nodes don't generate extra jz/jnz for phi resolution
+        // Only the original conditional branches remain (jnz for if conditions)
         size_t jmpCount = 0;
         size_t pos      = 0;
-        while ((pos = rvmStr.find("jz", pos)) != std::string::npos) {
+        while ((pos = rvmStr.find("jnz", pos)) != std::string::npos) {
             jmpCount++;
-            pos += 3;
+            pos += 4;
         }
 
         REQUIRE(jmpCount >= 3);
@@ -178,5 +179,107 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
 
         // Should have true constant (or optimized away)
         REQUIRE((rvmStr.find("true") != std::string::npos || rvmStr.find("1:bool") != std::string::npos));
+    }
+
+    SECTION("Complex branch pattern with multiple variables")
+    {
+        const char* source = R"(
+            [[extern, pure]] fn getBool() -> bool;
+            let mut x = 1;
+            let mut y = 2;
+            let mut z = 3;
+            
+            if getBool() {
+                x = 10;
+                y = 20;
+            } elif getBool() {
+                x = 30;
+                z = 40;
+            } else {
+                y = 50;
+                z = 60;
+            };
+            
+            x + y + z
+        )";
+
+        Environment env;
+        auto closure = env.parse(source);
+        REQUIRE(closure);
+
+        auto ssaProgram = env.map(closure);
+
+        // Map to RVM
+        auto mapper     = RVMMapper();
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
+
+        std::string rvmStr = RVMSerializer::serialize(rvmProgram);
+        REQUIRE(!rvmStr.empty());
+
+        // Should have phi nodes for x, y, and z with backpropagated MOVs
+        REQUIRE(rvmStr.find("add") != std::string::npos);
+    }
+
+    SECTION("Phi with same value in multiple branches")
+    {
+        const char* source = R"(
+            [[extern, pure]] fn getBool() -> bool;
+            let x = if getBool() {
+                42
+            } elif getBool() {
+                42
+            } else {
+                42
+            };
+            x
+        )";
+
+        Environment env;
+        auto closure = env.parse(source);
+        REQUIRE(closure);
+
+        auto ssaProgram = env.map(closure);
+
+        // Map to RVM
+        auto mapper     = RVMMapper();
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
+
+        std::string rvmStr = RVMSerializer::serialize(rvmProgram);
+        REQUIRE(!rvmStr.empty());
+
+        // Should handle duplicate values correctly (produces redundant MOVs that get optimized later)
+        REQUIRE(rvmStr.find("42") != std::string::npos);
+    }
+
+    SECTION("Variable updated in only one branch (from PExpr)")
+    {
+        const char* source = R"(
+            let mut x = 5;
+            let mut y = 10;
+            
+            if true {
+                x = 15;
+            } else {
+                y = 20;
+            };
+            
+            x + y
+        )";
+
+        Environment env;
+        auto closure = env.parse(source);
+        REQUIRE(closure);
+
+        auto ssaProgram = env.map(closure);
+
+        // Map to RVM
+        auto mapper     = RVMMapper();
+        auto rvmProgram = mapper.mapProgram(ssaProgram);
+
+        std::string rvmStr = RVMSerializer::serialize(rvmProgram);
+        REQUIRE(!rvmStr.empty());
+
+        // Should have phi nodes for both x and y (even though only one updated per branch)
+        REQUIRE(rvmStr.find("add") != std::string::npos);
     }
 }

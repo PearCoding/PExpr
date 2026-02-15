@@ -468,11 +468,55 @@ std::shared_ptr<RVMInstr> RVMMapper::mapGoto(const ssa::SSAInstrGoto& instr)
     return std::make_shared<RVMInstrJump>(instr.TargetLabel);
 }
 
+// Helper to insert phi updates for a newly defined value
+void RVMMapper::insertPhiUpdatesForValue(const ssa::SSAValue& definedValue, 
+                                         std::vector<std::shared_ptr<RVMInstr>>& result)
+{
+    auto it = mPhiValueToTargets.find(definedValue);
+    if (it == mPhiValueToTargets.end())
+        return;
+    
+    // Insert MOV instructions for each phi target that depends on this value
+    for (const auto& phiTarget : it->second) {
+        RVMValue phiTargetRVM = mapValue(phiTarget);
+        RVMValue definedValueRVM = mapValue(definedValue);
+        
+        if (phiTarget.type().isTuple()) {
+            // Tuple phi: need to dissolve into elementary moves
+            auto phiTargetVals = mapTupleValues(phiTarget);
+            auto definedVals = mapTupleValues(definedValue);
+            
+            PEXPR_ASSERT(phiTargetVals.size() == definedVals.size(),
+                        "Tuple phi target and defined value size mismatch");
+            
+            for (size_t i = 0; i < phiTargetVals.size(); ++i) {
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetVals[i], definedVals[i]));
+            }
+        } else {
+            // Scalar move
+            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetRVM, definedValueRVM));
+        }
+    }
+}
+
 // Map SSA instructions to RVM instructions
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vector<std::shared_ptr<ssa::SSAInstr>>& ssaInstrs, const ssa::SSAProgram& ssaProgram)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
+    
+    // Clear phi tracking state
+    mPhiValueToTargets.clear();
 
+    // First pass: collect all phi nodes and build the value-to-targets mapping
+    for (const auto& ssaInstr : ssaInstrs) {
+        if (auto* phi = dynamic_cast<ssa::SSAInstrPhi*>(ssaInstr.get())) {
+            // Record that each branch value maps to the phi target
+            for (const auto& branchValue : phi->Branches)
+                mPhiValueToTargets[branchValue].push_back(phi->Target);
+        }
+    }
+
+    // Second pass: generate RVM instructions
     for (const auto& ssaInstr : ssaInstrs) {
         // Handle label instructions
         if (auto* label = dynamic_cast<ssa::SSAInstrLabel*>(ssaInstr.get())) {
@@ -484,6 +528,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         // Handle assign instructions
         if (auto* assign = dynamic_cast<ssa::SSAInstrAssign*>(ssaInstr.get())) {
             auto instrs = mapAssign(*assign);
+            
+            // Insert phi updates for the defined value (if any)
+            insertPhiUpdatesForValue(assign->Target, instrs);
+            
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
@@ -491,6 +539,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         // Handle call instructions
         if (auto* call = dynamic_cast<ssa::SSAInstrCall*>(ssaInstr.get())) {
             auto instrs = mapCall(*call, ssaProgram);
+            
+            // Insert phi updates for the defined value (if any)
+            insertPhiUpdatesForValue(call->Target, instrs);
+            
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
@@ -516,58 +568,40 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
 
         // Handle phi instructions
         if (auto* phi = dynamic_cast<ssa::SSAInstrPhi*>(ssaInstr.get())) {
-            // Phi nodes select values based on conditions
-            // Implementation: result = cond1 ? val1 : (cond2 ? val2 : ... elseVal)
-            // We need to generate conditional branches for this
-            RVMValue dst = mapValue(phi->Target);
-
-            if (phi->Conditions.empty()) {
-                // No conditions, just use the else branch (or first branch if no else)
-                size_t branchIdx = phi->Branches.size() > 0 ? 0 : 0;
-                if (branchIdx < phi->Branches.size()) {
-                    RVMValue branchVal = mapValue(phi->Branches[branchIdx]);
-                    result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
+            // Process phi node: map branch values to phi target
+            for (size_t i = 0; i < phi->Branches.size(); ++i) {
+                const auto& branchValue = phi->Branches[i];
+                
+                // Record that this branch value maps to the phi target
+                mPhiValueToTargets[branchValue].push_back(phi->Target);
+                
+                // If branch value is a constant, insert MOV immediately
+                if (branchValue.isConstant()) {
+                    RVMValue phiTargetRVM = mapValue(phi->Target);
+                    RVMValue branchValueRVM = mapValue(branchValue);
+                    
+                    if (phi->Target.type().isTuple()) {
+                        // Tuple phi: need to dissolve into elementary moves
+                        auto phiTargetVals = mapTupleValues(phi->Target);
+                        auto branchVals = mapTupleValues(branchValue);
+                        
+                        PEXPR_ASSERT(phiTargetVals.size() == branchVals.size(),
+                                    "Tuple phi target and branch value size mismatch");
+                        
+                        for (size_t j = 0; j < phiTargetVals.size(); ++j)
+                            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetVals[j], branchVals[j]));
+                    } else {
+                        // Scalar move
+                        RVMValue phiTargetRVM = mapValue(phi->Target);
+                        RVMValue branchValueRVM = mapValue(branchValue);
+                        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetRVM, branchValueRVM));
+                    }
                 }
-                continue;
             }
-
-            // Generate conditional selection logic
-            // For N conditions, we need N-1 conditional branches and a final else/default
-            std::string phiEndLabel = "phi_end_" + std::to_string(result.size()); // Unique label
-
-            for (size_t i = 0; i < phi->Conditions.size(); ++i) {
-                RVMValue cond      = mapValue(phi->Conditions[i]);
-                RVMValue branchVal = mapValue(phi->Branches[i]);
-
-                // If condition is true, move branch value and jump to end
-                // Branch if condition is false to next condition
-                std::string nextLabel = "phi_next_" + std::to_string(result.size()) + "_" + std::to_string(i);
-
-                // Branch if condition is zero (false) to next condition
-                result.push_back(std::make_shared<RVMInstrBranch>(Opcode::JZ, cond, nextLabel));
-
-                // Condition is true: move branch value to destination
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, branchVal));
-                result.push_back(std::make_shared<RVMInstrJump>(phiEndLabel));
-
-                // Next condition label
-                result.push_back(std::make_shared<RVMInstrLabel>(nextLabel));
-            }
-
-            // Handle else branch (if exists) or default (last branch)
-            size_t elseIdx = phi->Conditions.size();
-            if (elseIdx < phi->Branches.size()) {
-                // There's an explicit else branch
-                RVMValue elseVal = mapValue(phi->Branches[elseIdx]);
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, elseVal));
-            } else if (phi->Branches.size() > phi->Conditions.size()) {
-                // Should not happen based on SSA spec, but handle gracefully
-                RVMValue defaultVal = mapValue(phi->Branches.back());
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, defaultVal));
-            }
-
-            // End of phi resolution
-            result.push_back(std::make_shared<RVMInstrLabel>(phiEndLabel));
+            
+            // Note: we don't generate any code for the phi node itself here
+            // The actual MOVs are inserted either above (for constants) or when values are defined
+            continue;
         }
     }
 
