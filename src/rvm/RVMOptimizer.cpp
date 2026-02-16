@@ -1,6 +1,5 @@
 #include "RVMOptimizer.h"
-#include "RVMMoveSimplifier.h"
-#include "RVMRedundantMoveEliminator.h"
+#include "RVMMoveOptimizer.h"
 #include "RVMRegisterAllocator.h"
 #include "RVMRegisterLinearizer.h"
 
@@ -15,16 +14,10 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
 
     // Repeat until no changes are made
     while (true) {
-        // Apply move-related optimizations
         bool changed = false;
 
-        // Apply identity MOV elimination (simplifies MOV chains)
-        if (options.OptimizeMoveChains)
-            changed |= RVMMoveSimplifier::simplify(program);
-
-        // Apply redundant MOV elimination (removes MOVs overwritten before being read)
-        if (options.OptimizeRedundantMoves)
-            changed |= RVMRedundantMoveEliminator::eliminate(program);
+        // Apply combined move optimizations (identity, chain collapsing, redundant)
+        changed |= RVMMoveOptimizer::optimize(options, program);
 
         changedAtAll |= changed;
         if (!changed)

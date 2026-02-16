@@ -18,6 +18,7 @@ struct OptimizerOptions {
 
     bool OptimizeMoveChains       = false; // < Optimize move chains in RVM
     bool OptimizeRedundantMoves   = false; // < Eliminate redundant MOV instructions in RVM
+    bool OptimizeIdentityMoves    = false; // < Eliminate identity MOV instructions (src == dst) in RVM
     bool EnableRegisterAllocation = false; // < Enable register allocation to minimize register count
 
     /// No option is enabled. This is -O0.
@@ -35,6 +36,7 @@ struct OptimizerOptions {
         opts.EliminateCommonSubexpressions = true;
         opts.OptimizeMoveChains            = true;
         opts.OptimizeRedundantMoves        = true;
+        opts.OptimizeIdentityMoves         = true;
         opts.EnableRegisterAllocation      = true;
         return opts;
     }

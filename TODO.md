@@ -43,3 +43,4 @@
 - [x] There is no need to have 'tuple' and 'assign' for SSA. Merge 'tuple' functionality to 'assign'.
 - [ ] RedundantMoveEliminator would profit from knowing expected return values of functions or the global closure to remove more redundant 'mov' instructions.
 - [ ] Fix some corner cases in the register allocator.
+- [ ] "--opt-force-function-inlining" is not working with recursive functions

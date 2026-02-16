@@ -2,10 +2,10 @@
 #include <memory>
 #include <string>
 
+#include "opt/OptimizerOptions.h"
 #include "rvm/RVMContext.h"
 #include "rvm/RVMMapper.h"
-#include "rvm/RVMMoveSimplifier.h"
-#include "rvm/RVMRedundantMoveEliminator.h"
+#include "rvm/RVMMoveOptimizer.h"
 #include "rvm/RVMSerializer.h"
 #include "rvm/RVMStructs.h"
 #include "rvm/RVMValue.h"
@@ -623,7 +623,7 @@ TEST_CASE("RVMSerializer: load_string instruction support", "[rvm][serializer][l
     }
 }
 
-TEST_CASE("RVMMoveSimplifier: identity mov elimination", "[rvm][move][optimization]")
+TEST_CASE("RVMMoveOptimizer: identity mov elimination", "[rvm][move][optimization]")
 {
     SECTION("Simple identity MOV removal")
     {
@@ -642,7 +642,7 @@ TEST_CASE("RVMMoveSimplifier: identity mov elimination", "[rvm][move][optimizati
         program.push_back(std::make_shared<RVMInstrReturn>(1));
 
         // Apply simplification
-        bool changed = RVMMoveSimplifier::simplify(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeIdentityMoves = true }, program);
 
         REQUIRE(changed == true);
 
@@ -677,14 +677,13 @@ TEST_CASE("RVMMoveSimplifier: identity mov elimination", "[rvm][move][optimizati
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::ADD, r0, r3, r0));
 
         // Apply simplification
-        bool changed = RVMMoveSimplifier::simplify(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeMoveChains = true }, program);
 
         // r3 is pinned (used in ADD), but chain will be simplified
         REQUIRE(changed == true);
 
         // Program should remain unchanged
-        // TODO: Remove obsolete mov instructions
-        REQUIRE(program.size() == 4);
+        REQUIRE(program.size() == 1);
     }
 
     SECTION("Pinned registers not renamed")
@@ -703,7 +702,7 @@ TEST_CASE("RVMMoveSimplifier: identity mov elimination", "[rvm][move][optimizati
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::ADD, r0, r2, r0));
 
         // Apply simplification
-        bool changed = RVMMoveSimplifier::simplify(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeMoveChains = true }, program);
         REQUIRE(changed == true);
 
         // r2 should not be renamed away since it's used in ADD
@@ -728,14 +727,14 @@ TEST_CASE("RVMMoveSimplifier: identity mov elimination", "[rvm][move][optimizati
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::SUB, r1, r2, r0));
 
         // Apply simplification
-        bool changed = RVMMoveSimplifier::simplify(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeMoveChains = true }, program);
 
         REQUIRE(changed == false);
         REQUIRE(program.size() == 2);
     }
 }
 
-TEST_CASE("RVMRedundantMoveEliminator: redundant mov elimination", "[rvm][move][optimization][redundant]")
+TEST_CASE("RVMMoveOptimizer: redundant mov elimination", "[rvm][move][optimization][redundant]")
 {
     SECTION("Redundant MOV elimination")
     {
@@ -753,7 +752,7 @@ TEST_CASE("RVMRedundantMoveEliminator: redundant mov elimination", "[rvm][move][
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::ADD, r0, r1, r0));
 
         // Apply redundant move elimination
-        bool changed = RVMRedundantMoveEliminator::eliminate(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeRedundantMoves = true }, program);
 
         REQUIRE(changed == true);
         REQUIRE(program.size() == 2); // First MOV should be removed
@@ -795,7 +794,7 @@ TEST_CASE("RVMRedundantMoveEliminator: redundant mov elimination", "[rvm][move][
         program.push_back(std::make_shared<RVMInstrReturn>(4));
 
         // Apply redundant move elimination
-        bool changed = RVMRedundantMoveEliminator::eliminate(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeRedundantMoves = true }, program);
 
         REQUIRE(changed == true);
         // Only mov r2 r0 should be removed (redundant - r2 is overwritten)
@@ -831,7 +830,7 @@ TEST_CASE("RVMRedundantMoveEliminator: redundant mov elimination", "[rvm][move][
         program.push_back(std::make_shared<RVMInstrReturn>(3));
 
         // Apply redundant move elimination
-        bool changed = RVMRedundantMoveEliminator::eliminate(program);
+        bool changed = RVMMoveOptimizer::optimize(opt::OptimizerOptions{ .OptimizeRedundantMoves = true }, program);
 
         REQUIRE(changed == false);
         REQUIRE(program.size() == 4); // All instructions remain
@@ -844,13 +843,13 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
     {
         RVMValue dst = RVMValue::Register(0, Type(TypeKind::Integer));
         RVMValue src = RVMValue::Constant(Integer(42));
-        
-        auto original = std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstr2Op*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::MOV);
@@ -860,16 +859,16 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
 
     SECTION("3-operand instruction roundtrip")
     {
-        RVMValue dst = RVMValue::Register(0, Type(TypeKind::Integer));
+        RVMValue dst  = RVMValue::Register(0, Type(TypeKind::Integer));
         RVMValue src1 = RVMValue::Constant(Integer(10));
         RVMValue src2 = RVMValue::Constant(Integer(20));
-        
-        auto original = std::make_shared<RVMInstr3Op>(Opcode::ADD, dst, src1, src2);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstr3Op>(Opcode::ADD, dst, src1, src2);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstr3Op*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::ADD);
@@ -880,15 +879,15 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
 
     SECTION("Branch instruction roundtrip")
     {
-        RVMValue src = RVMValue::Constant(true);
+        RVMValue src      = RVMValue::Constant(true);
         std::string label = "test_label";
-        
-        auto original = std::make_shared<RVMInstrBranch>(Opcode::JZ, src, label);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstrBranch>(Opcode::JZ, src, label);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstrBranch*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::JZ);
@@ -899,13 +898,13 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
     SECTION("Jump instruction roundtrip")
     {
         std::string label = "loop_start";
-        
-        auto original = std::make_shared<RVMInstrJump>(label);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstrJump>(label);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstrJump*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::JMP);
@@ -915,13 +914,13 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
     SECTION("Label instruction roundtrip")
     {
         std::string label = "my_label";
-        
-        auto original = std::make_shared<RVMInstrLabel>(label);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstrLabel>(label);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstrLabel*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->labelName() == label);
@@ -930,13 +929,13 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
     SECTION("Return instruction roundtrip")
     {
         size_t returnCount = 2;
-        
-        auto original = std::make_shared<RVMInstrReturn>(returnCount);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstrReturn>(returnCount);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstrReturn*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::RET);
@@ -945,16 +944,16 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
 
     SECTION("Call instruction roundtrip")
     {
-        size_t paramCount = 2;
-        size_t returnCount = 1;
+        size_t paramCount    = 2;
+        size_t returnCount   = 1;
         std::string funcName = "test_func";
-        
-        auto original = std::make_shared<RVMInstrCall>(false, paramCount, returnCount, funcName);
-        std::string serialized = RVMSerializer::serialize({original});
-        
+
+        auto original          = std::make_shared<RVMInstrCall>(false, paramCount, returnCount, funcName);
+        std::string serialized = RVMSerializer::serialize({ original });
+
         auto parsed = RVMSerializer::readInstruction(serialized);
         REQUIRE(parsed != nullptr);
-        
+
         auto* parsedInstr = dynamic_cast<RVMInstrCall*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::CALL_INTERNAL);
@@ -966,17 +965,17 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
     SECTION("All opcode types roundtrip")
     {
         // Test all 2-operand opcodes
-        std::vector<Opcode> twoOpOpcodes = {Opcode::MOV, Opcode::I2F, Opcode::F2I};
+        std::vector<Opcode> twoOpOpcodes = { Opcode::MOV, Opcode::I2F, Opcode::F2I };
         for (auto opcode : twoOpOpcodes) {
             RVMValue dst = RVMValue::Register(0, Type(TypeKind::Integer));
             RVMValue src = RVMValue::Constant(Integer(42));
-            
-            auto original = std::make_shared<RVMInstr2Op>(opcode, dst, src);
-            std::string serialized = RVMSerializer::serialize({original});
-            
+
+            auto original          = std::make_shared<RVMInstr2Op>(opcode, dst, src);
+            std::string serialized = RVMSerializer::serialize({ original });
+
             auto parsed = RVMSerializer::readInstruction(serialized);
             REQUIRE(parsed != nullptr);
-            
+
             auto* parsedInstr = dynamic_cast<RVMInstr2Op*>(parsed.get());
             REQUIRE(parsedInstr != nullptr);
             REQUIRE(parsedInstr->opcode() == opcode);
@@ -989,16 +988,16 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
             Opcode::CMP_EQ, Opcode::CMP_NE, Opcode::CMP_LT, Opcode::CMP_LE, Opcode::CMP_GT, Opcode::CMP_GE
         };
         for (auto opcode : threeOpOpcodes) {
-            RVMValue dst = RVMValue::Register(0, Type(TypeKind::Integer));
+            RVMValue dst  = RVMValue::Register(0, Type(TypeKind::Integer));
             RVMValue src1 = RVMValue::Constant(Integer(10));
             RVMValue src2 = RVMValue::Constant(Integer(20));
-            
-            auto original = std::make_shared<RVMInstr3Op>(opcode, dst, src1, src2);
-            std::string serialized = RVMSerializer::serialize({original});
-            
+
+            auto original          = std::make_shared<RVMInstr3Op>(opcode, dst, src1, src2);
+            std::string serialized = RVMSerializer::serialize({ original });
+
             auto parsed = RVMSerializer::readInstruction(serialized);
             REQUIRE(parsed != nullptr);
-            
+
             auto* parsedInstr = dynamic_cast<RVMInstr3Op*>(parsed.get());
             REQUIRE(parsedInstr != nullptr);
             REQUIRE(parsedInstr->opcode() == opcode);
@@ -1011,140 +1010,140 @@ TEST_CASE("RVMSerializer: error handling for ill-formed input", "[rvm][serialize
     SECTION("Invalid opcode")
     {
         std::string line = "invalid_op %r0:int 42:int";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Missing destination in 2-operand instruction")
     {
         std::string line = "mov 42:int";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Missing source in 2-operand instruction")
     {
         std::string line = "mov %r0:int";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Missing second source in 3-operand instruction")
     {
         std::string line = "add %r0:int 10:int";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid register format")
     {
         std::string line = "mov %invalid 42:int";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid constant format")
     {
         std::string line = "mov %r0:int not_a_number:int";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Missing type annotation")
     {
         std::string line = "mov %r0 42";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Branch instruction missing label")
     {
         std::string line = "jz true:bool";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Branch instruction missing value")
     {
         std::string line = "jz label";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Jump instruction missing label")
     {
         std::string line = "jmp";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid push_frame format")
     {
         std::string line = "push_frame";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid pop_frame format")
     {
         std::string line = "pop_frame";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid ret format")
     {
         std::string line = "ret";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid call_internal format")
     {
         std::string line = "call_internal";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid call_external format")
     {
         std::string line = "call_external";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid load_string format - missing string")
     {
         std::string line = "load_string #str0:str";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Invalid load_string format - missing destination")
     {
         std::string line = "load_string \"Hello\"";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Malformed comment")
     {
         std::string line = "// This is a comment";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr); // Comments should be ignored, returning nullptr
     }
 
     SECTION("Empty line")
     {
         std::string line = "";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 
     SECTION("Whitespace only")
     {
         std::string line = "   \t\n";
-        auto instr = RVMSerializer::readInstruction(line);
+        auto instr       = RVMSerializer::readInstruction(line);
         REQUIRE(instr == nullptr);
     }
 }
