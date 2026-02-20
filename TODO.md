@@ -42,4 +42,4 @@
 - [x] Split the call of functions in RVM into two cases: "call_external" as the way we handled calls for now and "call_internal" which uses a standard order of registers (saved via push_frame) to call.
 - [x] There is no need to have 'tuple' and 'assign' for SSA. Merge 'tuple' functionality to 'assign'.
 - [ ] Fix some corner cases in the register allocator.
-- [ ] "--opt-force-function-inlining" is not working with recursive functions
+- [x] "--opt-force-inline-functions" is not working with recursive functions

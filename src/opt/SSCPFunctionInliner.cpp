@@ -11,6 +11,7 @@ using namespace ssa;
 void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
 {
     mCallCounts.clear();
+    mRecursiveFunctions.clear();
 
     std::queue<std::string> mentionedFunctions;
 
@@ -47,6 +48,9 @@ void SSCPFunctionInliner::analyzeCallGraph(const SSAProgram& program)
             }
         }
     }
+
+    // Detect recursive functions
+    detectRecursiveFunctions(program);
 }
 
 bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& program, SSAFunction& func)
@@ -61,7 +65,10 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& pr
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    if (mOptions.ForceInlineFunctions && inlineFunctionCall(ctx, call, func, body, i)) { //< Force inlining
+                    // Check if this is a recursive function with force inlining enabled
+                    if (mOptions.ForceInlineFunctions && mRecursiveFunctions.contains(func.Name)) {
+                        // Skip force inlining for recursive functions to avoid infinite recursion
+                    } else if (mOptions.ForceInlineFunctions && inlineFunctionCall(ctx, call, func, body, i)) { //< Force inlining
                         changed = true;
                         break;
                     } else if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first
@@ -349,5 +356,73 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
     }
 
     return false;
+}
+
+void SSCPFunctionInliner::detectRecursiveFunctions(const ssa::SSAProgram& program)
+{
+    // Build adjacency list: function name -> set of called functions
+    std::unordered_map<std::string, std::unordered_set<std::string>> callGraph;
+    std::unordered_map<std::string, const SSAFunction*> functionMap;
+
+    // Map function names to their bodies
+    for (const auto& func : program.Functions)
+        functionMap[func.Name] = &func;
+
+    // Build call graph
+    auto collectCalls = [&](const InstructionList& body, const std::string& caller) {
+        for (const auto& instrPtr : body) {
+            if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+                // Only track calls to functions defined in this program (not external)
+                if (functionMap.contains(call->FunctionName))
+                    callGraph[caller].insert(call->FunctionName);
+            }
+        }
+    };
+
+    // Collect calls from main body
+    callGraph["<main>"] = {};
+    collectCalls(program.Body, "<main>");
+
+    // Collect calls from each function
+    for (const auto& func : program.Functions) {
+        callGraph[func.Name] = {};
+        collectCalls(func.Body, func.Name);
+    }
+
+    // Detect cycles using DFS with color marking and stack
+    std::unordered_map<std::string, int> color; // 0 = unvisited, 1 = visiting, 2 = visited
+    std::vector<std::string> stack;
+    std::unordered_map<std::string, size_t> stackIndex;
+
+    std::function<void(const std::string&)> dfs = [&](const std::string& node) {
+        color[node]      = 1; // visiting
+        stackIndex[node] = stack.size();
+        stack.push_back(node);
+
+        for (const auto& neighbor : callGraph[node]) {
+            if (color[neighbor] == 0) {
+                dfs(neighbor);
+            } else if (color[neighbor] == 1) {
+                // Found a cycle: neighbor is currently being visited
+                // Mark all nodes in the cycle from the neighbor's position to the end of stack
+                size_t startIdx = stackIndex[neighbor];
+                for (size_t i = startIdx; i < stack.size(); ++i)
+                    mRecursiveFunctions.insert(stack[i]);
+
+                // Also mark the neighbor itself
+                mRecursiveFunctions.insert(neighbor);
+            }
+        }
+
+        color[node] = 2; // visited
+        stack.pop_back();
+        stackIndex.erase(node);
+    };
+
+    // Run DFS on all nodes
+    for (const auto& [node, _] : callGraph) {
+        if (color[node] == 0)
+            dfs(node);
+    }
 }
 } // namespace PExpr::opt

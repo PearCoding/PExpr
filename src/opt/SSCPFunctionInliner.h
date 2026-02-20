@@ -72,6 +72,10 @@ private:
     };
     std::unordered_map<std::string, InlineAttemptInfo> mInlineAttempts;
     static constexpr int MAX_INLINE_ATTEMPTS = 16;
+
+    // Recursive function detection
+    std::unordered_set<std::string> mRecursiveFunctions;
+    void detectRecursiveFunctions(const ssa::SSAProgram& program);
 };
 
 } // namespace PExpr::opt
