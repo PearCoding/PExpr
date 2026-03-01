@@ -239,11 +239,15 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
                     }
                 }
             }
-            if (!blocks[blockIdx].empty() && !RVMBasicBlockAnalyzer::endsBlock(blocks[blockIdx].back().get())) {
-                if (blockIdx + 1 < blocks.size()) {
-                    for (RegId reg : liveIn[blockIdx + 1])
-                        newLiveOut.insert(reg);
-                }
+            bool canFallThrough = true;
+            if (!blocks[blockIdx].empty()) {
+                auto* last = blocks[blockIdx].back().get();
+                if (dynamic_cast<const RVMInstrJump*>(last) || dynamic_cast<const RVMInstrReturn*>(last))
+                    canFallThrough = false;
+            }
+            if (canFallThrough && blockIdx + 1 < blocks.size()) {
+                for (RegId reg : liveIn[blockIdx + 1])
+                    newLiveOut.insert(reg);
             }
 
             std::unordered_set<RegId> newLiveIn = useSets[blockIdx];
@@ -340,10 +344,14 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
             }
         }
         // Handle fall-through
-        if (!blocks[blockIdx].empty() && !RVMBasicBlockAnalyzer::endsBlock(blocks[blockIdx].back().get())) {
-            if (blockIdx + 1 < blocks.size())
-                succIndices.insert(blockIdx + 1);
+        bool canFallThrough = true;
+        if (!blocks[blockIdx].empty()) {
+            auto* last = blocks[blockIdx].back().get();
+            if (dynamic_cast<const RVMInstrJump*>(last) || dynamic_cast<const RVMInstrReturn*>(last))
+                canFallThrough = false;
         }
+        if (canFallThrough && blockIdx + 1 < blocks.size())
+            succIndices.insert(blockIdx + 1);
 
         for (size_t succIdx : succIndices) {
             for (size_t i = 0; i < blockSegments[blockIdx].size(); ++i) {
