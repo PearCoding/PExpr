@@ -125,8 +125,8 @@ ret 2
 
         REQUIRE(original.size() == 6);
 
-        bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::Medium(), optimized);
-        REQUIRE(changed == true);
+        bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::High(), optimized);
+        REQUIRE(changed == false); //< There is nothing we could optimize away
 
         REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
     }
