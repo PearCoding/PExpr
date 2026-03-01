@@ -27,13 +27,13 @@ public:
     static void write(std::ostream& os, const ValueVariant& value);
 
     /// Read an RVMProgram from a stream (deserialize)
-    static RVMProgram read(std::istream& is);
+    static std::optional<RVMProgram> read(std::istream& is);
 
     /// Helper: Serialize an RVMProgram to a string (convenience wrapper)
     [[nodiscard]] static std::string serialize(const RVMProgram& program);
 
     /// Helper: Deserialize an RVMProgram from a string (convenience wrapper)
-    [[nodiscard]] static RVMProgram deserialize(const std::string& str);
+    [[nodiscard]] static std::optional<RVMProgram> deserialize(const std::string& str);
 
     /// Parse a type string to Type
     static type::Type parseType(const std::string& typeStr);

@@ -8,6 +8,7 @@
 #include "rvm/RVMStructs.h"
 #include "rvm/RVMValue.h"
 #include "rvm/RVMSerializer.h"
+#include "rvm/RVMValidator.h"
 #include "type/Type.h"
 
 using namespace PExpr;
@@ -32,12 +33,15 @@ TEST_CASE("RVMMoveOptimizer: identity mov elimination", "[rvm][move][optimizatio
         // Ensure not everything is removed due to missing return
         program.push_back(std::make_shared<RVMInstrReturn>(1));
 
+        RVMProgram original = program;
+
         // Apply simplification
         opt::OptimizerOptions opts;
         opts.OptimizeIdentityMoves = true;
         bool changed = RVMMoveOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Count MOV instructions
         int movCount = 0;
@@ -69,6 +73,8 @@ TEST_CASE("RVMMoveOptimizer: identity mov elimination", "[rvm][move][optimizatio
         // Add computation using r3
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::ADD, r0, r3, r0));
 
+        RVMProgram original = program;
+
         // Apply simplification
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
@@ -76,6 +82,7 @@ TEST_CASE("RVMMoveOptimizer: identity mov elimination", "[rvm][move][optimizatio
 
         // r3 is pinned (used in ADD), but chain will be simplified
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Program should remain unchanged
         REQUIRE(program.size() == 1);
@@ -96,11 +103,14 @@ TEST_CASE("RVMMoveOptimizer: identity mov elimination", "[rvm][move][optimizatio
         // Use r2 in computation (pins r2)
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::ADD, r0, r2, r0));
 
+        RVMProgram original = program;
+
         // Apply simplification
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // r2 should not be renamed away since it's used in ADD
         // The implementation should preserve pinned registers
@@ -150,12 +160,15 @@ TEST_CASE("RVMMoveOptimizer: redundant mov elimination", "[rvm][move][optimizati
         // Use r1
         program.push_back(std::make_shared<RVMInstr3Op>(Opcode::ADD, r0, r1, r0));
 
+        RVMProgram original = program;
+
         // Apply redundant move elimination
         opt::OptimizerOptions opts;
         opts.OptimizeRedundantMoves = true;
         bool changed = RVMMoveOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
         REQUIRE(program.size() == 2); // First MOV should be removed
 
         // Check that the first MOV is gone
@@ -194,12 +207,15 @@ TEST_CASE("RVMMoveOptimizer: redundant mov elimination", "[rvm][move][optimizati
         // Ensure not everything is removed due to missing return
         program.push_back(std::make_shared<RVMInstrReturn>(4));
 
+        RVMProgram original = program;
+
         // Apply redundant move elimination
         opt::OptimizerOptions opts;
         opts.OptimizeRedundantMoves = true;
         bool changed = RVMMoveOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
         // Only mov r2 r0 should be removed (redundant - r2 is overwritten)
         // mov r0 r1 remains (not redundant - r0 is not overwritten)
         REQUIRE(program.size() == 3);

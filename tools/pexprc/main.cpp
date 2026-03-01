@@ -168,6 +168,7 @@ int main(int argc, char** argv)
         if (!optimizationOptions.DissolveTuples) {
             // std::cout << "Enabled '--opt-dissolve-tuples' for RVM" << std::endl;
             optimizationOptions.DissolveTuples = true;
+            optimizationOptions.RemoveDeadCode = true; //< Needed to dissolve tuples
         }
     }
 
@@ -250,7 +251,12 @@ int main(int argc, char** argv)
         rvm::RVMMapper mapper;
         rvmProgram = mapper.mapProgram(ssaProgram);
     } else {
-        rvmProgram = rvm::RVMSerializer::read(sourceFile);
+        auto rvmProgOpt = rvm::RVMSerializer::read(sourceFile);
+        if (!rvmProgOpt.has_value()) {
+            PEXPR_LOG_ERROR << "Failed to parse given RVM file" << std::endl;
+            return env.reporter().errorCount() + 1;
+        }
+        rvmProgram = rvmProgOpt.value();
     }
 
     if (!rvm::RVMValidator::checkIfElementary(rvmProgram))

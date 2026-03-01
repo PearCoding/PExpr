@@ -1,5 +1,7 @@
 #include "RVMSerializer.h"
+#include "log/Logger.h"
 #include "utils/StringUtils.h"
+
 #include <algorithm>
 #include <cctype>
 #include <ranges>
@@ -381,8 +383,10 @@ bool RVMSerializer::parseValue(const std::string& str, RVMValue& outValue)
 {
     // Format: value:type or %rN:type or #strN:type
     size_t colon = str.find(':');
-    if (colon == std::string::npos)
+    if (colon == std::string::npos) {
+        PEXPR_LOG_ERROR << "RVMSerializer: Value for instruction is invalid as it is missing the type specifier" << std::endl;
         return false;
+    }
 
     std::string valueStr = str.substr(0, colon);
     std::string typeStr  = trim(str.substr(colon + 1));
@@ -585,24 +589,18 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
         // Check if it's a valid opcode
         auto op = stringToOpcode(opcodeStr);
         if (op) {
-            // Try to parse as 2-operand instruction: op dst src
-            size_t secondSpace = rest.find(' ');
-            if (secondSpace != std::string::npos) {
-                std::string dstStr = trim(rest.substr(0, secondSpace));
-                std::string srcStr = trim(rest.substr(secondSpace + 1));
+            if (opcodeNumSources(*op) == 1) { //< Check if it's a 2-op instruction
+                                              // Try to parse as 2-operand instruction: op dst src
+                size_t secondSpace = rest.find(' ');
+                if (secondSpace != std::string::npos) {
+                    std::string dstStr = trim(rest.substr(0, secondSpace));
+                    std::string srcStr = trim(rest.substr(secondSpace + 1));
 
-                RVMValue dst, src;
-                if (parseValue(dstStr, dst) && parseValue(srcStr, src)) {
-                    // Check if it's a 2-op instruction
-                    if (opcodeNumSources(*op) == 1)
+                    RVMValue dst, src;
+                    if (parseValue(dstStr, dst) && parseValue(srcStr, src))
                         return std::make_shared<RVMInstr2Op>(*op, dst, src);
-                    else
-                        return nullptr;
                 }
-            }
-
-            // Check if it's a 3-op instruction
-            if (opcodeNumSources(*op) == 2) {
+            } else if (opcodeNumSources(*op) == 2) { //< Check if it's a 3-op instruction
                 // Try to parse as 3-operand instruction: op dst src1 src2
                 // Split by spaces
                 std::vector<std::string> tokens = split(rest, ' ');
@@ -622,22 +620,31 @@ std::shared_ptr<RVMInstr> RVMSerializer::readInstruction(const std::string& line
     return nullptr;
 }
 
-RVMProgram RVMSerializer::read(std::istream& is)
+std::optional<RVMProgram> RVMSerializer::read(std::istream& is)
 {
     RVMProgram program;
     std::string line;
 
     while (std::getline(is, line)) {
+        // Check if line is empty or only whitespace/comments
+        std::string trimmed = trim(eatComments(line));
+        if (trimmed.empty())
+            continue;
+
         // Parse instruction
         auto instr = readInstruction(line);
-        if (instr)
+        if (instr) {
             program.push_back(instr);
+        } else {
+            // Failed to parse instruction
+            return std::nullopt;
+        }
     }
 
     return program;
 }
 
-RVMProgram RVMSerializer::deserialize(const std::string& str)
+std::optional<RVMProgram> RVMSerializer::deserialize(const std::string& str)
 {
     std::istringstream iss(str);
     return read(iss);

@@ -6,6 +6,7 @@
 #include "opt/OptimizerOptions.h"
 #include "rvm/RVMMoveOptimizer.h"
 #include "rvm/RVMSerializer.h"
+#include "rvm/RVMValidator.h"
 #include "rvm/RVMStructs.h"
 #include "rvm/RVMValue.h"
 #include "type/Type.h"
@@ -35,6 +36,13 @@ bool isIdentityMov(const RVMInstr2Op* mov)
     auto srcs = mov->srcs();
     return dst.has_value() && srcs.size() == 1 && dst.value() == srcs[0];
 }
+
+RVMProgram deserializeSafe(const std::string& ir)
+{
+    auto prog_opt = RVMSerializer::deserialize(ir);
+    REQUIRE(prog_opt.has_value());
+    return *prog_opt;
+}
 } // namespace
 
 TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization][control-flow]")
@@ -54,7 +62,8 @@ TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         // Apply all move optimizations
         opt::OptimizerOptions opts;
@@ -66,6 +75,7 @@ TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization
 
         // Verify optimization occurred
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Count MOV instructions after optimization
         int movCount = countMovInstructions(program);
@@ -88,7 +98,8 @@ TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeRedundantMoves = true;
@@ -97,6 +108,7 @@ TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization
 
         // At least one MOV should be optimized
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
     }
 
     SECTION("MOV chain interrupted by control flow")
@@ -114,13 +126,15 @@ TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Verify no identity MOVs remain
         for (const auto& instr : program) {
@@ -144,7 +158,7 @@ TEST_CASE("RVMMoveOptimizer: control flow edge cases", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
@@ -174,7 +188,7 @@ TEST_CASE("RVMMoveOptimizer: type-specific optimizations", "[rvm][move][optimiza
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeIdentityMoves  = true;
@@ -194,7 +208,7 @@ TEST_CASE("RVMMoveOptimizer: type-specific optimizations", "[rvm][move][optimiza
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
@@ -220,13 +234,15 @@ TEST_CASE("RVMMoveOptimizer: complex chain scenarios", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Count remaining MOV instructions
         int movCount = countMovInstructions(program);
@@ -249,13 +265,15 @@ TEST_CASE("RVMMoveOptimizer: complex chain scenarios", "[rvm][move][optimization
             ret 2
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
     }
 
     SECTION("Self-referential chain (cycle detection)")
@@ -267,7 +285,7 @@ TEST_CASE("RVMMoveOptimizer: complex chain scenarios", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
@@ -288,13 +306,15 @@ TEST_CASE("RVMMoveOptimizer: complex chain scenarios", "[rvm][move][optimization
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // r2 should still exist (used by ADD)
         std::string optimized = RVMSerializer::serialize(program);
@@ -314,14 +334,16 @@ TEST_CASE("RVMMoveOptimizer: constant propagation", "[rvm][move][optimization][c
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeIdentityMoves = true;
         opts.OptimizeMoveChains    = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
-        REQUIRE(changed == true); //< FIXME
+        REQUIRE(changed == true); 
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
     }
 
     SECTION("Redundant moves involving constants")
@@ -333,13 +355,15 @@ TEST_CASE("RVMMoveOptimizer: constant propagation", "[rvm][move][optimization][c
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeRedundantMoves = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // First MOV (42) should be removed
         std::string optimized = RVMSerializer::serialize(program);
@@ -357,17 +381,19 @@ TEST_CASE("RVMMoveOptimizer: constant propagation", "[rvm][move][optimization][c
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Chain should be collapsed
         int movCount = countMovInstructions(program);
-        REQUIRE(movCount <= 1); //< FIXME
+        REQUIRE(movCount <= 1); 
     }
 }
 
@@ -377,14 +403,15 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
     {
         std::string rvmIr = R"(
             mov %r1:int %r0:int
-            mov %r1:int %r1:int  // Identity
+            mov %r1:int %r1:int // Identity
             mov %r2:int %r1:int
-            mov %r2:int %r3:int  // Redundant (overwrites before use)
+            mov %r2:int %r3:int // Redundant (overwrites before use)
             add %r0:int %r2:int %r0:int
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeIdentityMoves  = true;
@@ -393,6 +420,7 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Count remaining MOVs
         int movCount = countMovInstructions(program);
@@ -412,7 +440,8 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains     = true;
@@ -420,6 +449,7 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
     }
 
     SECTION("Order-dependent optimization outcomes")
@@ -434,7 +464,8 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         // Run optimization multiple times to check idempotence
         opt::OptimizerOptions opts;
@@ -443,6 +474,7 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
         opts.OptimizeRedundantMoves = true;
 
         bool changed1 = RVMMoveOptimizer::optimize(opts, program);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
         bool changed2 = RVMMoveOptimizer::optimize(opts, program);
 
         // We should have optimized away the identities
@@ -472,7 +504,7 @@ TEST_CASE("RVMMoveOptimizer: edge conditions", "[rvm][move][optimization][edge]"
         SECTION("Single MOV instruction")
         {
             std::string rvmIr  = "mov %r1:int %r0:int";
-            RVMProgram program = RVMSerializer::deserialize(rvmIr);
+            RVMProgram program = deserializeSafe(rvmIr);
 
             opt::OptimizerOptions opts;
             opts.OptimizeIdentityMoves = true;
@@ -486,7 +518,7 @@ TEST_CASE("RVMMoveOptimizer: edge conditions", "[rvm][move][optimization][edge]"
         SECTION("Single non-MOV instruction")
         {
             std::string rvmIr  = "add %r0:int %r1:int %r2:int";
-            RVMProgram program = RVMSerializer::deserialize(rvmIr);
+            RVMProgram program = deserializeSafe(rvmIr);
 
             opt::OptimizerOptions opts;
             opts.OptimizeIdentityMoves = true;
@@ -504,7 +536,7 @@ TEST_CASE("RVMMoveOptimizer: edge conditions", "[rvm][move][optimization][edge]"
             mov %r3:int %r2:int
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains     = true;
@@ -528,7 +560,7 @@ TEST_CASE("RVMMoveOptimizer: edge conditions", "[rvm][move][optimization][edge]"
         oss << "add %r0:int %r50:int %r0:int\n";
         oss << "ret 1";
 
-        RVMProgram program = RVMSerializer::deserialize(oss.str());
+        RVMProgram program = deserializeSafe(oss.str());
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
@@ -545,7 +577,7 @@ TEST_CASE("RVMMoveOptimizer: edge conditions", "[rvm][move][optimization][edge]"
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;
@@ -568,13 +600,15 @@ TEST_CASE("RVMMoveOptimizer: behavioral correctness", "[rvm][move][optimization]
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         opt::OptimizerOptions opts;
         opts.OptimizeIdentityMoves = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
         REQUIRE(changed == true);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Verify no identity MOVs remain
         for (const auto& instr : program) {
@@ -595,7 +629,8 @@ TEST_CASE("RVMMoveOptimizer: behavioral correctness", "[rvm][move][optimization]
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program  = deserializeSafe(rvmIr);
+        RVMProgram original = program;
 
         // Count MOVs before optimization
         int movCountBefore = countMovInstructions(program);
@@ -604,6 +639,7 @@ TEST_CASE("RVMMoveOptimizer: behavioral correctness", "[rvm][move][optimization]
         opts.OptimizeMoveChains = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
+        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // Count MOVs after optimization
         int movCountAfter = countMovInstructions(program);
@@ -623,7 +659,7 @@ TEST_CASE("RVMMoveOptimizer: behavioral correctness", "[rvm][move][optimization]
             ret 1
         )";
 
-        RVMProgram program = RVMSerializer::deserialize(rvmIr);
+        RVMProgram program = deserializeSafe(rvmIr);
 
         opt::OptimizerOptions opts;
         opts.OptimizeMoveChains = true;

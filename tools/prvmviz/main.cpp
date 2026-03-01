@@ -232,7 +232,12 @@ int main(int argc, char** argv)
 
     RVMProgram program;
     try {
-        program = RVMSerializer::read(file);
+        auto rvmProgOpt = RVMSerializer::read(file);
+        if (!rvmProgOpt.has_value()) {
+            std::cerr << "Error: Failed to parse given RVM IR file" << std::endl;
+            return EXIT_FAILURE;
+        }
+        program = rvmProgOpt.value();
     } catch (const std::exception& e) {
         std::cerr << "Error: Failed to parse RVM IR: " << e.what() << std::endl;
         return EXIT_FAILURE;
