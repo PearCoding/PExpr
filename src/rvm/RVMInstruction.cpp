@@ -49,8 +49,10 @@ RVMInstrCall::RVMInstrCall(bool isExternal, size_t numParams, size_t numReturns,
 
 void RVMInstrCall::forEachDestination(const std::function<void(RVMValue&)>& visitor)
 {
-    for (RegId i = 0; i < mReturnCount; ++i)
-        visitor(RVMValue::Register(i, type::Type(type::TypeKind::Unspecified)));
+    for (RegId i = 0; i < mReturnCount; ++i) {
+        auto val = RVMValue::Register(i, type::Type(type::TypeKind::Unspecified));
+        visitor(val);
+    }
 }
 
 void RVMInstrCall::forEachDestination(const std::function<void(const RVMValue&)>& visitor) const
@@ -61,8 +63,10 @@ void RVMInstrCall::forEachDestination(const std::function<void(const RVMValue&)>
 
 void RVMInstrCall::forEachSource(const std::function<void(RVMValue&)>& visitor)
 {
-    for (RegId i = 0; i < mParameterCount; ++i)
-        visitor(RVMValue::Register(i, type::Type(type::TypeKind::Unspecified)));
+    for (RegId i = 0; i < mParameterCount; ++i) {
+        auto val = RVMValue::Register(i, type::Type(type::TypeKind::Unspecified));
+        visitor(val);
+    }
 }
 
 void RVMInstrCall::forEachSource(const std::function<void(const RVMValue&)>& visitor) const
@@ -78,8 +82,10 @@ RVMInstrReturn::RVMInstrReturn(size_t returnCount)
 
 void RVMInstrReturn::forEachSource(const std::function<void(RVMValue&)>& visitor)
 {
-    for (RegId i = 0; i < mReturnCount; ++i)
-        visitor(RVMValue::Register(i, type::Type(type::TypeKind::Unspecified)));
+    for (RegId i = 0; i < mReturnCount; ++i) {
+        auto val = RVMValue::Register(i, type::Type(type::TypeKind::Unspecified));
+        visitor(val);
+    }
 }
 
 void RVMInstrReturn::forEachSource(const std::function<void(const RVMValue&)>& visitor) const
