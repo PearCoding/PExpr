@@ -43,3 +43,4 @@
 - [x] There is no need to have 'tuple' and 'assign' for SSA. Merge 'tuple' functionality to 'assign'.
 - [ ] Fix some corner cases in the register allocator.
 - [x] "--opt-force-inline-functions" is not working with recursive functions
+- [ ] The "//! location" might interfere with the unique naming of variables and other stuff! Verify this.
