@@ -331,7 +331,7 @@ private:
     {
         os << "\nLegend:\n"
            << " \033[1;34m" << (const char*)RangeStartSymbol.c_str() << "\033[0m: Move-only  "
-           << " \033[1;32m" << (const char*)RangeStartSymbol.c_str() << "\033[0m*: Non-move usage "
+           << " \033[1;32m" << (const char*)RangeStartSymbol.c_str() << "\033[0m: Non-move usage "
            << " \033[1;31m" << (const char*)RangeStartSymbol.c_str() << "\033[0m: Pinned (Param/Return)\n";
     }
 
