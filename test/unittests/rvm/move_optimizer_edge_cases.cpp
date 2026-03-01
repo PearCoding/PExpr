@@ -32,9 +32,9 @@ int countMovInstructions(const RVMProgram& program)
 // Helper to check if a MOV instruction is identity
 bool isIdentityMov(const RVMInstr2Op* mov)
 {
-    auto dst  = mov->dst();
-    auto srcs = mov->srcs();
-    return dst.has_value() && srcs.size() == 1 && dst.value() == srcs[0];
+    const RVMValue& dst = mov->destination();
+    const RVMValue& src = mov->source();
+    return dst == src;
 }
 
 RVMProgram deserializeSafe(const std::string& ir)

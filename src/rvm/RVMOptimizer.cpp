@@ -10,7 +10,7 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
     bool changedAtAll = false;
 
     // Apply register linearization first (syntax-only pass)
-    changedAtAll |= RVMRegisterLinearizer::linearize(program);
+    // changedAtAll |= RVMRegisterLinearizer::linearize(program);
 
     // Repeat until no changes are made
     while (true) {
@@ -29,7 +29,7 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
         changedAtAll |= RVMRegisterAllocator::allocate(program);
 
     // Apply register linearization at the end (syntax-only pass)
-    changedAtAll |= RVMRegisterLinearizer::linearize(program);
+    // changedAtAll |= RVMRegisterLinearizer::linearize(program);
 
     return changedAtAll;
 }

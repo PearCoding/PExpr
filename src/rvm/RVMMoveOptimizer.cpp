@@ -110,9 +110,9 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
             if (isMovInstruction(instr.get())) {
                 auto* movInstr = static_cast<const RVMInstr2Op*>(instr.get());
                 if (!isIdentityMov(movInstr)) {
-                    auto srcs = movInstr->srcs();
-                    if (srcs.size() == 1 && srcs[0].isRegister())
-                        movSourceAtStart[globalIdx] = srcs[0].regId();
+                    const RVMValue& src = movInstr->source();
+                    if (src.isRegister())
+                        movSourceAtStart[globalIdx] = src.regId();
                 }
             }
         }
@@ -151,9 +151,9 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
         auto blockIt = indexToBlockLocal.find(startIdx);
         if (blockIt == indexToBlockLocal.end())
             continue;
-        auto [bIdx, lIdx] = blockIt->second;
-        auto* movInstr    = static_cast<RVMInstr2Op*>(mutableBlocks[bIdx][lIdx].get());
-        RVMValue srcValue = movInstr->srcs()[0];
+        auto [bIdx, lIdx]        = blockIt->second;
+        auto* movInstr           = static_cast<RVMInstr2Op*>(mutableBlocks[bIdx][lIdx].get());
+        const RVMValue& srcValue = movInstr->source();
 
         if (srcValue.isRegister()) {
             RegId srcReg = srcValue.regId();
@@ -186,9 +186,8 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
                 // Check if this instruction uses dstReg
                 bool usesDstReg = false;
                 instr->forEachValue([&](const RVMValue& value) {
-                    if (value.isRegister() && value.regId() == dstReg) {
+                    if (value.isRegister() && value.regId() == dstReg)
                         usesDstReg = true;
-                    }
                 });
 
                 if (usesDstReg && !isMovInstruction(instr.get())) {
@@ -201,10 +200,10 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
         if (allUsesAreMovs) {
             // This interval can be collapsed
             // We need the srcValue again
-            auto blockItInner   = indexToBlockLocal.find(startIdx);
-            auto [bIdx, lIdx]   = blockItInner->second;
-            auto* movInstrInner = static_cast<RVMInstr2Op*>(mutableBlocks[bIdx][lIdx].get());
-            RVMValue srcValue   = movInstrInner->srcs()[0];
+            auto blockItInner        = indexToBlockLocal.find(startIdx);
+            auto [bIdx, lIdx]        = blockItInner->second;
+            auto* movInstrInner      = static_cast<RVMInstr2Op*>(mutableBlocks[bIdx][lIdx].get());
+            const RVMValue& srcValue = movInstrInner->source();
 
             // For simplification, we'll store the source register if it is one,
             // or we'll need a different way to handle constants.
@@ -323,14 +322,8 @@ bool RVMMoveOptimizer::isIdentityMov(const RVMInstr2Op* movInstr)
     if (movInstr->opcode() != Opcode::MOV)
         return false;
 
-    auto dstOpt = movInstr->dst();
-    auto srcs   = movInstr->srcs();
-
-    PEXPR_ASSERT(dstOpt.has_value(), "'mov' instruction must have a target destination");
-    PEXPR_ASSERT(srcs.size() == 1, "'mov' instruction must have a single source");
-
-    const RVMValue& dst = dstOpt.value();
-    const RVMValue& src = srcs[0];
+    const RVMValue& dst = movInstr->destination();
+    const RVMValue& src = movInstr->source();
 
     return dst == src;
 }
@@ -375,7 +368,7 @@ void RVMMoveOptimizer::removeRedundantMovesInBlock(
         // Get the destination register
         RegId destReg = 0;
         bool hasDest  = false;
-        instr->forDestination([&](const RVMValue& dstVal) {
+        instr->forEachDestination([&](const RVMValue& dstVal) {
             if (dstVal.isRegister()) {
                 destReg = dstVal.regId();
                 hasDest = true;

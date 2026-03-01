@@ -43,7 +43,7 @@ ValueVariant RVMInterpreter::execute(const RVMProgram& program, const type::Type
         }
 
         if (auto* branch = dynamic_cast<RVMInstrBranch*>(instr.get())) {
-            auto cond         = evaluateValue(branch->srcs()[0]);
+            auto cond         = evaluateValue(branch->condition());
             bool shouldBranch = false;
 
             if (branch->opcode() == Opcode::JZ)
@@ -100,29 +100,28 @@ ValueVariant RVMInterpreter::execute(const RVMProgram& program, const type::Type
         }
 
         if (auto* strLit = dynamic_cast<RVMInstrStringLiteral*>(instr.get())) {
-            stringTable[strLit->dst().value().stringId()] = strLit->stringValue();
+            stringTable[strLit->destination().stringId()] = strLit->stringValue();
             pc++;
             continue;
         }
 
         if (auto* mov = dynamic_cast<RVMInstr2Op*>(instr.get())) {
+            ValueVariant srcVal = evaluateValue(mov->source());
             if (mov->opcode() == Opcode::MOV) {
-                ValueVariant srcVal = evaluateValue(mov->srcs()[0]);
-                setRegister(mov->dst().value(), srcVal);
+                setRegister(mov->destination(), srcVal);
             } else {
-                ValueVariant srcVal = evaluateValue(mov->srcs()[0]);
                 ValueVariant result = applyUnaryOp(mov->opcode(), srcVal);
-                setRegister(mov->dst().value(), result);
+                setRegister(mov->destination(), result);
             }
             pc++;
             continue;
         }
 
         if (auto* arith = dynamic_cast<RVMInstr3Op*>(instr.get())) {
-            ValueVariant src1   = evaluateValue(arith->srcs()[0]);
-            ValueVariant src2   = evaluateValue(arith->srcs()[1]);
+            ValueVariant src1   = evaluateValue(arith->source1());
+            ValueVariant src2   = evaluateValue(arith->source2());
             ValueVariant result = applyBinaryOp(arith->opcode(), src1, src2);
-            setRegister(arith->dst().value(), result);
+            setRegister(arith->destination(), result);
             pc++;
             continue;
         }

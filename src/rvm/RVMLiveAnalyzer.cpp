@@ -85,11 +85,14 @@ void RVMLiveAnalyzer::processInstruction(
 {
     bool isNonMove = instr->opcode() != Opcode::MOV;
 
+    // A call or return pins its registers according to the calling convention
+    bool pins = (instr->opcode() == Opcode::CALL_EXTERNAL || instr->opcode() == Opcode::CALL_INTERNAL || instr->opcode() == Opcode::RET);
+
     // Check destination register (definition)
-    instr->forDestination([&](const RVMValue& dstVal) {
+    instr->forEachDestination([&](const RVMValue& dstVal) {
         if (dstVal.isRegister()) {
             RegId reg = dstVal.regId();
-            processRegDef(reg, index, activeIntervals, allIntervals, false);
+            processRegDef(reg, index, activeIntervals, allIntervals, pins);
             if (isNonMove)
                 activeIntervals[reg].HasNonMoveUsage = true;
         }
@@ -99,35 +102,13 @@ void RVMLiveAnalyzer::processInstruction(
     instr->forEachSource([&](const RVMValue& srcVal) {
         if (srcVal.isRegister()) {
             RegId reg = srcVal.regId();
-            processRegUse(reg, index, activeIntervals, false);
+            processRegUse(reg, index, activeIntervals, pins);
             if (isNonMove) {
                 if (auto it = activeIntervals.find(reg); it != activeIntervals.end())
                     it->second.HasNonMoveUsage = true;
             }
         }
     });
-
-    // Return instruction is a use-position for the n-count registers
-    if (auto ret = dynamic_cast<RVMInstrReturn*>(instr.get())) {
-        for (RegId reg = 0; reg < ret->returnCount(); ++reg) {
-            processRegUse(reg, index, activeIntervals, true);
-            if (auto it = activeIntervals.find(reg); it != activeIntervals.end())
-                it->second.HasNonMoveUsage = true;
-        }
-    }
-
-    // Call instruction uses and modifies registers
-    if (auto call = dynamic_cast<RVMInstrCall*>(instr.get())) {
-        for (RegId reg = 0; reg < call->parameterCount(); ++reg) {
-            processRegUse(reg, index, activeIntervals, true);
-            if (auto it = activeIntervals.find(reg); it != activeIntervals.end())
-                it->second.HasNonMoveUsage = true;
-        }
-        for (RegId reg = 0; reg < call->returnCount(); ++reg) {
-            processRegDef(reg, index, activeIntervals, allIntervals, true);
-            activeIntervals[reg].HasNonMoveUsage = true;
-        }
-    }
 }
 
 void RVMLiveAnalyzer::processRegUse(RegId reg, size_t index,
@@ -194,26 +175,10 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
                         blockUses.insert(reg);
                 }
             });
-            instr->forDestination([&](const RVMValue& dstVal) {
-                if (dstVal.isRegister()) {
-                    RegId reg = dstVal.regId();
-                    blockDefs.insert(reg);
-                }
+            instr->forEachDestination([&](const RVMValue& dstVal) {
+                if (dstVal.isRegister())
+                    blockDefs.insert(dstVal.regId());
             });
-            if (auto ret = dynamic_cast<const RVMInstrReturn*>(instr.get())) {
-                for (RegId reg = 0; reg < ret->returnCount(); ++reg) {
-                    if (blockDefs.find(reg) == blockDefs.end())
-                        blockUses.insert(reg);
-                }
-            }
-            if (auto call = dynamic_cast<const RVMInstrCall*>(instr.get())) {
-                for (RegId reg = 0; reg < call->parameterCount(); ++reg) {
-                    if (blockDefs.find(reg) == blockDefs.end())
-                        blockUses.insert(reg);
-                }
-                for (RegId reg = 0; reg < call->returnCount(); ++reg)
-                    blockDefs.insert(reg);
-            }
         }
         useSets[blockIdx] = blockUses;
         defSets[blockIdx] = blockDefs;
@@ -223,7 +188,7 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
     bool changed;
     do {
         changed = false;
-        for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
+        for (int blockIdx = static_cast<int>(blocks.size()) - 1; blockIdx >= 0; --blockIdx) {
             std::unordered_set<RegId> newLiveOut;
             auto successors = RVMBasicBlockAnalyzer::getSuccessors(blocks[blockIdx]);
             for (const auto& label : successors) {
@@ -245,7 +210,7 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
                 if (dynamic_cast<const RVMInstrJump*>(last) || dynamic_cast<const RVMInstrReturn*>(last))
                     canFallThrough = false;
             }
-            if (canFallThrough && blockIdx + 1 < blocks.size()) {
+            if (canFallThrough && static_cast<size_t>(blockIdx) + 1 < blocks.size()) {
                 for (RegId reg : liveIn[blockIdx + 1])
                     newLiveOut.insert(reg);
             }

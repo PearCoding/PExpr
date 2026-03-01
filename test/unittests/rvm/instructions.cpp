@@ -24,12 +24,9 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         auto instr = std::make_shared<RVMInstr3Op>(Opcode::ADD, dst, src1, src2);
 
         REQUIRE(instr->opcode() == Opcode::ADD);
-        REQUIRE(instr->dst().value() == dst);
-
-        auto srcs = instr->srcs();
-        REQUIRE(srcs.size() == 2);
-        REQUIRE(srcs[0] == src1);
-        REQUIRE(srcs[1] == src2);
+        REQUIRE(instr->destination() == dst);
+        REQUIRE(instr->source1() == src1);
+        REQUIRE(instr->source2() == src2);
     }
 
     SECTION("Move instruction")
@@ -40,11 +37,8 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         auto instr = std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src);
 
         REQUIRE(instr->opcode() == Opcode::MOV);
-        REQUIRE(instr->dst().value() == dst);
-
-        auto srcs = instr->srcs();
-        REQUIRE(srcs.size() == 1);
-        REQUIRE(srcs[0] == src);
+        REQUIRE(instr->destination() == dst);
+        REQUIRE(instr->source() == src);
     }
 
     SECTION("Branch instruction")
@@ -53,11 +47,7 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         auto instr   = std::make_shared<RVMInstrBranch>(Opcode::JZ, src, "target_label");
 
         REQUIRE(instr->opcode() == Opcode::JZ);
-        REQUIRE_FALSE(instr->dst().has_value());
-
-        auto srcs = instr->srcs();
-        REQUIRE(srcs.size() == 1);
-        REQUIRE(srcs[0] == src);
+        REQUIRE(instr->condition() == src);
         REQUIRE(instr->targetLabel() == "target_label");
     }
 
@@ -66,8 +56,6 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         auto instr = std::make_shared<RVMInstrJump>("loop_start");
 
         REQUIRE(instr->opcode() == Opcode::JMP);
-        REQUIRE_FALSE(instr->dst().has_value());
-        REQUIRE(instr->srcs().empty());
         REQUIRE(instr->targetLabel() == "loop_start");
     }
 
@@ -76,8 +64,6 @@ TEST_CASE("RVMInstructions: creation and properties", "[rvm][instructions]")
         auto instr = std::make_shared<RVMInstrLabel>("my_label");
 
         REQUIRE(instr->labelName() == "my_label");
-        REQUIRE_FALSE(instr->dst().has_value());
-        REQUIRE(instr->srcs().empty());
     }
 }
 
@@ -107,7 +93,7 @@ TEST_CASE("RVMInstructions: all arithmetic operations", "[rvm][instructions]")
         for (auto op : ops) {
             auto instr = std::make_shared<RVMInstr3Op>(op, dst, src1, src2);
             REQUIRE(instr->opcode() == op);
-            REQUIRE(instr->dst().value() == dst);
+            REQUIRE(instr->destination() == dst);
         }
     }
 }
@@ -120,8 +106,6 @@ TEST_CASE("RVMInstructions: call instructions", "[rvm][instructions][calling]")
 
         REQUIRE(instr->opcode() == Opcode::CALL_INTERNAL);
         REQUIRE(instr->functionName() == "my_function");
-        REQUIRE_FALSE(instr->dst().has_value());
-        REQUIRE(instr->srcs().empty());
     }
 
     SECTION("Internal call serialization")

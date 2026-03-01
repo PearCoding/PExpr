@@ -223,36 +223,26 @@ void RVMSerializer::write(std::ostream& os, const RVMValue& value)
 void RVMSerializer::write2Op(std::ostream& os, const RVMInstr2Op& instr)
 {
     os << opcodeToString(instr.opcode()) << " ";
-    write(os, instr.dst().value());
+    write(os, instr.destination());
     os << " ";
-
-    auto srcs = instr.srcs();
-    if (!srcs.empty())
-        write(os, srcs[0]);
+    write(os, instr.source());
 }
 
 void RVMSerializer::write3Op(std::ostream& os, const RVMInstr3Op& instr)
 {
     os << opcodeToString(instr.opcode()) << " ";
-    write(os, instr.dst().value());
+    write(os, instr.destination());
     os << " ";
-
-    auto srcs = instr.srcs();
-    if (srcs.size() >= 1)
-        write(os, srcs[0]);
-    if (srcs.size() >= 2) {
-        os << " ";
-        write(os, srcs[1]);
-    }
+    write(os, instr.source1());
+    os << " ";
+    write(os, instr.source2());
 }
 
 void RVMSerializer::writeBranch(std::ostream& os, const RVMInstrBranch& instr)
 {
     os << opcodeToString(instr.opcode()) << " ";
     os << instr.targetLabel() << " ";
-    auto srcs = instr.srcs();
-    if (!srcs.empty())
-        write(os, srcs[0]);
+    write(os, instr.condition());
 }
 
 void RVMSerializer::writeJump(std::ostream& os, const RVMInstrJump& instr)
@@ -287,7 +277,7 @@ void RVMSerializer::writeReturn(std::ostream& os, const RVMInstrReturn& instr)
 void RVMSerializer::writeStringLiteral(std::ostream& os, const RVMInstrStringLiteral& instr)
 {
     os << "load_string ";
-    write(os, instr.dst().value());
+    write(os, instr.destination());
     os << " \"" << utils::escapeString(instr.stringValue()) << "\"";
 }
 

@@ -200,10 +200,8 @@ TEST_CASE("RVMSerializer: load_string instruction support", "[rvm][serializer][l
         auto instr   = std::make_shared<RVMInstrStringLiteral>(dst, "Hello, World!");
 
         REQUIRE(instr->opcode() == Opcode::LOAD_STRING);
-        REQUIRE(instr->dst().has_value());
-        REQUIRE(instr->dst().value() == dst);
+        REQUIRE(instr->destination() == dst);
         REQUIRE(instr->stringValue() == "Hello, World!");
-        REQUIRE(instr->srcs().empty());
     }
 
     SECTION("String literal instruction serialization")
@@ -244,11 +242,10 @@ TEST_CASE("RVMSerializer: load_string instruction support", "[rvm][serializer][l
         REQUIRE(strInstr != nullptr);
         REQUIRE(strInstr->opcode() == Opcode::LOAD_STRING);
 
-        auto dstOpt = strInstr->dst();
-        REQUIRE(dstOpt.has_value());
-        REQUIRE(dstOpt.value().isStringRef());
-        REQUIRE(dstOpt.value().stringId() == 0);
-        REQUIRE(dstOpt.value().type() == Type(TypeKind::String));
+        const RVMValue& dst = strInstr->destination();
+        REQUIRE(dst.isStringRef());
+        REQUIRE(dst.stringId() == 0);
+        REQUIRE(dst.type() == Type(TypeKind::String));
 
         REQUIRE(strInstr->stringValue() == "Hello, World!");
     }
@@ -263,11 +260,10 @@ TEST_CASE("RVMSerializer: load_string instruction support", "[rvm][serializer][l
         REQUIRE(strInstr != nullptr);
         REQUIRE(strInstr->opcode() == Opcode::LOAD_STRING);
 
-        auto dstOpt = strInstr->dst();
-        REQUIRE(dstOpt.has_value());
-        REQUIRE(dstOpt.value().isStringRef());
-        REQUIRE(dstOpt.value().stringId() == 1);
-        REQUIRE(dstOpt.value().type() == Type(TypeKind::String));
+        const RVMValue& dst = strInstr->destination();
+        REQUIRE(dst.isStringRef());
+        REQUIRE(dst.stringId() == 1);
+        REQUIRE(dst.type() == Type(TypeKind::String));
 
         REQUIRE(strInstr->stringValue() == "He said: \"Hello!\"");
     }
@@ -292,8 +288,7 @@ TEST_CASE("RVMSerializer: load_string instruction support", "[rvm][serializer][l
 
         // Verify properties match
         REQUIRE(strInstr->opcode() == Opcode::LOAD_STRING);
-        REQUIRE(strInstr->dst().has_value());
-        REQUIRE(strInstr->dst().value() == dst);
+        REQUIRE(strInstr->destination() == dst);
         REQUIRE(strInstr->stringValue() == testString);
     }
 }
@@ -314,8 +309,8 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
         auto* parsedInstr = dynamic_cast<RVMInstr2Op*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::MOV);
-        REQUIRE(parsedInstr->dst().value() == dst);
-        REQUIRE(parsedInstr->srcs()[0] == src);
+        REQUIRE(parsedInstr->destination() == dst);
+        REQUIRE(parsedInstr->source() == src);
     }
 
     SECTION("3-operand instruction roundtrip")
@@ -333,9 +328,9 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
         auto* parsedInstr = dynamic_cast<RVMInstr3Op*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::ADD);
-        REQUIRE(parsedInstr->dst().value() == dst);
-        REQUIRE(parsedInstr->srcs()[0] == src1);
-        REQUIRE(parsedInstr->srcs()[1] == src2);
+        REQUIRE(parsedInstr->destination() == dst);
+        REQUIRE(parsedInstr->source1() == src1);
+        REQUIRE(parsedInstr->source2() == src2);
     }
 
     SECTION("Branch instruction roundtrip")
@@ -352,7 +347,7 @@ TEST_CASE("RVMSerializer: comprehensive roundtrip tests", "[rvm][serializer][rou
         auto* parsedInstr = dynamic_cast<RVMInstrBranch*>(parsed.get());
         REQUIRE(parsedInstr != nullptr);
         REQUIRE(parsedInstr->opcode() == Opcode::JZ);
-        REQUIRE(parsedInstr->srcs()[0] == src);
+        REQUIRE(parsedInstr->condition() == src);
         REQUIRE(parsedInstr->targetLabel() == label);
     }
 
