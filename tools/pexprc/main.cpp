@@ -121,9 +121,10 @@ int main(int argc, char** argv)
     app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
     app.add_flag("--opt-dissolve-tuples,!--no-opt-dissolve-tuples", optimizationOptions.DissolveTuples, "Dissolve tuples");
-    app.add_flag("--opt-rvm-moves,!--no-opt-rvm-moves", optimizationOptions.OptimizeMoveChains, "Optimize RVM move instructions (identity mov elimination)");
+    app.add_flag("--opt-rvm-identity-moves,!--no-opt-rvm-identity-moves", optimizationOptions.OptimizeIdentityMoves, "Optimize RVM identity moves (redundant code)");
+    app.add_flag("--opt-rvm-move-chains,!--no-opt-rvm-move-chains", optimizationOptions.OptimizeMoveChains, "Optimize RVM move chains");
     app.add_flag("--opt-rvm-redundant-moves,!--no-opt-rvm-redundant-moves", optimizationOptions.OptimizeRedundantMoves, "Eliminate redundant MOV instructions in RVM");
-    app.add_flag("--opt-register-allocation,!--no-opt-register-allocation", optimizationOptions.EnableRegisterAllocation, "Enable register allocation to minimize register count");
+    app.add_flag("--opt-rvm-register-allocation,!--no-opt-rvm-register-allocation", optimizationOptions.EnableRegisterAllocation, "Enable register allocation to minimize register count");
 
     bool skipOptimizationPass = false;
     app.add_flag("--skip-optimization", skipOptimizationPass, "Skip the optimization pass. Not recommended");
