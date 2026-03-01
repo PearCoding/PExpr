@@ -99,7 +99,7 @@ void RVMRegisterAllocator::linearScanAllocate(std::vector<InternalLiveInterval>&
 
     for (auto& interval : intervals) {
         // If the register is pinned inside the interval, we can't do much
-        if (interval.Interval.HasPinned)
+        if (interval.Interval.isPinned())
             continue;
 
         // Expire old intervals (end <= start means interval is no longer live)

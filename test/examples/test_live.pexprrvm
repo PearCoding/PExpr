@@ -1,0 +1,9 @@
+mov %r0:int 10:int
+jz label1 %r0:int
+mov %r1:int 20:int
+jmp label2
+label1:
+mov %r1:int 30:int
+label2:
+add %r2:int %r1:int %r1:int
+ret 1

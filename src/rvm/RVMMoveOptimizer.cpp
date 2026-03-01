@@ -137,7 +137,7 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
             continue;
 
         // Already pinned intervals cannot be collapsed
-        if (interval.HasPinned)
+        if (interval.isPinned())
             continue;
 
         // Skip redundant intervals (Start == End means no uses)
@@ -167,7 +167,7 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
                 }
             }
 
-            if (!srcInterval || srcInterval->HasPinned)
+            if (!srcInterval || srcInterval->isPinned())
                 continue;
         }
 

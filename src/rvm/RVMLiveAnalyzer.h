@@ -16,22 +16,28 @@ class RVMLiveAnalyzer {
 public:
     /// Live interval of a register
     struct LiveInterval {
-        RegId Register = 0;
-        size_t Start   = 0;     // Instruction index where defined (or block start if live-in)
-        size_t End     = 0;     // Instruction index of last use
-        bool HasPinned = false; // Is the register inside this interval pinned?
+        RegId Register       = 0;
+        size_t Start         = 0;     // Instruction index where defined (or block start if live-in)
+        size_t End           = 0;     // Instruction index of last use
+        bool PinnedStart     = false; // Is the start of the interval pinned (e.g., return value of a call)?
+        bool PinnedEnd       = false; // Is the end of the interval pinned (e.g., parameter of a call)?
+        bool HasNonMoveUsage = false; // Does the interval contain any non-move instruction usage?
 
         LiveInterval() = default;
-        LiveInterval(RegId r, size_t s, size_t e, bool pinned)
+        LiveInterval(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nonMove)
             : Register(r)
             , Start(s)
             , End(e)
-            , HasPinned(pinned)
+            , PinnedStart(pStart)
+            , PinnedEnd(pEnd)
+            , HasNonMoveUsage(nonMove)
         {
         }
 
         /// Returns true when the interval is not used and is not associated with a pinned register
-        [[nodiscard]] inline bool isRedundant() const { return Start == End && !HasPinned; }
+        [[nodiscard]] inline bool isRedundant() const { return Start == End && !PinnedStart && !PinnedEnd; }
+        /// Returns true when the interval is pinned (either start or end)
+        [[nodiscard]] inline bool isPinned() const { return PinnedStart || PinnedEnd; }
     };
 
     /// Analyze live intervals for registers in a block.

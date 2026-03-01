@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -23,6 +24,7 @@
 
 using namespace PExpr::rvm;
 
+// Visual symbols for CLI
 static const std::u8string RangeStartSymbol  = u8"▄";
 static const std::u8string RangeMiddleSymbol = u8"█";
 static const std::u8string RangeEndSymbol    = u8"▀";
@@ -31,308 +33,357 @@ static const std::u8string RangeSingleSymbol = u8"○";
 // Helper to get register name from register ID
 std::string regName(RegId reg)
 {
-    std::stringstream ss;
-    ss << "%r" << reg;
-    return ss.str();
+    return "%r" + std::to_string(reg);
 }
 
-// Visualize live intervals in ASCII with rows as instructions and columns as registers
-void visualizeLiveIntervals(const std::vector<std::shared_ptr<RVMInstr>>& program,
-                            const RVMBasicBlockAnalyzer::BlockList& blocks,
-                            const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
-{
-    if (program.empty()) {
-        std::cout << "Empty program" << std::endl;
-        return;
+/**
+ * @brief Simple utility for constructing tables in terminal
+ */
+class TerminalTable {
+public:
+    struct Column {
+        std::string Header;
+        size_t Width    = 0;
+        bool RightAlign = false;
+    };
+
+    struct Row {
+        std::vector<std::string> Data;
+        bool IsSeparator = false;
+    };
+
+    void addColumn(const std::string& header, bool rightAlign = false, size_t minWidth = 0)
+    {
+        mColumns.push_back({ header, std::max(header.length(), minWidth), rightAlign });
     }
 
-    // Find max register for display
-    RegId maxReg = 0;
-    for (const auto& interval : intervals)
-        maxReg = std::max(maxReg, interval.Register);
+    void addRow(const std::vector<std::string>& row)
+    {
+        mRows.push_back({ row, false });
+        for (size_t i = 0; i < std::min(row.size(), mColumns.size()); ++i)
+            mColumns[i].Width = std::max(mColumns[i].Width, countVisibleCharacters(row[i]));
+    }
 
-    // Find max instruction index
-    size_t maxIdx = program.size();
+    void addSeparator()
+    {
+        mRows.push_back({ {}, true });
+    }
 
-    // Build a grid: rows = instruction positions, columns = registers
-    std::vector<std::vector<std::u8string>> grid(maxIdx, std::vector<std::u8string>(maxReg + 1, u8" "));
-    std::vector<std::vector<bool>> pinned(maxIdx, std::vector<bool>(maxReg + 1, false));
+    void print(std::ostream& os, bool headers = true, bool borders = true) const
+    {
+        if (mColumns.empty())
+            return;
 
-    // Determine which block each instruction belongs to
-    std::vector<size_t> instructionToBlock(maxIdx, 0);
-    size_t currentIdx = 0;
-    for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
-        for (size_t i = 0; i < blocks[blockIdx].size(); ++i) {
-            if (currentIdx < maxIdx) {
-                instructionToBlock[currentIdx] = blockIdx;
-                currentIdx++;
+        if (borders)
+            printSeparator(os);
+
+        if (headers) {
+            if (borders)
+                os << "| ";
+            for (size_t i = 0; i < mColumns.size(); ++i) {
+                printCell(os, mColumns[i].Header, mColumns[i]);
+                if (borders)
+                    os << (i == mColumns.size() - 1 ? " |" : " | ");
+                else if (i < mColumns.size() - 1)
+                    os << " ";
+            }
+            os << "\n";
+            if (borders)
+                printSeparator(os);
+        }
+
+        // Print rows
+        for (const auto& rowEntry : mRows) {
+            if (rowEntry.IsSeparator) {
+                printSeparator(os, "\033[1;33m-\033[0m", "\033[1;33m+\033[0m");
+            } else {
+                if (borders)
+                    os << "| ";
+                for (size_t i = 0; i < mColumns.size(); ++i) {
+                    std::string val = (i < rowEntry.Data.size()) ? rowEntry.Data[i] : "";
+                    printCell(os, val, mColumns[i]);
+                    if (borders)
+                        os << (i == mColumns.size() - 1 ? " |" : " | ");
+                    else if (i < mColumns.size() - 1)
+                        os << " ";
+                }
+                os << "\n";
+            }
+        }
+        if (borders)
+            printSeparator(os);
+    }
+
+private:
+    void printCell(std::ostream& os, const std::string& text, const Column& col) const
+    {
+        size_t visibleLen = countVisibleCharacters(text);
+        size_t padding    = (col.Width > visibleLen) ? col.Width - visibleLen : 0;
+
+        if (col.RightAlign)
+            os << std::string(padding, ' ') << text;
+        else
+            os << text << std::string(padding, ' ');
+    }
+
+    static size_t countVisibleCharacters(const std::string& s)
+    {
+        size_t count = 0;
+        bool inEsc   = false;
+        for (size_t i = 0; i < s.length(); ++i) {
+            if (s[i] == '\033') {
+                inEsc = true;
+            } else if (inEsc && s[i] == 'm') {
+                inEsc = false;
+            } else if (!inEsc) {
+                if ((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    void printSeparator(std::ostream& os, const std::string& charOverride = "-", const std::string& crossOverride = "+") const
+    {
+        for (size_t i = 0; i < mColumns.size(); ++i) {
+            for (size_t j = 0; j < mColumns[i].Width; ++j) {
+                if (i == 0 && j == 0)
+                    os << crossOverride;
+                else
+                    os << charOverride;
+            }
+            os << crossOverride;
+        }
+        os << "\n";
+    }
+
+    std::vector<Column> mColumns;
+    std::vector<Row> mRows;
+};
+
+class RVMLiveVisualizer {
+public:
+    RVMLiveVisualizer(const RVMProgram& program, const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
+        : mProgram(program)
+        , mIntervals(intervals)
+    {
+        mBlocks = RVMBasicBlockAnalyzer::splitIntoBlocks(program);
+        mMaxIndex = program.size();
+
+        for (const auto& interval : intervals)
+            mUsedRegisters.insert(interval.Register);
+
+        // Map instruction index to block index
+        mInstructionToBlock.resize(mMaxIndex, 0);
+        size_t currentIdx = 0;
+        for (size_t bIdx = 0; bIdx < mBlocks.size(); ++bIdx) {
+            for (size_t i = 0; i < mBlocks[bIdx].size(); ++i) {
+                if (currentIdx < mMaxIndex) {
+                    mInstructionToBlock[currentIdx] = bIdx;
+                    currentIdx++;
+                }
             }
         }
     }
 
-    // Fill the grid
-    for (const auto& interval : intervals) {
-        if (interval.isRedundant())
-            continue; // Skip redundant intervals
-
-        RegId reg = interval.Register;
-        for (size_t pos = interval.Start; pos <= interval.End && pos < maxIdx; ++pos) {
-            if (interval.Start == interval.End)
-                grid[pos][reg] = RangeSingleSymbol; // Single point interval
-            else if (pos == interval.Start)
-                grid[pos][reg] = RangeStartSymbol; // Start
-            else if (pos == interval.End)
-                grid[pos][reg] = RangeEndSymbol; // End
-            else
-                grid[pos][reg] = RangeMiddleSymbol; // Middle
-
-            if (interval.HasPinned)
-                pinned[pos][reg] = true;
+    void visualizeASCII(std::ostream& os) const
+    {
+        if (mProgram.empty()) {
+            os << "Empty program\n";
+            return;
         }
+
+        os << "Live Intervals Visualization:\n"
+           << std::string(29, '=') << "\n\n";
+
+        TerminalTable table;
+        table.addColumn("Blk", true, 2);
+        table.addColumn("Idx", true, 3);
+        for (RegId r : mUsedRegisters)
+            table.addColumn(regName(r), false, 3);
+        table.addColumn("Instruction");
+
+        // Cell symbols with colors
+        auto getCellStr = [&](RegId r, size_t pos) -> std::string {
+            struct GridCell {
+                std::u8string Symbol = u8" ";
+                bool Pinned          = false;
+                bool NonMove         = false;
+            } cell;
+
+            for (const auto& interval : mIntervals) {
+                if (interval.Register == r && pos >= interval.Start && pos <= interval.End) {
+                    if (interval.Start == interval.End)
+                        cell.Symbol = RangeSingleSymbol;
+                    else if (pos == interval.Start)
+                        cell.Symbol = RangeStartSymbol;
+                    else if (pos == interval.End)
+                        cell.Symbol = RangeEndSymbol;
+                    else
+                        cell.Symbol = RangeMiddleSymbol;
+
+                    if ((pos == interval.Start && interval.PinnedStart) || (pos == interval.End && interval.PinnedEnd))
+                        cell.Pinned = true;
+                    if (interval.HasNonMoveUsage)
+                        cell.NonMove = true;
+                    break;
+                }
+            }
+
+            std::stringstream ss;
+            ss << " ";
+            if (cell.Pinned)
+                ss << "\033[1;31m" << (const char*)cell.Symbol.c_str() << "\033[0m";
+            else if (cell.NonMove)
+                ss << "\033[1;32m" << (const char*)cell.Symbol.c_str() << "\033[0m";
+            else if (cell.Symbol != u8" ")
+                ss << "\033[1;34m" << (const char*)cell.Symbol.c_str() << "\033[0m";
+            else
+                ss << " ";
+
+            return ss.str();
+        };
+
+        for (size_t i = 0; i < mMaxIndex; ++i) {
+            if (i > 0 && mInstructionToBlock[i] != mInstructionToBlock[i - 1])
+                table.addSeparator();
+
+            std::vector<std::string> row;
+            row.push_back(std::to_string(mInstructionToBlock[i]));
+            row.push_back(std::to_string(i));
+            for (RegId r : mUsedRegisters)
+                row.push_back(getCellStr(r, i));
+
+            std::stringstream instr_ss;
+            printInstruction(instr_ss, i);
+            row.push_back(instr_ss.str());
+            table.addRow(row);
+        }
+
+        table.print(os, true, false);
+        printLegend(os);
     }
 
-    // Print header
-    std::cout << "Live Intervals Visualization:" << std::endl
-              << "=============================" << std::endl
-              << std::endl;
+    void printTable(std::ostream& os) const
+    {
+        TerminalTable table;
+        table.addColumn("Register");
+        table.addColumn("Start", true);
+        table.addColumn("End", true);
+        table.addColumn("Length", true);
+        table.addColumn("Flags");
 
-    // Print register header with block column
-    std::cout << "Blk         ";
-    for (RegId reg = 0; reg <= maxReg; ++reg)
-        std::cout << std::setw(3) << regName(reg) << " ";
-    std::cout << std::endl;
+        for (const auto& interval : mIntervals) {
+            std::string flags;
+            if (interval.PinnedStart)
+                flags += "P-Start ";
+            if (interval.PinnedEnd)
+                flags += "P-End ";
+            if (interval.HasNonMoveUsage)
+                flags += "Non-Move ";
+            if (flags.empty())
+                flags = "-";
 
-    std::cout << "---         ";
-    for (RegId reg = 0; reg <= maxReg; ++reg)
-        std::cout << "----";
-    std::cout << std::endl;
-
-    // Print instruction rows with block indicator
-    size_t currentBlock = 0;
-    for (size_t i = 0; i < maxIdx; ++i) {
-        // Show block change
-        if (i == 0 || instructionToBlock[i] != instructionToBlock[i - 1]) {
-            currentBlock = instructionToBlock[i];
-            if (i > 0) {
-                std::cout << "   \033[1;33m---------";
-                for (RegId reg = 0; reg <= maxReg; ++reg)
-                    std::cout << "----";
-                std::cout << "\033[0m" << std::endl;
-            }
+            table.addRow({ regName(interval.Register),
+                           std::to_string(interval.Start),
+                           std::to_string(interval.End),
+                           std::to_string(interval.End - interval.Start + 1),
+                           flags });
         }
+        os << "Total Intervals: " << mIntervals.size() << "\n";
+        table.print(os);
+    }
 
-        std::cout << std::setw(3) << currentBlock << " " << std::setw(3) << i << ":     ";
+    void printStatistics(std::ostream& os) const
+    {
+        os << "\nGeneral Statistics:\n"
+           << std::string(19, '=') << "\n"
+           << "Instructions:     " << mMaxIndex << "\n"
+           << "Basic blocks:     " << mBlocks.size() << "\n"
+           << "Pinned intervals: " << std::count_if(mIntervals.begin(), mIntervals.end(), [](auto& i) { return i.isPinned(); }) << "\n";
 
-        for (RegId reg = 0; reg <= maxReg; ++reg) {
-            auto sym = grid[i][reg];
-            if (pinned[i][reg])
-                std::cout << "\033[1;31m" << (const char*)sym.c_str() << "\033[0m" << "   "; // Red for pinned
-            else if (sym != u8" ")
-                std::cout << "\033[1;32m" << (const char*)sym.c_str() << "\033[0m" << "   "; // Green for normal
-            else
-                std::cout << "    ";
+        std::vector<size_t> liveAtPos(mMaxIndex, 0);
+        for (const auto& i : mIntervals) {
+            for (size_t p = i.Start; p <= i.End && p < mMaxIndex; ++p)
+                liveAtPos[p]++;
         }
+        auto maxLive = liveAtPos.empty() ? 0 : *std::max_element(liveAtPos.begin(), liveAtPos.end());
+        os << "Max simultaneously live: " << maxLive << "\n";
+    }
 
-        // Print instruction text
-        auto& instr = program[i];
-        std::cout << "  ";
-        if (auto* label = dynamic_cast<RVMInstrLabel*>(instr.get())) {
-            std::cout << label->labelName() << ":";
-        } else if (auto* comment = dynamic_cast<RVMInstrComment*>(instr.get())) {
-            std::cout << "// " << comment->message();
-        } else {
+private:
+    void printInstruction(std::ostream& os, size_t idx) const
+    {
+        auto& instr = mProgram[idx];
+        if (auto* label = dynamic_cast<RVMInstrLabel*>(instr.get()))
+            os << label->labelName() << ":";
+        else {
             std::stringstream ss;
             RVMSerializer::write(ss, *instr);
-            std::string line = ss.str();
-            // Truncate if too long
-            if (line.length() > 80)
-                line = line.substr(0, 77) + "...";
-            std::cout << line;
+            std::string s = ss.str();
+            if (s.length() > 60)
+                s = s.substr(0, 57) + "...";
+            os << s;
         }
-        std::cout << std::endl;
     }
 
-    std::cout << std::endl
-              << "Legend:" << std::endl
-              << "   \033[1;32m" << (const char*)RangeStartSymbol.c_str() << "\033[0m  - Interval start" << std::endl
-              << "   \033[1;32m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m  - Interval middle" << std::endl
-              << "   \033[1;32m" << (const char*)RangeEndSymbol.c_str() << "\033[0m  - Interval end" << std::endl
-              << "   \033[1;32m" << (const char*)RangeSingleSymbol.c_str() << "\033[0m  - Single-instruction interval" << std::endl
-              << "   \033[1;31m" << (const char*)RangeStartSymbol.c_str() << "\033[0m  - Pinned interval start" << std::endl
-              << "   \033[1;31m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m  - Pinned interval middle" << std::endl
-              << "   \033[1;31m" << (const char*)RangeEndSymbol.c_str() << "\033[0m  - Pinned interval end" << std::endl
-              << "  Blk - Basic block number" << std::endl
-              << std::endl;
-}
-
-// Print intervals in a table
-void printIntervalTable(const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
-{
-    std::cout << "Live Intervals:" << std::endl
-              << "===============" << std::endl
-              << std::left << std::setw(10) << "Register"
-              << std::setw(10) << "Start"
-              << std::setw(10) << "End"
-              << std::setw(15) << "Length"
-              << std::setw(10) << "Pinned"
-              << std::endl
-              << std::string(55, '-') << std::endl;
-
-    for (const auto& interval : intervals) {
-        std::cout << std::left << std::setw(10) << regName(interval.Register)
-                  << std::setw(10) << interval.Start
-                  << std::setw(10) << interval.End
-                  << std::setw(15) << (interval.End - interval.Start + 1)
-                  << std::setw(10) << (interval.HasPinned ? "Yes" : "No")
-                  << std::endl;
+    void printLegend(std::ostream& os) const
+    {
+        os << "\nLegend:\n"
+           << " \033[1;34m" << (const char*)RangeStartSymbol.c_str() << "\033[0m: Move-only  "
+           << " \033[1;32m" << (const char*)RangeStartSymbol.c_str() << "\033[0m*: Non-move usage "
+           << " \033[1;31m" << (const char*)RangeStartSymbol.c_str() << "\033[0m: Pinned (Param/Return)\n";
     }
-    std::cout << std::endl;
-}
+
+    const RVMProgram& mProgram;
+    const std::vector<RVMLiveAnalyzer::LiveInterval>& mIntervals;
+    RVMBasicBlockAnalyzer::BlockList mBlocks;
+    std::set<RegId> mUsedRegisters;
+    size_t mMaxIndex;
+    std::vector<size_t> mInstructionToBlock;
+};
 
 int main(int argc, char** argv)
 {
 #ifdef PEXPR_OS_WINDOWS
-    // Enable Unicode output on Windows
     SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-
     const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
     if (handle != INVALID_HANDLE_VALUE)
         SetConsoleMode(handle, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 #endif
 
-    CLI::App app{ "prvmviz - RVM Live Interval Visualizer", argc >= 1 ? argv[0] : "prvmviz" };
-    argv = app.ensure_utf8(argv);
-
+    CLI::App app{ "prvmviz - RVM Live Interval Visualizer", "prvmviz" };
     std::filesystem::path inputFile;
-    app.add_option("file", inputFile, "Input RVM IR file (.pexprrvm)")->required(true)->check(CLI::ExistingFile);
-
+    app.add_option("file", inputFile, "Input RVM IR file (.pexprrvm)")->required()->check(CLI::ExistingFile);
     bool showTable = false;
-    app.add_flag("--table,-t", showTable, "Show interval table instead of ASCII visualization");
-
-    bool color = true;
-    app.add_flag("--color/--no-color", color, "Enable/disable colored output");
-
-    bool sortByStart = true;
-    app.add_flag("--sort-start/--sort-reg", sortByStart, "Sort intervals by start position (default) or register ID");
+    app.add_flag("--table,-t", showTable, "Show interval table");
 
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
-        app.exit(e);
-        return EXIT_FAILURE;
+        return app.exit(e);
     }
 
-    // Read the RVM program
     std::ifstream file(inputFile);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open file '" << inputFile << "'" << std::endl;
-        return EXIT_FAILURE;
+    auto rvmProgOpt = RVMSerializer::read(file);
+    if (!rvmProgOpt) {
+        std::cerr << "Error: Failed to parse RVM IR\n";
+        return 1;
     }
 
-    RVMProgram program;
-    try {
-        auto rvmProgOpt = RVMSerializer::read(file);
-        if (!rvmProgOpt.has_value()) {
-            std::cerr << "Error: Failed to parse given RVM IR file" << std::endl;
-            return EXIT_FAILURE;
-        }
-        program = rvmProgOpt.value();
-    } catch (const std::exception& e) {
-        std::cerr << "Error: Failed to parse RVM IR: " << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
+    auto& program  = *rvmProgOpt;
+    auto intervals = RVMLiveAnalyzer::analyzeProgram(program);
+    std::sort(intervals.begin(), intervals.end(), [](const auto& a, const auto& b) {
+        return a.Start < b.Start || (a.Start == b.Start && a.Register < b.Register);
+    });
 
-    // Split into basic blocks and analyze live intervals per block
-    const auto blocks = RVMBasicBlockAnalyzer::splitIntoBlocks(program);
-    auto allIntervals = RVMLiveAnalyzer::analyzeProgram(program);
-
-    // Sort intervals
-    if (sortByStart) {
-        std::sort(allIntervals.begin(), allIntervals.end(),
-                  [](const RVMLiveAnalyzer::LiveInterval& a, const RVMLiveAnalyzer::LiveInterval& b) {
-                      return a.Start < b.Start;
-                  });
-    } else {
-        std::sort(allIntervals.begin(), allIntervals.end(),
-                  [](const RVMLiveAnalyzer::LiveInterval& a, const RVMLiveAnalyzer::LiveInterval& b) {
-                      return a.Register < b.Register;
-                  });
-    }
-
+    RVMLiveVisualizer viz(program, intervals);
     if (showTable)
-        printIntervalTable(allIntervals);
+        viz.printTable(std::cout);
     else
-        visualizeLiveIntervals(program, blocks, allIntervals);
+        viz.visualizeASCII(std::cout);
 
-    // Display results
-    std::cout << "General Statistics:" << std::endl
-              << "===================" << std::endl
-              << "Instructions:     " << program.size() << std::endl
-              << "Basic blocks:     " << blocks.size() << std::endl
-              << "Live intervals:   " << allIntervals.size() << std::endl;
+    viz.printStatistics(std::cout);
 
-    // Count pinned intervals
-    size_t pinnedCount = 0;
-    for (const auto& interval : allIntervals) {
-        if (interval.HasPinned)
-            pinnedCount++;
-    }
-    std::cout << "Pinned intervals: " << pinnedCount << std::endl
-              << std::endl;
-
-    // Also print some statistics
-    std::map<RegId, size_t> registerUsage;
-    for (const auto& interval : allIntervals)
-        registerUsage[interval.Register]++;
-
-    std::cout << "Register Usage Statistics:" << std::endl
-              << "==========================" << std::endl;
-    for (const auto& [reg, count] : registerUsage)
-        std::cout << regName(reg) << ": " << count << " interval(s)" << std::endl;
-
-    // Find max live registers at any point
-    std::vector<size_t> liveAtPos(program.size(), 0);
-    for (const auto& interval : allIntervals) {
-        if (interval.isRedundant() && !interval.HasPinned)
-            continue;
-        for (size_t pos = interval.Start; pos <= interval.End && pos < liveAtPos.size(); ++pos)
-            liveAtPos[pos]++;
-    }
-
-    if (!liveAtPos.empty()) {
-        auto maxLive = *std::max_element(liveAtPos.begin(), liveAtPos.end());
-        auto maxPos  = std::distance(liveAtPos.begin(), std::max_element(liveAtPos.begin(), liveAtPos.end()));
-        std::cout << std::endl
-                  << "Maximum simultaneously live registers: " << maxLive << " at instruction " << maxPos << std::endl;
-    }
-
-    // Print per-block statistics
-    std::cout << std::endl
-              << "Per-Block Statistics:" << std::endl
-              << "=====================" << std::endl;
-    for (size_t blockIdx = 0; blockIdx < blocks.size(); ++blockIdx) {
-        const auto& block   = blocks[blockIdx];
-        auto blockIntervals = RVMLiveAnalyzer::analyzeBlock(block);
-
-        std::map<RegId, size_t> blockRegisterUsage;
-        for (const auto& interval : blockIntervals) {
-            blockRegisterUsage[interval.Register]++;
-        }
-
-        std::cout << "Block " << blockIdx << ": " << block.size() << " instructions, "
-                  << blockIntervals.size() << " intervals, uses registers: ";
-        bool first = true;
-        for (const auto& [reg, count] : blockRegisterUsage) {
-            if (!first)
-                std::cout << ", ";
-            std::cout << regName(reg);
-            first = false;
-        }
-        if (blockRegisterUsage.empty())
-            std::cout << "none";
-        std::cout << std::endl;
-    }
-
-    return EXIT_SUCCESS;
+    return 0;
 }
