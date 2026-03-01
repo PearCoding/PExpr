@@ -122,7 +122,7 @@ bool RVMValue::operator==(const RVMValue& other) const
     case Kind::CONSTANT:
         return std::get<ValueVariant>(mStorage) == std::get<ValueVariant>(other.mStorage);
     case Kind::REGISTER:
-        return std::get<uint32_t>(mStorage) == std::get<uint32_t>(other.mStorage);
+        return std::get<RegId>(mStorage) == std::get<RegId>(other.mStorage);
     case Kind::STRING_REF:
         return std::get<uint32_t>(mStorage) == std::get<uint32_t>(other.mStorage);
     default:

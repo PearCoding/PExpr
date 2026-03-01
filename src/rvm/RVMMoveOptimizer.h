@@ -39,11 +39,10 @@ private:
     /// Remove identity moves from a block
     static size_t removeIdentityMoves(std::vector<std::shared_ptr<RVMInstr>>& block, bool& changed);
 
-    /// Analyze and optimize moves in program using global live intervals
-    static bool optimizeWithLiveIntervals(const opt::OptimizerOptions& options, 
-                                         RVMProgram& program,
-                                         const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
-                                         const std::vector<std::vector<std::shared_ptr<RVMInstr>>>& blocks);
+    /// Run independent optimization passes
+    [[nodiscard]] static bool runIdentityMovePass(RVMProgram& program);
+    [[nodiscard]] static bool runMoveChainPass(RVMProgram& program);
+    [[nodiscard]] static bool runRedundantMovePass(RVMProgram& program);
 
     /// Remove redundant moves in a block using global intervals
     static void removeRedundantMovesInBlock(

@@ -329,7 +329,7 @@ TEST_CASE("RVMMoveOptimizer: constant propagation", "[rvm][move][optimization][c
     {
         std::string rvmIr = R"(
             mov %r2:int 42:int
-            mov %r1:int %r2:int
+            mov %r1:int %r2:int //<- Should be collapsed
             add %r0:int %r1:int 10:int
             ret 1
         )";
@@ -433,9 +433,9 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
     {
         // MOV that is both part of chain and potentially redundant
         std::string rvmIr = R"(
-            mov %r1:int %r0:int
-            mov %r2:int %r1:int
-            mov %r2:int %r3:int  // Overwrites r2
+            mov %r1:int %r0:int // Redundant - see below
+            mov %r2:int %r1:int // Redundant - see below
+            mov %r2:int %r3:int // Overwrites r2 with undefined %r3
             add %r0:int %r2:int %r0:int
             ret 1
         )";
@@ -448,7 +448,9 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
         opts.OptimizeRedundantMoves = true;
 
         bool changed = RVMMoveOptimizer::optimize(opts, program);
-        REQUIRE(changed == true);
+        CHECK(changed == true);
+        CHECK(original.size() == 5);
+        CHECK(program.size() == 3); // Dropped first two instructions
         REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
     }
 
@@ -457,9 +459,9 @@ TEST_CASE("RVMMoveOptimizer: optimization interactions", "[rvm][move][optimizati
         // Test that optimization order doesn't cause issues
         std::string rvmIr = R"(
             mov %r1:int %r0:int
-            mov %r1:int %r1:int  // Identity
+            mov %r1:int %r1:int // Identity
             mov %r2:int %r1:int
-            mov %r2:int %r2:int  // Identity
+            mov %r2:int %r2:int // Identity
             add %r0:int %r2:int %r0:int
             ret 1
         )";
