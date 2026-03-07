@@ -34,10 +34,11 @@ struct OptimizerOptions {
         opts.RemoveDeadCode                = true;
         opts.EnableConstantFolding         = true;
         opts.EliminateCommonSubexpressions = true;
-        opts.OptimizeMoveChains            = true;
-        opts.OptimizeRedundantMoves        = true;
-        opts.OptimizeIdentityMoves         = true;
-        opts.EnableRegisterAllocation      = true;
+
+        opts.OptimizeMoveChains       = true;
+        opts.OptimizeRedundantMoves   = true;
+        opts.OptimizeIdentityMoves    = true;
+        opts.EnableRegisterAllocation = true;
         return opts;
     }
 

@@ -230,9 +230,6 @@
                 "--std-output",
                 "--input-rvm",
                 "--emit-rvm",
-                "--no-opt-rvm-moves",
-                // "--no-opt-rvm-redundant-moves",
-                "--no-opt-register-allocation",
                 "${file}"
             ],
             "stopAtEntry": false,

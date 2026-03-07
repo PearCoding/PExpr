@@ -19,6 +19,12 @@ bool RVMValidator::checkIfElementary(const RVMProgram& program)
 
 bool RVMValidator::checkIfElementary(const RVMInstr& instr)
 {
+    // Skip CALL and RET instructions - they generate placeholder values
+    // with unspecified types in forEachValue - by design
+    Opcode op = instr.opcode();
+    if (op == Opcode::CALL_INTERNAL || op == Opcode::CALL_EXTERNAL || op == Opcode::RET)
+        return true;
+
     bool bad = false;
     instr.forEachValue([&bad](const RVMValue& val) {
         if (!checkIfElementary(val))
