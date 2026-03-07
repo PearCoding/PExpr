@@ -92,8 +92,8 @@ ret 1
         ss << "mov %r0:str #str1:str\n";
         ss << "call_external 1 1 " << getNumberMangled << "\n";
         ss << "mov %r2:num %r0:num\n";
-        ss << "add %r3:num %r2:num 10.0:num\n";
-        ss << "ret 4\n";
+        ss << "add %r0:num %r2:num 10.0:num\n";
+        ss << "ret 1\n";
 
         auto original_opt = RVMSerializer::deserialize(ss.str());
         REQUIRE(original_opt.has_value());

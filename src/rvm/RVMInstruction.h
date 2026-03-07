@@ -135,7 +135,7 @@ class RVMInstrComment : public RVMInstr {
 public:
     RVMInstrComment(const std::string& msg);
 
-    [[nodiscard]] Opcode opcode() const override { return Opcode::RET; } // Placeholder, comments don't execute
+    [[nodiscard]] Opcode opcode() const override { return Opcode::NOP; } // Placeholder, comments don't execute
     [[nodiscard]] const std::string& message() const { return mMessage; }
 
 private:
@@ -147,7 +147,7 @@ class RVMInstrLabel : public RVMInstr {
 public:
     RVMInstrLabel(const std::string& name);
 
-    [[nodiscard]] Opcode opcode() const override { return Opcode::RET; } // Placeholder, labels don't execute
+    [[nodiscard]] Opcode opcode() const override { return Opcode::NOP; } // Placeholder, labels don't execute
     [[nodiscard]] const std::string& labelName() const { return mName; }
 
 private:

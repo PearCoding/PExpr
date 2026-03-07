@@ -1,8 +1,8 @@
-#include <catch2/catch_test_macros.hpp>
-#include "rvm/RVMLiveAnalyzer.h"
 #include "rvm/RVMInstruction.h"
+#include "rvm/RVMLiveAnalyzer.h"
 #include "rvm/RVMProgram.h"
 #include "rvm/RVMSerializer.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace PExpr::rvm;
 
@@ -15,8 +15,9 @@ RVMProgram deserializeSafe(const std::string& ir)
 }
 } // namespace
 
-TEST_CASE("RVMLiveAnalyzer: Basic block with moves and non-moves", "[rvm][live_analyzer]") {
-    std::string rvmIr = R"(
+TEST_CASE("RVMLiveAnalyzer: Basic block with moves and non-moves", "[rvm][live_analyzer]")
+{
+    std::string rvmIr  = R"(
         mov %r0:int 42:int
         mov %r1:int %r0:int
         add %r2:int %r1:int 10:int
@@ -29,7 +30,8 @@ TEST_CASE("RVMLiveAnalyzer: Basic block with moves and non-moves", "[rvm][live_a
 
     auto getInterval = [&](RegId reg) {
         for (const auto& i : intervals) {
-            if (i.Register == reg) return i;
+            if (i.Register == reg)
+                return i;
         }
         throw std::runtime_error("Interval not found");
     };
@@ -38,7 +40,7 @@ TEST_CASE("RVMLiveAnalyzer: Basic block with moves and non-moves", "[rvm][live_a
     CHECK(i0.Start == 0);
     // Interval for r0 goes from definition at 0 to move at 1,
     // but analyzeBlock currently lets dangling intervals go to the end of block (2).
-    CHECK(i0.End == 2); 
+    CHECK(i0.End == 2);
     CHECK(i0.HasNonMoveUsage == false);
     CHECK(i0.isPinned() == false);
 
@@ -55,10 +57,11 @@ TEST_CASE("RVMLiveAnalyzer: Basic block with moves and non-moves", "[rvm][live_a
     CHECK(i2.isPinned() == false);
 }
 
-TEST_CASE("RVMLiveAnalyzer: Call and Return pinning", "[rvm][live_analyzer]") {
+TEST_CASE("RVMLiveAnalyzer: Call and Return pinning", "[rvm][live_analyzer]")
+{
     // call my_func(r0) -> returns r0
     // ret 1 (returns r0)
-    std::string rvmIr = R"(
+    std::string rvmIr  = R"(
         call_internal 1 1 my_func
         ret 1
     )";
@@ -69,7 +72,8 @@ TEST_CASE("RVMLiveAnalyzer: Call and Return pinning", "[rvm][live_analyzer]") {
     auto getIntervals = [&](RegId reg) {
         std::vector<RVMLiveAnalyzer::LiveInterval> res;
         for (const auto& i : intervals) {
-            if (i.Register == reg) res.push_back(i);
+            if (i.Register == reg)
+                res.push_back(i);
         }
         return res;
     };
@@ -86,7 +90,7 @@ TEST_CASE("RVMLiveAnalyzer: Call and Return pinning", "[rvm][live_analyzer]") {
     CHECK(i0s[0].Start == 0);
     CHECK(i0s[0].End == 0);
     CHECK(i0s[0].PinnedStart == false);
-    CHECK(i0s[0].PinnedEnd == true);   // Parameter to call
+    CHECK(i0s[0].PinnedEnd == true); // Parameter to call
 
     // Second interval: return from call
     CHECK(i0s[1].Start == 0);
@@ -95,8 +99,9 @@ TEST_CASE("RVMLiveAnalyzer: Call and Return pinning", "[rvm][live_analyzer]") {
     CHECK(i0s[1].PinnedEnd == true);   // Used in RET
 }
 
-TEST_CASE("RVMLiveAnalyzer: Global program analysis", "[rvm][live_analyzer]") {
-    std::string rvmIr = R"(
+TEST_CASE("RVMLiveAnalyzer: Global program analysis", "[rvm][live_analyzer]")
+{
+    std::string rvmIr  = R"(
         mov %r0:int 10:int
         jz label1 %r0:int
         mov %r1:int 20:int
@@ -113,7 +118,7 @@ TEST_CASE("RVMLiveAnalyzer: Global program analysis", "[rvm][live_analyzer]") {
 
     // r1 is defined in two different paths and used in the merge block.
     // They are merged because they both reach the merge block label2 and r1 is live-in there.
-    
+
     // Check r1 interval
     bool found_r1 = false;
     for (const auto& i : intervals) {

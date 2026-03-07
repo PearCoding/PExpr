@@ -16,6 +16,8 @@ using RegId = uint32_t;
 
 /// RVM instruction opcode
 enum class Opcode : uint8_t {
+    NOP, // No operation, used internally
+
     MOV, // Move between registers
 
     // Arithmetic operations
