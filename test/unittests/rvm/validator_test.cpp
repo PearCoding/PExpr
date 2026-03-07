@@ -1,6 +1,9 @@
+#include "Environment.h"
 #include "opt/OptimizerOptions.h"
+#include "rvm/RVMMapper.h"
 #include "rvm/RVMMoveOptimizer.h"
 #include "rvm/RVMOptimizer.h"
+#include "rvm/RVMRegisterAllocator.h"
 #include "rvm/RVMSerializer.h"
 #include "rvm/RVMStructs.h"
 #include "rvm/RVMValidator.h"
@@ -129,5 +132,212 @@ ret 2
         REQUIRE(changed == false); //< There is nothing we could optimize away
 
         REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
+    }
+}
+
+TEST_CASE("RVMValidator: Use-Before-Definition Validation", "[rvm][validation][use-before-def]")
+{
+    SECTION("Valid program with no use-before-definition")
+    {
+        const std::string source = R"(
+mov %r0:int 10:int
+mov %r1:int %r0:int
+add %r2:int %r0:int %r1:int
+ret 1
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateUseBeforeDefinition(program, errorMsg);
+        REQUIRE(isValid == true);
+        REQUIRE(errorMsg.empty());
+    }
+
+    SECTION("Invalid program with use before definition")
+    {
+        const std::string source = R"(
+mov %r1:int %r0:int
+ret 1
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateUseBeforeDefinition(program, errorMsg);
+        REQUIRE(isValid == false);
+    }
+
+    SECTION("Program with multiple uses before definition")
+    {
+        const std::string source = R"(
+add %r2:int %r0:int %r1:int  // both r0 and r1 used before definition
+ret 1
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateUseBeforeDefinition(program, errorMsg);
+        REQUIRE(isValid == false);
+        // Should report at least one of the registers
+        REQUIRE((errorMsg.find("Register 0") != std::string::npos || errorMsg.find("Register 1") != std::string::npos));
+    }
+
+    SECTION("Valid program with late definition but early use")
+    {
+        const std::string source = R"(
+mov %r0:int 10:int
+jz label %r1:int      // r1 used before definition
+mov %r1:int 20:int
+label:
+ret 2
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateUseBeforeDefinition(program, errorMsg);
+        REQUIRE(isValid == false);
+        REQUIRE(errorMsg.find("Register 1") != std::string::npos);
+    }
+}
+
+TEST_CASE("RVMValidator: Register Allocation Validation", "[rvm][validation][register-allocation]")
+{
+    SECTION("Valid program with non-overlapping register usage")
+    {
+        const std::string source = R"(
+mov %r0:int 10:int
+mov %r1:int 20:int
+add %r2:int %r0:int %r1:int
+mov %r0:int 30:int     // r0 redefined after original use
+ret 1
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        REQUIRE(isValid == true);
+        REQUIRE(errorMsg.empty());
+    }
+
+    SECTION("Program with overlapping live ranges for same register")
+    {
+        // This program has r0 defined at position 0, used at position 2,
+        // then redefined at position 1. The first definition is dead (never used),
+        // so intervals don't overlap.
+        const std::string source = R"(
+mov %r0:int 10:int
+mov %r0:int 20:int    // redefinition - first r0 value is dead
+add %r1:int %r0:int 5:int
+ret 1
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        // Actually valid: first r0 is dead, second r0 defined before use
+        REQUIRE(isValid == true);
+        REQUIRE(errorMsg.empty());
+    }
+
+    SECTION("Complex control flow with register reuse")
+    {
+        const std::string source = R"(
+mov %r0:int 10:int
+jz label1 %r0:int
+mov %r1:int 20:int
+jmp label2
+label1:
+mov %r1:int 30:int
+label2:
+add %r2:int %r1:int %r1:int
+ret 1
+)";
+        auto program_opt         = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        // This should be valid - r1 is defined in both branches but they don't overlap
+        REQUIRE(isValid == true);
+        REQUIRE(errorMsg.empty());
+    }
+
+    SECTION("Function call with parameter registers")
+    {
+        const std::string source = R"(
+mov %r0:int 10:int
+mov %r1:int 20:int
+call_external 2 1 foo
+mov %r2:int %r0:int
+ret 1 // In reality only %r0 = 10 will be returned.
+)";
+
+        auto program_opt = RVMSerializer::deserialize(source);
+        REQUIRE(program_opt.has_value());
+        RVMProgram program = *program_opt;
+
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        // This should be valid - r0 and r1 are used as parameters, r0 is also used after call
+        // The live intervals:
+        // r0: defined at 0, used at 2 (call), used at 3 (mov), ends at 3
+        // r1: defined at 1, used at 2 (call), ends at 2
+        // r2: defined at 3, ends at 3
+        REQUIRE(isValid == true);
+        REQUIRE(errorMsg.empty());
+    }
+}
+
+TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation][integration]")
+{
+    SECTION("Register allocation should produce valid program")
+    {
+        Environment env;
+        auto ast = env.parse(R"(
+            [[extern]] fn getInput1() -> int;
+            [[extern]] fn getInput2() -> int;
+            
+            let a = getInput1();
+            let b = getInput2();
+            let c = a + b;
+            let d = c * 2;
+            d
+        )");
+        REQUIRE(ast != nullptr);
+
+        auto prog = env.map(ast);
+        rvm::RVMMapper mapper;
+        auto rvmProg = mapper.mapProgram(prog);
+
+        // Validate before allocation
+        std::string errorMsg;
+        bool isValidBefore = RVMValidator::validateUseBeforeDefinition(rvmProg, errorMsg);
+        REQUIRE(isValidBefore == true);
+
+        isValidBefore = RVMValidator::validateRegisterAllocation(rvmProg, errorMsg);
+        REQUIRE(isValidBefore == true);
+
+        // Apply register allocation
+        bool changed = RVMRegisterAllocator::allocate(rvmProg);
+        REQUIRE(changed == true);
+
+        // Validate after allocation
+        bool isValidAfter = RVMValidator::validateUseBeforeDefinition(rvmProg, errorMsg);
+        REQUIRE(isValidAfter == true);
+
+        isValidAfter = RVMValidator::validateRegisterAllocation(rvmProg, errorMsg);
+        REQUIRE(isValidAfter == true);
     }
 }

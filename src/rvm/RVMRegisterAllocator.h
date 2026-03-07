@@ -33,14 +33,11 @@ private:
     /// Perform linear scan allocation on intervals
     static void linearScanAllocate(std::vector<InternalLiveInterval>& intervals);
 
-    /// Rewrite program with new register assignments
-    static void rewriteProgram(RVMProgram& program, const std::unordered_map<RegId, RegId>& regMap);
+    /// Rewrite program with new register assignments using interval-based mapping
+    static void rewriteProgram(RVMProgram& program, const std::vector<InternalLiveInterval>& intervals);
 
     /// Collect all registers used in program
     static std::unordered_set<RegId> collectRegisters(const RVMProgram& program);
-
-    /// Create register mapping from intervals
-    static std::unordered_map<RegId, RegId> createRegisterMap(const std::vector<InternalLiveInterval>& intervals);
 };
 
 } // namespace PExpr::rvm

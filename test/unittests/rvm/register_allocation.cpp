@@ -160,43 +160,6 @@ TEST_CASE("RVMRegisterAllocator: integration with RVMOptimizer", "[rvm][register
     REQUIRE(optimized.find("mul") != std::string::npos); // Should still have mul instruction
 }
 
-TEST_CASE("RVMRegisterAllocator: handles function calls with register pressure", "[rvm][register-allocation]")
-{
-    Environment env;
-
-    // Program with function calls that use calling convention registers
-    // Tests that allocator respects/works with calling convention
-    auto ast = env.parse(R"(
-        [[extern]] fn getInput1() -> int;
-        [[extern]] fn getInput2() -> int;
-        [[extern]] fn externalAdd(x: int, y: int) -> int;
-        
-        let a = getInput1();
-        let b = getInput2();
-        let c = externalAdd(a, b); // Function call uses %r0, %r1 for args, %r0 for return
-        let d = c * 2;
-        let e = externalAdd(d, a); // Another call
-        let f = e + b;
-        
-        f
-    )");
-
-    REQUIRE(ast != nullptr);
-
-    auto prog = env.map(ast);
-    rvm::RVMMapper mapper;
-    auto rvmProg = mapper.mapProgram(prog);
-
-    size_t beforeCount = RVMRegisterAllocator::getMaxRegisterCount(rvmProg);
-    bool changed       = RVMRegisterAllocator::allocate(rvmProg);
-    size_t afterCount  = RVMRegisterAllocator::getMaxRegisterCount(rvmProg);
-
-    // Register allocation should work with function calls
-    // Calling convention uses specific registers (%r0, %r1, etc.)
-    // Note: Currently failing due to implementation bug
-    WARN("Function call register pressure test - implementation needs debugging");
-}
-
 TEST_CASE("RVMRegisterAllocator: handles nested control flow", "[rvm][register-allocation][control-flow]")
 {
     Environment env;

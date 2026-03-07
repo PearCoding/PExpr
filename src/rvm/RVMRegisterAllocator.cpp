@@ -31,13 +31,10 @@ bool RVMRegisterAllocator::allocate(RVMProgram& program)
     // Perform linear scan allocation
     linearScanAllocate(internalIntervals);
 
-    // Create register mapping
-    std::unordered_map<RegId, RegId> regMap = createRegisterMap(internalIntervals);
-
     // Check if any changes needed
     bool changesNeeded = false;
-    for (const auto& [oldReg, newReg] : regMap) {
-        if (oldReg != newReg) {
+    for (const auto& internalInterval : internalIntervals) {
+        if (internalInterval.Interval.Register != internalInterval.AllocatedRegister) {
             changesNeeded = true;
             break;
         }
@@ -46,8 +43,8 @@ bool RVMRegisterAllocator::allocate(RVMProgram& program)
     if (!changesNeeded)
         return false;
 
-    // Rewrite program with new register assignments
-    rewriteProgram(program, regMap);
+    // Rewrite program with new register assignments using interval-based mapping
+    rewriteProgram(program, internalIntervals);
 
     return true;
 }
@@ -175,25 +172,37 @@ void RVMRegisterAllocator::linearScanAllocate(std::vector<InternalLiveInterval>&
     }
 }
 
-std::unordered_map<RegId, RegId> RVMRegisterAllocator::createRegisterMap(const std::vector<InternalLiveInterval>& intervals)
+void RVMRegisterAllocator::rewriteProgram(RVMProgram& program, const std::vector<InternalLiveInterval>& intervals)
 {
-    std::unordered_map<RegId, RegId> regMap;
+    if (intervals.empty())
+        return;
 
-    for (const auto& interval : intervals)
-        regMap[interval.Interval.Register] = interval.AllocatedRegister;
-
-    return regMap;
-}
-
-void RVMRegisterAllocator::rewriteProgram(RVMProgram& program, const std::unordered_map<RegId, RegId>& regMap)
-{
-    for (auto& instr : program) {
-        // Use the instruction's visitor to rewrite values in-place
-        instr->forEachValue([&regMap](RVMValue& value) {
+    // Build a mapping from (register, instruction index) -> allocated register
+    // For each instruction index, we need to know which interval covers it
+    std::vector<std::pair<RegId, RegId>> rewrites;
+    
+    // We'll process each instruction and find the appropriate interval
+    for (size_t instrIdx = 0; instrIdx < program.size(); ++instrIdx) {
+        auto& instr = program[instrIdx];
+        
+        instr->forEachValue([&](RVMValue& value) {
             if (value.isRegister()) {
                 RegId oldReg = value.regId();
-                if (auto it = regMap.find(oldReg); it != regMap.end() && it->second != oldReg) //< Create new register value with same type
-                    value = RVMValue::Register(it->second, value.type());
+                RegId newReg = oldReg; // Default: no change
+                
+                // Find the interval that covers this instruction index for this register
+                for (const auto& interval : intervals) {
+                    if (interval.Interval.Register == oldReg &&
+                        interval.Interval.Start <= instrIdx &&
+                        interval.Interval.End >= instrIdx) {
+                        newReg = interval.AllocatedRegister;
+                        break;
+                    }
+                }
+                
+                if (newReg != oldReg) {
+                    value = RVMValue::Register(newReg, value.type());
+                }
             }
         });
     }

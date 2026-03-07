@@ -88,17 +88,8 @@ void RVMLiveAnalyzer::processInstruction(
     // A call or return pins its registers according to the calling convention
     bool pins = (instr->opcode() == Opcode::CALL_EXTERNAL || instr->opcode() == Opcode::CALL_INTERNAL || instr->opcode() == Opcode::RET);
 
-    // Check destination register (definition)
-    instr->forEachDestination([&](const RVMValue& dstVal) {
-        if (dstVal.isRegister()) {
-            RegId reg = dstVal.regId();
-            processRegDef(reg, index, activeIntervals, allIntervals, pins);
-            if (isNonMove)
-                activeIntervals[reg].HasNonMoveUsage = true;
-        }
-    });
-
-    // Track last use positions for all source registers
+    // Track last use positions for all source registers FIRST
+    // This ensures reads happen before writes for the same register
     instr->forEachSource([&](const RVMValue& srcVal) {
         if (srcVal.isRegister()) {
             RegId reg = srcVal.regId();
@@ -107,6 +98,16 @@ void RVMLiveAnalyzer::processInstruction(
                 if (auto it = activeIntervals.find(reg); it != activeIntervals.end())
                     it->second.HasNonMoveUsage = true;
             }
+        }
+    });
+
+    // Check destination register (definition) AFTER sources
+    instr->forEachDestination([&](const RVMValue& dstVal) {
+        if (dstVal.isRegister()) {
+            RegId reg = dstVal.regId();
+            processRegDef(reg, index, activeIntervals, allIntervals, pins);
+            if (isNonMove)
+                activeIntervals[reg].HasNonMoveUsage = true;
         }
     });
 }

@@ -18,6 +18,12 @@ public:
     [[nodiscard]] static bool validateOptimizations(const RVMProgram& original,
                                                   const RVMProgram& optimized,
                                                   const type::Type& returnType);
+
+    /// Check for use-before-definition errors in the program
+    [[nodiscard]] static bool validateUseBeforeDefinition(const RVMProgram& program, std::string& errorMsg);
+
+    /// Validate register allocation correctness (no overlapping assignments)
+    [[nodiscard]] static bool validateRegisterAllocation(const RVMProgram& program, std::string& errorMsg);
 };
 
 } // namespace PExpr::rvm
