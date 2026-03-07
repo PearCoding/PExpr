@@ -65,19 +65,27 @@ bool SSCPFunctionInliner::attempFunctionInlining(SSAContext* ctx, SSAProgram& pr
                 continue;
             if (auto call = dynamic_cast<SSAInstrCall*>(body[i].get())) {
                 if (call->FunctionName == func.Name) {
-                    // Check if this is a recursive function with force inlining enabled
-                    if (mOptions.ForceInlineFunctions && mRecursiveFunctions.contains(func.Name)) {
-                        // Skip force inlining for recursive functions to avoid infinite recursion
-                    } else if (mOptions.ForceInlineFunctions && inlineFunctionCall(ctx, call, func, body, i)) { //< Force inlining
-                        changed = true;
-                        break;
-                    } else if (attemptAdvancedInlining(ctx, call, func, body, i)) { //< Try advanced inlining first
-                        changed = true;
-                        break;
-                    } else if (mCallCounts[func.Name] == 1 && inlineFunctionCall(ctx, call, func, body, i)) { //< Fall back to basic inlining for single-call functions
-                        changed = true;
-                        break;
-                    } else if (tryInlineIntrinsic(call, func, body, i)) {
+                    // Skip force inlining for recursive functions to avoid infinite recursion
+                    if (mOptions.ForceInlineFunctions && !mRecursiveFunctions.contains(func.Name)) {
+                        if (tryBasicInlining(ctx, call, func, body, i)) {
+                            changed = true;
+                            break;
+                        }
+                    } else if (mOptions.InlineFunctions) {
+                        // Try optimized inlining (with constant folding and simplification check)
+                        if (tryOptimizedInlining(ctx, call, func, body, i)) {
+                            changed = true;
+                            break;
+                        }
+                        // Fall back to basic inlining for single-call functions
+                        else if (mCallCounts[func.Name] == 1 && tryBasicInlining(ctx, call, func, body, i)) {
+                            changed = true;
+                            break;
+                        }
+                    }
+                    
+                    // Always try intrinsic inlining regardless of options
+                    if (tryInlineIntrinsic(call, func, body, i)) {
                         changed = true;
                         break;
                     }
@@ -201,17 +209,17 @@ void SSCPFunctionInliner::cloneAndMapFunctionBody(SSAContext* ctx, const SSAFunc
     outInlinedBody.back() = std::move(assign);
 }
 
-bool SSCPFunctionInliner::inlineFunctionCall(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+bool SSCPFunctionInliner::tryBasicInlining(SSAContext* ctx, SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex)
 {
     if (func.External)
         return false;
 
     InstructionList inlinedInstructions;
 
-    // Use common helper to clone and map function body
+    // Use common helper to clone and map function body (no optimization)
     cloneAndMapFunctionBody(ctx, func, call, inlinedInstructions, false);
 
-    // Replace the call with the optimized inlined instructions
+    // Replace the call with the inlined instructions
     instructions.erase(instructions.begin() + callIndex);
     instructions.insert(instructions.begin() + callIndex, inlinedInstructions.begin(), inlinedInstructions.end());
 
@@ -236,28 +244,7 @@ bool SSCPFunctionInliner::removeUnusedFunctions(SSAProgram& program)
     return changed;
 }
 
-bool SSCPFunctionInliner::shouldInlineFunctionCall(SSAInstrCall* call, SSAFunction& func)
-{
-    if (func.External)
-        return false;
-
-    // Check if we've already attempted inlining this function too many times
-    auto& attemptInfo = mInlineAttempts[func.Name];
-    if (attemptInfo.attempts >= MAX_INLINE_ATTEMPTS) {
-        attemptInfo.failed = true;
-        return false;
-    }
-
-    // Check if all arguments are constants
-    for (const auto& arg : call->Arguments) {
-        if (!arg.isConstant())
-            return false;
-    }
-
-    return true;
-}
-
-bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody)
+bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody) const
 {
     const size_t originalEffective = originalBody.size();
     const size_t inlinedEffective  = inlinedBody.size();
@@ -266,31 +253,36 @@ bool SSCPFunctionInliner::isSimplerAfterOptimization(const InstructionList& orig
     return inlinedEffective <= 2 || inlinedEffective < originalEffective / 2;
 }
 
-bool SSCPFunctionInliner::attemptAdvancedInlining(SSAContext* ctx, SSAInstrCall* call, SSAFunction& func, InstructionList& instructions, size_t callIndex)
+bool SSCPFunctionInliner::tryOptimizedInlining(SSAContext* ctx, SSAInstrCall* call, const SSAFunction& func, InstructionList& instructions, size_t callIndex)
 {
-    if (!shouldInlineFunctionCall(call, func))
+    if (func.External)
         return false;
 
-    auto& attemptInfo = mInlineAttempts[func.Name];
-    attemptInfo.attempts++;
+    // Check if all arguments are constants (required for optimization to be effective)
+    for (const auto& arg : call->Arguments) {
+        if (!arg.isConstant())
+            return false;
+    }
 
     InstructionList inlinedInstructions;
 
-    // Use common helper to clone and map function body (keep return instruction for optimization)
+    // Clone and optimize the function body with argument substitution
     cloneAndMapFunctionBody(ctx, func, call, inlinedInstructions, true);
 
-    // Check if optimization resulted in something simpler
-    if (inlinedInstructions.empty() || !isSimplerAfterOptimization(func.Body, inlinedInstructions)) {
-        // Inlining didn't help, reject it
-        attemptInfo.failed = true;
+    // Check if inlining was beneficial
+    if (inlinedInstructions.empty() || !isSimplerAfterOptimization(func.Body, inlinedInstructions))
         return false;
+
+    // For recursive functions: only inline if the result has NO recursive calls
+    if (mRecursiveFunctions.contains(func.Name)) {
+        if (containsCallToRecursiveFunction(inlinedInstructions))
+            return false; // Recursion not eliminated, reject inlining
     }
 
     // Replace the call with the optimized inlined instructions
     const auto prevCallIt = instructions.erase(instructions.begin() + callIndex);
     instructions.insert(prevCallIt, inlinedInstructions.begin(), inlinedInstructions.end());
 
-    attemptInfo.succeeded = true;
     return true;
 }
 
@@ -355,6 +347,19 @@ bool SSCPFunctionInliner::tryInlineIntrinsic(SSAInstrCall* call, const SSAFuncti
         return true;
     }
 
+    return false;
+}
+
+bool SSCPFunctionInliner::containsCallToRecursiveFunction(const InstructionList& body) const
+{
+    for (const auto& instrPtr : body) {
+        if (!instrPtr)
+            continue;
+        if (auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get())) {
+            if (mRecursiveFunctions.contains(call->FunctionName))
+                return true;
+        }
+    }
     return false;
 }
 

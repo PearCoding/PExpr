@@ -48,12 +48,12 @@ private:
                                  InstructionList& outInlinedBody,
                                  bool runOptimization);
 
-    [[nodiscard]] bool inlineFunctionCall(ssa::SSAContext* ctx, ssa::SSAInstrCall* call, ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    [[nodiscard]] bool shouldInlineFunctionCall(ssa::SSAInstrCall* call, ssa::SSAFunction& func);
-    [[nodiscard]] bool attemptAdvancedInlining(ssa::SSAContext* ctx, ssa::SSAInstrCall* call, ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
-    [[nodiscard]] bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody);
-
+    [[nodiscard]] bool tryOptimizedInlining(ssa::SSAContext* ctx, ssa::SSAInstrCall* call, const ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    [[nodiscard]] bool tryBasicInlining(ssa::SSAContext* ctx, ssa::SSAInstrCall* call, const ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
     [[nodiscard]] bool tryInlineIntrinsic(ssa::SSAInstrCall* call, const ssa::SSAFunction& func, InstructionList& instructions, size_t callIndex);
+    
+    [[nodiscard]] bool isSimplerAfterOptimization(const InstructionList& originalBody, const InstructionList& inlinedBody) const;
+    [[nodiscard]] bool containsCallToRecursiveFunction(const InstructionList& body) const;
 
     const OptimizerOptions mOptions;
     std::unordered_map<std::string, int> mCallCounts;
@@ -64,16 +64,7 @@ private:
     };
     std::unordered_multimap<std::string, FunctionInlinePair> mIntrinsics;
 
-    // Advanced inlining state
-    struct InlineAttemptInfo {
-        int attempts   = 0;
-        bool succeeded = false;
-        bool failed    = false;
-    };
-    std::unordered_map<std::string, InlineAttemptInfo> mInlineAttempts;
-    static constexpr int MAX_INLINE_ATTEMPTS = 16;
-
-    // Recursive function detection
+    // Recursive function detection (includes mutual recursion)
     std::unordered_set<std::string> mRecursiveFunctions;
     void detectRecursiveFunctions(const ssa::SSAProgram& program);
 };
