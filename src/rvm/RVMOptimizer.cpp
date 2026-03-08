@@ -1,4 +1,5 @@
 #include "RVMOptimizer.h"
+#include "RVMConstantOptimizer.h"
 #include "RVMMoveOptimizer.h"
 #include "RVMRegisterAllocator.h"
 #include "RVMRegisterLinearizer.h"
@@ -16,6 +17,9 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
     while (true) {
         bool changed = false;
 
+        // Apply constant propagation first (makes MOVs with constants redundant)
+        changed |= RVMConstantOptimizer::optimize(options, program);
+        
         // Apply combined move optimizations (identity, chain collapsing, redundant)
         changed |= RVMMoveOptimizer::optimize(options, program);
 
@@ -39,7 +43,7 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
         if (!changed)
             break;
     }
-    
+
     // Apply register linearization at the end (syntax-only pass)
     // changedAtAll |= RVMRegisterLinearizer::linearize(program);
 

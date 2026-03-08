@@ -129,7 +129,8 @@ ret 2
         REQUIRE(original.size() == 6);
 
         bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::High(), optimized);
-        REQUIRE(changed == false); //< There is nothing we could optimize away
+        // Constant propagation may replace %r0:int with 1:int in the JZ instruction
+        REQUIRE(changed == true);
 
         REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
     }
