@@ -46,13 +46,26 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         RVMInterpreter interp;
 
         // Register getNumber(str) -> num
-        std::vector<type::Type> params = { type::Type(type::TypeKind::String) };
-        std::string getNumberMangled   = type::makeMangledNameFromTypes("getNumber", params, nullptr);
-        interp.registerExternalFunction(getNumberMangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
-            if (args.empty() || !std::holds_alternative<std::string>(args[0]))
-                return 0.0;
-            return RVMInterpreter::parseValue(std::get<std::string>(args[0]));
-        });
+        {
+            std::vector<type::Type> params = { type::Type(type::TypeKind::String) };
+            std::string getNumberMangled   = type::makeMangledNameFromTypes("getNumber", params, nullptr);
+            interp.registerExternalFunction(getNumberMangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.empty() || !std::holds_alternative<std::string>(args[0]))
+                    return 0.0;
+                return RVMInterpreter::parseValue(std::get<std::string>(args[0]));
+            });
+        }
+
+        // Register pass(num) -> num
+        {
+            std::vector<type::Type> params = { type::Type(type::TypeKind::Number) };
+            std::string passMangled        = type::makeMangledNameFromTypes("pass", params, nullptr);
+            interp.registerExternalFunction(passMangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.empty() || !std::holds_alternative<Number>(args[0]))
+                    return 0.0;
+                return std::get<Number>(args[0]);
+            });
+        }
 
         return interp.execute(prog, returnType);
     };

@@ -169,6 +169,26 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
 
             if (!srcInterval || srcInterval->isPinned())
                 continue;
+
+            // Replace lines 163-167 (the srcInterval->End check) with:
+            if (srcValue.isRegister()) {
+                RegId srcReg = srcValue.regId();
+
+                // Explicitly check if srcReg is redefined in [startIdx+1, interval.End]
+                bool srcRedefined = false;
+                for (size_t checkIdx = startIdx + 1; checkIdx <= interval.End && !srcRedefined; ++checkIdx) {
+                    auto checkIt = indexToBlockLocal.find(checkIdx);
+                    if (checkIt != indexToBlockLocal.end()) {
+                        auto [bi, li] = checkIt->second;
+                        mutableBlocks[bi][li]->forEachDestination([&](const RVMValue& dst) {
+                            if (dst.isRegister() && dst.regId() == srcReg)
+                                srcRedefined = true;
+                        });
+                    }
+                }
+                if (srcRedefined)
+                    continue; // Don't collapse - source is redefined before dest's last use
+            }
         }
 
         // Check if all uses in this interval are in MOV instructions
@@ -215,6 +235,17 @@ bool RVMMoveOptimizer::runMoveChainPass(RVMProgram& program)
                 intervalsToCollapse.push_back({ interval.Start, interval.End, dstReg, srcValue.regId() });
         }
     }
+
+    // After collecting intervalsToCollapse, filter out transitives:
+    std::unordered_set<RegId> collapsedDsts;
+    for (const auto& c : intervalsToCollapse)
+        collapsedDsts.insert(c.dstReg);
+
+    // Remove any collapse where srcReg is also a collapsed dst
+    intervalsToCollapse.erase(
+        std::remove_if(intervalsToCollapse.begin(), intervalsToCollapse.end(),
+                       [&](const CollapseInfo& c) { return collapsedDsts.count(c.srcReg) > 0; }),
+        intervalsToCollapse.end());
 
     bool changed = false;
     // Apply renaming for collapsed intervals

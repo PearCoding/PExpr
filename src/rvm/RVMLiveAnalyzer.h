@@ -16,26 +16,28 @@ class RVMLiveAnalyzer {
 public:
     /// Live interval of a register
     struct LiveInterval {
-        RegId Register       = 0;
-        size_t Start         = 0;     // Instruction index where defined (or block start if live-in)
-        size_t End           = 0;     // Instruction index of last use
-        bool PinnedStart     = false; // Is the start of the interval pinned (e.g., return value of a call)?
-        bool PinnedEnd       = false; // Is the end of the interval pinned (e.g., parameter of a call)?
-        bool HasNonMoveUsage = false; // Does the interval contain any non-move instruction usage?
+        RegId Register            = 0;
+        size_t Start              = 0;     // Instruction index where defined (or block start if live-in)
+        size_t End                = 0;     // Instruction index of last use
+        bool PinnedStart          = false; // Is the start of the interval pinned (e.g., return value of a call)?
+        bool PinnedEnd            = false; // Is the end of the interval pinned (e.g., parameter of a call)?
+        bool HasNonMoveUsage      = false; // Does the interval contain any non-move instruction usage?
+        bool PreservesPinnedValue = false; // Does this interval preserve a pinned value from another register?
 
         LiveInterval() = default;
-        LiveInterval(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nonMove)
+        LiveInterval(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nonMove, bool preservesPinned)
             : Register(r)
             , Start(s)
             , End(e)
             , PinnedStart(pStart)
             , PinnedEnd(pEnd)
             , HasNonMoveUsage(nonMove)
+            , PreservesPinnedValue(preservesPinned)
         {
         }
 
         /// Returns true when the interval is not used and is not associated with a pinned register
-        [[nodiscard]] inline bool isRedundant() const { return Start == End && !PinnedStart && !PinnedEnd; }
+        [[nodiscard]] inline bool isRedundant() const { return Start == End && !PinnedStart && !PinnedEnd && !PreservesPinnedValue; }
         /// Returns true when the interval is pinned (either start or end)
         [[nodiscard]] inline bool isPinned() const { return PinnedStart || PinnedEnd; }
     };
@@ -68,7 +70,8 @@ private:
     static void processRegDef(RegId reg, size_t index,
                               std::unordered_map<RegId, LiveInterval>& activeIntervals,
                               std::vector<LiveInterval>& allIntervals,
-                              bool pin);
+                              bool pin,
+                              bool preservesPinnedValue = false);
 };
 
 } // namespace PExpr::rvm

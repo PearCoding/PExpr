@@ -33,16 +33,16 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
         changedAtAll |= RVMRegisterAllocator::allocate(program);
 
     // Repeat until no changes are made
-    while (true) {
-        bool changed = false;
+    // while (true) {
+    //     bool changed = false;
 
-        // Apply combined move optimizations (identity, chain collapsing, redundant)
-        changed |= RVMMoveOptimizer::optimize(options, program);
+    //     // Apply combined move optimizations (identity, chain collapsing, redundant)
+    //     changed |= RVMMoveOptimizer::optimize(options, program);
 
-        changedAtAll |= changed;
-        if (!changed)
-            break;
-    }
+    //     changedAtAll |= changed;
+    //     if (!changed)
+    //         break;
+    // }
 
     // Apply register linearization at the end (syntax-only pass)
     // changedAtAll |= RVMRegisterLinearizer::linearize(program);

@@ -342,3 +342,54 @@ TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation
         REQUIRE(isValidAfter == true);
     }
 }
+
+TEST_CASE("RVMValidator: Complex verification", "[rvm][validation]")
+{
+    SECTION("Case 1")
+    {
+        Environment env;
+        auto ast = env.parse(R"(
+[[extern, pure]] fn getNumber(str:str) -> num;
+[[extern, pure]] fn passthrough(rgb:vec3) -> vec3;
+
+let uv = [getNumber("42"), getNumber("11"), getNumber("7")];
+passthrough([0.4*uv.x, uv.y, 1])
+        )");
+        REQUIRE(ast != nullptr);
+
+        auto opt = opt::OptimizerOptions::None();
+        opt.OptimizeIdentityMoves = true;
+        opt.OptimizeConstantPropagation = true;
+        
+        opt.EnableRegisterAllocation = true;
+        
+        opt.OptimizeRedundantMoves = true;
+        opt.OptimizeMoveChains = true;
+
+        // The following are necessary for RVM
+        opt.DissolveTuples = true;
+        opt.RemoveDeadCode = true;
+
+        auto prog = env.map(ast);
+        env.optimize(prog, opt);
+
+        rvm::RVMMapper mapper;
+        auto original = mapper.mapProgram(prog);
+
+        RVMProgram optimized = original;
+
+        // std::cout << "Before: " << std::endl
+        //           << RVMSerializer::serialize(original) << std::endl
+        //           << "-------------------------------------------------" << std::endl;
+
+        REQUIRE(original.size() > 0);
+
+        bool changed = RVMOptimizer::optimize(opt, optimized);
+        CHECK(changed == true);
+
+        // std::cout << "After: " << std::endl
+        //           << RVMSerializer::serialize(optimized) << std::endl;
+
+        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type::AsVector(3)) == true);
+    }
+}

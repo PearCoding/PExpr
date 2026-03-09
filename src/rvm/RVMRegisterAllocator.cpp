@@ -95,10 +95,10 @@ void RVMRegisterAllocator::linearScanAllocate(std::vector<InternalLiveInterval>&
     RegId nextReg = 0;
 
     for (auto& interval : intervals) {
-        // Expire old intervals (end <= start means interval is no longer live)
+        // Expire old intervals (end < start means interval is no longer live)
         active.erase(std::remove_if(active.begin(), active.end(),
                                     [&interval](InternalLiveInterval* activeInterval) {
-                                        return activeInterval->Interval.End <= interval.Interval.Start;
+                                        return activeInterval->Interval.End < interval.Interval.Start;
                                     }),
                      active.end());
 
