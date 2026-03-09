@@ -5,7 +5,6 @@
 
 #include "opt/OptimizerOptions.h"
 #include "rvm/RVMConstantOptimizer.h"
-#include "rvm/RVMMoveOptimizer.h"
 #include "rvm/RVMOptimizer.h"
 #include "rvm/RVMSerializer.h"
 #include "rvm/RVMStructs.h"
@@ -60,15 +59,8 @@ TEST_CASE("RVMConstantOptimizer: basic constant propagation", "[rvm][constant][o
         REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
 
         // The MOV should still be there (only propagation, no removal)
+        // Move optimization is now part of register allocation
         REQUIRE(countMovInstructions(program) == 1);
-
-        // Now run with redundant move elimination to clean up
-        opts.OptimizeRedundantMoves = true;
-        bool changed2               = RVMMoveOptimizer::optimize(opts, program);
-        REQUIRE(changed2 == true);
-
-        // MOV should be removed
-        REQUIRE(countMovInstructions(program) == 0);
     }
 
     SECTION("Propagate number constant")
@@ -282,18 +274,15 @@ TEST_CASE("RVMConstantOptimizer: full optimizer integration", "[rvm][constant][o
     {
         std::string rvmIr = R"(
             mov %r4:int 42:int
-            add %r1:int %r4:int %r2:int
-            ret 3
+            add %r0:int %r4:int %r2:int
+            ret 1
         )";
 
         RVMProgram program  = deserializeSafe(rvmIr);
         RVMProgram original = program;
 
         // Apply full optimizer with constant propagation and redundant moves
-        opt::OptimizerOptions opts;
-        opts.OptimizeConstantPropagation = true;
-        opts.OptimizeRedundantMoves      = true;
-        bool changed                     = RVMOptimizer::optimize(opts, program);
+        bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::Medium(), program);
 
         REQUIRE(changed == true);
         REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
@@ -309,9 +298,10 @@ TEST_CASE("RVMConstantOptimizer: full optimizer integration", "[rvm][constant][o
     {
         std::string rvmIr = R"(
             mov %r4:int 42:int
+            mov %r2:int 17:int
             mov %r5:int %r4:int
-            add %r1:int %r5:int %r2:int
-            ret 3
+            add %r0:int %r5:int %r2:int
+            ret 1
         )";
 
         RVMProgram program  = deserializeSafe(rvmIr);

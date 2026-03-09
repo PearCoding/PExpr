@@ -1,7 +1,6 @@
 #include "Environment.h"
 #include "opt/OptimizerOptions.h"
 #include "rvm/RVMMapper.h"
-#include "rvm/RVMMoveOptimizer.h"
 #include "rvm/RVMOptimizer.h"
 #include "rvm/RVMRegisterAllocator.h"
 #include "rvm/RVMSerializer.h"
@@ -17,74 +16,6 @@ using namespace PExpr::type;
 
 TEST_CASE("RVMValidator: Optimization Verification", "[rvm][validation]")
 {
-    SECTION("Redundant Move Elimination Verification")
-    {
-        const std::string source = R"(
-mov %r0:int 10:int
-mov %r1:int %r0:int
-mov %r1:int 20:int
-ret 2
-)";
-        auto original_opt        = RVMSerializer::deserialize(source);
-        REQUIRE(original_opt.has_value());
-        RVMProgram original  = *original_opt;
-        RVMProgram optimized = original;
-
-        REQUIRE(original.size() == 4);
-
-        opt::OptimizerOptions opts;
-        opts.OptimizeRedundantMoves = true;
-        bool changed                = RVMMoveOptimizer::optimize(opts, optimized);
-        REQUIRE(changed == true);
-
-        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
-    }
-
-    SECTION("Move Chain Optimization Verification")
-    {
-        const std::string source = R"(
-mov %r0:int 10:int
-mov %r1:int %r0:int
-mov %r2:int %r1:int
-ret 3
-)";
-        auto original_opt        = RVMSerializer::deserialize(source);
-        REQUIRE(original_opt.has_value());
-        RVMProgram original  = *original_opt;
-        RVMProgram optimized = original;
-
-        REQUIRE(original.size() == 4);
-
-        opt::OptimizerOptions opts;
-        opts.OptimizeMoveChains = true;
-        bool changed            = RVMMoveOptimizer::optimize(opts, optimized);
-        REQUIRE(changed == false); // No change as all three registers are used as a return value
-
-        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
-    }
-
-    SECTION("Identity Move Elimination Verification")
-    {
-        const std::string source = R"(
-mov %r0:int 10:int
-mov %r0:int %r0:int
-ret 1
-)";
-        auto original_opt        = RVMSerializer::deserialize(source);
-        REQUIRE(original_opt.has_value());
-        RVMProgram original  = *original_opt;
-        RVMProgram optimized = original;
-
-        REQUIRE(original.size() == 3);
-
-        opt::OptimizerOptions opts;
-        opts.OptimizeIdentityMoves = true;
-        bool changed               = RVMMoveOptimizer::optimize(opts, optimized);
-        REQUIRE(changed == true);
-
-        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
-    }
-
     SECTION("Constant Propagation and getNumber Verification")
     {
         std::vector<Type> params     = { Type(TypeKind::String) };
@@ -105,9 +36,15 @@ ret 1
 
         REQUIRE(original.size() == 6);
 
+        std::cout << "Before:" << std::endl
+                  << RVMSerializer::serialize(original) << std::endl
+                  << "--------------------------------------------";
         bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::Medium(), optimized);
         REQUIRE(changed == true);
 
+        std::cout << "After:" << std::endl
+                  << RVMSerializer::serialize(optimized) << std::endl
+                  << "--------------------------------------------";
         REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Number)) == true);
     }
 
@@ -322,6 +259,9 @@ TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation
         rvm::RVMMapper mapper;
         auto rvmProg = mapper.mapProgram(prog);
 
+        std::cout << "Before:" << std::endl
+                  << RVMSerializer::serialize(rvmProg) << std::endl
+                  << "--------------------------------------------";
         // Validate before allocation
         std::string errorMsg;
         bool isValidBefore = RVMValidator::validateUseBeforeDefinition(rvmProg, errorMsg);
@@ -331,9 +271,12 @@ TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation
         REQUIRE(isValidBefore == true);
 
         // Apply register allocation
-        bool changed = RVMRegisterAllocator::allocate(rvmProg);
-        REQUIRE(changed == true);
+        auto result = RVMRegisterAllocator::allocate(rvmProg);
+        REQUIRE(result.Changed == true);
 
+        std::cout << "After:" << std::endl
+                  << RVMSerializer::serialize(rvmProg) << std::endl
+                  << "--------------------------------------------";
         // Validate after allocation
         bool isValidAfter = RVMValidator::validateUseBeforeDefinition(rvmProg, errorMsg);
         REQUIRE(isValidAfter == true);
@@ -358,13 +301,10 @@ passthrough([0.4*uv.x, uv.y, 1])
         REQUIRE(ast != nullptr);
 
         auto opt = opt::OptimizerOptions::None();
-        opt.OptimizeIdentityMoves = true;
+
+        opt.OptimizeIdentityMoves       = true;
         opt.OptimizeConstantPropagation = true;
-        
-        opt.EnableRegisterAllocation = true;
-        
-        opt.OptimizeRedundantMoves = true;
-        opt.OptimizeMoveChains = true;
+        opt.EnableRegisterAllocation    = true;
 
         // The following are necessary for RVM
         opt.DissolveTuples = true;
@@ -378,17 +318,10 @@ passthrough([0.4*uv.x, uv.y, 1])
 
         RVMProgram optimized = original;
 
-        // std::cout << "Before: " << std::endl
-        //           << RVMSerializer::serialize(original) << std::endl
-        //           << "-------------------------------------------------" << std::endl;
-
         REQUIRE(original.size() > 0);
 
         bool changed = RVMOptimizer::optimize(opt, optimized);
         CHECK(changed == true);
-
-        // std::cout << "After: " << std::endl
-        //           << RVMSerializer::serialize(optimized) << std::endl;
 
         REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type::AsVector(3)) == true);
     }

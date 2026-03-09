@@ -122,8 +122,6 @@ int main(int argc, char** argv)
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
     app.add_flag("--opt-dissolve-tuples,!--no-opt-dissolve-tuples", optimizationOptions.DissolveTuples, "Dissolve tuples");
     app.add_flag("--opt-rvm-identity-moves,!--no-opt-rvm-identity-moves", optimizationOptions.OptimizeIdentityMoves, "Optimize RVM identity moves (redundant code)");
-    app.add_flag("--opt-rvm-move-chains,!--no-opt-rvm-move-chains", optimizationOptions.OptimizeMoveChains, "Optimize RVM move chains");
-    app.add_flag("--opt-rvm-redundant-moves,!--no-opt-rvm-redundant-moves", optimizationOptions.OptimizeRedundantMoves, "Eliminate redundant MOV instructions in RVM");
     app.add_flag("--opt-rvm-constant-folding,!--no-opt-rvm-constant-folding", optimizationOptions.OptimizeConstantPropagation, "Enable constant folding in RVM");
     app.add_flag("--opt-rvm-register-allocation,!--no-opt-rvm-register-allocation", optimizationOptions.EnableRegisterAllocation, "Enable register allocation to minimize register count");
 
