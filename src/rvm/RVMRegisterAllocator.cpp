@@ -108,6 +108,8 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                 const RVMValue& dst = mov->destination();
                 const RVMValue& src = mov->source();
 
+                PEXPR_ASSERT(dst.type() == src.type(), "mov instructions require matching types for source and destination");
+
                 // Only handle register-to-register MOVs for coalescing
                 if (dst.isRegister() && src.isRegister()) {
                     MovInfo info;

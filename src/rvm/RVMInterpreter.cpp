@@ -85,7 +85,13 @@ ValueVariant RVMInterpreter::execute(const RVMProgram& program, const type::Type
                     if (call->returnCount() > 0)
                         registers[0] = { result, type::Type(type::TypeKind::Unspecified) }; // Type will be updated by MOV if needed
                 } else {
-                    // Fallback or error
+                    // External function not found - this is an error
+                    std::cerr << "Error: External function '" << call->functionName() << "' not registered" << std::endl;
+                    // Set default values for return registers
+                    for (size_t i = 0; i < call->returnCount(); ++i) {
+                        registers[i] = { getDefaultValue(type::Type(type::TypeKind::Number)),
+                                         type::Type(type::TypeKind::Unspecified) };
+                    }
                 }
             } else {
                 auto it = labelMap.find(call->functionName());
@@ -143,20 +149,23 @@ ValueVariant RVMInterpreter::execute(const RVMProgram& program, const type::Type
 
 ValueVariant RVMInterpreter::parseValue(const std::string& str)
 {
-    if (str == "true") return true;
-    if (str == "false") return false;
-    
+    if (str == "true")
+        return true;
+    if (str == "false")
+        return false;
+
     // Check for number (has dot or 'f' suffix)
-    if (str.find('.') != std::string::npos || (str.back() == 'f' && str.size() > 1 && std::isdigit(str[str.size()-2]))) {
+    if (str.find('.') != std::string::npos || (str.back() == 'f' && str.size() > 1 && std::isdigit(str[str.size() - 2]))) {
         std::string s = str;
-        if (s.back() == 'f') s.pop_back();
+        if (s.back() == 'f')
+            s.pop_back();
         try {
             return std::stod(s);
         } catch (...) {
             return 0.0;
         }
     }
-    
+
     // Try integer
     try {
         return static_cast<Integer>(std::stoll(str));
@@ -210,19 +219,27 @@ void RVMInterpreter::setRegister(const RVMValue& dst, const ValueVariant& value)
 ValueVariant RVMInterpreter::getDefaultValue(const type::Type& type)
 {
     switch (type.kind()) {
-    case type::TypeKind::Boolean: return false;
-    case type::TypeKind::Integer: return Integer(0);
-    case type::TypeKind::Number: return 0.0;
-    case type::TypeKind::String: return std::string("");
-    default: return Integer(0);
+    case type::TypeKind::Boolean:
+        return false;
+    case type::TypeKind::Integer:
+        return Integer(0);
+    case type::TypeKind::Number:
+        return 0.0;
+    case type::TypeKind::String:
+        return std::string("");
+    default:
+        return Integer(0);
     }
 }
 
 bool RVMInterpreter::isZero(const ValueVariant& val)
 {
-    if (std::holds_alternative<bool>(val)) return !std::get<bool>(val);
-    if (std::holds_alternative<Integer>(val)) return std::get<Integer>(val) == 0;
-    if (std::holds_alternative<Number>(val)) return std::get<Number>(val) == 0.0;
+    if (std::holds_alternative<bool>(val))
+        return !std::get<bool>(val);
+    if (std::holds_alternative<Integer>(val))
+        return std::get<Integer>(val) == 0;
+    if (std::holds_alternative<Number>(val))
+        return std::get<Number>(val) == 0.0;
     return false;
 }
 
@@ -237,7 +254,8 @@ ValueVariant RVMInterpreter::applyUnaryOp(Opcode op, const ValueVariant& src)
         if (std::holds_alternative<Number>(src))
             return static_cast<Integer>(std::get<Number>(src));
         break;
-    default: break;
+    default:
+        break;
     }
     return src;
 }
@@ -246,20 +264,31 @@ ValueVariant RVMInterpreter::applyBinaryOp(Opcode op, const ValueVariant& src1, 
 {
     if (op >= Opcode::ADD && op <= Opcode::POW) {
         double a = 0.0, b = 0.0;
-        if (std::holds_alternative<Integer>(src1)) a = static_cast<double>(std::get<Integer>(src1));
-        else if (std::holds_alternative<Number>(src1)) a = std::get<Number>(src1);
-        
-        if (std::holds_alternative<Integer>(src2)) b = static_cast<double>(std::get<Integer>(src2));
-        else if (std::holds_alternative<Number>(src2)) b = std::get<Number>(src2);
+        if (std::holds_alternative<Integer>(src1))
+            a = static_cast<double>(std::get<Integer>(src1));
+        else if (std::holds_alternative<Number>(src1))
+            a = std::get<Number>(src1);
+
+        if (std::holds_alternative<Integer>(src2))
+            b = static_cast<double>(std::get<Integer>(src2));
+        else if (std::holds_alternative<Number>(src2))
+            b = std::get<Number>(src2);
 
         switch (op) {
-        case Opcode::ADD: return a + b;
-        case Opcode::SUB: return a - b;
-        case Opcode::MUL: return a * b;
-        case Opcode::DIV: return (b == 0.0) ? std::numeric_limits<double>::infinity() : a / b;
-        case Opcode::MOD: return (b == 0.0) ? 0.0 : std::fmod(a, b);
-        case Opcode::POW: return std::pow(a, b);
-        default: break;
+        case Opcode::ADD:
+            return a + b;
+        case Opcode::SUB:
+            return a - b;
+        case Opcode::MUL:
+            return a * b;
+        case Opcode::DIV:
+            return (b == 0.0) ? std::numeric_limits<double>::infinity() : a / b;
+        case Opcode::MOD:
+            return (b == 0.0) ? 0.0 : std::fmod(a, b);
+        case Opcode::POW:
+            return std::pow(a, b);
+        default:
+            break;
         }
     }
 
@@ -267,26 +296,39 @@ ValueVariant RVMInterpreter::applyBinaryOp(Opcode op, const ValueVariant& src1, 
         if (std::holds_alternative<std::string>(src1) && std::holds_alternative<std::string>(src2)) {
             const auto& s1 = std::get<std::string>(src1);
             const auto& s2 = std::get<std::string>(src2);
-            if (op == Opcode::CMP_EQ) return s1 == s2;
-            if (op == Opcode::CMP_NE) return s1 != s2;
+            if (op == Opcode::CMP_EQ)
+                return s1 == s2;
+            if (op == Opcode::CMP_NE)
+                return s1 != s2;
             return false;
         }
 
         double a = 0.0, b = 0.0;
-        if (std::holds_alternative<Integer>(src1)) a = static_cast<double>(std::get<Integer>(src1));
-        else if (std::holds_alternative<Number>(src1)) a = std::get<Number>(src1);
-        
-        if (std::holds_alternative<Integer>(src2)) b = static_cast<double>(std::get<Integer>(src2));
-        else if (std::holds_alternative<Number>(src2)) b = std::get<Number>(src2);
+        if (std::holds_alternative<Integer>(src1))
+            a = static_cast<double>(std::get<Integer>(src1));
+        else if (std::holds_alternative<Number>(src1))
+            a = std::get<Number>(src1);
+
+        if (std::holds_alternative<Integer>(src2))
+            b = static_cast<double>(std::get<Integer>(src2));
+        else if (std::holds_alternative<Number>(src2))
+            b = std::get<Number>(src2);
 
         switch (op) {
-        case Opcode::CMP_EQ: return a == b;
-        case Opcode::CMP_NE: return a != b;
-        case Opcode::CMP_LT: return a < b;
-        case Opcode::CMP_LE: return a <= b;
-        case Opcode::CMP_GT: return a > b;
-        case Opcode::CMP_GE: return a >= b;
-        default: break;
+        case Opcode::CMP_EQ:
+            return a == b;
+        case Opcode::CMP_NE:
+            return a != b;
+        case Opcode::CMP_LT:
+            return a < b;
+        case Opcode::CMP_LE:
+            return a <= b;
+        case Opcode::CMP_GT:
+            return a > b;
+        case Opcode::CMP_GE:
+            return a >= b;
+        default:
+            break;
         }
     }
     return Integer(0);

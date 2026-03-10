@@ -86,14 +86,75 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
             });
         }
 
-        // Register pass(num) -> num
+        // Register passthrough(num) -> num
         {
             std::vector<type::Type> params = { type::Type(type::TypeKind::Number) };
-            std::string passMangled        = type::makeMangledNameFromTypes("pass", params, nullptr);
-            interp.registerExternalFunction(passMangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.empty() || !std::holds_alternative<Number>(args[0]))
                     return 0.0;
                 return std::get<Number>(args[0]);
+            });
+        }
+
+        // Register passthrough(int) -> int
+        {
+            std::vector<type::Type> params = { type::Type(type::TypeKind::Integer) };
+            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.empty() || !std::holds_alternative<Integer>(args[0]))
+                    return Integer(0);
+                return std::get<Integer>(args[0]);
+            });
+        }
+
+        // Register passthrough(bool) -> bool
+        {
+            std::vector<type::Type> params = { type::Type(type::TypeKind::Boolean) };
+            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.empty() || !std::holds_alternative<bool>(args[0]))
+                    return false;
+                return std::get<bool>(args[0]);
+            });
+        }
+
+        // Register passthrough(vec2) -> vec2
+        {
+            std::vector<type::Type> params = { type::Type::AsVector(2) };
+            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.size() < 2)
+                    return ValueVariant{};
+                auto tuple = std::make_shared<TupleVariant>();
+                tuple->elements = { args[0], args[1] };
+                return ValueVariant{ tuple };
+            });
+        }
+
+        // Register passthrough(vec3) -> vec3
+        {
+            std::vector<type::Type> params = { type::Type::AsVector(3) };
+            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.size() < 3)
+                    return ValueVariant{};
+                auto tuple = std::make_shared<TupleVariant>();
+                tuple->elements = { args[0], args[1], args[2] };
+                return ValueVariant{ tuple };
+            });
+        }
+
+        // Register passthrough(vec4) -> vec4
+        {
+            std::vector<type::Type> params = { type::Type::AsVector(4) };
+            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
+                if (args.size() < 4)
+                    return ValueVariant{};
+                auto tuple = std::make_shared<TupleVariant>();
+                tuple->elements = { args[0], args[1], args[2], args[3] };
+                return ValueVariant{ tuple };
             });
         }
 
