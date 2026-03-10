@@ -38,9 +38,39 @@ bool RVMValidator::checkIfElementary(const RVMValue& value)
     return value.type().isSpecified() && !value.type().isTuple();
 }
 
+namespace {
+
+// Helper function to convert ValueVariant to a readable string
+std::string valueVariantToString(const ValueVariant& val)
+{
+    if (std::holds_alternative<Number>(val)) {
+        return "Number(" + std::to_string(std::get<Number>(val)) + ")";
+    } else if (std::holds_alternative<Integer>(val)) {
+        return "Integer(" + std::to_string(std::get<Integer>(val)) + ")";
+    } else if (std::holds_alternative<bool>(val)) {
+        return std::string("bool(") + (std::get<bool>(val) ? "true" : "false") + ")";
+    } else if (std::holds_alternative<std::string>(val)) {
+        return "String(\"" + std::get<std::string>(val) + "\")";
+    } else if (std::holds_alternative<Tuple>(val)) {
+        const auto& tuple = std::get<Tuple>(val);
+        std::string result = "Tuple[";
+        for (size_t i = 0; i < tuple->elements.size(); ++i) {
+            if (i > 0)
+                result += ", ";
+            result += valueVariantToString(tuple->elements[i]);
+        }
+        result += "]";
+        return result;
+    }
+    return "Unknown";
+}
+
+} // anonymous namespace
+
 bool RVMValidator::validateOptimizations(const RVMProgram& original,
                                          const RVMProgram& optimized,
-                                         const type::Type& returnType)
+                                         const type::Type& returnType,
+                                         std::string& errorMsg)
 {
     auto run = [&](const RVMProgram& prog) {
         RVMInterpreter interp;
@@ -73,27 +103,42 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
     ValueVariant resOrig = run(original);
     ValueVariant resOpt  = run(optimized);
 
-    // Deep comparison of results (nested lambdas require a bit of care with std::function or similar for recursion)
-    auto compare = [](auto&& self, const ValueVariant& v1, const ValueVariant& v2) -> bool {
-        if (v1.index() != v2.index())
+    // Deep comparison of results with detailed error reporting
+    auto compare = [](auto&& self, const ValueVariant& v1, const ValueVariant& v2, std::string& err, const std::string& path = "") -> bool {
+        if (v1.index() != v2.index()) {
+            err = "Type mismatch at " + path + ": original has type " + std::to_string(v1.index()) + 
+                  " (" + valueVariantToString(v1) + "), optimized has type " + std::to_string(v2.index()) + 
+                  " (" + valueVariantToString(v2) + ")";
             return false;
+        }
 
-        if (std::holds_alternative<std::shared_ptr<TupleVariant>>(v1)) {
-            const auto& t1 = std::get<std::shared_ptr<TupleVariant>>(v1);
-            const auto& t2 = std::get<std::shared_ptr<TupleVariant>>(v2);
-            if (t1->elements.size() != t2->elements.size())
+        if (std::holds_alternative<Tuple>(v1)) {
+            const auto& t1 = std::get<Tuple>(v1);
+            const auto& t2 = std::get<Tuple>(v2);
+            if (t1->elements.size() != t2->elements.size()) {
+                err = "Tuple size mismatch at " + path + ": original has " + std::to_string(t1->elements.size()) + 
+                      " elements, optimized has " + std::to_string(t2->elements.size()) + " elements";
                 return false;
+            }
             for (size_t i = 0; i < t1->elements.size(); ++i) {
-                if (!self(self, t1->elements[i], t2->elements[i]))
+                std::string elementPath = path + "[" + std::to_string(i) + "]";
+                if (!self(self, t1->elements[i], t2->elements[i], err, elementPath)) {
                     return false;
+                }
             }
             return true;
         }
 
-        return v1 == v2;
+        if (v1 != v2) {
+            err = "Value mismatch at " + path + ": original returned " + valueVariantToString(v1) + 
+                  ", optimized returned " + valueVariantToString(v2);
+            return false;
+        }
+
+        return true;
     };
 
-    return compare(compare, resOrig, resOpt);
+    return compare(compare, resOrig, resOpt, errorMsg, "<root>");
 }
 
 bool RVMValidator::validateUseBeforeDefinition(const RVMProgram& program, std::string& errorMsg)

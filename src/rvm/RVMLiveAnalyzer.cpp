@@ -17,8 +17,8 @@ struct LivenessSegment : public RVMLiveAnalyzer::LiveInterval {
     bool EndsAtBlockExit    = false;
 
     LivenessSegment() = default;
-    LivenessSegment(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nm, bool pp, size_t bIdx, bool entries, bool exits)
-        : LiveInterval(r, s, e, pStart, pEnd, nm, pp)
+    LivenessSegment(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nm, size_t bIdx, bool entries, bool exits)
+        : LiveInterval(r, s, e, pStart, pEnd, nm)
         , BlockIndex(bIdx)
         , StartsAtBlockEntry(entries)
         , EndsAtBlockExit(exits)
@@ -84,7 +84,6 @@ void RVMLiveAnalyzer::processInstruction(
     std::vector<LiveInterval>& allIntervals)
 {
     bool isNonMove = instr->opcode() != Opcode::MOV;
-    bool isMov     = !isNonMove;
 
     // A call or return pins its registers according to the calling convention
     bool pins = (instr->opcode() == Opcode::CALL_EXTERNAL || instr->opcode() == Opcode::CALL_INTERNAL || instr->opcode() == Opcode::RET);
@@ -107,21 +106,7 @@ void RVMLiveAnalyzer::processInstruction(
         if (dstVal.isRegister()) {
             RegId reg = dstVal.regId();
 
-            // For MOV instructions, check if source is pinned
-            bool preservesPinnedValue = false;
-            if (isMov && instr->opcode() == Opcode::MOV) {
-                if (auto* movInstr = dynamic_cast<const RVMInstr2Op*>(instr.get())) {
-                    const RVMValue& srcVal = movInstr->source();
-                    if (srcVal.isRegister()) {
-                        RegId srcReg = srcVal.regId();
-                        auto it      = activeIntervals.find(srcReg);
-                        if (it != activeIntervals.end() && (it->second.isPinned() || it->second.PreservesPinnedValue))
-                            preservesPinnedValue = true;
-                    }
-                }
-            }
-
-            processRegDef(reg, index, activeIntervals, allIntervals, pins, preservesPinnedValue);
+            processRegDef(reg, index, activeIntervals, allIntervals, pins);
             if (isNonMove)
                 activeIntervals[reg].HasNonMoveUsage = true;
         }
@@ -139,20 +124,19 @@ void RVMLiveAnalyzer::processRegUse(RegId reg, size_t index,
     } else {
         // Register used before definition (e.g., function parameter or live-in)
         // Create an interval that starts at 0 (block beginning)
-        activeIntervals[reg] = LiveInterval(reg, 0, index, false, pin, false, false);
+        activeIntervals[reg] = LiveInterval(reg, 0, index, false, pin, false);
     }
 }
 
 void RVMLiveAnalyzer::processRegDef(RegId reg, size_t index,
                                     std::unordered_map<RegId, LiveInterval>& activeIntervals,
                                     std::vector<LiveInterval>& allIntervals,
-                                    bool pin,
-                                    bool preservesPinnedValue)
+                                    bool pin)
 {
     if (auto it = activeIntervals.find(reg); it != activeIntervals.end())
         allIntervals.push_back(it->second);
 
-    activeIntervals[reg] = LiveInterval(reg, index, index, pin, false, false, preservesPinnedValue);
+    activeIntervals[reg] = LiveInterval(reg, index, index, pin, false, false);
 }
 
 std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const RVMProgram& program)
@@ -259,7 +243,7 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
 
         // If register is live-in, it starts at block entry
         for (RegId reg : liveIn[blockIdx])
-            activeIntervals[reg] = LiveInterval(reg, 0, 0, false, false, false, false);
+            activeIntervals[reg] = LiveInterval(reg, 0, 0, false, false, false);
 
         // Process instructions
         for (size_t i = 0; i < block.size(); ++i)
@@ -278,7 +262,6 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
                 interval.PinnedStart,
                 interval.PinnedEnd,
                 interval.HasNonMoveUsage,
-                interval.PreservesPinnedValue,
                 blockIdx,
                 startsAtEntry,
                 isLiveOut);
@@ -294,7 +277,6 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
                 interval.PinnedStart,
                 interval.PinnedEnd,
                 interval.HasNonMoveUsage,
-                interval.PreservesPinnedValue,
                 blockIdx,
                 startsAtEntry,
                 false // Completed segments within a block never reach the exit
@@ -371,7 +353,6 @@ std::vector<RVMLiveAnalyzer::LiveInterval> RVMLiveAnalyzer::analyzeProgram(const
             merged.PinnedStart |= seg.PinnedStart;
             merged.PinnedEnd |= seg.PinnedEnd;
             merged.HasNonMoveUsage |= seg.HasNonMoveUsage;
-            merged.PreservesPinnedValue |= seg.PreservesPinnedValue;
         }
     }
 

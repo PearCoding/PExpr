@@ -22,22 +22,20 @@ public:
         bool PinnedStart          = false; // Is the start of the interval pinned (e.g., return value of a call)?
         bool PinnedEnd            = false; // Is the end of the interval pinned (e.g., parameter of a call)?
         bool HasNonMoveUsage      = false; // Does the interval contain any non-move instruction usage?
-        bool PreservesPinnedValue = false; // Does this interval preserve a pinned value from another register?
 
         LiveInterval() = default;
-        LiveInterval(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nonMove, bool preservesPinned)
+        LiveInterval(RegId r, size_t s, size_t e, bool pStart, bool pEnd, bool nonMove)
             : Register(r)
             , Start(s)
             , End(e)
             , PinnedStart(pStart)
             , PinnedEnd(pEnd)
             , HasNonMoveUsage(nonMove)
-            , PreservesPinnedValue(preservesPinned)
         {
         }
 
         /// Returns true when the interval is not used and is not associated with a pinned register
-        [[nodiscard]] inline bool isRedundant() const { return Start == End && !PinnedStart && !PinnedEnd && !PreservesPinnedValue; }
+        [[nodiscard]] inline bool isRedundant() const { return Start == End && !PinnedStart && !PinnedEnd; }
         /// Returns true when the interval is pinned (either start or end)
         [[nodiscard]] inline bool isPinned() const { return PinnedStart || PinnedEnd; }
     };
@@ -70,8 +68,7 @@ private:
     static void processRegDef(RegId reg, size_t index,
                               std::unordered_map<RegId, LiveInterval>& activeIntervals,
                               std::vector<LiveInterval>& allIntervals,
-                              bool pin,
-                              bool preservesPinnedValue = false);
+                              bool pin);
 };
 
 } // namespace PExpr::rvm

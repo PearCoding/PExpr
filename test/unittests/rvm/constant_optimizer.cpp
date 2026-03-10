@@ -56,7 +56,16 @@ TEST_CASE("RVMConstantOptimizer: basic constant propagation", "[rvm][constant][o
         bool changed                     = RVMConstantOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
 
         // The MOV should still be there (only propagation, no removal)
         // Move optimization is now part of register allocation
@@ -80,7 +89,16 @@ TEST_CASE("RVMConstantOptimizer: basic constant propagation", "[rvm][constant][o
         bool changed                     = RVMConstantOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Number)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Number), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 
     SECTION("Propagate boolean constant")
@@ -100,7 +118,16 @@ TEST_CASE("RVMConstantOptimizer: basic constant propagation", "[rvm][constant][o
         bool changed                     = RVMConstantOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Boolean)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Boolean), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 
     SECTION("Multiple constant propagations")
@@ -121,7 +148,16 @@ TEST_CASE("RVMConstantOptimizer: basic constant propagation", "[rvm][constant][o
         bool changed                     = RVMConstantOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 }
 
@@ -146,7 +182,16 @@ TEST_CASE("RVMConstantOptimizer: basic block boundaries", "[rvm][constant][optim
 
         // Should NOT propagate because label starts new basic block
         REQUIRE(changed == false);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 
     SECTION("No propagation across jump")
@@ -169,7 +214,16 @@ TEST_CASE("RVMConstantOptimizer: basic block boundaries", "[rvm][constant][optim
 
         // Should NOT propagate because jump separates blocks
         REQUIRE(changed == false);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 
     SECTION("Propagation within same block")
@@ -191,7 +245,16 @@ TEST_CASE("RVMConstantOptimizer: basic block boundaries", "[rvm][constant][optim
 
         // Should propagate to both ADD and SUB
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 }
 
@@ -215,7 +278,16 @@ TEST_CASE("RVMConstantOptimizer: redefinition invalidates constant", "[rvm][cons
         bool changed                     = RVMConstantOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
         // The constant 10 should be propagated, not 42
     }
 
@@ -238,7 +310,16 @@ TEST_CASE("RVMConstantOptimizer: redefinition invalidates constant", "[rvm][cons
 
         // No propagation should happen because r4 is overwritten before being read as a source
         REQUIRE(changed == false);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
         // The MOV sets r4 = 42, but then ADD overwrites r4 before any use of r4 as a source.
         // The second ADD uses r4 after it has been overwritten, so no constant propagation.
     }
@@ -264,7 +345,16 @@ TEST_CASE("RVMConstantOptimizer: no propagation for register source", "[rvm][con
 
         // Should not change because source is register, not constant
         REQUIRE(changed == false);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 }
 
@@ -285,7 +375,16 @@ TEST_CASE("RVMConstantOptimizer: full optimizer integration", "[rvm][constant][o
         bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::Medium(), program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
 
         // MOV should be removed
         REQUIRE(countMovInstructions(program) == 0);
@@ -312,7 +411,16 @@ TEST_CASE("RVMConstantOptimizer: full optimizer integration", "[rvm][constant][o
         bool changed               = RVMOptimizer::optimize(opts, program);
 
         REQUIRE(changed == true);
-        REQUIRE(RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer)));
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, program, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
 
         // Both MOVs should be eliminated: first becomes redundant after propagation,
         // second is a chain that gets collapsed.

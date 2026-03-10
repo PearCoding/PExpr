@@ -120,10 +120,16 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                     if (info.IsIdentity) {
                         info.CanCoalesce = true; // Identity MOVs always removable
                     } else {
-                        bool srcPinned   = isPinned(info.SrcReg, intervals);
-                        bool dstPinned   = isPinned(info.DstReg, intervals);
-                        bool conflict    = interferes(info.SrcReg, info.DstReg, intervals);
-                        info.CanCoalesce = !srcPinned && !dstPinned && !conflict;
+                        bool srcPinned = isPinned(info.SrcReg, intervals);
+                        bool dstPinned = isPinned(info.DstReg, intervals);
+                        bool conflict  = interferes(info.SrcReg, info.DstReg, intervals, i);
+
+                        // Only block coalescing if BOTH are pinned (to different registers)
+                        // If only one is pinned, the merged group will use the pinned register's ID
+                        // bool pinningConflict = srcPinned && dstPinned;
+                        // info.CanCoalesce     = !pinningConflict && !conflict;
+                        
+                        info.CanCoalesce     = !srcPinned && !dstPinned && !conflict;
                     }
 
                     movs.push_back(info);
@@ -156,7 +162,8 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
 
 bool RVMRegisterAllocator::interferes(
     RegId r1, RegId r2,
-    const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
+    const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
+    size_t movIdx)
 {
     // Collect all intervals for r1 and r2
     std::vector<std::pair<size_t, size_t>> ranges1, ranges2;
@@ -168,12 +175,25 @@ bool RVMRegisterAllocator::interferes(
             ranges2.push_back({ interval.Start, interval.End });
     }
 
-    // Check if any ranges overlap
+    // Check if any ranges overlap, excluding the MOV handoff point
     for (const auto& [s1, e1] : ranges1) {
         for (const auto& [s2, e2] : ranges2) {
-            // Two ranges [s1,e1] and [s2,e2] overlap if:
-            // NOT (e1 < s2 OR e2 < s1)
-            // Which simplifies to: s1 <= e2 AND s2 <= e1
+            // Special case for MOV coalescing at movIdx:
+            // If one interval ends exactly at movIdx and the other starts at movIdx,
+            // this is the handoff point - they don't truly interfere
+            if (e1 == movIdx && s2 == movIdx)
+                continue; // r1 ends at MOV, r2 starts at MOV - OK to coalesce
+            if (e2 == movIdx && s1 == movIdx)
+                continue; // r2 ends at MOV, r1 starts at MOV - OK to coalesce
+
+            // General read-before-write semantic:
+            // If one interval ends exactly where another starts, they don't interfere.
+            // At that instruction, the ending register is read (last use) while the
+            // starting register is written (first def). Reads happen before writes.
+            if (e1 == s2 || e2 == s1)
+                continue;
+
+            // Standard overlap check
             if (s1 <= e2 && s2 <= e1)
                 return true;
         }

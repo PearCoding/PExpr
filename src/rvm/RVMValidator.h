@@ -15,9 +15,11 @@ public:
 
     /// Validate that two programs are semantically equivalent by interpreting them.
     /// This assumes the programs take no arguments and return the same type.
+    /// Returns false and sets errorMsg if the programs produce different values.
     [[nodiscard]] static bool validateOptimizations(const RVMProgram& original,
                                                   const RVMProgram& optimized,
-                                                  const type::Type& returnType);
+                                                  const type::Type& returnType,
+                                                  std::string& errorMsg);
 
     /// Check for use-before-definition errors in the program
     [[nodiscard]] static bool validateUseBeforeDefinition(const RVMProgram& program, std::string& errorMsg);

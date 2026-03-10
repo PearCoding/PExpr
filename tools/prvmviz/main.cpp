@@ -167,7 +167,7 @@ public:
         : mProgram(program)
         , mIntervals(intervals)
     {
-        mBlocks = RVMBasicBlockAnalyzer::splitIntoBlocks(program);
+        mBlocks   = RVMBasicBlockAnalyzer::splitIntoBlocks(program);
         mMaxIndex = program.size();
 
         for (const auto& interval : intervals)
@@ -209,7 +209,6 @@ public:
                 std::u8string Symbol = u8" ";
                 bool Pinned          = false;
                 bool NonMove         = false;
-                bool PreservesPinned = false;
             } cell;
 
             for (const auto& interval : mIntervals) {
@@ -227,8 +226,6 @@ public:
                         cell.Pinned = true;
                     if (interval.HasNonMoveUsage)
                         cell.NonMove = true;
-                    if (interval.PreservesPinnedValue)
-                        cell.PreservesPinned = true;
                     break;
                 }
             }
@@ -237,8 +234,6 @@ public:
             ss << " ";
             if (cell.Pinned)
                 ss << "\033[1;31m" << (const char*)cell.Symbol.c_str() << "\033[0m";
-            else if (cell.PreservesPinned)
-                ss << "\033[1;35m" << (const char*)cell.Symbol.c_str() << "\033[0m";
             else if (cell.NonMove)
                 ss << "\033[1;32m" << (const char*)cell.Symbol.c_str() << "\033[0m";
             else if (cell.Symbol != u8" ")
@@ -337,8 +332,7 @@ private:
         os << "\nLegend:\n"
            << " \033[1;34m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m: Move-only  "
            << " \033[1;32m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m: Non-move usage "
-           << " \033[1;31m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m: Pinned (Param/Return)"
-           << " \033[1;35m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m: Preserves pinned value\n";
+           << " \033[1;31m" << (const char*)RangeMiddleSymbol.c_str() << "\033[0m: Pinned (Param/Return)";
     }
 
     const RVMProgram& mProgram;

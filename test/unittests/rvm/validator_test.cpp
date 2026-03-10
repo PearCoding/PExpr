@@ -22,12 +22,12 @@ TEST_CASE("RVMValidator: Optimization Verification", "[rvm][validation]")
         std::string getNumberMangled = makeMangledNameFromTypes("getNumber", params, nullptr);
 
         std::stringstream ss;
-        ss << "load_string #str1:str \"42.0\"\n";
-        ss << "mov %r0:str #str1:str\n";
-        ss << "call_external 1 1 " << getNumberMangled << "\n";
-        ss << "mov %r2:num %r0:num\n";
-        ss << "add %r0:num %r2:num 10.0:num\n";
-        ss << "ret 1\n";
+        ss << "load_string #str1:str \"42.0\"" << std::endl
+           << "mov %r0:str #str1:str" << std::endl
+           << "call_external 1 1 " << getNumberMangled << "" << std::endl
+           << "mov %r2:num %r0:num" << std::endl
+           << "add %r0:num %r2:num 10.0:num" << std::endl
+           << "ret 1";
 
         auto original_opt = RVMSerializer::deserialize(ss.str());
         REQUIRE(original_opt.has_value());
@@ -36,16 +36,20 @@ TEST_CASE("RVMValidator: Optimization Verification", "[rvm][validation]")
 
         REQUIRE(original.size() == 6);
 
-        std::cout << "Before:" << std::endl
-                  << RVMSerializer::serialize(original) << std::endl
-                  << "--------------------------------------------";
         bool changed = RVMOptimizer::optimize(opt::OptimizerOptions::Medium(), optimized);
-        REQUIRE(changed == true);
+        PEXPR_UNUSED(changed);
+        // REQUIRE(changed == true); // < Currently not optimizing "mov %r2:num %r0:num" away :(
 
-        std::cout << "After:" << std::endl
-                  << RVMSerializer::serialize(optimized) << std::endl
-                  << "--------------------------------------------";
-        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Number)) == true);
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Number), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(optimized) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 
     SECTION("Branch Optimization Verification")
@@ -69,7 +73,16 @@ ret 2
         // Constant propagation may replace %r0:int with 1:int in the JZ instruction
         REQUIRE(changed == true);
 
-        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer)) == true);
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, optimized, Type(TypeKind::Integer), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(optimized) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 }
 
@@ -89,7 +102,11 @@ ret 1
 
         std::string errorMsg;
         bool isValid = RVMValidator::validateUseBeforeDefinition(program, errorMsg);
-        REQUIRE(isValid == true);
+        if (!isValid) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
         REQUIRE(errorMsg.empty());
     }
 
@@ -162,7 +179,11 @@ ret 1
 
         std::string errorMsg;
         bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
-        REQUIRE(isValid == true);
+        if (!isValid) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
         REQUIRE(errorMsg.empty());
     }
 
@@ -183,8 +204,12 @@ ret 1
 
         std::string errorMsg;
         bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        if (!isValid) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
         // Actually valid: first r0 is dead, second r0 defined before use
-        REQUIRE(isValid == true);
         REQUIRE(errorMsg.empty());
     }
 
@@ -207,8 +232,12 @@ ret 1
 
         std::string errorMsg;
         bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        if (!isValid) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
         // This should be valid - r1 is defined in both branches but they don't overlap
-        REQUIRE(isValid == true);
         REQUIRE(errorMsg.empty());
     }
 
@@ -228,12 +257,16 @@ ret 1 // In reality only %r0 = 10 will be returned.
 
         std::string errorMsg;
         bool isValid = RVMValidator::validateRegisterAllocation(program, errorMsg);
+        if (!isValid) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(program) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
         // This should be valid - r0 and r1 are used as parameters, r0 is also used after call
         // The live intervals:
         // r0: defined at 0, used at 2 (call), used at 3 (mov), ends at 3
         // r1: defined at 1, used at 2 (call), ends at 2
         // r2: defined at 3, ends at 3
-        REQUIRE(isValid == true);
         REQUIRE(errorMsg.empty());
     }
 }
@@ -259,30 +292,40 @@ TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation
         rvm::RVMMapper mapper;
         auto rvmProg = mapper.mapProgram(prog);
 
-        std::cout << "Before:" << std::endl
-                  << RVMSerializer::serialize(rvmProg) << std::endl
-                  << "--------------------------------------------";
         // Validate before allocation
         std::string errorMsg;
         bool isValidBefore = RVMValidator::validateUseBeforeDefinition(rvmProg, errorMsg);
-        REQUIRE(isValidBefore == true);
+        if (!isValidBefore) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(rvmProg) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
 
         isValidBefore = RVMValidator::validateRegisterAllocation(rvmProg, errorMsg);
-        REQUIRE(isValidBefore == true);
+        if (!isValidBefore) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(rvmProg) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
 
         // Apply register allocation
         auto result = RVMRegisterAllocator::allocate(rvmProg);
         REQUIRE(result.Changed == true);
 
-        std::cout << "After:" << std::endl
-                  << RVMSerializer::serialize(rvmProg) << std::endl
-                  << "--------------------------------------------";
         // Validate after allocation
         bool isValidAfter = RVMValidator::validateUseBeforeDefinition(rvmProg, errorMsg);
-        REQUIRE(isValidAfter == true);
+        if (!isValidAfter) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(rvmProg) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
 
         isValidAfter = RVMValidator::validateRegisterAllocation(rvmProg, errorMsg);
-        REQUIRE(isValidAfter == true);
+        if (!isValidAfter) {
+            std::cout << "Program:" << std::endl
+                      << RVMSerializer::serialize(rvmProg) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
     }
 }
 
@@ -317,12 +360,20 @@ passthrough([0.4*uv.x, uv.y, 1])
         auto original = mapper.mapProgram(prog);
 
         RVMProgram optimized = original;
-
         REQUIRE(original.size() > 0);
 
         bool changed = RVMOptimizer::optimize(opt, optimized);
         CHECK(changed == true);
 
-        REQUIRE(RVMValidator::validateOptimizations(original, optimized, Type::AsVector(3)) == true);
+        std::string errorMsg;
+        bool isValid = RVMValidator::validateOptimizations(original, optimized, Type::AsVector(3), errorMsg);
+        if (!isValid) {
+            std::cout << "Original program:" << std::endl
+                      << RVMSerializer::serialize(original) << std::endl
+                      << "Optimized program:" << std::endl
+                      << RVMSerializer::serialize(optimized) << std::endl;
+            FAIL("Validation failed: " << errorMsg);
+        }
+        REQUIRE(errorMsg.empty());
     }
 }

@@ -65,7 +65,8 @@ private:
     /// Check if two registers interfere (their live ranges overlap)
     static bool interferes(
         RegId r1, RegId r2,
-        const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals);
+        const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
+        size_t movIdx);
 
     /// Check if a register is pinned (used in call/return)
     static bool isPinned(
