@@ -73,6 +73,12 @@ private:
         RegId reg,
         const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals);
 
+    /// Check if a MOV destination is dead (never used after the MOV)
+    static bool isDestinationDead(
+        RegId dstReg,
+        const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
+        size_t movIdx);
+
     /// Build interference graph: set of (r1, r2) pairs that interfere
     static std::set<std::pair<RegId, RegId>> buildInterferenceGraph(
         const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals);

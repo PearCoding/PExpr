@@ -128,27 +128,24 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                         // If only one is pinned, the merged group will use the pinned register's ID
                         // bool pinningConflict = srcPinned && dstPinned;
                         // info.CanCoalesce     = !pinningConflict && !conflict;
-                        
-                        info.CanCoalesce     = !srcPinned && !dstPinned && !conflict;
+
+                        info.CanCoalesce = !srcPinned && !dstPinned && !conflict;
+
+                        // If coalescing failed, check if destination is dead (never used)
+                        if (!info.CanCoalesce && isDestinationDead(info.DstReg, intervals, i))
+                            info.CanCoalesce = true; // Dead destination = can remove
                     }
 
                     movs.push_back(info);
                 } else if (dst.isRegister()) { //< Also check for redundant MOVs (dst never used)
-                    // Find interval for dst at this instruction
-                    RegId dstReg = dst.regId();
-                    for (const auto& interval : intervals) {
-                        if (interval.Register == dstReg && interval.Start == i) {
-                            if (interval.isRedundant()) {
-                                MovInfo info;
-                                info.InstructionIndex = i;
-                                info.SrcReg           = 0; // Not relevant
-                                info.DstReg           = dstReg;
-                                info.IsIdentity       = false;
-                                info.CanCoalesce      = true; // Redundant = can remove
-                                movs.push_back(info);
-                            }
-                            break;
-                        }
+                    if (isDestinationDead(dst.regId(), intervals, i)) {
+                        MovInfo info;
+                        info.InstructionIndex = i;
+                        info.SrcReg           = 0; // Not relevant
+                        info.DstReg           = dst.regId();
+                        info.IsIdentity       = false;
+                        info.CanCoalesce      = true; // Redundant = can remove
+                        movs.push_back(info);
                     }
                 }
             }
@@ -211,6 +208,26 @@ bool RVMRegisterAllocator::isPinned(
     for (const auto& interval : intervals) {
         if (interval.Register == reg && interval.isPinned())
             return true;
+    }
+    return false;
+}
+
+//=== isDestinationDead() ===
+
+bool RVMRegisterAllocator::isDestinationDead(
+    RegId dstReg,
+    const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
+    size_t movIdx)
+{
+    // Find the interval for the destination register that starts at this MOV
+    for (const auto& interval : intervals) {
+        if (interval.Register == dstReg && interval.Start == movIdx) {
+            // The destination is dead if:
+            // 1. It's not pinned (pinned registers must exist for calling convention)
+            // 2. It's never used (Start == End means defined and never read)
+            // 3. It has no non-move usage (only used in MOVs, which we're removing)
+            return interval.isRedundant();
+        }
     }
     return false;
 }
