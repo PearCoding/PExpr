@@ -44,6 +44,7 @@ private:
         RegId DstReg;            // Destination register
         bool IsIdentity;         // true if SrcReg == DstReg
         bool CanCoalesce;        // true if src/dst don't interfere and neither is pinned
+        bool ShouldMerge;        // true if registers should be merged (false for dead destination MOVs)
     };
 
     /// Union-Find for coalescing intervals

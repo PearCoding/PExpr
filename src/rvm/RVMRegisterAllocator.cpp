@@ -115,10 +115,12 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                     info.SrcReg           = src.regId();
                     info.DstReg           = dst.regId();
                     info.IsIdentity       = (info.SrcReg == info.DstReg);
+                    info.ShouldMerge      = false; // Default: don't merge
 
                     // Check if can coalesce (neither pinned, don't interfere)
                     if (info.IsIdentity) {
-                        info.CanCoalesce = true; // Identity MOVs always removable
+                        info.CanCoalesce = true;  // Identity MOVs always removable
+                        info.ShouldMerge = false; // No need to merge identity MOVs
                     } else {
                         bool srcPinned = isPinned(info.SrcReg, intervals);
                         bool dstPinned = isPinned(info.DstReg, intervals);
@@ -130,10 +132,13 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                         // info.CanCoalesce     = !pinningConflict && !conflict;
 
                         info.CanCoalesce = !srcPinned && !dstPinned && !conflict;
+                        info.ShouldMerge = info.CanCoalesce; // Coalescing means merge registers
 
                         // If coalescing failed, check if destination is dead (never used)
-                        if (!info.CanCoalesce && isDestinationDead(info.DstReg, intervals, i))
-                            info.CanCoalesce = true; // Dead destination = can remove
+                        if (!info.CanCoalesce && isDestinationDead(info.DstReg, intervals, i)) {
+                            info.CanCoalesce = true;  // Dead destination = can remove
+                            info.ShouldMerge = false; // But don't merge registers!
+                        }
                     }
 
                     movs.push_back(info);
@@ -144,7 +149,8 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                         info.SrcReg           = 0; // Not relevant
                         info.DstReg           = dst.regId();
                         info.IsIdentity       = false;
-                        info.CanCoalesce      = true; // Redundant = can remove
+                        info.CanCoalesce      = true;  // Redundant = can remove
+                        info.ShouldMerge      = false; // Don't merge for non-register sources
                         movs.push_back(info);
                     }
                 }
@@ -281,8 +287,9 @@ RVMRegisterAllocator::performCoalescing(
         if (mov.CanCoalesce) {
             movsToRemove.insert(mov.InstructionIndex);
 
-            // If not identity, merge the registers
-            if (!mov.IsIdentity)
+            // Only merge registers if ShouldMerge is true
+            // (false for dead destination MOVs and identity MOVs)
+            if (mov.ShouldMerge)
                 uf.unite(mov.SrcReg, mov.DstReg);
         }
     }
