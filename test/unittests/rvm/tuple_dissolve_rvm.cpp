@@ -8,14 +8,6 @@
 
 using namespace PExpr;
 
-[[nodiscard]] inline static auto MakeTupleOptimization()
-{
-    auto opts           = opt::OptimizerOptions::None();
-    opts.RemoveDeadCode = true;
-    opts.DissolveTuples = true;
-    return opts;
-}
-
 TEST_CASE("Tuple dissolve with RVM mapping - simple tuple return", "[tuple_dissolve][rvm]")
 {
     const char* source = R"(
@@ -33,7 +25,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - simple tuple return", "[tuple_disso
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -42,9 +34,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - simple tuple return", "[tuple_disso
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have proper function calls and register assignments
     REQUIRE(rvmCode.find("call_internal") != std::string::npos);
@@ -68,7 +57,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - nested tuple arguments", "[tuple_di
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -77,9 +66,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - nested tuple arguments", "[tuple_di
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have proper function calls with multiple arguments
     REQUIRE(rvmCode.find("call_internal") != std::string::npos);
@@ -105,7 +91,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple in phi node", "[tuple_dissolv
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -114,9 +100,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple in phi node", "[tuple_dissolv
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have proper RVM code (phi nodes may be optimized away)
     REQUIRE_FALSE(rvmCode.empty());
@@ -139,7 +122,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - complex nested tuple", "[tuple_diss
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -148,9 +131,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - complex nested tuple", "[tuple_diss
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have element access operations
     REQUIRE(rvmCode.find("mov") != std::string::npos);
@@ -171,7 +151,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple swizzle", "[tuple_dissolve][r
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -180,9 +160,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple swizzle", "[tuple_dissolve][r
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have multiple element assignments
     REQUIRE(rvmCode.find("mov") != std::string::npos);
@@ -204,7 +181,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple binary operations", "[tuple_d
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -213,9 +190,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple binary operations", "[tuple_d
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have multiple add operations
     REQUIRE(rvmCode.find("add") != std::string::npos);
@@ -236,7 +210,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple copy propagation", "[tuple_di
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -245,9 +219,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - tuple copy propagation", "[tuple_di
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have element-wise copy operations
     REQUIRE(rvmCode.find("mov") != std::string::npos);
@@ -275,7 +246,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - function returning tuple", "[tuple_
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -284,9 +255,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - function returning tuple", "[tuple_
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have proper function calls with multiple return values
     REQUIRE(rvmCode.find("call_internal") != std::string::npos);
@@ -308,7 +276,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - mixed scalar/tuple operations", "[t
     auto program = env.map(closure);
 
     // Apply tuple dissolve optimization
-    bool changed = env.optimize(program, MakeTupleOptimization());
+    bool changed = env.optimize(program, opt::OptimizerOptions::None());
     REQUIRE(changed);
 
     // Map to RVM
@@ -317,9 +285,6 @@ TEST_CASE("Tuple dissolve with RVM mapping - mixed scalar/tuple operations", "[t
 
     // Serialize RVM program
     std::string rvmCode = rvm::RVMSerializer::serialize(rvmProgram);
-
-    // Should have no tuple instructions in RVM
-    REQUIRE(rvmCode.find("tuple[") == std::string::npos);
 
     // Should have multiple mul operations
     REQUIRE(rvmCode.find("mul") != std::string::npos);

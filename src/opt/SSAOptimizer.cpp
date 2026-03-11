@@ -90,12 +90,6 @@ void SSAOptimizer::runProgram(ssa::SSAProgram& program)
                 changed |= mFunctionInliner->attempFunctionInlining(mContext.get(), program, func);
         }
     }
-
-    // We can't really repeat over this as it will dissolve tuples and reconstruct it over and over again
-    if (mOptions.DissolveTuples) {
-        PEXPR_ASSERT(mOptions.RemoveDeadCode, "Dissolving tuples requires removal of dead code!");
-        changed |= mTupleDissolvePass->dissolve(mContext.get(), program);
-    }
 }
 
 bool SSAOptimizer::processBody(InstructionList& body)

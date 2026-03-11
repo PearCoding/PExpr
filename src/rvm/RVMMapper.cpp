@@ -55,20 +55,27 @@ std::vector<RVMValue> RVMMapper::mapTupleValues(const ssa::SSAValue& value)
         if (auto it = mTupleMap.find(value); it != mTupleMap.end()) {
             return it->second;
         } else if (value.isConstant()) {
+            // Dissolve constant tuple and cache the result
             std::vector<RVMValue> constants;
             const auto& tuple = value.valueAs<Tuple>();
             dissolveConstantTuple(tuple, constants);
+            mTupleMap[value] = constants;
             return constants;
         } else {
-            PEXPR_ASSERT(false, "Invalid SSA with incomplete tuple graph!");
-            return {};
+            // TODO:
+            const auto& types = dissolveTupleType(value.type());
+            std::vector<RVMValue> result;
+            result.reserve(types.size());
+            for (const auto& type : types)
+                result.push_back(RVMValue::Register(mContext.allocateRegister(), type));
+            mTupleMap[value] = result;
+            return result;
         }
     } else {
         // Elementary type
         return { mapValue(value) };
     }
 }
-
 static Integer getFlatSize(const type::Type& type)
 {
     if (!type.isTuple())
@@ -132,6 +139,10 @@ RVMValue RVMMapper::accessTuple(const ssa::SSAValue& value, Integer idx)
         for (Integer i = 0; i < aIt->second.second; ++i)
             linearOffset += getFlatSize(aIt->second.first.type().components().at(i));
         return accessTuple(aIt->second.first, linearOffset + idx);
+    } else if (value.type().isTuple()) {
+        // Tuple not in mTupleMap yet - use mapTupleValues to handle it
+        auto tupleValues = mapTupleValues(value);
+        return tupleValues.at(idx);
     } else {
         return mapValue(value);
     }
@@ -147,26 +158,17 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
         if (instr.Target.type().isTuple()) {
             // Tuple assignment: could be tuple copy or tuple construction
             if (instr.Operands.size() == 1) {
-                // Tuple copy: forward the association
-                mTupleMap[instr.Target] = mTupleMap.at(instr.Operands[0]);
+                // Tuple copy: use mapTupleValues to handle both mapped tuples and constant tuples
+                mTupleMap[instr.Target] = mapTupleValues(instr.Operands[0]);
             } else {
                 // Tuple construction from multiple operands
                 std::vector<RVMValue> elements;
 
                 for (size_t i = 0; i < instr.Operands.size(); ++i) {
-                    if (auto it = mTupleMap.find(instr.Operands[i]); it != mTupleMap.end()) {
-                        for (const auto& e : it->second)
-                            elements.push_back(e);
-                    } else {
-                        const auto dstType = instr.Operands[i].type();
-                        PEXPR_ASSERT(!dstType.isTuple(), "Undetected tuple found during tuple dissolving");
-
-                        RVMValue src = mapValue(instr.Operands[i]);
-                        RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstType);
-
-                        elements.push_back(dst);
-                        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-                    }
+                    // Use mapTupleValues to handle both mapped tuples and constant tuples
+                    auto operandValues = mapTupleValues(instr.Operands[i]);
+                    for (const auto& e : operandValues)
+                        elements.push_back(e);
                 }
 
                 mTupleMap[instr.Target] = std::move(elements);
@@ -185,30 +187,65 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
         // Unary operation
         PEXPR_ASSERT(instr.Operands.size() == 1, "Unary expects 1 operand");
 
-        RVMValue dst = mapValue(instr.Target);
-        RVMValue src = mapValue(instr.Operands[0]);
+        if (instr.Target.type().isTuple()) {
+            // Element-wise unary operation on tuples
+            auto srcTuple = mapTupleValues(instr.Operands[0]);
+            auto dstTypes = dissolveTupleType(instr.Target.type());
 
-        switch (instr.UnaryOp) {
-        case UnaryOperation::Neg: {
-            // For negation, we could add a NEG opcode or use 2-op SUB from zero
-            // Using 0 - src with 3-operand for now
-            RVMValue zero = instr.Target.type().kind() == type::TypeKind::Integer
-                                ? RVMValue::Constant(Integer(0))
-                                : RVMValue::Constant(Number(0.0));
-            result.push_back(std::make_shared<RVMInstr3Op>(Opcode::SUB, dst, zero, src));
-            break;
-        }
-        case UnaryOperation::Pos:
-            // dst = src (no-op, just move)
-            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-            break;
-        case UnaryOperation::Not: {
-            // Logical not:  dst = !src
-            // Using 2-operand with XOR would need a NOT opcode, for now use 3-op
-            RVMValue one = RVMValue::Constant(Integer(1));
-            result.push_back(std::make_shared<RVMInstr3Op>(Opcode::XOR, dst, src, one));
-            break;
-        }
+            PEXPR_ASSERT(srcTuple.size() == dstTypes.size(), "Tuple size mismatch in unary operation");
+
+            std::vector<RVMValue> elements;
+            for (size_t i = 0; i < srcTuple.size(); ++i) {
+                RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                RVMValue src = srcTuple[i];
+
+                switch (instr.UnaryOp) {
+                case UnaryOperation::Neg: {
+                    RVMValue zero = dstTypes[i].kind() == type::TypeKind::Integer
+                                        ? RVMValue::Constant(Integer(0))
+                                        : RVMValue::Constant(Number(0.0));
+                    result.push_back(std::make_shared<RVMInstr3Op>(Opcode::SUB, dst, zero, src));
+                    break;
+                }
+                case UnaryOperation::Pos:
+                    result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+                    break;
+                case UnaryOperation::Not: {
+                    RVMValue one = RVMValue::Constant(Integer(1));
+                    result.push_back(std::make_shared<RVMInstr3Op>(Opcode::XOR, dst, src, one));
+                    break;
+                }
+                }
+                elements.push_back(dst);
+            }
+            mTupleMap[instr.Target] = std::move(elements);
+        } else {
+            // Scalar unary operation
+            RVMValue dst = mapValue(instr.Target);
+            RVMValue src = mapValue(instr.Operands[0]);
+
+            switch (instr.UnaryOp) {
+            case UnaryOperation::Neg: {
+                // For negation, we could add a NEG opcode or use 2-op SUB from zero
+                // Using 0 - src with 3-operand for now
+                RVMValue zero = instr.Target.type().kind() == type::TypeKind::Integer
+                                    ? RVMValue::Constant(Integer(0))
+                                    : RVMValue::Constant(Number(0.0));
+                result.push_back(std::make_shared<RVMInstr3Op>(Opcode::SUB, dst, zero, src));
+                break;
+            }
+            case UnaryOperation::Pos:
+                // dst = src (no-op, just move)
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+                break;
+            case UnaryOperation::Not: {
+                // Logical not:  dst = !src
+                // Using 2-operand with XOR would need a NOT opcode, for now use 3-op
+                RVMValue one = RVMValue::Constant(Integer(1));
+                result.push_back(std::make_shared<RVMInstr3Op>(Opcode::XOR, dst, src, one));
+                break;
+            }
+            }
         }
         break;
     }
@@ -216,57 +253,250 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
         // Binary operation
         PEXPR_ASSERT(instr.Operands.size() == 2, "Binary expects 2 operands");
 
-        RVMValue dst  = mapValue(instr.Target);
-        RVMValue src1 = mapValue(instr.Operands[0]);
-        RVMValue src2 = mapValue(instr.Operands[1]);
+        if (instr.Target.type().isTuple()) {
+            if (instr.Operands[0].type().isTuple() && !instr.Operands[1].type().isTuple()) {
+                // Scalar × Tuple operation (e.g., vec * 2.0)
+                auto srcTuple  = mapTupleValues(instr.Operands[0]);
+                auto scalarSrc = mapValue(instr.Operands[1]);
+                auto dstTypes  = dissolveTupleType(instr.Target.type());
 
-        Opcode op;
-        switch (instr.BinaryOp) {
-        case BinaryOperation::Add:
-            op = Opcode::ADD;
-            break;
-        case BinaryOperation::Sub:
-            op = Opcode::SUB;
-            break;
-        case BinaryOperation::Mul:
-            op = Opcode::MUL;
-            break;
-        case BinaryOperation::Div:
-            op = Opcode::DIV;
-            break;
-        case BinaryOperation::Mod:
-            op = Opcode::MOD;
-            break;
-        case BinaryOperation::Equal:
-            op = Opcode::CMP_EQ;
-            break;
-        case BinaryOperation::NotEqual:
-            op = Opcode::CMP_NE;
-            break;
-        case BinaryOperation::Less:
-            op = Opcode::CMP_LT;
-            break;
-        case BinaryOperation::LessEqual:
-            op = Opcode::CMP_LE;
-            break;
-        case BinaryOperation::Greater:
-            op = Opcode::CMP_GT;
-            break;
-        case BinaryOperation::GreaterEqual:
-            op = Opcode::CMP_GE;
-            break;
-        case BinaryOperation::And:
-            op = Opcode::AND;
-            break;
-        case BinaryOperation::Or:
-            op = Opcode::OR;
-            break;
-        case BinaryOperation::Pow:
-            op = Opcode::POW;
-            break;
+                PEXPR_ASSERT(srcTuple.size() == dstTypes.size(), "Tuple size mismatch in scalar x tuple operation");
+
+                Opcode op;
+                switch (instr.BinaryOp) {
+                case BinaryOperation::Add:
+                    op = Opcode::ADD;
+                    break;
+                case BinaryOperation::Sub:
+                    op = Opcode::SUB;
+                    break;
+                case BinaryOperation::Mul:
+                    op = Opcode::MUL;
+                    break;
+                case BinaryOperation::Div:
+                    op = Opcode::DIV;
+                    break;
+                case BinaryOperation::Mod:
+                    op = Opcode::MOD;
+                    break;
+                case BinaryOperation::Equal:
+                    op = Opcode::CMP_EQ;
+                    break;
+                case BinaryOperation::NotEqual:
+                    op = Opcode::CMP_NE;
+                    break;
+                case BinaryOperation::Less:
+                    op = Opcode::CMP_LT;
+                    break;
+                case BinaryOperation::LessEqual:
+                    op = Opcode::CMP_LE;
+                    break;
+                case BinaryOperation::Greater:
+                    op = Opcode::CMP_GT;
+                    break;
+                case BinaryOperation::GreaterEqual:
+                    op = Opcode::CMP_GE;
+                    break;
+                case BinaryOperation::And:
+                    op = Opcode::AND;
+                    break;
+                case BinaryOperation::Or:
+                    op = Opcode::OR;
+                    break;
+                case BinaryOperation::Pow:
+                    op = Opcode::POW;
+                    break;
+                }
+
+                std::vector<RVMValue> elements;
+                for (size_t i = 0; i < srcTuple.size(); ++i) {
+                    RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                    RVMValue src = srcTuple[i];
+                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src, scalarSrc));
+                    elements.push_back(dst);
+                }
+                mTupleMap[instr.Target] = std::move(elements);
+            } else if (!instr.Operands[0].type().isTuple() && instr.Operands[1].type().isTuple()) {
+                // Tuple × Scalar operation (e.g., 2.0 * vec)
+                auto scalarSrc = mapValue(instr.Operands[0]);
+                auto srcTuple  = mapTupleValues(instr.Operands[1]);
+                auto dstTypes  = dissolveTupleType(instr.Target.type());
+
+                PEXPR_ASSERT(srcTuple.size() == dstTypes.size(), "Tuple size mismatch in tuple×scalar operation");
+
+                Opcode op;
+                switch (instr.BinaryOp) {
+                case BinaryOperation::Add:
+                    op = Opcode::ADD;
+                    break;
+                case BinaryOperation::Sub:
+                    op = Opcode::SUB;
+                    break;
+                case BinaryOperation::Mul:
+                    op = Opcode::MUL;
+                    break;
+                case BinaryOperation::Div:
+                    op = Opcode::DIV;
+                    break;
+                case BinaryOperation::Mod:
+                    op = Opcode::MOD;
+                    break;
+                case BinaryOperation::Equal:
+                    op = Opcode::CMP_EQ;
+                    break;
+                case BinaryOperation::NotEqual:
+                    op = Opcode::CMP_NE;
+                    break;
+                case BinaryOperation::Less:
+                    op = Opcode::CMP_LT;
+                    break;
+                case BinaryOperation::LessEqual:
+                    op = Opcode::CMP_LE;
+                    break;
+                case BinaryOperation::Greater:
+                    op = Opcode::CMP_GT;
+                    break;
+                case BinaryOperation::GreaterEqual:
+                    op = Opcode::CMP_GE;
+                    break;
+                case BinaryOperation::And:
+                    op = Opcode::AND;
+                    break;
+                case BinaryOperation::Or:
+                    op = Opcode::OR;
+                    break;
+                case BinaryOperation::Pow:
+                    op = Opcode::POW;
+                    break;
+                }
+
+                std::vector<RVMValue> elements;
+                for (size_t i = 0; i < srcTuple.size(); ++i) {
+                    RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                    RVMValue src = srcTuple[i];
+                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, scalarSrc, src));
+                    elements.push_back(dst);
+                }
+                mTupleMap[instr.Target] = std::move(elements);
+            } else {
+                // Element-wise binary operation on tuples
+                auto srcTuple1 = mapTupleValues(instr.Operands[0]);
+                auto srcTuple2 = mapTupleValues(instr.Operands[1]);
+                auto dstTypes  = dissolveTupleType(instr.Target.type());
+
+                PEXPR_ASSERT(srcTuple1.size() == srcTuple2.size(), "Tuple size mismatch in binary operation");
+                PEXPR_ASSERT(srcTuple1.size() == dstTypes.size(), "Tuple size mismatch with target type");
+
+                Opcode op;
+                switch (instr.BinaryOp) {
+                case BinaryOperation::Add:
+                    op = Opcode::ADD;
+                    break;
+                case BinaryOperation::Sub:
+                    op = Opcode::SUB;
+                    break;
+                case BinaryOperation::Mul:
+                    op = Opcode::MUL;
+                    break;
+                case BinaryOperation::Div:
+                    op = Opcode::DIV;
+                    break;
+                case BinaryOperation::Mod:
+                    op = Opcode::MOD;
+                    break;
+                case BinaryOperation::Equal:
+                    op = Opcode::CMP_EQ;
+                    break;
+                case BinaryOperation::NotEqual:
+                    op = Opcode::CMP_NE;
+                    break;
+                case BinaryOperation::Less:
+                    op = Opcode::CMP_LT;
+                    break;
+                case BinaryOperation::LessEqual:
+                    op = Opcode::CMP_LE;
+                    break;
+                case BinaryOperation::Greater:
+                    op = Opcode::CMP_GT;
+                    break;
+                case BinaryOperation::GreaterEqual:
+                    op = Opcode::CMP_GE;
+                    break;
+                case BinaryOperation::And:
+                    op = Opcode::AND;
+                    break;
+                case BinaryOperation::Or:
+                    op = Opcode::OR;
+                    break;
+                case BinaryOperation::Pow:
+                    op = Opcode::POW;
+                    break;
+                }
+
+                std::vector<RVMValue> elements;
+                for (size_t i = 0; i < srcTuple1.size(); ++i) {
+                    RVMValue dst  = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                    RVMValue src1 = srcTuple1[i];
+                    RVMValue src2 = srcTuple2[i];
+                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src1, src2));
+                    elements.push_back(dst);
+                }
+                mTupleMap[instr.Target] = std::move(elements);
+            }
+        } else {
+            // Scalar binary operation
+            RVMValue dst  = mapValue(instr.Target);
+            RVMValue src1 = mapValue(instr.Operands[0]);
+            RVMValue src2 = mapValue(instr.Operands[1]);
+
+            Opcode op;
+            switch (instr.BinaryOp) {
+            case BinaryOperation::Add:
+                op = Opcode::ADD;
+                break;
+            case BinaryOperation::Sub:
+                op = Opcode::SUB;
+                break;
+            case BinaryOperation::Mul:
+                op = Opcode::MUL;
+                break;
+            case BinaryOperation::Div:
+                op = Opcode::DIV;
+                break;
+            case BinaryOperation::Mod:
+                op = Opcode::MOD;
+                break;
+            case BinaryOperation::Equal:
+                op = Opcode::CMP_EQ;
+                break;
+            case BinaryOperation::NotEqual:
+                op = Opcode::CMP_NE;
+                break;
+            case BinaryOperation::Less:
+                op = Opcode::CMP_LT;
+                break;
+            case BinaryOperation::LessEqual:
+                op = Opcode::CMP_LE;
+                break;
+            case BinaryOperation::Greater:
+                op = Opcode::CMP_GT;
+                break;
+            case BinaryOperation::GreaterEqual:
+                op = Opcode::CMP_GE;
+                break;
+            case BinaryOperation::And:
+                op = Opcode::AND;
+                break;
+            case BinaryOperation::Or:
+                op = Opcode::OR;
+                break;
+            case BinaryOperation::Pow:
+                op = Opcode::POW;
+                break;
+            }
+
+            result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src1, src2));
         }
-
-        result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src1, src2));
         break;
     }
     case ssa::SSAInstrAssign::OpKind::Access: {
@@ -291,22 +521,51 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
         // Type cast
         PEXPR_ASSERT(instr.Operands.size() == 1, "Cast expects 1 operand");
 
-        RVMValue dst = mapValue(instr.Target);
-        RVMValue src = mapValue(instr.Operands[0]);
+        if (instr.Target.type().isTuple()) {
+            // Element-wise cast on tuples
+            auto srcTuple = mapTupleValues(instr.Operands[0]);
+            auto dstTypes = dissolveTupleType(instr.Target.type());
 
-        const auto& srcType = instr.Operands[0].type();
-        const auto& dstType = instr.Target.type();
+            PEXPR_ASSERT(srcTuple.size() == dstTypes.size(), "Tuple size mismatch in cast operation");
 
-        // Determine conversion opcode
-        Opcode castOp = Opcode::MOV; // default to move if same type
+            std::vector<RVMValue> elements;
+            for (size_t i = 0; i < srcTuple.size(); ++i) {
+                RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                RVMValue src = srcTuple[i];
 
-        if (srcType.kind() == type::TypeKind::Integer && dstType.kind() == type::TypeKind::Number)
-            castOp = Opcode::I2F;
-        else if (srcType.kind() == type::TypeKind::Number && dstType.kind() == type::TypeKind::Integer)
-            castOp = Opcode::F2I;
+                const auto& srcType = srcTuple[i].type();
+                const auto& dstType = dstTypes[i];
 
-        result.push_back(std::make_shared<RVMInstr2Op>(castOp, dst, src));
+                // Determine conversion opcode
+                Opcode castOp = Opcode::MOV; // default to move if same type
 
+                if (srcType.kind() == type::TypeKind::Integer && dstType.kind() == type::TypeKind::Number)
+                    castOp = Opcode::I2F;
+                else if (srcType.kind() == type::TypeKind::Number && dstType.kind() == type::TypeKind::Integer)
+                    castOp = Opcode::F2I;
+
+                result.push_back(std::make_shared<RVMInstr2Op>(castOp, dst, src));
+                elements.push_back(dst);
+            }
+            mTupleMap[instr.Target] = std::move(elements);
+        } else {
+            // Scalar cast
+            RVMValue dst = mapValue(instr.Target);
+            RVMValue src = mapValue(instr.Operands[0]);
+
+            const auto& srcType = instr.Operands[0].type();
+            const auto& dstType = instr.Target.type();
+
+            // Determine conversion opcode
+            Opcode castOp = Opcode::MOV; // default to move if same type
+
+            if (srcType.kind() == type::TypeKind::Integer && dstType.kind() == type::TypeKind::Number)
+                castOp = Opcode::I2F;
+            else if (srcType.kind() == type::TypeKind::Number && dstType.kind() == type::TypeKind::Integer)
+                castOp = Opcode::F2I;
+
+            result.push_back(std::make_shared<RVMInstr2Op>(castOp, dst, src));
+        }
         break;
     }
     }
@@ -469,26 +728,26 @@ std::shared_ptr<RVMInstr> RVMMapper::mapGoto(const ssa::SSAInstrGoto& instr)
 }
 
 // Helper to insert phi updates for a newly defined value
-void RVMMapper::insertPhiUpdatesForValue(const ssa::SSAValue& definedValue, 
+void RVMMapper::insertPhiUpdatesForValue(const ssa::SSAValue& definedValue,
                                          std::vector<std::shared_ptr<RVMInstr>>& result)
 {
     auto it = mPhiValueToTargets.find(definedValue);
     if (it == mPhiValueToTargets.end())
         return;
-    
+
     // Insert MOV instructions for each phi target that depends on this value
     for (const auto& phiTarget : it->second) {
-        RVMValue phiTargetRVM = mapValue(phiTarget);
+        RVMValue phiTargetRVM    = mapValue(phiTarget);
         RVMValue definedValueRVM = mapValue(definedValue);
-        
+
         if (phiTarget.type().isTuple()) {
             // Tuple phi: need to dissolve into elementary moves
             auto phiTargetVals = mapTupleValues(phiTarget);
-            auto definedVals = mapTupleValues(definedValue);
-            
+            auto definedVals   = mapTupleValues(definedValue);
+
             PEXPR_ASSERT(phiTargetVals.size() == definedVals.size(),
-                        "Tuple phi target and defined value size mismatch");
-            
+                         "Tuple phi target and defined value size mismatch");
+
             for (size_t i = 0; i < phiTargetVals.size(); ++i) {
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetVals[i], definedVals[i]));
             }
@@ -503,7 +762,7 @@ void RVMMapper::insertPhiUpdatesForValue(const ssa::SSAValue& definedValue,
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vector<std::shared_ptr<ssa::SSAInstr>>& ssaInstrs, const ssa::SSAProgram& ssaProgram)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
-    
+
     // Clear phi tracking state
     mPhiValueToTargets.clear();
 
@@ -528,10 +787,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         // Handle assign instructions
         if (auto* assign = dynamic_cast<ssa::SSAInstrAssign*>(ssaInstr.get())) {
             auto instrs = mapAssign(*assign);
-            
+
             // Insert phi updates for the defined value (if any)
             insertPhiUpdatesForValue(assign->Target, instrs);
-            
+
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
@@ -539,10 +798,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         // Handle call instructions
         if (auto* call = dynamic_cast<ssa::SSAInstrCall*>(ssaInstr.get())) {
             auto instrs = mapCall(*call, ssaProgram);
-            
+
             // Insert phi updates for the defined value (if any)
             insertPhiUpdatesForValue(call->Target, instrs);
-            
+
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
@@ -571,34 +830,32 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
             // Process phi node: map branch values to phi target
             for (size_t i = 0; i < phi->Branches.size(); ++i) {
                 const auto& branchValue = phi->Branches[i];
-                
+
                 // Record that this branch value maps to the phi target
                 mPhiValueToTargets[branchValue].push_back(phi->Target);
-                
+
                 // If branch value is a constant, insert MOV immediately
                 if (branchValue.isConstant()) {
-                    RVMValue phiTargetRVM = mapValue(phi->Target);
+                    RVMValue phiTargetRVM   = mapValue(phi->Target);
                     RVMValue branchValueRVM = mapValue(branchValue);
-                    
+
                     if (phi->Target.type().isTuple()) {
                         // Tuple phi: need to dissolve into elementary moves
                         auto phiTargetVals = mapTupleValues(phi->Target);
-                        auto branchVals = mapTupleValues(branchValue);
-                        
+                        auto branchVals    = mapTupleValues(branchValue);
+
                         PEXPR_ASSERT(phiTargetVals.size() == branchVals.size(),
-                                    "Tuple phi target and branch value size mismatch");
-                        
+                                     "Tuple phi target and branch value size mismatch");
+
                         for (size_t j = 0; j < phiTargetVals.size(); ++j)
                             result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetVals[j], branchVals[j]));
                     } else {
                         // Scalar move
-                        RVMValue phiTargetRVM = mapValue(phi->Target);
-                        RVMValue branchValueRVM = mapValue(branchValue);
                         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetRVM, branchValueRVM));
                     }
                 }
             }
-            
+
             // Note: we don't generate any code for the phi node itself here
             // The actual MOVs are inserted either above (for constants) or when values are defined
             continue;

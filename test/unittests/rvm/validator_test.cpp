@@ -350,7 +350,6 @@ passthrough([0.4*uv.x, uv.y, 1])
         opt.EnableRegisterAllocation    = true;
 
         // The following are necessary for RVM
-        opt.DissolveTuples = true;
         opt.RemoveDeadCode = true;
 
         auto prog = env.map(ast);

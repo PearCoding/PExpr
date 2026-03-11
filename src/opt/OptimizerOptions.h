@@ -14,8 +14,7 @@ struct OptimizerOptions {
     bool EliminateCommonSubexpressions = false; // < Common subexpression elimination (CSE)
     bool EliminatePartialRedundancies  = false; // < Partial redundancy elimination (PRE)
     bool OptimizeTailCalls             = false; // < Tail call optimization
-    bool DissolveTuples                = false; // < Dissolve tuples to elementary types (except call and returns). Not recommended, but necessary for RVM
-
+    
     bool OptimizeIdentityMoves       = false; // < Eliminate identity MOV instructions (src == dst) in RVM
     bool OptimizeConstantPropagation = false; // < Propagate constants from MOV instructions within basic blocks
     bool EnableRegisterAllocation    = false; // < Enable register allocation to minimize register count

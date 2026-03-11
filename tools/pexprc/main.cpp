@@ -120,7 +120,6 @@ int main(int argc, char** argv)
     app.add_flag("--opt-trigonometric-identities,!--no-opt-trigonometric-identities", optimizationOptions.ApplyTrigonometricIdentities, "Apply trigonometric identities");
     app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");
-    app.add_flag("--opt-dissolve-tuples,!--no-opt-dissolve-tuples", optimizationOptions.DissolveTuples, "Dissolve tuples");
     app.add_flag("--opt-rvm-identity-moves,!--no-opt-rvm-identity-moves", optimizationOptions.OptimizeIdentityMoves, "Optimize RVM identity moves (redundant code)");
     app.add_flag("--opt-rvm-constant-folding,!--no-opt-rvm-constant-folding", optimizationOptions.OptimizeConstantPropagation, "Enable constant folding in RVM");
     app.add_flag("--opt-rvm-register-allocation,!--no-opt-rvm-register-allocation", optimizationOptions.EnableRegisterAllocation, "Enable register allocation to minimize register count");
@@ -158,18 +157,6 @@ int main(int argc, char** argv)
     if (readRVMIR & (emitAST || !emitRVM)) {
         std::cerr << "Can't read RVM IR and emit AST or SSA IR afterwards" << std::endl;
         return 1;
-    }
-
-    if (emitRVM) {
-        if (skipOptimizationPass) {
-            std::cerr << "Can't skip optimization when emitting RVM" << std::endl;
-            return 1;
-        }
-        if (!optimizationOptions.DissolveTuples) {
-            // std::cout << "Enabled '--opt-dissolve-tuples' for RVM" << std::endl;
-            optimizationOptions.DissolveTuples = true;
-            optimizationOptions.RemoveDeadCode = true; //< Needed to dissolve tuples
-        }
     }
 
     if (outputFile.empty()) {

@@ -19,8 +19,13 @@ bool RVMOptimizer::optimize(const opt::OptimizerOptions& options, RVMProgram& pr
 
     // Apply register allocation with integrated MOV optimization
     if (options.EnableRegisterAllocation) {
-        auto result = RVMRegisterAllocator::allocate(program);
-        changedAtAll |= result.Changed;
+        while (true) {
+            auto result = RVMRegisterAllocator::allocate(program);
+            changedAtAll |= result.Changed;
+
+            if (!result.Changed)
+                break;
+        }
     }
 
     return changedAtAll;

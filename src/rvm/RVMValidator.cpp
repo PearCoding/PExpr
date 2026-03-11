@@ -52,7 +52,7 @@ std::string valueVariantToString(const ValueVariant& val)
     } else if (std::holds_alternative<std::string>(val)) {
         return "String(\"" + std::get<std::string>(val) + "\")";
     } else if (std::holds_alternative<Tuple>(val)) {
-        const auto& tuple = std::get<Tuple>(val);
+        const auto& tuple  = std::get<Tuple>(val);
         std::string result = "Tuple[";
         for (size_t i = 0; i < tuple->elements.size(); ++i) {
             if (i > 0)
@@ -89,7 +89,7 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         // Register passthrough(num) -> num
         {
             std::vector<type::Type> params = { type::Type(type::TypeKind::Number) };
-            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            std::string mangled            = type::makeMangledNameFromTypes("passthrough", params, nullptr);
             interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.empty() || !std::holds_alternative<Number>(args[0]))
                     return 0.0;
@@ -100,7 +100,7 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         // Register passthrough(int) -> int
         {
             std::vector<type::Type> params = { type::Type(type::TypeKind::Integer) };
-            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            std::string mangled            = type::makeMangledNameFromTypes("passthrough", params, nullptr);
             interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.empty() || !std::holds_alternative<Integer>(args[0]))
                     return Integer(0);
@@ -111,7 +111,7 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         // Register passthrough(bool) -> bool
         {
             std::vector<type::Type> params = { type::Type(type::TypeKind::Boolean) };
-            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            std::string mangled            = type::makeMangledNameFromTypes("passthrough", params, nullptr);
             interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.empty() || !std::holds_alternative<bool>(args[0]))
                     return false;
@@ -122,11 +122,11 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         // Register passthrough(vec2) -> vec2
         {
             std::vector<type::Type> params = { type::Type::AsVector(2) };
-            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            std::string mangled            = type::makeMangledNameFromTypes("passthrough", params, nullptr);
             interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.size() < 2)
                     return ValueVariant{};
-                auto tuple = std::make_shared<TupleVariant>();
+                auto tuple      = std::make_shared<TupleVariant>();
                 tuple->elements = { args[0], args[1] };
                 return ValueVariant{ tuple };
             });
@@ -135,11 +135,11 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         // Register passthrough(vec3) -> vec3
         {
             std::vector<type::Type> params = { type::Type::AsVector(3) };
-            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            std::string mangled            = type::makeMangledNameFromTypes("passthrough", params, nullptr);
             interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.size() < 3)
                     return ValueVariant{};
-                auto tuple = std::make_shared<TupleVariant>();
+                auto tuple      = std::make_shared<TupleVariant>();
                 tuple->elements = { args[0], args[1], args[2] };
                 return ValueVariant{ tuple };
             });
@@ -148,11 +148,11 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
         // Register passthrough(vec4) -> vec4
         {
             std::vector<type::Type> params = { type::Type::AsVector(4) };
-            std::string mangled = type::makeMangledNameFromTypes("passthrough", params, nullptr);
+            std::string mangled            = type::makeMangledNameFromTypes("passthrough", params, nullptr);
             interp.registerExternalFunction(mangled, [](const std::vector<ValueVariant>& args) -> ValueVariant {
                 if (args.size() < 4)
                     return ValueVariant{};
-                auto tuple = std::make_shared<TupleVariant>();
+                auto tuple      = std::make_shared<TupleVariant>();
                 tuple->elements = { args[0], args[1], args[2], args[3] };
                 return ValueVariant{ tuple };
             });
@@ -167,9 +167,7 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
     // Deep comparison of results with detailed error reporting
     auto compare = [](auto&& self, const ValueVariant& v1, const ValueVariant& v2, std::string& err, const std::string& path = "") -> bool {
         if (v1.index() != v2.index()) {
-            err = "Type mismatch at " + path + ": original has type " + std::to_string(v1.index()) + 
-                  " (" + valueVariantToString(v1) + "), optimized has type " + std::to_string(v2.index()) + 
-                  " (" + valueVariantToString(v2) + ")";
+            err = "Type mismatch at " + path + ": original has type " + valueVariantToString(v1) + " optimized has type " + valueVariantToString(v2);
             return false;
         }
 
@@ -177,22 +175,19 @@ bool RVMValidator::validateOptimizations(const RVMProgram& original,
             const auto& t1 = std::get<Tuple>(v1);
             const auto& t2 = std::get<Tuple>(v2);
             if (t1->elements.size() != t2->elements.size()) {
-                err = "Tuple size mismatch at " + path + ": original has " + std::to_string(t1->elements.size()) + 
-                      " elements, optimized has " + std::to_string(t2->elements.size()) + " elements";
+                err = "Tuple size mismatch at " + path + ": original has " + std::to_string(t1->elements.size()) + " elements, optimized has " + std::to_string(t2->elements.size()) + " elements";
                 return false;
             }
             for (size_t i = 0; i < t1->elements.size(); ++i) {
                 std::string elementPath = path + "[" + std::to_string(i) + "]";
-                if (!self(self, t1->elements[i], t2->elements[i], err, elementPath)) {
+                if (!self(self, t1->elements[i], t2->elements[i], err, elementPath))
                     return false;
-                }
             }
             return true;
         }
 
         if (v1 != v2) {
-            err = "Value mismatch at " + path + ": original returned " + valueVariantToString(v1) + 
-                  ", optimized returned " + valueVariantToString(v2);
+            err = "Value mismatch at " + path + ": original returned " + valueVariantToString(v1) + ", optimized returned " + valueVariantToString(v2);
             return false;
         }
 

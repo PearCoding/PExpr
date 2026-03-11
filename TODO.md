@@ -44,3 +44,4 @@
 - [ ] Fix some corner cases in the register allocator.
 - [x] "--opt-force-inline-functions" is not working with recursive functions
 - [ ] The "//! location" might interfere with the unique naming of variables and other stuff! Verify this.
+- [x] Drop tuple dissolve and integrate it directly into the RVMMapper
