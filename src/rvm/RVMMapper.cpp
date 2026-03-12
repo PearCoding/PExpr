@@ -2,10 +2,48 @@
 #include "RVMStructs.h"
 #include "ast/Enums.h"
 
+#include <functional>
 #include <span>
 
 namespace PExpr::rvm {
 using namespace ast;
+
+// Helper: Convert BinaryOperation to Opcode
+static Opcode binaryOpToOpcode(BinaryOperation op)
+{
+    switch (op) {
+    case BinaryOperation::Add:
+        return Opcode::ADD;
+    case BinaryOperation::Sub:
+        return Opcode::SUB;
+    case BinaryOperation::Mul:
+        return Opcode::MUL;
+    case BinaryOperation::Div:
+        return Opcode::DIV;
+    case BinaryOperation::Mod:
+        return Opcode::MOD;
+    case BinaryOperation::Equal:
+        return Opcode::CMP_EQ;
+    case BinaryOperation::NotEqual:
+        return Opcode::CMP_NE;
+    case BinaryOperation::Less:
+        return Opcode::CMP_LT;
+    case BinaryOperation::LessEqual:
+        return Opcode::CMP_LE;
+    case BinaryOperation::Greater:
+        return Opcode::CMP_GT;
+    case BinaryOperation::GreaterEqual:
+        return Opcode::CMP_GE;
+    case BinaryOperation::And:
+        return Opcode::AND;
+    case BinaryOperation::Or:
+        return Opcode::OR;
+    case BinaryOperation::Pow:
+        return Opcode::POW;
+    }
+    PEXPR_ASSERT(false, "Invalid binary operation");
+    return Opcode::NOP;
+}
 
 // Constructor
 RVMMapper::RVMMapper()
@@ -274,248 +312,54 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
         // Binary operation
         PEXPR_ASSERT(instr.Operands.size() == 2, "Binary expects 2 operands");
 
+        Opcode op = binaryOpToOpcode(instr.BinaryOp);
+
         if (instr.Target.type().isTuple()) {
+            auto dstTypes = dissolveTupleType(instr.Target.type());
+            std::vector<RVMValue> elements;
+            elements.reserve(dstTypes.size());
+
             if (instr.Operands[0].type().isTuple() && !instr.Operands[1].type().isTuple()) {
                 // Scalar × Tuple operation (e.g., vec * 2.0)
                 auto srcTuple  = mapTupleValues(instr.Operands[0]);
                 auto scalarSrc = mapValue(instr.Operands[1]);
-                auto dstTypes  = dissolveTupleType(instr.Target.type());
-
                 PEXPR_ASSERT(srcTuple.size() == dstTypes.size(), "Tuple size mismatch in scalar x tuple operation");
 
-                Opcode op;
-                switch (instr.BinaryOp) {
-                case BinaryOperation::Add:
-                    op = Opcode::ADD;
-                    break;
-                case BinaryOperation::Sub:
-                    op = Opcode::SUB;
-                    break;
-                case BinaryOperation::Mul:
-                    op = Opcode::MUL;
-                    break;
-                case BinaryOperation::Div:
-                    op = Opcode::DIV;
-                    break;
-                case BinaryOperation::Mod:
-                    op = Opcode::MOD;
-                    break;
-                case BinaryOperation::Equal:
-                    op = Opcode::CMP_EQ;
-                    break;
-                case BinaryOperation::NotEqual:
-                    op = Opcode::CMP_NE;
-                    break;
-                case BinaryOperation::Less:
-                    op = Opcode::CMP_LT;
-                    break;
-                case BinaryOperation::LessEqual:
-                    op = Opcode::CMP_LE;
-                    break;
-                case BinaryOperation::Greater:
-                    op = Opcode::CMP_GT;
-                    break;
-                case BinaryOperation::GreaterEqual:
-                    op = Opcode::CMP_GE;
-                    break;
-                case BinaryOperation::And:
-                    op = Opcode::AND;
-                    break;
-                case BinaryOperation::Or:
-                    op = Opcode::OR;
-                    break;
-                case BinaryOperation::Pow:
-                    op = Opcode::POW;
-                    break;
-                }
-
-                std::vector<RVMValue> elements;
                 for (size_t i = 0; i < srcTuple.size(); ++i) {
                     RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
-                    RVMValue src = srcTuple[i];
-                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src, scalarSrc));
+                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, srcTuple[i], scalarSrc));
                     elements.push_back(dst);
                 }
-                mTupleMap[instr.Target] = std::move(elements);
             } else if (!instr.Operands[0].type().isTuple() && instr.Operands[1].type().isTuple()) {
                 // Tuple × Scalar operation (e.g., 2.0 * vec)
                 auto scalarSrc = mapValue(instr.Operands[0]);
                 auto srcTuple  = mapTupleValues(instr.Operands[1]);
-                auto dstTypes  = dissolveTupleType(instr.Target.type());
-
                 PEXPR_ASSERT(srcTuple.size() == dstTypes.size(), "Tuple size mismatch in tuple×scalar operation");
 
-                Opcode op;
-                switch (instr.BinaryOp) {
-                case BinaryOperation::Add:
-                    op = Opcode::ADD;
-                    break;
-                case BinaryOperation::Sub:
-                    op = Opcode::SUB;
-                    break;
-                case BinaryOperation::Mul:
-                    op = Opcode::MUL;
-                    break;
-                case BinaryOperation::Div:
-                    op = Opcode::DIV;
-                    break;
-                case BinaryOperation::Mod:
-                    op = Opcode::MOD;
-                    break;
-                case BinaryOperation::Equal:
-                    op = Opcode::CMP_EQ;
-                    break;
-                case BinaryOperation::NotEqual:
-                    op = Opcode::CMP_NE;
-                    break;
-                case BinaryOperation::Less:
-                    op = Opcode::CMP_LT;
-                    break;
-                case BinaryOperation::LessEqual:
-                    op = Opcode::CMP_LE;
-                    break;
-                case BinaryOperation::Greater:
-                    op = Opcode::CMP_GT;
-                    break;
-                case BinaryOperation::GreaterEqual:
-                    op = Opcode::CMP_GE;
-                    break;
-                case BinaryOperation::And:
-                    op = Opcode::AND;
-                    break;
-                case BinaryOperation::Or:
-                    op = Opcode::OR;
-                    break;
-                case BinaryOperation::Pow:
-                    op = Opcode::POW;
-                    break;
-                }
-
-                std::vector<RVMValue> elements;
                 for (size_t i = 0; i < srcTuple.size(); ++i) {
                     RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
-                    RVMValue src = srcTuple[i];
-                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, scalarSrc, src));
+                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, scalarSrc, srcTuple[i]));
                     elements.push_back(dst);
                 }
-                mTupleMap[instr.Target] = std::move(elements);
             } else {
                 // Element-wise binary operation on tuples
                 auto srcTuple1 = mapTupleValues(instr.Operands[0]);
                 auto srcTuple2 = mapTupleValues(instr.Operands[1]);
-                auto dstTypes  = dissolveTupleType(instr.Target.type());
-
                 PEXPR_ASSERT(srcTuple1.size() == srcTuple2.size(), "Tuple size mismatch in binary operation");
                 PEXPR_ASSERT(srcTuple1.size() == dstTypes.size(), "Tuple size mismatch with target type");
 
-                Opcode op;
-                switch (instr.BinaryOp) {
-                case BinaryOperation::Add:
-                    op = Opcode::ADD;
-                    break;
-                case BinaryOperation::Sub:
-                    op = Opcode::SUB;
-                    break;
-                case BinaryOperation::Mul:
-                    op = Opcode::MUL;
-                    break;
-                case BinaryOperation::Div:
-                    op = Opcode::DIV;
-                    break;
-                case BinaryOperation::Mod:
-                    op = Opcode::MOD;
-                    break;
-                case BinaryOperation::Equal:
-                    op = Opcode::CMP_EQ;
-                    break;
-                case BinaryOperation::NotEqual:
-                    op = Opcode::CMP_NE;
-                    break;
-                case BinaryOperation::Less:
-                    op = Opcode::CMP_LT;
-                    break;
-                case BinaryOperation::LessEqual:
-                    op = Opcode::CMP_LE;
-                    break;
-                case BinaryOperation::Greater:
-                    op = Opcode::CMP_GT;
-                    break;
-                case BinaryOperation::GreaterEqual:
-                    op = Opcode::CMP_GE;
-                    break;
-                case BinaryOperation::And:
-                    op = Opcode::AND;
-                    break;
-                case BinaryOperation::Or:
-                    op = Opcode::OR;
-                    break;
-                case BinaryOperation::Pow:
-                    op = Opcode::POW;
-                    break;
-                }
-
-                std::vector<RVMValue> elements;
                 for (size_t i = 0; i < srcTuple1.size(); ++i) {
                     RVMValue dst  = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
-                    RVMValue src1 = srcTuple1[i];
-                    RVMValue src2 = srcTuple2[i];
-                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src1, src2));
+                    result.push_back(std::make_shared<RVMInstr3Op>(op, dst, srcTuple1[i], srcTuple2[i]));
                     elements.push_back(dst);
                 }
-                mTupleMap[instr.Target] = std::move(elements);
             }
+            mTupleMap[instr.Target] = std::move(elements);
         } else {
             // Scalar binary operation
             RVMValue dst  = mapValue(instr.Target);
             RVMValue src1 = mapValue(instr.Operands[0]);
             RVMValue src2 = mapValue(instr.Operands[1]);
-
-            Opcode op;
-            switch (instr.BinaryOp) {
-            case BinaryOperation::Add:
-                op = Opcode::ADD;
-                break;
-            case BinaryOperation::Sub:
-                op = Opcode::SUB;
-                break;
-            case BinaryOperation::Mul:
-                op = Opcode::MUL;
-                break;
-            case BinaryOperation::Div:
-                op = Opcode::DIV;
-                break;
-            case BinaryOperation::Mod:
-                op = Opcode::MOD;
-                break;
-            case BinaryOperation::Equal:
-                op = Opcode::CMP_EQ;
-                break;
-            case BinaryOperation::NotEqual:
-                op = Opcode::CMP_NE;
-                break;
-            case BinaryOperation::Less:
-                op = Opcode::CMP_LT;
-                break;
-            case BinaryOperation::LessEqual:
-                op = Opcode::CMP_LE;
-                break;
-            case BinaryOperation::Greater:
-                op = Opcode::CMP_GT;
-                break;
-            case BinaryOperation::GreaterEqual:
-                op = Opcode::CMP_GE;
-                break;
-            case BinaryOperation::And:
-                op = Opcode::AND;
-                break;
-            case BinaryOperation::Or:
-                op = Opcode::OR;
-                break;
-            case BinaryOperation::Pow:
-                op = Opcode::POW;
-                break;
-            }
-
             result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src1, src2));
         }
         break;
@@ -611,7 +455,16 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
 
     std::unordered_map<RegId, RVMValue> savedRegisters;
 
-    // Internal call: use calling convention with registers
+    // Helper to save a register if needed
+    auto saveRegister = [&](RegId regId, const type::Type& type) {
+        if (savedRegisters.contains(regId))
+            return;
+        RVMValue dst    = RVMValue::Register(regId, type);
+        RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, type);
+        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
+        savedRegisters[regId] = tmpDst;
+    };
+
     // 1. Get flat call arguments
     std::vector<RVMValue> arguments;
     for (const auto& arg : instr.Arguments) {
@@ -619,70 +472,57 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         arguments.insert(arguments.end(), types.begin(), types.end());
     }
 
-    // 2. Determine number of registers to save (max of args and return values)
+    // 2. Determine number of registers to save
     auto returnTypes       = dissolveTupleType(instr.Target.type());
     uint32_t numReturnRegs = returnTypes.empty() || instr.Target.type().isVoid() ? 0 : static_cast<uint32_t>(returnTypes.size());
     uint32_t numArgRegs    = static_cast<uint32_t>(arguments.size());
 
-    // 3. Save frame
-    //  Parameters
+    // 3. Save registers that will be overwritten
     for (size_t i = 0; i < arguments.size(); ++i) {
         RVMValue src = arguments[i];
-        if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
-            continue;
-
-        RVMValue dst    = RVMValue::Register(i, arguments[i].type()); // %r0, %r1, %r2, ...
-        RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, arguments[i].type());
-        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
-        savedRegisters[dst.regId()] = tmpDst;
+        if (src.isRegister() && src.regId() == i)
+            continue; // Already in correct register
+        saveRegister(static_cast<RegId>(i), arguments[i].type());
     }
-    //  Return values
     for (size_t i = 0; i < returnTypes.size(); ++i) {
-        RVMValue dst = RVMValue::Register(i, returnTypes[i]); // %r0, %r1, %r2, ...
-        if (savedRegisters.contains(dst.regId()))
-            continue;
-        RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, returnTypes[i]);
-        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
-        savedRegisters[dst.regId()] = tmpDst;
+        saveRegister(static_cast<RegId>(i), returnTypes[i]);
     }
 
-    // 4. Move arguments to registers %r0, %r1, %r2, etc. and save previous content
+    // 4. Move arguments to registers %r0, %r1, %r2, etc.
     for (size_t i = 0; i < arguments.size(); ++i) {
         RVMValue src = arguments[i];
-        if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
-            continue;
-
-        RVMValue dst = RVMValue::Register(i, arguments[i].type()); // %r0, %r1, %r2, ...
+        if (src.isRegister() && src.regId() == i)
+            continue; // Already in correct register
+        RVMValue dst = RVMValue::Register(i, arguments[i].type());
         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
     }
 
-    // 5. Call internal function
-    // Note: It is the job of the host to ensure register changes inside functions do not change this context
+    // 5. Call function
     result.push_back(std::make_shared<RVMInstrCall>(isExternal, numArgRegs, numReturnRegs, instr.FunctionName));
 
     // 6. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
     if (!instr.Target.type().isVoid()) {
         if (instr.Target.type().isTuple()) {
-            // Multiple return values. Essentially a virtual tuple instruction
+            // Multiple return values
             std::vector<RVMValue> values;
             for (size_t i = 0; i < returnTypes.size(); ++i) {
                 RVMValue dst = RVMValue::Register(mNextVirtualRegister++, returnTypes[i]);
-                RVMValue src = RVMValue::Register(i, returnTypes[i]); // %r0 holds return value
+                RVMValue src = RVMValue::Register(i, returnTypes[i]);
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-                values.push_back(dst); // %r0, %r1, %r2, ...
+                values.push_back(dst);
             }
             mTupleMap[instr.Target] = std::move(values);
         } else {
             // Single return value
             RVMValue dst = mapValue(instr.Target);
-            if (!dst.isRegister() || dst.regId() != 0) {                   //< Only move if destination is not already %r0
-                RVMValue src = RVMValue::Register(0, instr.Target.type()); // %r0 holds return value
+            if (!dst.isRegister() || dst.regId() != 0) {
+                RVMValue src = RVMValue::Register(0, instr.Target.type());
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
             }
         }
     }
 
-    // 7. Restore frame to for original register context
+    // 7. Restore saved registers
     for (const auto& [dstId, tmpDst] : savedRegisters)
         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, RVMValue::Register(dstId, tmpDst.type()), tmpDst));
 
@@ -696,19 +536,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
     size_t returnCount = 0;
 
     if (!instr.Value.type().isVoid()) {
-        if (auto it = mTupleMap.find(instr.Value); it != mTupleMap.end()) {
-            // Dissolved tuple, flat it out
-            returnCount = it->second.size();
-            for (size_t i = 0; i < it->second.size(); ++i) {
-                RVMValue src = it->second[i];
-                RVMValue dst = RVMValue::Register(i, src.type()); // %r0, %r1, %r2, ...
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-            }
-        } else if (instr.Value.isConstant() && instr.Value.type().isTuple()) {
-            // Tuple return value: move to %r0
-            // but it is constant -> map to multiple as above
+        if (instr.Value.type().isTuple()) {
+            // Tuple return value: use mapTupleValues which handles both cached and constant tuples
             const auto tupleValues = mapTupleValues(instr.Value);
-            returnCount            = tupleValues.size();
+            returnCount = tupleValues.size();
 
             for (size_t i = 0; i < tupleValues.size(); ++i) {
                 RVMValue src = tupleValues[i];
@@ -717,7 +548,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
             }
         } else {
             // Single return value: move to %r0
-            returnCount  = 1;
+            returnCount = 1;
             RVMValue src = mapValue(instr.Value);
             if (!src.isRegister() || src.regId() != 0) {                  //< Only move if source is not already %r0
                 RVMValue dst = RVMValue::Register(0, instr.Value.type()); // %r0
