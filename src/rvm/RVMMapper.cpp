@@ -349,7 +349,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
                 PEXPR_ASSERT(srcTuple1.size() == dstTypes.size(), "Tuple size mismatch with target type");
 
                 for (size_t i = 0; i < srcTuple1.size(); ++i) {
-                    RVMValue dst  = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
+                    RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
                     result.push_back(std::make_shared<RVMInstr3Op>(op, dst, srcTuple1[i], srcTuple2[i]));
                     elements.push_back(dst);
                 }
@@ -461,7 +461,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
             return;
         RVMValue dst    = RVMValue::Register(regId, type);
         RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, type);
-        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
+        if (tmpDst.regId() != regId)
+            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
         savedRegisters[regId] = tmpDst;
     };
 
@@ -539,7 +540,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
         if (instr.Value.type().isTuple()) {
             // Tuple return value: use mapTupleValues which handles both cached and constant tuples
             const auto tupleValues = mapTupleValues(instr.Value);
-            returnCount = tupleValues.size();
+            returnCount            = tupleValues.size();
 
             for (size_t i = 0; i < tupleValues.size(); ++i) {
                 RVMValue src = tupleValues[i];
@@ -548,7 +549,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
             }
         } else {
             // Single return value: move to %r0
-            returnCount = 1;
+            returnCount  = 1;
             RVMValue src = mapValue(instr.Value);
             if (!src.isRegister() || src.regId() != 0) {                  //< Only move if source is not already %r0
                 RVMValue dst = RVMValue::Register(0, instr.Value.type()); // %r0
