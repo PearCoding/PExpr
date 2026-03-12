@@ -185,10 +185,12 @@ size_t RVMInterpreter::popCallFrame(size_t retCount)
     auto cf = callStack.back();
     callStack.pop_back();
 
+    // Restore caller's registers, but skip return value registers (0..retCount-1)
     for (const auto& [reg, val] : cf.Registers) {
         if (reg >= retCount)
             registers[reg] = val;
     }
+
     return cf.ReturnPC;
 }
 
@@ -263,32 +265,58 @@ ValueVariant RVMInterpreter::applyUnaryOp(Opcode op, const ValueVariant& src)
 ValueVariant RVMInterpreter::applyBinaryOp(Opcode op, const ValueVariant& src1, const ValueVariant& src2)
 {
     if (op >= Opcode::ADD && op <= Opcode::POW) {
-        double a = 0.0, b = 0.0;
-        if (std::holds_alternative<Integer>(src1))
-            a = static_cast<double>(std::get<Integer>(src1));
-        else if (std::holds_alternative<Number>(src1))
-            a = std::get<Number>(src1);
+        // Check if both operands are integers for integer arithmetic
+        bool bothIntegers = std::holds_alternative<Integer>(src1) && std::holds_alternative<Integer>(src2);
 
-        if (std::holds_alternative<Integer>(src2))
-            b = static_cast<double>(std::get<Integer>(src2));
-        else if (std::holds_alternative<Number>(src2))
-            b = std::get<Number>(src2);
+        if (bothIntegers) {
+            Integer a = std::get<Integer>(src1);
+            Integer b = std::get<Integer>(src2);
 
-        switch (op) {
-        case Opcode::ADD:
-            return a + b;
-        case Opcode::SUB:
-            return a - b;
-        case Opcode::MUL:
-            return a * b;
-        case Opcode::DIV:
-            return (b == 0.0) ? std::numeric_limits<double>::infinity() : a / b;
-        case Opcode::MOD:
-            return (b == 0.0) ? 0.0 : std::fmod(a, b);
-        case Opcode::POW:
-            return std::pow(a, b);
-        default:
-            break;
+            switch (op) {
+            case Opcode::ADD:
+                return a + b;
+            case Opcode::SUB:
+                return a - b;
+            case Opcode::MUL:
+                return a * b;
+            case Opcode::DIV:
+                return (b == 0) ? static_cast<Integer>(0) : a / b; // Integer division
+            case Opcode::MOD:
+                return (b == 0) ? static_cast<Integer>(0) : a % b;
+            case Opcode::POW:
+                return static_cast<Integer>(std::pow(static_cast<Number>(a), static_cast<Number>(b)));
+            default:
+                break;
+            }
+        } else {
+            // Floating-point arithmetic
+            Number a = 0.0, b = 0.0;
+            if (std::holds_alternative<Integer>(src1))
+                a = static_cast<Number>(std::get<Integer>(src1));
+            else if (std::holds_alternative<Number>(src1))
+                a = std::get<Number>(src1);
+
+            if (std::holds_alternative<Integer>(src2))
+                b = static_cast<Number>(std::get<Integer>(src2));
+            else if (std::holds_alternative<Number>(src2))
+                b = std::get<Number>(src2);
+
+            switch (op) {
+            case Opcode::ADD:
+                return a + b;
+            case Opcode::SUB:
+                return a - b;
+            case Opcode::MUL:
+                return a * b;
+            case Opcode::DIV:
+                return (b == 0.0) ? std::numeric_limits<Number>::infinity() : a / b;
+            case Opcode::MOD:
+                return (b == 0.0) ? 0.0 : std::fmod(a, b);
+            case Opcode::POW:
+                return std::pow(a, b);
+            default:
+                break;
+            }
         }
     }
 
@@ -303,14 +331,14 @@ ValueVariant RVMInterpreter::applyBinaryOp(Opcode op, const ValueVariant& src1, 
             return false;
         }
 
-        double a = 0.0, b = 0.0;
+        Number a = 0.0, b = 0.0;
         if (std::holds_alternative<Integer>(src1))
-            a = static_cast<double>(std::get<Integer>(src1));
+            a = static_cast<Number>(std::get<Integer>(src1));
         else if (std::holds_alternative<Number>(src1))
             a = std::get<Number>(src1);
 
         if (std::holds_alternative<Integer>(src2))
-            b = static_cast<double>(std::get<Integer>(src2));
+            b = static_cast<Number>(std::get<Integer>(src2));
         else if (std::holds_alternative<Number>(src2))
             b = std::get<Number>(src2);
 
