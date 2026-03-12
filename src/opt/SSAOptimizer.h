@@ -20,7 +20,6 @@ class SSCPSideEffectAnalyzer;
 class SSCPCommonSubexpressionEliminator;
 class SSCPPreOptimizer;
 class SSCPTailCallOptimizer;
-class SSATupleDissolvePass;
 
 /// Optimizer containing multiple optimization passes for the SSA IR.
 class SSAOptimizer {
@@ -57,7 +56,6 @@ private:
     std::unique_ptr<SSCPCommonSubexpressionEliminator> mCommonSubexpressionEliminator;
     std::unique_ptr<SSCPPreOptimizer> mPreOptimizer;
     std::unique_ptr<SSCPTailCallOptimizer> mTailCallOptimizer;
-    std::unique_ptr<SSATupleDissolvePass> mTupleDissolvePass;
 };
 
 } // namespace PExpr::opt

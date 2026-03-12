@@ -1,6 +1,5 @@
 #include "SSAOptimizer.h"
 
-#include "SSATupleDissolvePass.h"
 #include "SSCPCommonSubexpressionEliminator.h"
 #include "SSCPConstantFolder.h"
 #include "SSCPControlFlowOptimizer.h"
@@ -29,7 +28,6 @@ SSAOptimizer::SSAOptimizer(const OptimizerOptions& opts)
     , mCommonSubexpressionEliminator(std::make_unique<SSCPCommonSubexpressionEliminator>(opts))
     , mPreOptimizer(std::make_unique<SSCPPreOptimizer>(opts))
     , mTailCallOptimizer(std::make_unique<SSCPTailCallOptimizer>())
-    , mTupleDissolvePass(std::make_unique<SSATupleDissolvePass>())
 {
     intrinsics::setupIntrinsics(*mFunctionInliner);
 }
@@ -64,7 +62,6 @@ void SSAOptimizer::Run(const OptimizerOptions& opts, InstructionList& body)
 void SSAOptimizer::runProgram(ssa::SSAProgram& program)
 {
     mSideEffectAnalyzer->propagateSideEffects(program);
-    mTupleDissolvePass->clear();
 
     // Keep optimizing until no changes are possible
     bool changed = true;

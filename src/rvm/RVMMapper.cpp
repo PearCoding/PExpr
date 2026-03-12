@@ -9,7 +9,7 @@ using namespace ast;
 
 // Constructor
 RVMMapper::RVMMapper()
-    : mContext()
+    : mNextVirtualRegister(0)
 {
 }
 
@@ -48,6 +48,42 @@ static void dissolveConstantTuple(const Tuple& tuple, std::vector<RVMValue>& con
     }
 }
 
+static Integer getFlatSize(const type::Type& type)
+{
+    if (!type.isTuple())
+        return 1;
+
+    Integer sum = 0;
+    for (const auto& tuple : type.components())
+        sum += getFlatSize(tuple);
+    return sum;
+}
+
+// Helper to compute values for a tuple access (e.g., inner = outer[0])
+// This handles cases where the target tuple's values are a subset of the source tuple's values
+std::vector<RVMValue> RVMMapper::computeAccessValues(const ssa::SSAValue& tuple, Integer index)
+{
+    // Get the parent tuple values
+    auto parentValues = mapTupleValues(tuple);
+
+    // Compute the flat offset (sum of sizes before the access index)
+    Integer flatOffset     = 0;
+    const auto& components = tuple.type().components();
+    for (Integer i = 0; i < index; ++i)
+        flatOffset += getFlatSize(components.at(i));
+
+    // Get the type of the sub-tuple at the access index
+    const auto& subTupleType = components.at(index);
+    auto subTupleTypes       = dissolveTupleType(subTupleType);
+
+    // Extract the sub-tuple values starting from the flat offset
+    std::vector<RVMValue> result;
+    for (size_t i = 0; i < subTupleTypes.size(); ++i)
+        result.push_back(parentValues.at(flatOffset + i));
+
+    return result;
+}
+
 // Dissolve tuple value into elementary registers
 std::vector<RVMValue> RVMMapper::mapTupleValues(const ssa::SSAValue& value)
 {
@@ -67,7 +103,7 @@ std::vector<RVMValue> RVMMapper::mapTupleValues(const ssa::SSAValue& value)
             std::vector<RVMValue> result;
             result.reserve(types.size());
             for (const auto& type : types)
-                result.push_back(RVMValue::Register(mContext.allocateRegister(), type));
+                result.push_back(RVMValue::Register(mNextVirtualRegister++, type));
             mTupleMap[value] = result;
             return result;
         }
@@ -75,16 +111,6 @@ std::vector<RVMValue> RVMMapper::mapTupleValues(const ssa::SSAValue& value)
         // Elementary type
         return { mapValue(value) };
     }
-}
-static Integer getFlatSize(const type::Type& type)
-{
-    if (!type.isTuple())
-        return 1;
-
-    Integer sum = 0;
-    for (const auto& tuple : type.components())
-        sum += getFlatSize(tuple);
-    return sum;
 }
 
 // Map SSA value to RVM value
@@ -120,7 +146,7 @@ RVMValue RVMMapper::mapValue(const ssa::SSAValue& ssaValue)
     }
 
     // Register/named value - allocate register and store mapping
-    RegId reg         = mContext.allocateRegister();
+    RegId reg         = mNextVirtualRegister++;
     RVMValue rvmValue = RVMValue::Register(reg, ssaValue.type());
 
     // Store the mapping for future reference
@@ -134,11 +160,6 @@ RVMValue RVMMapper::accessTuple(const ssa::SSAValue& value, Integer idx)
 {
     if (auto tIt = mTupleMap.find(value); tIt != mTupleMap.end()) {
         return tIt->second.at(idx);
-    } else if (auto aIt = mAccessMap.find(value); aIt != mAccessMap.end()) {
-        Integer linearOffset = 0;
-        for (Integer i = 0; i < aIt->second.second; ++i)
-            linearOffset += getFlatSize(aIt->second.first.type().components().at(i));
-        return accessTuple(aIt->second.first, linearOffset + idx);
     } else if (value.type().isTuple()) {
         // Tuple not in mTupleMap yet - use mapTupleValues to handle it
         auto tupleValues = mapTupleValues(value);
@@ -196,7 +217,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
 
             std::vector<RVMValue> elements;
             for (size_t i = 0; i < srcTuple.size(); ++i) {
-                RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
                 RVMValue src = srcTuple[i];
 
                 switch (instr.UnaryOp) {
@@ -310,7 +331,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
 
                 std::vector<RVMValue> elements;
                 for (size_t i = 0; i < srcTuple.size(); ++i) {
-                    RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                    RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
                     RVMValue src = srcTuple[i];
                     result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src, scalarSrc));
                     elements.push_back(dst);
@@ -372,7 +393,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
 
                 std::vector<RVMValue> elements;
                 for (size_t i = 0; i < srcTuple.size(); ++i) {
-                    RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                    RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
                     RVMValue src = srcTuple[i];
                     result.push_back(std::make_shared<RVMInstr3Op>(op, dst, scalarSrc, src));
                     elements.push_back(dst);
@@ -435,7 +456,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
 
                 std::vector<RVMValue> elements;
                 for (size_t i = 0; i < srcTuple1.size(); ++i) {
-                    RVMValue dst  = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                    RVMValue dst  = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
                     RVMValue src1 = srcTuple1[i];
                     RVMValue src2 = srcTuple2[i];
                     result.push_back(std::make_shared<RVMInstr3Op>(op, dst, src1, src2));
@@ -505,8 +526,9 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
         Integer index = instr.Operands[1].valueAs<Integer>();
 
         if (instr.Target.type().isTuple()) {
-            // Remember for the following access'es
-            mAccessMap[instr.Target] = { instr.Operands[0], index };
+            // Compute and cache the tuple values for future accesses
+            // This handles cases like inner = outer[0] where inner's values are a subset of outer's values
+            mTupleMap[instr.Target] = computeAccessValues(instr.Operands[0], index);
         } else {
             RVMValue dst = mapValue(instr.Target);
             RVMValue src = accessTuple(instr.Operands[0], index);
@@ -530,7 +552,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapAssign(const ssa::SSAInstrA
 
             std::vector<RVMValue> elements;
             for (size_t i = 0; i < srcTuple.size(); ++i) {
-                RVMValue dst = RVMValue::Register(mContext.allocateRegister(), dstTypes[i]);
+                RVMValue dst = RVMValue::Register(mNextVirtualRegister++, dstTypes[i]);
                 RVMValue src = srcTuple[i];
 
                 const auto& srcType = srcTuple[i].type();
@@ -608,22 +630,18 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         RVMValue src = arguments[i];
         if (src.isRegister() && src.regId() == i) //< Already in the correct register, no move needed
             continue;
-        if (!mContext.isRegisterUsed(i))
-            continue;
 
         RVMValue dst    = RVMValue::Register(i, arguments[i].type()); // %r0, %r1, %r2, ...
-        RVMValue tmpDst = RVMValue::Register(mContext.allocateRegister(), arguments[i].type());
+        RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, arguments[i].type());
         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
         savedRegisters[dst.regId()] = tmpDst;
     }
     //  Return values
     for (size_t i = 0; i < returnTypes.size(); ++i) {
         RVMValue dst = RVMValue::Register(i, returnTypes[i]); // %r0, %r1, %r2, ...
-        if (dst.isRegister() || dst.regId() == i)             //< Only move if destination is not already the correct one
+        if (savedRegisters.contains(dst.regId()))
             continue;
-        if (!mContext.isRegisterUsed(i) || savedRegisters.contains(dst.regId()))
-            continue;
-        RVMValue tmpDst = RVMValue::Register(mContext.allocateRegister(), returnTypes[i]);
+        RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, returnTypes[i]);
         result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
         savedRegisters[dst.regId()] = tmpDst;
     }
@@ -648,11 +666,9 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
             // Multiple return values. Essentially a virtual tuple instruction
             std::vector<RVMValue> values;
             for (size_t i = 0; i < returnTypes.size(); ++i) {
-                RVMValue dst = RVMValue::Register(mContext.allocateRegister(), returnTypes[i]);
-                if (!dst.isRegister() || dst.regId() != i) {              //< Only move if destination is not already %r0
-                    RVMValue src = RVMValue::Register(i, returnTypes[i]); // %r0 holds return value
-                    result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-                }
+                RVMValue dst = RVMValue::Register(mNextVirtualRegister++, returnTypes[i]);
+                RVMValue src = RVMValue::Register(i, returnTypes[i]); // %r0 holds return value
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
                 values.push_back(dst); // %r0, %r1, %r2, ...
             }
             mTupleMap[instr.Target] = std::move(values);
@@ -677,10 +693,12 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
 std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrReturn& instr)
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
+    size_t returnCount = 0;
 
     if (!instr.Value.type().isVoid()) {
         if (auto it = mTupleMap.find(instr.Value); it != mTupleMap.end()) {
             // Dissolved tuple, flat it out
+            returnCount = it->second.size();
             for (size_t i = 0; i < it->second.size(); ++i) {
                 RVMValue src = it->second[i];
                 RVMValue dst = RVMValue::Register(i, src.type()); // %r0, %r1, %r2, ...
@@ -690,6 +708,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
             // Tuple return value: move to %r0
             // but it is constant -> map to multiple as above
             const auto tupleValues = mapTupleValues(instr.Value);
+            returnCount            = tupleValues.size();
 
             for (size_t i = 0; i < tupleValues.size(); ++i) {
                 RVMValue src = tupleValues[i];
@@ -698,6 +717,7 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
             }
         } else {
             // Single return value: move to %r0
+            returnCount  = 1;
             RVMValue src = mapValue(instr.Value);
             if (!src.isRegister() || src.regId() != 0) {                  //< Only move if source is not already %r0
                 RVMValue dst = RVMValue::Register(0, instr.Value.type()); // %r0
@@ -706,8 +726,8 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapReturn(const ssa::SSAInstrR
         }
     }
 
-    // Add the actual return instruction
-    result.push_back(std::make_shared<RVMInstrReturn>(result.size()));
+    // Add the actual return instruction with the correct return count
+    result.push_back(std::make_shared<RVMInstrReturn>(returnCount));
 
     return result;
 }
@@ -948,21 +968,20 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
                     std::vector<RVMValue> values;
                     for (size_t i = 0; i < innerTypes.size(); ++i) {
                         size_t srcRegId = paramIndex++;
-                        RVMValue dst    = RVMValue::Register(mContext.allocateRegister(), innerTypes[i]);
-                        if (!dst.isRegister() || dst.regId() != srcRegId) {             //< Only move if destination is not already the correct one
-                            RVMValue src = RVMValue::Register(srcRegId, innerTypes[i]); // %rI holds return value
-                            rvmProgram.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-                        }
-                        values.push_back(dst); // %r0, %r1, %r2, ...
+                        RVMValue src    = RVMValue::Register(srcRegId, innerTypes[i]); // %rI holds return value
+                        values.push_back(src);
                     }
                     mTupleMap[param] = std::move(values);
                 } else {
-                    RVMValue rvmValue = RVMValue::Register(paramIndex++, param.type());
+                    size_t srcRegId = paramIndex++;
+                    RVMValue src    = RVMValue::Register(srcRegId, param.type()); // %rI holds return value
 
                     // Store the mapping for future reference
-                    mSSAtoRVMMap[param.name()] = rvmValue;
+                    mSSAtoRVMMap[param.name()] = src;
                 }
             }
+            mNextVirtualRegister = paramIndex;
+
             // Map function body instructions
             auto funcInstructions = mapInstructions(ssaFunc.Body, ssaProgram);
 

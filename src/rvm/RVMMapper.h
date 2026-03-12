@@ -44,16 +44,18 @@ private:
 
     RVMValue accessTuple(const ssa::SSAValue& value, Integer idx);
 
+    // Helper to compute values for a tuple access (e.g., inner = outer[0])
+    std::vector<RVMValue> computeAccessValues(const ssa::SSAValue& tuple, Integer index);
+
     // Helper to insert phi updates for a newly defined value
     void insertPhiUpdatesForValue(const ssa::SSAValue& definedValue,
                                   std::vector<std::shared_ptr<RVMInstr>>& result);
 
     // Member variables
-    RVMContext mContext;
+    RegId mNextVirtualRegister = 0;
     std::unordered_map<std::string, RVMValue> mSSAtoRVMMap;
     std::unordered_map<std::string, RVMValue> mStringMap;
     std::unordered_map<ssa::SSAValue, std::vector<RVMValue>> mTupleMap;
-    std::unordered_map<ssa::SSAValue, std::pair<ssa::SSAValue, Integer>> mAccessMap;
 
     // Phi value to targets mapping
     std::unordered_map<ssa::SSAValue, std::vector<ssa::SSAValue>> mPhiValueToTargets;
