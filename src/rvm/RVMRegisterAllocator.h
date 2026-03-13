@@ -51,9 +51,14 @@ private:
     struct UnionFind {
         std::map<RegId, RegId> parent;
 
-        RegId find(RegId x);
+        /// Find the root of x (const, no path compression)
+        RegId find(RegId x) const;
+
+        /// Find or create the root of x with path compression (mutable)
+        RegId findOrCreate(RegId x);
+
         void unite(RegId x, RegId y);
-        bool connected(RegId x, RegId y);
+        bool connected(RegId x, RegId y) const;
     };
 
     //=== Helper Functions ===
@@ -79,6 +84,14 @@ private:
         RegId dstReg,
         const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
         size_t movIdx);
+
+    /// Find the pinned register ID for a group (if any).
+    /// Returns std::nullopt if no pin, or the pinned register ID if found.
+    /// If multiple registers in the group are pinned to different IDs, returns std::nullopt (conflict).
+    static std::optional<RegId> getPinnedRegisterForGroup(
+        RegId reg,
+        const UnionFind& uf,
+        const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals);
 
     /// Build interference graph: set of (r1, r2) pairs that interfere
     static std::set<std::pair<RegId, RegId>> buildInterferenceGraph(

@@ -3,30 +3,51 @@
 #include "RVMValue.h"
 
 #include <algorithm>
+#include <optional>
 #include <unordered_set>
 
 namespace PExpr::rvm {
 
 //=== UnionFind Implementation ===
 
-RegId RVMRegisterAllocator::UnionFind::find(RegId x)
+RegId RVMRegisterAllocator::UnionFind::find(RegId x) const
 {
+    // Const version: no path compression, just follow parent pointers
+    // If x is not in the map, return x itself (it's its own root)
+    auto it = parent.find(x);
+    if (it == parent.end())
+        return x;
+
+    RegId current = it->second;
+    while (current != x) {
+        x  = current;
+        it = parent.find(x);
+        if (it == parent.end())
+            return x;
+        current = it->second;
+    }
+    return x;
+}
+
+RegId RVMRegisterAllocator::UnionFind::findOrCreate(RegId x)
+{
+    // Mutable version: with path compression
     if (parent.find(x) == parent.end())
         parent[x] = x;
     if (parent[x] != x)
-        parent[x] = find(parent[x]); // Path compression
+        parent[x] = findOrCreate(parent[x]); // Path compression
     return parent[x];
 }
 
 void RVMRegisterAllocator::UnionFind::unite(RegId x, RegId y)
 {
-    RegId rootX = find(x);
-    RegId rootY = find(y);
+    RegId rootX = findOrCreate(x);
+    RegId rootY = findOrCreate(y);
     if (rootX != rootY)
         parent[rootX] = rootY;
 }
 
-bool RVMRegisterAllocator::UnionFind::connected(RegId x, RegId y)
+bool RVMRegisterAllocator::UnionFind::connected(RegId x, RegId y) const
 {
     return find(x) == find(y);
 }
@@ -130,11 +151,10 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
 
                         // Only block coalescing if BOTH are pinned (to different registers)
                         // If only one is pinned, the merged group will use the pinned register's ID
-                        // bool pinningConflict = srcPinned && dstPinned;
-                        // info.CanCoalesce     = !pinningConflict && !conflict;
-
-                        info.CanCoalesce = !srcPinned && !dstPinned && !conflict;
-                        info.ShouldMerge = info.CanCoalesce; // Coalescing means merge registers
+                        // Note: Transitive pinning conflicts are checked in performCoalescing
+                        bool pinningConflict = srcPinned && dstPinned;
+                        info.CanCoalesce     = !pinningConflict && !conflict;
+                        info.ShouldMerge     = info.CanCoalesce; // Coalescing means merge registers
 
                         // If coalescing failed, check if destination is dead (never used)
                         if (!info.CanCoalesce && isDestinationDead(info.DstReg, intervals, i)) {
@@ -257,8 +277,10 @@ std::set<std::pair<RegId, RegId>> RVMRegisterAllocator::buildInterferenceGraph(
             if (a.Register == b.Register)
                 continue;
 
-            // Check overlap
-            if (a.Start <= b.End && b.Start <= a.End) {
+            // Strict overlap: intervals that only touch at an endpoint don't interfere.
+            // At a handoff point (e.g. e1 == s2), the ending register is read last
+            // and the starting register is written first — they can share the same color.
+            if (a.Start < b.End && b.Start < a.End) {
                 // Store in canonical order (smaller first)
                 RegId r1 = std::min(a.Register, b.Register);
                 RegId r2 = std::max(a.Register, b.Register);
@@ -268,6 +290,31 @@ std::set<std::pair<RegId, RegId>> RVMRegisterAllocator::buildInterferenceGraph(
     }
 
     return interference;
+}
+
+//=== getPinnedRegisterForGroup() ===
+
+std::optional<RegId> RVMRegisterAllocator::getPinnedRegisterForGroup(
+    RegId reg,
+    const UnionFind& uf,
+    const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
+{
+    std::optional<RegId> pinnedReg; // No pin yet
+
+    for (const auto& interval : intervals) {
+        // Check if this interval's register is in the same group as 'reg'
+        if (uf.connected(interval.Register, reg)) {
+            if (interval.isPinned()) {
+                if (!pinnedReg.has_value()) {
+                    pinnedReg = interval.Register; // First pinned register found
+                } else if (pinnedReg.value() != interval.Register) {
+                    return std::nullopt; // Conflict: two different pinned registers in same group
+                }
+            }
+        }
+    }
+
+    return pinnedReg;
 }
 
 //=== performCoalescing() ===
@@ -282,17 +329,33 @@ RVMRegisterAllocator::performCoalescing(
 
     // Initialize union-find with all registers
     for (const auto& interval : intervals)
-        uf.find(interval.Register); // Creates entry
+        uf.findOrCreate(interval.Register); // Creates entry
 
     // Process each MOV
     for (const auto& mov : movs) {
         if (mov.CanCoalesce) {
-            movsToRemove.insert(mov.InstructionIndex);
-
             // Only merge registers if ShouldMerge is true
             // (false for dead destination MOVs and identity MOVs)
-            if (mov.ShouldMerge)
-                uf.unite(mov.SrcReg, mov.DstReg);
+            if (mov.ShouldMerge) {
+                // Check for transitive pinning conflicts before merging
+                auto srcPinned = getPinnedRegisterForGroup(mov.SrcReg, uf, intervals);
+                auto dstPinned = getPinnedRegisterForGroup(mov.DstReg, uf, intervals);
+
+                // Merge only if:
+                // - Neither group has a pin, OR
+                // - Only one group has a pin (group adopts that pin), OR
+                // - Both groups have the SAME pin (already compatible)
+                // Do NOT merge if both have different pins
+                if (!srcPinned.has_value() || !dstPinned.has_value() || srcPinned == dstPinned) {
+                    uf.unite(mov.SrcReg, mov.DstReg);
+                    movsToRemove.insert(mov.InstructionIndex);
+                }
+                // If both are pinned to different registers, we cannot coalesce
+                // and we also cannot remove the MOV (it's needed for correctness)
+            } else {
+                // For identity MOVs and dead destination MOVs, always remove
+                movsToRemove.insert(mov.InstructionIndex);
+            }
         }
     }
 
@@ -317,7 +380,7 @@ std::map<RegId, RegId> RVMRegisterAllocator::assignRegisters(
     std::map<RegId, std::vector<RegId>> groups;
     UnionFind ufCopy = coalesced; // Need non-const copy
     for (RegId reg : allRegs) {
-        RegId rep = ufCopy.find(reg);
+        RegId rep = ufCopy.findOrCreate(reg);
         groups[rep].push_back(reg);
     }
 
@@ -376,7 +439,10 @@ std::map<RegId, RegId> RVMRegisterAllocator::assignRegisters(
         if (groupColor.count(rep)) // Skip already pre-colored groups
             continue;
 
-        std::set<RegId> usedColors = usedPinnedColors; // Start with pinned colors
+        // Build the forbidden set only from colors of interfering neighbors,
+        // NOT a global set of all pinned colors. A non-pinned group can reuse a
+        // physical register ID if no interfering neighbor holds that ID.
+        std::set<RegId> usedColors;
         for (RegId other : reps) {
             if (other != rep && groupsInterfere(rep, other)) {
                 if (groupColor.count(other))
@@ -393,7 +459,7 @@ std::map<RegId, RegId> RVMRegisterAllocator::assignRegisters(
 
     // Build final register map
     for (RegId reg : allRegs) {
-        RegId rep        = ufCopy.find(reg);
+        RegId rep        = ufCopy.findOrCreate(reg);
         registerMap[reg] = groupColor[rep];
     }
 

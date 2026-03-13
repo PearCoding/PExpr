@@ -363,6 +363,7 @@ TEST_CASE("RVMConstantOptimizer: full optimizer integration", "[rvm][constant][o
     SECTION("Constant propagation with redundant move elimination")
     {
         std::string rvmIr = R"(
+            mov %r2:int 11:int
             mov %r4:int 42:int
             add %r0:int %r4:int %r2:int
             ret 1

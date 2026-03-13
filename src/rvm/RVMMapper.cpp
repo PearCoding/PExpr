@@ -45,9 +45,12 @@ static Opcode binaryOpToOpcode(BinaryOperation op)
     return Opcode::NOP;
 }
 
+// Virtual registers start above the physical call-convention range (r0..r63)
+static constexpr RegId kVirtualBase = 64;
+
 // Constructor
 RVMMapper::RVMMapper()
-    : mNextVirtualRegister(0)
+    : mNextVirtualRegister(kVirtualBase)
 {
 }
 
@@ -453,79 +456,46 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapCall(const ssa::SSAInstrCal
         }
     }
 
-    std::unordered_map<RegId, RVMValue> savedRegisters;
-
-    // Helper to save a register if needed
-    auto saveRegister = [&](RegId regId, const type::Type& type) {
-        if (savedRegisters.contains(regId))
-            return;
-        RVMValue dst    = RVMValue::Register(regId, type);
-        RVMValue tmpDst = RVMValue::Register(mNextVirtualRegister++, type);
-        if (tmpDst.regId() != regId)
-            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, tmpDst, dst));
-        savedRegisters[regId] = tmpDst;
-    };
-
-    // 1. Get flat call arguments
+    // 1. Flatten all call arguments to a list of RVM values
     std::vector<RVMValue> arguments;
     for (const auto& arg : instr.Arguments) {
-        const auto types = mapTupleValues(arg);
-        arguments.insert(arguments.end(), types.begin(), types.end());
+        const auto vals = mapTupleValues(arg);
+        arguments.insert(arguments.end(), vals.begin(), vals.end());
     }
 
-    // 2. Determine number of registers to save
+    // 2. Determine return register count
     auto returnTypes       = dissolveTupleType(instr.Target.type());
-    uint32_t numReturnRegs = returnTypes.empty() || instr.Target.type().isVoid() ? 0 : static_cast<uint32_t>(returnTypes.size());
+    uint32_t numReturnRegs = (!instr.Target.type().isVoid()) ? static_cast<uint32_t>(returnTypes.size()) : 0;
     uint32_t numArgRegs    = static_cast<uint32_t>(arguments.size());
 
-    // 3. Save registers that will be overwritten
+    // 3. Move arguments to physical call registers r0, r1, ...
+    // No save/restore needed: the interference graph ensures virtual registers live
+    // across a call are not assigned to physical call-convention register IDs.
     for (size_t i = 0; i < arguments.size(); ++i) {
-        RVMValue src = arguments[i];
-        if (src.isRegister() && src.regId() == i)
-            continue; // Already in correct register
-        saveRegister(static_cast<RegId>(i), arguments[i].type());
-    }
-    for (size_t i = 0; i < returnTypes.size(); ++i) {
-        saveRegister(static_cast<RegId>(i), returnTypes[i]);
-    }
-
-    // 4. Move arguments to registers %r0, %r1, %r2, etc.
-    for (size_t i = 0; i < arguments.size(); ++i) {
-        RVMValue src = arguments[i];
-        if (src.isRegister() && src.regId() == i)
-            continue; // Already in correct register
         RVMValue dst = RVMValue::Register(i, arguments[i].type());
-        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
+        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, arguments[i]));
     }
 
-    // 5. Call function
+    // 4. Emit call instruction
     result.push_back(std::make_shared<RVMInstrCall>(isExternal, numArgRegs, numReturnRegs, instr.FunctionName));
 
-    // 6. Move return values from %r0, %r1, %r2, ... to destinations (if not void)
+    // 5. Move return values from physical registers to fresh virtual registers
     if (!instr.Target.type().isVoid()) {
         if (instr.Target.type().isTuple()) {
-            // Multiple return values
             std::vector<RVMValue> values;
             for (size_t i = 0; i < returnTypes.size(); ++i) {
-                RVMValue dst = RVMValue::Register(mNextVirtualRegister++, returnTypes[i]);
                 RVMValue src = RVMValue::Register(i, returnTypes[i]);
+                RVMValue dst = RVMValue::Register(mNextVirtualRegister++, returnTypes[i]);
                 result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
                 values.push_back(dst);
             }
             mTupleMap[instr.Target] = std::move(values);
         } else {
-            // Single return value
-            RVMValue dst = mapValue(instr.Target);
-            if (!dst.isRegister() || dst.regId() != 0) {
-                RVMValue src = RVMValue::Register(0, instr.Target.type());
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
-            }
+            RVMValue src = RVMValue::Register(0, instr.Target.type());
+            RVMValue dst = mapValue(instr.Target); // allocates a fresh virtual register
+            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, dst, src));
         }
     }
-
-    // 7. Restore saved registers
-    for (const auto& [dstId, tmpDst] : savedRegisters)
-        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, RVMValue::Register(dstId, tmpDst.type()), tmpDst));
 
     return result;
 }
@@ -812,7 +782,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
                     mSSAtoRVMMap[param.name()] = src;
                 }
             }
-            mNextVirtualRegister = paramIndex;
+            mNextVirtualRegister = kVirtualBase;
 
             // Map function body instructions
             auto funcInstructions = mapInstructions(ssaFunc.Body, ssaProgram);
