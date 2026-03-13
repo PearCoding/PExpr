@@ -331,48 +331,45 @@ TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation
 
 TEST_CASE("RVMValidator: Complex verification", "[rvm][validation]")
 {
-    SECTION("Case 1")
-    {
-        Environment env;
-        auto ast = env.parse(R"(
+    Environment env;
+    auto ast = env.parse(R"(
 [[extern, pure]] fn getNumber(str:str) -> num;
 [[extern, pure]] fn passthrough(rgb:vec3) -> vec3;
 
 let uv = [getNumber("42"), getNumber("11"), getNumber("7")];
 passthrough([0.4*uv.x, uv.y, 1])
         )");
-        REQUIRE(ast != nullptr);
+    REQUIRE(ast != nullptr);
 
-        auto opt = opt::OptimizerOptions::None();
+    auto opt = opt::OptimizerOptions::None();
 
-        opt.OptimizeIdentityMoves       = true;
-        opt.OptimizeConstantPropagation = true;
-        opt.EnableRegisterAllocation    = true;
+    opt.OptimizeIdentityMoves       = true;
+    opt.OptimizeConstantPropagation = true;
+    opt.EnableRegisterAllocation    = true;
 
-        // The following are necessary for RVM
-        opt.RemoveDeadCode = true;
+    // The following are necessary for RVM
+    opt.RemoveDeadCode = true;
 
-        auto prog = env.map(ast);
-        env.optimize(prog, opt);
+    auto prog = env.map(ast);
+    env.optimize(prog, opt);
 
-        rvm::RVMMapper mapper;
-        auto original = mapper.mapProgram(prog);
+    rvm::RVMMapper mapper;
+    auto original = mapper.mapProgram(prog);
 
-        RVMProgram optimized = original;
-        REQUIRE(original.size() > 0);
+    RVMProgram optimized = original;
+    REQUIRE(original.size() > 0);
 
-        bool changed = RVMOptimizer::optimize(opt, optimized);
-        CHECK(changed == true);
+    bool changed = RVMOptimizer::optimize(opt, optimized);
+    CHECK(changed == true);
 
-        std::string errorMsg;
-        bool isValid = RVMValidator::validateOptimizations(original, optimized, Type::AsVector(3), errorMsg);
-        if (!isValid) {
-            std::cout << "Original program:" << std::endl
-                      << RVMSerializer::serialize(original) << std::endl
-                      << "Optimized program:" << std::endl
-                      << RVMSerializer::serialize(optimized) << std::endl;
-            FAIL("Validation failed: " << errorMsg);
-        }
-        REQUIRE(errorMsg.empty());
+    std::string errorMsg;
+    bool isValid = RVMValidator::validateOptimizations(original, optimized, Type::AsVector(3), errorMsg);
+    if (!isValid) {
+        std::cout << "Original program:" << std::endl
+                  << RVMSerializer::serialize(original) << std::endl
+                  << "Optimized program:" << std::endl
+                  << RVMSerializer::serialize(optimized) << std::endl;
+        FAIL("Validation failed: " << errorMsg);
     }
+    REQUIRE(errorMsg.empty());
 }

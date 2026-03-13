@@ -82,8 +82,17 @@ ValueVariant RVMInterpreter::execute(const RVMProgram& program, const type::Type
                         args.push_back(registers[i].value);
                     ValueVariant result = it->second(args);
                     // RVM calls store results in registers starting from 0
-                    if (call->returnCount() > 0)
-                        registers[0] = { result, type::Type(type::TypeKind::Unspecified) }; // Type will be updated by MOV if needed
+                    if (call->returnCount() > 0) {
+                        if (call->returnCount() > 1 && std::holds_alternative<Tuple>(result)) {
+                            // Unpack tuple into individual registers
+                            const auto& tuple = std::get<Tuple>(result);
+                            for (size_t i = 0; i < std::min(tuple->elements.size(), static_cast<size_t>(call->returnCount())); ++i)
+                                registers[i] = { tuple->elements[i], type::Type(type::TypeKind::Unspecified) };
+                        } else {
+                            registers[0] = { result, type::Type(type::TypeKind::Unspecified) };
+                        }
+                    }
+
                 } else {
                     // External function not found - this is an error
                     std::cerr << "Error: External function '" << call->functionName() << "' not registered" << std::endl;
