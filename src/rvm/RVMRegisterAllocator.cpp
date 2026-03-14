@@ -10,25 +10,6 @@ namespace PExpr::rvm {
 
 //=== UnionFind Implementation ===
 
-RegId RVMRegisterAllocator::UnionFind::find(RegId x) const
-{
-    // Const version: no path compression, just follow parent pointers
-    // If x is not in the map, return x itself (it's its own root)
-    auto it = parent.find(x);
-    if (it == parent.end())
-        return x;
-
-    RegId current = it->second;
-    while (current != x) {
-        x  = current;
-        it = parent.find(x);
-        if (it == parent.end())
-            return x;
-        current = it->second;
-    }
-    return x;
-}
-
 RegId RVMRegisterAllocator::UnionFind::findOrCreate(RegId x)
 {
     // Mutable version: with path compression
@@ -47,9 +28,9 @@ void RVMRegisterAllocator::UnionFind::unite(RegId x, RegId y)
         parent[rootX] = rootY;
 }
 
-bool RVMRegisterAllocator::UnionFind::connected(RegId x, RegId y) const
+bool RVMRegisterAllocator::UnionFind::connected(RegId x, RegId y)
 {
-    return find(x) == find(y);
+    return findOrCreate(x) == findOrCreate(y);
 }
 
 //=== Main allocate() Function ===
@@ -118,17 +99,18 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
     const RVMProgram& program,
     const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
 {
+    // TODO: We hijack this to do dead-code elimination
     std::vector<MovInfo> movs;
 
     for (size_t i = 0; i < program.size(); ++i) {
         const auto& instr = program[i];
 
-        // Check if MOV instruction
         if (auto* mov = dynamic_cast<const RVMInstr2Op*>(instr.get())) {
-            if (mov->opcode() == Opcode::MOV) {
-                const RVMValue& dst = mov->destination();
-                const RVMValue& src = mov->source();
+            const RVMValue& dst = mov->destination();
+            const RVMValue& src = mov->source();
 
+            // Check if MOV instruction
+            if (mov->opcode() == Opcode::MOV) {
                 PEXPR_ASSERT(dst.type() == src.type(), "mov instructions require matching types for source and destination");
 
                 // Only handle register-to-register MOVs for coalescing
@@ -164,17 +146,34 @@ std::vector<RVMRegisterAllocator::MovInfo> RVMRegisterAllocator::collectMovInstr
                     }
 
                     movs.push_back(info);
-                } else if (dst.isRegister()) { //< Also check for redundant MOVs (dst never used)
-                    if (isDestinationDead(dst.regId(), intervals, i)) {
-                        MovInfo info;
-                        info.InstructionIndex = i;
-                        info.SrcReg           = 0; // Not relevant
-                        info.DstReg           = dst.regId();
-                        info.IsIdentity       = false;
-                        info.CanCoalesce      = true;  // Redundant = can remove
-                        info.ShouldMerge      = false; // Don't merge for non-register sources
-                        movs.push_back(info);
-                    }
+                    continue;
+                }
+            }
+
+            if (dst.isRegister()) { //< Also check for redundant op (dst never used)
+                if (isDestinationDead(dst.regId(), intervals, i)) {
+                    MovInfo info;
+                    info.InstructionIndex = i;
+                    info.SrcReg           = 0; // Not relevant
+                    info.DstReg           = dst.regId();
+                    info.IsIdentity       = false;
+                    info.CanCoalesce      = true;  // Redundant = can remove
+                    info.ShouldMerge      = false; // Don't merge for non-register sources
+                    movs.push_back(info);
+                }
+            }
+        } else if (auto* op3 = dynamic_cast<const RVMInstr3Op*>(instr.get())) {
+            const RVMValue& dst = op3->destination();
+            if (dst.isRegister()) { //< Also check for redundant op (dst never used)
+                if (isDestinationDead(dst.regId(), intervals, i)) {
+                    MovInfo info;
+                    info.InstructionIndex = i;
+                    info.SrcReg           = 0; // Not relevant
+                    info.DstReg           = dst.regId();
+                    info.IsIdentity       = false;
+                    info.CanCoalesce      = true;  // Redundant = can remove
+                    info.ShouldMerge      = false; // Don't merge for non-register sources
+                    movs.push_back(info);
                 }
             }
         }
@@ -296,7 +295,7 @@ std::set<std::pair<RegId, RegId>> RVMRegisterAllocator::buildInterferenceGraph(
 
 std::optional<RegId> RVMRegisterAllocator::getPinnedRegisterForGroup(
     RegId reg,
-    const UnionFind& uf,
+    UnionFind& uf,
     const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
 {
     std::optional<RegId> pinnedReg; // No pin yet

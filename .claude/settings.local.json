@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ninja -j4)",
+      "Bash(ctest -R \"rvm\" -V)",
+      "Bash(./bin/pexpr_tests.exe \"[rvm]\")"
+    ]
+  }
+}

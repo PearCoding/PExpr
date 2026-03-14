@@ -57,6 +57,27 @@ bool RVMConstantOptimizer::runConstantPropagationPass(RVMProgram& program)
                         // remove this MOV if the register is never used again
                         continue;
                     }
+                } else if (op == Opcode::I2F || op == Opcode::F2I) {
+                    const RVMValue& src = movInstr->source();
+                    const RVMValue& dst = movInstr->destination();
+
+                    // If source is a constant and destination is a register,
+                    // record the constant mapping
+                    if (src.isConstant() && dst.isRegister()) {
+                        if (op == Opcode::I2F && src.type().kind() == type::TypeKind::Integer) {
+                            RegId dstReg     = dst.regId();
+                            constMap[dstReg] = RVMValue::Constant(static_cast<Number>(std::get<Integer>(src.constantValue())));
+                            // Continue to next instruction - we'll let dead-code elimination
+                            // remove this I2F if the register is never used again
+                            continue;
+                        } else if (op == Opcode::F2I && src.type().kind() == type::TypeKind::Number) {
+                            RegId dstReg     = dst.regId();
+                            constMap[dstReg] = RVMValue::Constant(static_cast<Integer>(std::get<Number>(src.constantValue())));
+                            // Continue to next instruction - we'll let dead-code elimination
+                            // remove this F2I if the register is never used again
+                            continue;
+                        }
+                    }
                 }
             }
 
