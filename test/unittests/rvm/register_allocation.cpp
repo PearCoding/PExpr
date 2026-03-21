@@ -440,15 +440,15 @@ TEST_CASE("RVMRegisterAllocator: handles mixed type registers", "[rvm][register-
         [[extern]] fn getInt() -> int;
         [[extern]] fn getNum() -> num;
         [[extern]] fn getBool() -> bool;
-        
+
         let i = getInt();
         let n = getNum();
         let b = getBool();
-        
+
         // Mix types in computation
         let i2 = if b { i * 2 } else { i / 2 };
         let n2 = n + (i2 as num);
-        
+
         [i2, n2, b]
     )");
 
@@ -470,4 +470,96 @@ TEST_CASE("RVMRegisterAllocator: handles mixed type registers", "[rvm][register-
 
     std::string serialized = RVMSerializer::serialize(rvmProg);
     REQUIRE(!serialized.empty());
+}
+
+TEST_CASE("RVMRegisterAllocator: no transitive interference in MOV chains with mixed types", "[rvm][register-allocation][regression]")
+{
+    Environment env;
+
+    // Regression test: When an extern call returns vec2 (pinned %r0:num, %r1:num)
+    // and another extern call takes (str, vec2) (pinned %r0:str, %r1:num, %r2:num),
+    // the MOV chain from the first call's returns through intermediates to the second
+    // call's parameters must NOT be fully coalesced. If it is, %r0 gets reused for
+    // both str and num, and the string write clobbers the numeric value.
+    auto ast = env.parse(R"(
+        [[extern]] fn getUV() -> vec2;
+        [[extern]] fn sample(name:str, uv:vec2) -> num;
+        let uv = getUV();
+        sample("tex", uv)
+    )");
+
+    REQUIRE(ast != nullptr);
+
+    auto prog = env.map(ast);
+    env.optimize(prog, opt::OptimizerOptions::High());
+
+    rvm::RVMMapper mapper;
+    auto rvmProg = mapper.mapProgram(prog);
+
+    // Apply full RVM optimization (constant folding + register allocation)
+    opt::OptimizerOptions opts    = opt::OptimizerOptions::None();
+    opts.OptimizeConstantPropagation = true;
+    opts.EnableRegisterAllocation = true;
+    RVMOptimizer::optimize(opts, rvmProg);
+
+    // Serialize the output and verify the str write does NOT clobber a num value
+    // that is still live. The bug manifested as:
+    //   call_external 0 2 ...     (returns %r0:num, %r1:num)
+    //   mov %r0:str #str0:str     (clobbers %r0:num before it's consumed!)
+    //   mov %r1:num %r0:num       (reads %r0 as num — WRONG, it's str)
+    // The fix ensures %r0:num is saved before the str write.
+    std::string serialized = RVMSerializer::serialize(rvmProg);
+    REQUIRE(!serialized.empty());
+
+    // Verify: between the first call_external and the str write,
+    // there must be a MOV that reads %r0:num (saving the value).
+    auto callPos = serialized.find("call_external 0 2");
+    auto strPos  = serialized.find(":str");
+    REQUIRE(callPos != std::string::npos);
+    REQUIRE(strPos != std::string::npos);
+
+    // There must be a read of %r0:num between the call and the str write
+    std::string between = serialized.substr(callPos, strPos - callPos);
+    INFO("Between call and str write:\n" << between);
+    REQUIRE(between.find("%r0:num") != std::string::npos);
+}
+
+TEST_CASE("RVMRegisterAllocator: transitive interference with long MOV chain", "[rvm][register-allocation][regression]")
+{
+    Environment env;
+
+    // Similar regression test with a different pattern: extern returning a value,
+    // passed through to another extern that also takes a string parameter.
+    // This tests the same transitive interference bug with a simpler (non-vec2) case.
+    auto ast = env.parse(R"(
+        [[extern]] fn getValue() -> num;
+        [[extern]] fn lookup(name:str, v:num) -> num;
+        let v = getValue();
+        lookup("key", v)
+    )");
+
+    REQUIRE(ast != nullptr);
+
+    auto prog = env.map(ast);
+    env.optimize(prog, opt::OptimizerOptions::High());
+
+    rvm::RVMMapper mapper;
+    auto rvmProg = mapper.mapProgram(prog);
+
+    opt::OptimizerOptions opts    = opt::OptimizerOptions::None();
+    opts.OptimizeConstantPropagation = true;
+    opts.EnableRegisterAllocation = true;
+    RVMOptimizer::optimize(opts, rvmProg);
+
+    std::string serialized = RVMSerializer::serialize(rvmProg);
+    REQUIRE(!serialized.empty());
+
+    // Verify: the num value from %r0 must be saved before the str write clobbers it.
+    // In the correct output, "mov %r1:num %r0:num" appears BEFORE "mov %r0:str"
+    auto numReadPos = serialized.find("mov %r1:num %r0:num");
+    auto strWritePos = serialized.find("%r0:str");
+    INFO("Serialized RVM:\n" << serialized);
+    REQUIRE(numReadPos != std::string::npos);
+    REQUIRE(strWritePos != std::string::npos);
+    REQUIRE(numReadPos < strWritePos);
 }

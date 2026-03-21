@@ -63,7 +63,7 @@ RVMRegisterAllocator::AllocationResult RVMRegisterAllocator::allocate(RVMProgram
     auto interference = buildInterferenceGraph(intervals);
 
     // Step 5: Perform coalescing (merges non-interfering MOV src/dst)
-    auto [coalesced, movsToRemove] = performCoalescing(movs, intervals);
+    auto [coalesced, movsToRemove] = performCoalescing(movs, intervals, interference);
     result.MovsRemoved             = movsToRemove.size();
 
     // Step 6: Assign registers using graph coloring
@@ -321,7 +321,8 @@ std::optional<RegId> RVMRegisterAllocator::getPinnedRegisterForGroup(
 std::pair<RVMRegisterAllocator::UnionFind, std::set<size_t>>
 RVMRegisterAllocator::performCoalescing(
     const std::vector<MovInfo>& movs,
-    const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals)
+    const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
+    const std::set<std::pair<RegId, RegId>>& interference)
 {
     UnionFind uf;
     std::set<size_t> movsToRemove;
@@ -346,8 +347,34 @@ RVMRegisterAllocator::performCoalescing(
                 // - Both groups have the SAME pin (already compatible)
                 // Do NOT merge if both have different pins
                 if (!srcPinned.has_value() || !dstPinned.has_value() || srcPinned == dstPinned) {
-                    uf.unite(mov.SrcReg, mov.DstReg);
-                    movsToRemove.insert(mov.InstructionIndex);
+                    // Check for transitive interference: ensure no member of src's group
+                    // interferes with any member of dst's group.
+                    // This prevents coalescing chains like r0→r64→r66→r68 when r0 has
+                    // a second live interval that overlaps with r68's interval.
+                    bool hasGroupInterference = false;
+                    for (const auto& iv : intervals) {
+                        if (!uf.connected(iv.Register, mov.SrcReg))
+                            continue;
+                        for (const auto& jv : intervals) {
+                            if (!uf.connected(jv.Register, mov.DstReg))
+                                continue;
+                            if (iv.Register == jv.Register)
+                                continue;
+                            RegId lo = std::min(iv.Register, jv.Register);
+                            RegId hi = std::max(iv.Register, jv.Register);
+                            if (interference.count({ lo, hi })) {
+                                hasGroupInterference = true;
+                                break;
+                            }
+                        }
+                        if (hasGroupInterference)
+                            break;
+                    }
+
+                    if (!hasGroupInterference) {
+                        uf.unite(mov.SrcReg, mov.DstReg);
+                        movsToRemove.insert(mov.InstructionIndex);
+                    }
                 }
                 // If both are pinned to different registers, we cannot coalesce
                 // and we also cannot remove the MOV (it's needed for correctness)

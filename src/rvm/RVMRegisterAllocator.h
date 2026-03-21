@@ -98,7 +98,8 @@ private:
     /// Returns UnionFind structure and set of MOV indices to remove
     static std::pair<UnionFind, std::set<size_t>> performCoalescing(
         const std::vector<MovInfo>& movs,
-        const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals);
+        const std::vector<RVMLiveAnalyzer::LiveInterval>& intervals,
+        const std::set<std::pair<RegId, RegId>>& interference);
 
     /// Assign registers using graph coloring (greedy)
     /// Returns map from original register to allocated register
