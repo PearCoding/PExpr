@@ -549,35 +549,61 @@ std::shared_ptr<RVMInstr> RVMMapper::mapGoto(const ssa::SSAInstrGoto& instr)
     return std::make_shared<RVMInstrJump>(instr.TargetLabel);
 }
 
-// Helper to insert phi updates for a newly defined value
-void RVMMapper::insertPhiUpdatesForValue(const ssa::SSAValue& definedValue,
-                                         std::vector<std::shared_ptr<RVMInstr>>& result)
+// Emit a conditional select sequence for a phi node
+std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapPhi(const ssa::SSAInstrPhi& phi)
 {
-    auto it = mPhiValueToTargets.find(definedValue);
-    if (it == mPhiValueToTargets.end())
-        return;
+    std::vector<std::shared_ptr<RVMInstr>> result;
 
-    // Insert MOV instructions for each phi target that depends on this value
-    for (const auto& phiTarget : it->second) {
-        RVMValue phiTargetRVM    = mapValue(phiTarget);
-        RVMValue definedValueRVM = mapValue(definedValue);
+    const size_t numConditions = phi.Conditions.size();
+    const uint32_t labelBase   = mNextPhiLabelId++;
+    const std::string endLabel = "phi_end_" + std::to_string(labelBase);
+    const bool isTuple         = phi.Target.type().isTuple();
 
-        if (phiTarget.type().isTuple()) {
-            // Tuple phi: need to dissolve into elementary moves
-            auto phiTargetVals = mapTupleValues(phiTarget);
-            auto definedVals   = mapTupleValues(definedValue);
-
-            PEXPR_ASSERT(phiTargetVals.size() == definedVals.size(),
-                         "Tuple phi target and defined value size mismatch");
-
-            for (size_t i = 0; i < phiTargetVals.size(); ++i) {
-                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetVals[i], definedVals[i]));
-            }
+    // Helper to emit MOV(s) from a branch value to the phi target
+    auto emitMov = [&](const ssa::SSAValue& branchValue) {
+        if (isTuple) {
+            auto targetVals = mapTupleValues(phi.Target);
+            auto branchVals = mapTupleValues(branchValue);
+            PEXPR_ASSERT(targetVals.size() == branchVals.size(),
+                         "Tuple phi target and branch value size mismatch");
+            for (size_t j = 0; j < targetVals.size(); ++j)
+                result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, targetVals[j], branchVals[j]));
         } else {
-            // Scalar move
-            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetRVM, definedValueRVM));
+            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, mapValue(phi.Target), mapValue(branchValue)));
         }
+    };
+
+    // Start with else value (last branch)
+    emitMov(phi.Branches.back());
+
+    // Emit conditional overwrites for each condition
+    for (size_t i = 0; i < numConditions; ++i) {
+        RVMValue cond = mapValue(phi.Conditions[i]);
+
+        // Determine the label to jump to when this condition is false
+        const std::string nextLabel = (i + 1 < numConditions)
+            ? "phi_next_" + std::to_string(labelBase) + "_" + std::to_string(i)
+            : endLabel;
+
+        // JZ nextLabel, cond — skip this branch's value if condition is false
+        result.push_back(std::make_shared<RVMInstrBranch>(Opcode::JZ, cond, nextLabel));
+
+        // MOV target = branch[i] (the value for when condition[i] is true)
+        emitMov(phi.Branches[i]);
+
+        // JMP endLabel — skip remaining conditions
+        if (i + 1 < numConditions)
+            result.push_back(std::make_shared<RVMInstrJump>(endLabel));
+
+        // Emit intermediate label for the next condition
+        if (i + 1 < numConditions)
+            result.push_back(std::make_shared<RVMInstrLabel>(nextLabel));
     }
+
+    // End label
+    result.push_back(std::make_shared<RVMInstrLabel>(endLabel));
+
+    return result;
 }
 
 // Map SSA instructions to RVM instructions
@@ -585,23 +611,9 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
 {
     std::vector<std::shared_ptr<RVMInstr>> result;
 
-    // Clear phi tracking state
-    mPhiValueToTargets.clear();
-
-    // First pass: collect all phi nodes and build the value-to-targets mapping
-    for (const auto& ssaInstr : ssaInstrs) {
-        if (auto* phi = dynamic_cast<ssa::SSAInstrPhi*>(ssaInstr.get())) {
-            // Record that each branch value maps to the phi target
-            for (const auto& branchValue : phi->Branches)
-                mPhiValueToTargets[branchValue].push_back(phi->Target);
-        }
-    }
-
-    // Second pass: generate RVM instructions
     for (const auto& ssaInstr : ssaInstrs) {
         // Handle label instructions
         if (auto* label = dynamic_cast<ssa::SSAInstrLabel*>(ssaInstr.get())) {
-            // Emit label instruction for jump targets
             result.push_back(std::make_shared<RVMInstrLabel>(label->Name));
             continue;
         }
@@ -609,10 +621,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         // Handle assign instructions
         if (auto* assign = dynamic_cast<ssa::SSAInstrAssign*>(ssaInstr.get())) {
             auto instrs = mapAssign(*assign);
-
-            // Insert phi updates for the defined value (if any)
-            insertPhiUpdatesForValue(assign->Target, instrs);
-
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
@@ -620,10 +628,6 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
         // Handle call instructions
         if (auto* call = dynamic_cast<ssa::SSAInstrCall*>(ssaInstr.get())) {
             auto instrs = mapCall(*call, ssaProgram);
-
-            // Insert phi updates for the defined value (if any)
-            insertPhiUpdatesForValue(call->Target, instrs);
-
             result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
@@ -647,39 +651,10 @@ std::vector<std::shared_ptr<RVMInstr>> RVMMapper::mapInstructions(const std::vec
             continue;
         }
 
-        // Handle phi instructions
+        // Handle phi instructions — emit a self-contained conditional select
         if (auto* phi = dynamic_cast<ssa::SSAInstrPhi*>(ssaInstr.get())) {
-            // Process phi node: map branch values to phi target
-            for (size_t i = 0; i < phi->Branches.size(); ++i) {
-                const auto& branchValue = phi->Branches[i];
-
-                // Record that this branch value maps to the phi target
-                mPhiValueToTargets[branchValue].push_back(phi->Target);
-
-                // If branch value is a constant, insert MOV immediately
-                if (branchValue.isConstant()) {
-                    RVMValue phiTargetRVM   = mapValue(phi->Target);
-                    RVMValue branchValueRVM = mapValue(branchValue);
-
-                    if (phi->Target.type().isTuple()) {
-                        // Tuple phi: need to dissolve into elementary moves
-                        auto phiTargetVals = mapTupleValues(phi->Target);
-                        auto branchVals    = mapTupleValues(branchValue);
-
-                        PEXPR_ASSERT(phiTargetVals.size() == branchVals.size(),
-                                     "Tuple phi target and branch value size mismatch");
-
-                        for (size_t j = 0; j < phiTargetVals.size(); ++j)
-                            result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetVals[j], branchVals[j]));
-                    } else {
-                        // Scalar move
-                        result.push_back(std::make_shared<RVMInstr2Op>(Opcode::MOV, phiTargetRVM, branchValueRVM));
-                    }
-                }
-            }
-
-            // Note: we don't generate any code for the phi node itself here
-            // The actual MOVs are inserted either above (for constants) or when values are defined
+            auto instrs = mapPhi(*phi);
+            result.insert(result.end(), instrs.begin(), instrs.end());
             continue;
         }
     }
@@ -783,6 +758,7 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
                 }
             }
             mNextVirtualRegister = kVirtualBase;
+            mNextPhiLabelId     = 0;
 
             // Map function body instructions
             auto funcInstructions = mapInstructions(ssaFunc.Body, ssaProgram);
