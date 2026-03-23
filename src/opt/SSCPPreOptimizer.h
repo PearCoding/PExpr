@@ -1,19 +1,29 @@
 #pragma once
 
 #include "OptimizerOptions.h"
-#include "ssa/SSAInstruction.h"
 #include "ssa/BasicBlockAnalyzer.h"
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+namespace PExpr::ssa {
+class SSAContext;
+class SSAInstr;
+class SSAValue;
+} // namespace PExpr::ssa
+
 namespace PExpr::opt {
 
-/// Partial Redundancy Elimination (PRE) optimizer for SSA IR.
-/// Moves computations to dominate all uses, eliminating partial redundancies
-/// (computations that are redundant on some but not all paths).
+/// Partial Redundancy Elimination (PRE) optimizer.
+/// Eliminates computations that are redundant on some or all control-flow paths by inserting
+/// computations on missing paths and replacing the originals with the pre-computed value.
+///
+/// Handles two cases:
+/// - Global CSE: expression available on ALL paths to a block (fully redundant cross-block)
+/// - Partial redundancy: expression available on SOME paths; insert on missing paths
 class SSCPPreOptimizer {
 public:
     using InstructionList = std::vector<std::shared_ptr<ssa::SSAInstr>>;
@@ -23,65 +33,81 @@ public:
     {
     }
 
-    /// Apply partial redundancy elimination to the instruction list
-    /// Returns true if any changes were made
-    [[nodiscard]] bool applyPRE(ssa::SSAContext* ctx, InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions);
+    /// Apply PRE to the instruction list. Returns true if any changes were made.
+    [[nodiscard]] bool applyPRE(ssa::SSAContext* ctx, InstructionList& instructions,
+                                const std::unordered_set<std::string>& sideEffectedFunctions);
 
 private:
-    /// Expression information for redundancy analysis
-    struct ExpressionInfo {
-        size_t expressionId;                           // Unique ID for this expression
-        std::unordered_set<size_t> availableAtEntry;   // Blocks where expression is available at entry
-        std::unordered_set<size_t> availableAtExit;    // Blocks where expression is available at exit
-        std::unordered_set<size_t> anticipatedAtEntry; // Blocks where expression is anticipated at entry
-        std::unordered_set<size_t> anticipatedAtExit;  // Blocks where expression is anticipated at exit
-        std::unordered_set<size_t> earliest;           // Earliest placement
-        std::unordered_set<size_t> latest;             // Latest placement
-        std::unordered_set<size_t> insert;             // Insertion points
-        std::unordered_set<size_t> delete_;            // Deletion points
+    /// Expression fingerprint for identifying equivalent expressions across blocks
+    struct ExpressionHash {
+        struct Hash {
+            size_t operator()(const ExpressionHash& h) const { return h.hash; }
+        };
 
-        // Expression value for this computation
-        ssa::SSAValue value;
+        size_t hash;
+        type::Type type;
+
+        inline bool operator==(const ExpressionHash& other) const { return hash == other.hash && type == other.type; }
     };
 
-    /// Identify redundant expressions
-    void identifyExpressions(const InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions);
+    /// Per-expression analysis data
+    struct ExpressionInfo {
+        ExpressionHash hash;
+        std::shared_ptr<ssa::SSAInstr> exemplar; // Representative instruction
 
-    /// Check if expression is available at block entry
-    void computeAvailability();
+        // Per-block local properties
+        std::vector<bool> ueExpr;   // Upward exposed: expression computed before any operand kill
+        std::vector<bool> deExpr;   // Downward exposed: expression computed and not killed after
+        std::vector<bool> exprKill; // Expression killed: an operand is redefined
 
-    /// Check if expression is anticipated at block entry
-    void computeAnticipability();
+        // Dataflow results (indexed by block)
+        std::vector<bool> antIn;    // Anticipated at block entry
+        std::vector<bool> antOut;   // Anticipated at block exit
+        std::vector<bool> availIn;  // Available at block entry
+        std::vector<bool> availOut; // Available at block exit
+    };
 
-    /// Compute earliest placement
-    void computeEarliestPlacement();
+    /// Hash an SSA instruction for PRE (excludes target name)
+    [[nodiscard]] std::optional<ExpressionHash> hashInstruction(const ssa::SSAInstr* instr) const;
 
-    /// Compute latest placement
-    void computeLatestPlacement();
+    /// Collect the set of SSA names that an expression's operands reference
+    void collectOperandNames(const ssa::SSAInstr* instr, std::unordered_set<std::string>& names) const;
 
-    /// Compute insertion and deletion points
-    void computeInsertionDeletionPoints();
+    /// Phase 1: Identify candidate expressions and build per-block gen/kill sets
+    void identifyExpressions(const InstructionList& instructions,
+                             const std::vector<ssa::BasicBlock>& blocks,
+                             const std::unordered_set<std::string>& sideEffectedFunctions);
 
-    /// Apply code motion based on analysis
-    bool applyCodeMotion(ssa::SSAContext* ctx, InstructionList& instructions, const std::unordered_set<std::string>& sideEffectedFunctions);
+    /// Phase 2: Backward dataflow — anticipated expressions
+    void computeAnticipated(const std::vector<ssa::BasicBlock>& blocks);
 
-    /// Check if two instructions compute the same expression
-    [[nodiscard]] bool areExpressionsEquivalent(const ssa::SSAInstr* a, const ssa::SSAInstr* b) const;
+    /// Phase 3: Forward dataflow — available expressions
+    void computeAvailable(const std::vector<ssa::BasicBlock>& blocks);
 
-    /// Get expression ID for an instruction
-    [[nodiscard]] size_t getExpressionId(const ssa::SSAInstr* instr) const;
+    /// Phase 4: Identify global CSE / partial redundancy opportunities and apply
+    [[nodiscard]] bool applyTransformations(ssa::SSAContext* ctx, InstructionList& instructions,
+                                            const std::vector<ssa::BasicBlock>& blocks);
 
-    /// Check if instruction is safe to move (no side effects, etc.)
-    [[nodiscard]] bool isSafeToMove(const ssa::SSAInstr* instr, const std::unordered_set<std::string>& sideEffectedFunctions) const;
+    /// Clone the exemplar instruction with a new target
+    [[nodiscard]] std::shared_ptr<ssa::SSAInstr> cloneExemplar(const ExpressionInfo& expr,
+                                                               const ssa::SSAValue& target) const;
 
-    /// Check if instruction dominates all its uses
-    [[nodiscard]] bool dominatesAllUses(size_t blockIdx, const ssa::SSAInstr* instr) const;
+    /// Insert "preTarget = originalTarget" after the last computation of expr in blockIdx
+    void addCopyAfterComputation(const ExpressionInfo& expr, size_t blockIdx,
+                                 const ssa::SSAValue& preTarget,
+                                 const InstructionList& instructions,
+                                 const std::vector<ssa::BasicBlock>& blocks,
+                                 std::vector<std::pair<size_t, std::shared_ptr<ssa::SSAInstr>>>& insertions) const;
 
-    // Expression information map
-    std::unordered_map<size_t, ExpressionInfo> mExpressionInfo;
+    /// Replace the first computation of expr in blockIdx with "originalTarget = preTarget"
+    void replaceComputation(const ExpressionInfo& expr, size_t blockIdx,
+                            const ssa::SSAValue& preTarget,
+                            InstructionList& instructions,
+                            const std::vector<ssa::BasicBlock>& blocks) const;
 
-    // Map from instruction to expression ID
-    std::unordered_map<const ssa::SSAInstr*, size_t> mInstructionToExpression;
+    // Expression analysis data
+    std::vector<ExpressionInfo> mExpressions;
+    std::unordered_map<ExpressionHash, size_t, ExpressionHash::Hash> mHashToExprIndex;
 
     ssa::BasicBlockAnalyzer mBlockAnalyzer;
     const OptimizerOptions mOptions;

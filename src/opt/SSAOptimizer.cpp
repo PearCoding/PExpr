@@ -124,11 +124,9 @@ bool SSAOptimizer::processBody(InstructionList& body)
     if (mOptions.RemoveDeadCode)
         changed |= mControlFlowOptimizer->collapse(body);
 
-    if (mOptions.EliminatePartialRedundancies) {
-        // 9) Apply partial redundancy elimination
-        // if (mPreOptimizer->applyPRE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions()))
-        //     changed = true;
-    }
+    // 9) Apply partial redundancy elimination (cross-block)
+    if (mOptions.EliminatePartialRedundancies)
+        changed |= mPreOptimizer->applyPRE(mContext.get(), body, mSideEffectAnalyzer->getSideEffectFunctions());
 
     // 10) Apply tail call optimization
     if (mOptions.OptimizeTailCalls)
