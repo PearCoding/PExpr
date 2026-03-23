@@ -296,11 +296,24 @@ bool SSCPPreOptimizer::applyTransformations(SSAContext* ctx, InstructionList& in
 
                 ensurePreName();
 
-                // Add "preTarget = originalTarget" after each predecessor's computation
+                // Add "preTarget = originalTarget" after each predecessor's computation.
+                // If any predecessor doesn't have the computation (it just flows through),
+                // we can't safely replace — skip and let a future iteration handle it
+                // once hoisting makes the computation locally available in all predecessors.
+                const size_t insertionsBefore = insertions.size();
+                bool allCopied = true;
                 for (size_t pred : blocks[bi].predecessors) {
                     if (!expr.availOut[pred])
                         continue;
-                    addCopyAfterComputation(expr, pred, preTarget, instructions, blocks, insertions);
+                    if (!addCopyAfterComputation(expr, pred, preTarget, instructions, blocks, insertions)) {
+                        allCopied = false;
+                        break;
+                    }
+                }
+
+                if (!allCopied) {
+                    insertions.resize(insertionsBefore); // Roll back partial insertions
+                    continue;
                 }
 
                 // Replace this block's computation
@@ -341,11 +354,19 @@ bool SSCPPreOptimizer::applyTransformations(SSAContext* ctx, InstructionList& in
 
             ensurePreName();
 
-            // Insert computation on missing predecessor paths
+            // Insert computation on missing predecessor paths.
+            // For available predecessors, add a copy after the existing computation.
+            // If any available predecessor doesn't actually have the computation
+            // (it just flows through), skip this transformation and roll back.
+            const size_t insertionsBefore = insertions.size();
+            bool allCopied = true;
             for (size_t pred : blocks[bi].predecessors) {
                 if (expr.availOut[pred]) {
                     // Already available — add copy to PRE temp after existing computation
-                    addCopyAfterComputation(expr, pred, preTarget, instructions, blocks, insertions);
+                    if (!addCopyAfterComputation(expr, pred, preTarget, instructions, blocks, insertions)) {
+                        allCopied = false;
+                        break;
+                    }
                 } else {
                     // Missing — insert full computation
                     auto clone = cloneExemplar(expr, preTarget);
@@ -367,6 +388,11 @@ bool SSCPPreOptimizer::applyTransformations(SSAContext* ctx, InstructionList& in
                     }
                     insertions.emplace_back(insertIdx, std::move(clone));
                 }
+            }
+
+            if (!allCopied) {
+                insertions.resize(insertionsBefore); // Roll back partial insertions
+                continue;
             }
 
             // Replace this block's computation with the PRE temp
@@ -403,6 +429,19 @@ bool SSCPPreOptimizer::applyTransformations(SSAContext* ctx, InstructionList& in
             if (!allSuccsCompute)
                 continue;
 
+            // Only hoist if at least one successor can be replaced (single predecessor).
+            // Otherwise the hoisted value would be dead code, creating a cycle with
+            // dead code elimination that prevents the fixpoint from converging.
+            bool anyReplaceable = false;
+            for (size_t succ : blocks[bi].successors) {
+                if (blocks[succ].predecessors.size() == 1) {
+                    anyReplaceable = true;
+                    break;
+                }
+            }
+            if (!anyReplaceable)
+                continue;
+
             ensurePreName();
 
             auto clone = cloneExemplar(expr, preTarget);
@@ -424,9 +463,14 @@ bool SSCPPreOptimizer::applyTransformations(SSAContext* ctx, InstructionList& in
             }
             insertions.emplace_back(insertIdx, std::move(clone));
 
-            // Replace computations in all successors with the PRE temp
-            for (size_t succ : blocks[bi].successors)
-                replaceComputation(expr, succ, preTarget, instructions, blocks);
+            // Replace computations only in single-predecessor successors.
+            // Multi-predecessor successors keep their original computation;
+            // the next fixpoint iteration eliminates it via Case A once
+            // availability propagates from all predecessors.
+            for (size_t succ : blocks[bi].successors) {
+                if (blocks[succ].predecessors.size() == 1)
+                    replaceComputation(expr, succ, preTarget, instructions, blocks);
+            }
 
             anyChanged = true;
         }
@@ -470,7 +514,7 @@ std::shared_ptr<SSAInstr> SSCPPreOptimizer::cloneExemplar(const ExpressionInfo& 
     return nullptr;
 }
 
-void SSCPPreOptimizer::addCopyAfterComputation(const ExpressionInfo& expr, size_t blockIdx,
+bool SSCPPreOptimizer::addCopyAfterComputation(const ExpressionInfo& expr, size_t blockIdx,
                                                 const SSAValue& preTarget,
                                                 const InstructionList& instructions,
                                                 const std::vector<BasicBlock>& blocks,
@@ -504,8 +548,9 @@ void SSCPPreOptimizer::addCopyAfterComputation(const ExpressionInfo& expr, size_
         copy->Operator = SSAInstrAssign::OpKind::Assign;
         copy->Operands = { originalTarget };
         insertions.emplace_back(ii + 1, std::move(copy));
-        return;
+        return true;
     }
+    return false;
 }
 
 void SSCPPreOptimizer::replaceComputation(const ExpressionInfo& expr, size_t blockIdx,

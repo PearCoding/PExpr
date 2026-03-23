@@ -92,12 +92,13 @@ private:
     [[nodiscard]] std::shared_ptr<ssa::SSAInstr> cloneExemplar(const ExpressionInfo& expr,
                                                                const ssa::SSAValue& target) const;
 
-    /// Insert "preTarget = originalTarget" after the last computation of expr in blockIdx
-    void addCopyAfterComputation(const ExpressionInfo& expr, size_t blockIdx,
-                                 const ssa::SSAValue& preTarget,
-                                 const InstructionList& instructions,
-                                 const std::vector<ssa::BasicBlock>& blocks,
-                                 std::vector<std::pair<size_t, std::shared_ptr<ssa::SSAInstr>>>& insertions) const;
+    /// Insert "preTarget = originalTarget" after the last computation of expr in blockIdx.
+    /// Returns true if the computation was found and the copy was inserted.
+    [[nodiscard]] bool addCopyAfterComputation(const ExpressionInfo& expr, size_t blockIdx,
+                                               const ssa::SSAValue& preTarget,
+                                               const InstructionList& instructions,
+                                               const std::vector<ssa::BasicBlock>& blocks,
+                                               std::vector<std::pair<size_t, std::shared_ptr<ssa::SSAInstr>>>& insertions) const;
 
     /// Replace the first computation of expr in blockIdx with "originalTarget = preTarget"
     void replaceComputation(const ExpressionInfo& expr, size_t blockIdx,
