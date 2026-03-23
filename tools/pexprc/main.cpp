@@ -116,7 +116,8 @@ int main(int argc, char** argv)
     app.add_flag("--opt-dead-code,!--no-opt-dead-code", optimizationOptions.RemoveDeadCode, "Enable removal of dead code");
     app.add_flag("--opt-inline-functions,!--no-opt-inline-functions", optimizationOptions.InlineFunctions, "Attempt to inline functions");
     app.add_flag("--opt-force-inline-functions,!--no-opt-force-inline-functions", optimizationOptions.ForceInlineFunctions, "Force inline all internal functions, eliminating all functions from IR");
-    app.add_flag("--opt-math-identities,!--no-opt-math-identities", optimizationOptions.ApplyMathIdentities, "Apply math identities");
+    app.add_flag("--opt-math-identities,!--no-opt-math-identities", optimizationOptions.ApplyMathIdentities, "Apply IEEE-754-safe math identities (a+0=a, a*1=a, a||false=a, etc.)");
+    app.add_flag("--opt-unsafe-math-identities,!--no-opt-unsafe-math-identities", optimizationOptions.ApplyUnsafeMathIdentities, "Apply non-IEEE-754-compliant identities (a-a=0, a/a=1, a==a=true)");
     app.add_flag("--opt-trigonometric-identities,!--no-opt-trigonometric-identities", optimizationOptions.ApplyTrigonometricIdentities, "Apply trigonometric identities");
     app.add_flag("--opt-cse,!--no-opt-cse", optimizationOptions.EliminateCommonSubexpressions, "Eliminate common subexpressions");
     app.add_flag("--opt-pre,!--no-opt-pre", optimizationOptions.EliminatePartialRedundancies, "Eliminate partial redundancies");

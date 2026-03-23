@@ -39,6 +39,8 @@ private:
     [[nodiscard]] bool tryApplyIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);
 
     [[nodiscard]] bool matchBasicMathIdentities(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);      // a + 0 = a, a - 0 = a, a * 1 = a, a / 1 = a, 0 * a = 0, 1 * a = a
+    [[nodiscard]] bool matchLogicalIdentities(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);        // a || false = a, a && true = a, etc.
+    [[nodiscard]] bool matchSelfOperandIdentities(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);    // a - a = 0, a / a = 1, a == a = true, etc.
     [[nodiscard]] bool matchUnaryIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);            // -(-a) = a, +a = a, !!a = a
     [[nodiscard]] bool matchPowerToSquareIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction);    // a^2 = a*a
     [[nodiscard]] bool matchRepeatedAdditionIdentity(ssa::SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction); // a+a+a = 3*a, n*a + a = (n+1)*a
@@ -67,6 +69,9 @@ private:
 
     /// Helper to check if a value is a power operation
     [[nodiscard]] bool isPowerOp(const ssa::SSAValue& val, ssa::SSAValue& base, ssa::SSAValue& exponent) const;
+
+    /// Helper to check if a value is a constant boolean
+    [[nodiscard]] bool isConstantBool(const ssa::SSAValue& val, bool& outValue) const;
 
     /// Helper to check if a value is a constant number
     [[nodiscard]] bool isConstantNumber(const ssa::SSAValue& val, Number& outValue) const;

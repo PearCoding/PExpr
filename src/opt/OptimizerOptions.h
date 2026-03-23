@@ -9,12 +9,13 @@ struct OptimizerOptions {
     bool RemoveDeadCode                = false;
     bool InlineFunctions               = false;
     bool ForceInlineFunctions          = false; // < Force inline all internal functions, eliminating all functions from IR
-    bool ApplyMathIdentities           = false; // < Standard math identities
+    bool ApplyMathIdentities           = false; // < IEEE-754-safe math identities (a+0=a, a*1=a, a||false=a, etc.)
+    bool ApplyUnsafeMathIdentities     = false; // < Non-IEEE-754-compliant identities (a-a=0, a/a=1, a==a=true — invalid for NaN)
     bool ApplyTrigonometricIdentities  = false; // < Trigonometric identities (sin, cos, ...)
     bool EliminateCommonSubexpressions = false; // < Common subexpression elimination (CSE)
     bool EliminatePartialRedundancies  = false; // < Partial redundancy elimination (PRE)
     bool OptimizeTailCalls             = false; // < Tail call optimization
-    
+
     bool OptimizeIdentityMoves       = false; // < Eliminate identity MOV instructions (src == dst) in RVM
     bool OptimizeConstantPropagation = false; // < Propagate constants from MOV instructions within basic blocks
     bool EnableRegisterAllocation    = false; // < Enable register allocation to minimize register count
@@ -47,6 +48,7 @@ struct OptimizerOptions {
         opts.InlineFunctions              = true;
         opts.EliminatePartialRedundancies = true;
         opts.OptimizeTailCalls            = true;
+        opts.ApplyMathIdentities          = true;
         return opts;
     }
 
@@ -56,7 +58,7 @@ struct OptimizerOptions {
     {
         auto opts                         = Medium();
         opts.EnableConstantFoldingNumber  = true;
-        opts.ApplyMathIdentities          = true;
+        opts.ApplyUnsafeMathIdentities    = true;
         opts.ApplyTrigonometricIdentities = true;
         return opts;
     }

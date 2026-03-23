@@ -64,6 +64,12 @@ bool SSCPIdentityOptimizer::tryApplyIdentity(SSAContext* ctx, std::shared_ptr<ss
         if (matchBasicMathIdentities(ctx, currentInstruction))
             return true;
 
+        if (matchLogicalIdentities(ctx, currentInstruction))
+            return true;
+
+        if (matchSelfOperandIdentities(ctx, currentInstruction))
+            return true;
+
         if (matchRepeatedAdditionIdentity(ctx, currentInstruction))
             return true;
 
@@ -239,6 +245,191 @@ bool SSCPIdentityOptimizer::matchBasicMathIdentities(SSAContext* ctx, std::share
         default:
             break;
         }
+    }
+
+    return false;
+}
+
+bool SSCPIdentityOptimizer::matchLogicalIdentities(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
+{
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
+    if (!asg)
+        return false;
+
+    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->Operands.size() != 2)
+        return false;
+
+    if (asg->BinaryOp != BinaryOperation::And && asg->BinaryOp != BinaryOperation::Or)
+        return false;
+
+    SSAValue left  = asg->Operands[0];
+    SSAValue right = asg->Operands[1];
+
+    bool constVal;
+    bool leftIsConst  = isConstantBool(left, constVal);
+    bool rightIsConst = isConstantBool(right, constVal);
+
+    // Both constant -> constant folding handles it; both non-constant -> nothing to do here
+    if (leftIsConst == rightIsConst)
+        return false;
+
+    const SSAValue& constSide    = leftIsConst ? left : right;
+    const SSAValue& nonConstSide = leftIsConst ? right : left;
+
+    bool boolVal = false;
+    (void)isConstantBool(constSide, boolVal);
+
+    if (asg->BinaryOp == BinaryOperation::Or) {
+        if (boolVal) {
+            // a || true = true, true || a = true
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+            newAsg->Operands = { SSAValue::Constant(true) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            currentInstruction                  = std::move(newAsg);
+            return true;
+        } else {
+            // a || false = a, false || a = a
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+            newAsg->Operands = { nonConstSide };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            currentInstruction                  = std::move(newAsg);
+            return true;
+        }
+    }
+
+    if (asg->BinaryOp == BinaryOperation::And) {
+        if (!boolVal) {
+            // a && false = false, false && a = false
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+            newAsg->Operands = { SSAValue::Constant(false) };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            currentInstruction                  = std::move(newAsg);
+            return true;
+        } else {
+            // a && true = a, true && a = a
+            auto newAsg      = std::make_shared<SSAInstrAssign>();
+            newAsg->Target   = asg->Target;
+            newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+            newAsg->Operands = { nonConstSide };
+
+            mDefinitions[newAsg->Target.name()] = newAsg.get();
+            currentInstruction                  = std::move(newAsg);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// WARNING: Some of these identities (a - a = 0, a / a = 1, a == a = true, etc.) are not valid
+// for IEEE-754 doubles when the value is NaN (NaN != NaN, NaN == NaN is false, etc.).
+// For num types, these are only applied when ApplyUnsafeMathIdentities is set (-O3 / fast-math).
+// For int and bool types, they are always safe and applied under ApplyMathIdentities.
+bool SSCPIdentityOptimizer::matchSelfOperandIdentities(SSAContext* ctx, std::shared_ptr<ssa::SSAInstr>& currentInstruction)
+{
+    PEXPR_UNUSED(ctx);
+
+    const auto asg = dynamic_cast<const SSAInstrAssign*>(currentInstruction.get());
+    if (!asg)
+        return false;
+
+    if (asg->Operator != SSAInstrAssign::OpKind::Binary || asg->Operands.size() != 2)
+        return false;
+
+    const SSAValue& left  = asg->Operands[0];
+    const SSAValue& right = asg->Operands[1];
+
+    // Both must be non-constant and refer to the same variable
+    if (left.isConstant() || right.isConstant() || left.name() != right.name())
+        return false;
+
+    const bool isNum = (left.type().kind() == type::TypeKind::Number);
+    const bool isInt = (left.type().kind() == type::TypeKind::Integer);
+
+    // For num types, these identities are only valid under fast-math (NaN breaks them)
+    if (isNum && !mOptions.ApplyUnsafeMathIdentities)
+        return false;
+
+    switch (asg->BinaryOp) {
+    case BinaryOperation::Sub:
+    case BinaryOperation::Mod: {
+        // a - a = 0, a % a = 0
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { isInt ? SSAValue::Constant(Integer(0)) : SSAValue::Constant(Number(0.0)) };
+
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        currentInstruction                  = std::move(newAsg);
+        return true;
+    }
+
+    case BinaryOperation::Div: {
+        // a / a = 1
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { isInt ? SSAValue::Constant(Integer(1)) : SSAValue::Constant(Number(1.0)) };
+
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        currentInstruction                  = std::move(newAsg);
+        return true;
+    }
+
+    case BinaryOperation::And:
+    case BinaryOperation::Or: {
+        // a && a = a, a || a = a (idempotent)
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { left };
+
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        currentInstruction                  = std::move(newAsg);
+        return true;
+    }
+
+    case BinaryOperation::Equal:
+    case BinaryOperation::LessEqual:
+    case BinaryOperation::GreaterEqual: {
+        // a == a = true, a <= a = true, a >= a = true
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { SSAValue::Constant(true) };
+
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        currentInstruction                  = std::move(newAsg);
+        return true;
+    }
+
+    case BinaryOperation::NotEqual:
+    case BinaryOperation::Less:
+    case BinaryOperation::Greater: {
+        // a != a = false, a < a = false, a > a = false
+        auto newAsg      = std::make_shared<SSAInstrAssign>();
+        newAsg->Target   = asg->Target;
+        newAsg->Operator = SSAInstrAssign::OpKind::Assign;
+        newAsg->Operands = { SSAValue::Constant(false) };
+
+        mDefinitions[newAsg->Target.name()] = newAsg.get();
+        currentInstruction                  = std::move(newAsg);
+        return true;
+    }
+
+    default:
+        break;
     }
 
     return false;
@@ -658,6 +849,19 @@ bool SSCPIdentityOptimizer::isBinaryOp(const SSAValue& val, BinaryOperation op, 
 bool SSCPIdentityOptimizer::isPowerOp(const SSAValue& val, SSAValue& base, SSAValue& exponent) const
 {
     return isBinaryOp(val, BinaryOperation::Pow, base, exponent);
+}
+
+bool SSCPIdentityOptimizer::isConstantBool(const SSAValue& val, bool& outValue) const
+{
+    if (!val.isConstant())
+        return false;
+
+    if (const bool* b = val.valueAsIf<bool>()) {
+        outValue = *b;
+        return true;
+    }
+
+    return false;
 }
 
 bool SSCPIdentityOptimizer::isConstantNumber(const SSAValue& val, Number& outValue) const

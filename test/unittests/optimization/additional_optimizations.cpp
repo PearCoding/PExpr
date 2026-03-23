@@ -207,6 +207,202 @@ TEST_CASE("SSAOptimizer: tail recursion optimization", "[sscp][tailrec]")
     REQUIRE(!dumped.empty());
 }
 
+// --- Logical identity tests ---
+
+TEST_CASE("SSAOptimizer: a || false = a", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        a || false
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    // The or operation should be eliminated
+    REQUIRE(dumped.find("or(") == std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: false || a = a", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        false || a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("or(") == std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a || true = true", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        a || true
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("or(") == std::string::npos);
+    REQUIRE(dumped.find("true") != std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a && true = a", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        a && true
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("and(") == std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a && false = false", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        a && false
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("and(") == std::string::npos);
+    REQUIRE(dumped.find("false") != std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: num self-identity NOT applied at O2 (IEEE-754 safe)", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getInput() -> num;
+        let a = getInput();
+        a - a
+    )");
+    auto prog = env.map(ast);
+    // O2 has ApplyMathIdentities but NOT ApplyUnsafeMathIdentities
+    opt::SSAOptimizer::Run(opt::OptimizerOptions::Medium(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    // The subtraction should still be present because num self-identities are unsafe
+    REQUIRE(dumped.find("sub(") != std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: num self-identity applied at O3 (fast-math)", "[sscp][identity][logical]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getInput() -> num;
+        let a = getInput();
+        a - a
+    )");
+    auto prog = env.map(ast);
+    // O3 has ApplyUnsafeMathIdentities
+    opt::SSAOptimizer::Run(opt::OptimizerOptions::High(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    // The subtraction should be eliminated
+    REQUIRE(dumped.find("sub(") == std::string::npos);
+}
+
+// --- Self-operand identity tests ---
+
+TEST_CASE("SSAOptimizer: a - a = 0", "[sscp][identity][self]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getInput() -> int;
+        let a = getInput();
+        a - a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("sub(") == std::string::npos);
+    REQUIRE(dumped.find("0") != std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a / a = 1", "[sscp][identity][self]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getInput() -> int;
+        let a = getInput();
+        a / a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("div(") == std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a == a = true", "[sscp][identity][self]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getInput() -> int;
+        let a = getInput();
+        a == a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("eq(") == std::string::npos);
+    REQUIRE(dumped.find("true") != std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a != a = false", "[sscp][identity][self]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getInput() -> int;
+        let a = getInput();
+        a != a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("neq(") == std::string::npos);
+    REQUIRE(dumped.find("false") != std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a && a = a (idempotent)", "[sscp][identity][self]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        a && a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("and(") == std::string::npos);
+}
+
+TEST_CASE("SSAOptimizer: a || a = a (idempotent)", "[sscp][identity][self]")
+{
+    Environment env;
+    auto ast  = env.parse(R"(
+        [[extern]] fn getBool() -> bool;
+        let a = getBool();
+        a || a
+    )");
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(MakeAllOptimizations(), prog);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("or(") == std::string::npos);
+}
+
 TEST_CASE("SSAOptimizer: common expression elimination across functions", "[sscp][interprocedural]")
 {
     Environment env;
