@@ -174,6 +174,46 @@ TEST_CASE("SSASerializer: round-trip with multiple instructions", "[serializer]"
     REQUIRE(serialized == reserialized);
 }
 
+TEST_CASE("SSASerializer: round-trip with tuple access instructions", "[serializer]")
+{
+    // This tests the specific bug where parseValueList splits on commas
+    // inside tuple type brackets, e.g. access(t:[int, int], 0:int)
+    // was incorrectly parsed as having only one operand (0:int)
+    std::string program = R"(
+fn _Z10take_tuple_PT2ii(t_L4C15) : int
+  %.2:int = access(t_L4C15:[int, int], 0:int)
+  %.3:int = access(t_L4C15:[int, int], 1:int)
+  %.4:int = add(%.2:int, %.3:int)
+  return %.4:int
+endfn
+)";
+
+    SSAProgram prog = SSASerializer::deserialize(program);
+    REQUIRE(prog.Functions.size() == 1);
+    REQUIRE(prog.Functions[0].Body.size() == 4);
+
+    // Verify both access instructions have 2 operands (tuple ref + index)
+    auto* access0 = dynamic_cast<SSAInstrAssign*>(prog.Functions[0].Body[0].get());
+    auto* access1 = dynamic_cast<SSAInstrAssign*>(prog.Functions[0].Body[1].get());
+    REQUIRE(access0 != nullptr);
+    REQUIRE(access1 != nullptr);
+    REQUIRE(access0->Operands.size() == 2);
+    REQUIRE(access1->Operands.size() == 2);
+
+    // Verify the operands are correct: first is the tuple, second is the index
+    REQUIRE(access0->Operands[0].name() == "t_L4C15");
+    REQUIRE(access0->Operands[0].type().isTuple());
+    REQUIRE(access0->Operands[1].isConstant());
+    REQUIRE(access1->Operands[0].name() == "t_L4C15");
+    REQUIRE(access1->Operands[1].isConstant());
+
+    // Verify round-trip
+    std::string serialized   = SSASerializer::serialize(prog);
+    SSAProgram deserialized   = SSASerializer::deserialize(serialized);
+    std::string reserialized  = SSASerializer::serialize(deserialized);
+    REQUIRE(serialized == reserialized);
+}
+
 TEST_CASE("SSASerializer: handles comments in PExprIR", "[serializer]")
 {
     SECTION("Line comments")

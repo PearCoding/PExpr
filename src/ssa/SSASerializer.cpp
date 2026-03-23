@@ -357,13 +357,27 @@ Type SSASerializer::parseType(const std::string& typeStr)
         std::string inner = typeStr.substr(1, typeStr.size() - 2);
         std::vector<Type> components;
         if (!inner.empty()) {
-            std::vector<std::string> tokens = split(inner, ',');
-            for (const auto& token : tokens) {
-                Type component = parseType(trim(token));
-                if (component.kind() == TypeKind::Unspecified)
-                    return Type(TypeKind::Unspecified);
-                components.push_back(component);
+            // Bracket-aware split for nested tuple types like [[int, int], int]
+            int depth    = 0;
+            size_t start = 0;
+            for (size_t i = 0; i < inner.size(); ++i) {
+                if (inner[i] == '[')
+                    ++depth;
+                else if (inner[i] == ']')
+                    --depth;
+                else if (inner[i] == ',' && depth == 0) {
+                    Type component = parseType(trim(inner.substr(start, i - start)));
+                    if (component.kind() == TypeKind::Unspecified)
+                        return Type(TypeKind::Unspecified);
+                    components.push_back(component);
+                    start = i + 1;
+                }
             }
+            // Last component
+            Type component = parseType(trim(inner.substr(start)));
+            if (component.kind() == TypeKind::Unspecified)
+                return Type(TypeKind::Unspecified);
+            components.push_back(component);
         }
         if (components.empty())
             return Type(TypeKind::Unspecified);
@@ -468,11 +482,29 @@ bool SSASerializer::parseValue(const std::string& str, SSAValue& outValue)
 std::vector<SSAValue> SSASerializer::parseValueList(const std::string& str)
 {
     std::vector<SSAValue> values;
-    std::vector<std::string> tokens = split(str, ',');
-    for (const auto& token : tokens) {
-        if (SSAValue val; parseValue(token, val))
+
+    // Bracket-aware split: don't split on commas inside [...] (tuple types)
+    int depth    = 0;
+    size_t start = 0;
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '[')
+            ++depth;
+        else if (str[i] == ']')
+            --depth;
+        else if (str[i] == ',' && depth == 0) {
+            std::string token = trim(str.substr(start, i - start));
+            if (SSAValue val; !token.empty() && parseValue(token, val))
+                values.push_back(val);
+            start = i + 1;
+        }
+    }
+    // Last token
+    if (start < str.size()) {
+        std::string token = trim(str.substr(start));
+        if (SSAValue val; !token.empty() && parseValue(token, val))
             values.push_back(val);
     }
+
     return values;
 }
 
