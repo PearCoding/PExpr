@@ -147,6 +147,28 @@ bool SSCPControlFlowOptimizer::collapsePhiNodes(InstructionList& instructions)
                 phi->Conditions.erase(phi->Conditions.begin() + *it);
             }
 
+            // Phi identity: if all branch values are the same, replace with that value.
+            // This arises after PRE hoisting (diamond CFG) and other simplifications.
+            {
+                bool allSame = true;
+                const auto& first = phi->Branches.at(0);
+                for (size_t i = 1; i < phi->Branches.size(); ++i) {
+                    if (!(phi->Branches[i] == first)) {
+                        allSame = false;
+                        break;
+                    }
+                }
+                if (allSame) {
+                    SSAInstrAssign asg;
+                    asg.Target   = phi->Target;
+                    asg.Operator = SSAInstrAssign::OpKind::Assign;
+                    asg.Operands = { first };
+                    instrPtr     = std::make_shared<SSAInstrAssign>(std::move(asg));
+                    changed      = true;
+                    continue;
+                }
+            }
+
             // Only the 'else' statement survived
             if (phi->Conditions.empty()) {
                 SSAInstrAssign asg;
