@@ -220,10 +220,10 @@ void SSASerializer::write(std::ostream& os, const SSAInstr& instr)
 void SSASerializer::write(std::ostream& os, const SSAFunction& func)
 {
     if (func.External) {
-        os << "[[extern";
+        os << "@[extern";
         if (!func.HasSideEffect)
             os << ", pure";
-        os << "]] ";
+        os << "] ";
     }
 
     os << "fn " << func.Name << "(";
@@ -508,18 +508,18 @@ std::vector<SSAValue> SSASerializer::parseValueList(const std::string& str)
     return values;
 }
 
-// Helper to parse function attributes like [[extern]], [[extern, pure]], [[pure, extern]], etc.
+// Helper to parse function attributes like @[extern], @[extern, pure], @[pure, extern], etc.
 static void parseFunctionAttributes(const std::string& line, bool& isExternal, bool& hasSideEffect)
 {
     isExternal    = false;
     hasSideEffect = true; // Default to having side effects
 
-    // Find attribute section [[...]]
-    size_t attrStart = line.find("[[");
+    // Find attribute section @[...]
+    size_t attrStart = line.find("@[");
     if (attrStart == std::string::npos)
         return;
 
-    size_t attrEnd = line.find("]]", attrStart);
+    size_t attrEnd = line.find(']', attrStart);
     if (attrEnd == std::string::npos)
         return;
 
@@ -774,14 +774,8 @@ SSAProgram SSASerializer::read(std::istream& is)
             currentFunction = std::make_shared<SSAFunction>();
 
             // Parse attributes if present
-            if (line.find("[[") != std::string::npos) {
-                size_t attrStart = line.find("[["); // This is where attributes start
-                size_t attrEnd   = line.find("]]");
-                if (attrEnd != std::string::npos) {
-                    // Extract the part from [[ to ]] including attributes
-                    std::string attrContent = line.substr(attrStart, attrEnd - attrStart + 2);
-                    parseFunctionAttributes(attrContent, currentFunction->External, currentFunction->HasSideEffect);
-                }
+            if (line.find("@[") != std::string::npos) {
+                parseFunctionAttributes(line, currentFunction->External, currentFunction->HasSideEffect);
             }
 
             // Find function name (skip over attributes if present)

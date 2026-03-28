@@ -2,9 +2,9 @@
 
 // The following is implemented in pcalc and exposed in the internal header.
 // Therefore, these will trigger a warning when the file is read. Ignore it.
-[[extern]] fn readInteger() -> int;
-[[extern]] fn print(n: num) -> void;
-[[extern]] fn print(s: str) -> void;
+@[extern] fn readInteger() -> int;
+@[extern] fn print(n: num) -> void;
+@[extern] fn print(s: str) -> void;
 
 fn gcd(a:int, b:int) -> int = if b == 0 {
         a

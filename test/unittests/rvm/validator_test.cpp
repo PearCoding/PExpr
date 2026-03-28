@@ -277,8 +277,8 @@ TEST_CASE("RVMValidator: Integration with Register Allocator", "[rvm][validation
     {
         Environment env;
         auto ast = env.parse(R"(
-            [[extern]] fn getInput1() -> int;
-            [[extern]] fn getInput2() -> int;
+            @[extern] fn getInput1() -> int;
+            @[extern] fn getInput2() -> int;
             
             let a = getInput1();
             let b = getInput2();
@@ -333,8 +333,8 @@ TEST_CASE("RVMValidator: Complex verification", "[rvm][validation]")
 {
     Environment env;
     auto ast = env.parse(R"(
-[[extern, pure]] fn getNumber(str:str) -> num;
-[[extern, pure]] fn passthrough(rgb:vec3) -> vec3;
+@[extern, pure] fn getNumber(str:str) -> num;
+@[extern, pure] fn passthrough(rgb:vec3) -> vec3;
 
 let uv = [getNumber("42"), getNumber("11"), getNumber("7")];
 passthrough([0.4*uv.x, uv.y, 1])

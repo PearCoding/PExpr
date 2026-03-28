@@ -134,11 +134,10 @@ private:
         while (P.cur().Type != TokenType::Eof) {
             // Check for attributes before statements/expressions
             AttributeList attrs;
-            if (P.cur(0).Type == TokenType::OpenSquareBracket && P.cur(1).Type == TokenType::OpenSquareBracket) {
-                P.expect(TokenType::OpenSquareBracket);
+            if (P.cur(0).Type == TokenType::At) {
+                P.expect(TokenType::At);
                 P.expect(TokenType::OpenSquareBracket);
                 attrs = p_attributes();
-                P.expect(TokenType::ClosedSquareBracket);
                 P.expect(TokenType::ClosedSquareBracket);
             }
 

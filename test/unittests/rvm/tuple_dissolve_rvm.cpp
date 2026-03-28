@@ -75,7 +75,7 @@ TEST_CASE("Tuple dissolve with RVM mapping - nested tuple arguments", "[tuple_di
 TEST_CASE("Tuple dissolve with RVM mapping - tuple in phi node", "[tuple_dissolve][rvm]")
 {
     const char* source = R"(
-        [[extern, pure]] fn get_bool() -> bool;
+        @[extern, pure] fn get_bool() -> bool;
         
         let t = if get_bool() {
             [1, 2.0]

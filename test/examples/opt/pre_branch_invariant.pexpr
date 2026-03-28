@@ -1,9 +1,9 @@
 // Partial Redundancy Elimination (PRE) - Branch-invariant code motion
 // Tests moving computations out of conditional branches when they appear in multiple paths
 
-[[extern]] fn getInput() -> num;
-[[extern, pure]] fn sin(a:num) -> num;
-[[extern, pure]] fn cos(a:num) -> num;
+@[extern] fn getInput() -> num;
+@[extern, pure] fn sin(a:num) -> num;
+@[extern, pure] fn cos(a:num) -> num;
 
 let a = getInput();
 let b = getInput();

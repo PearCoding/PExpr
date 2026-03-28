@@ -86,7 +86,7 @@ TEST_CASE("Casts: mixed int/num tuple multiplication", "[casts]")
 TEST_CASE("Casts: nested mixed int/num tuple multiplication", "[casts]")
 {
     Environment env;
-    auto ast = env.parse("let a = [[1, 2.0], 3] * [[2.0, 1], 1]; a");
+    auto ast = env.parse("[[1, 2.0], 3] * [[2.0, 1], 1]");
     REQUIRE(ast != nullptr);
 
     auto prog   = env.map(ast);
@@ -160,14 +160,14 @@ TEST_CASE("Casts: full implicit_casts.pexpr example compiles", "[casts]")
 TEST_CASE("Casts: nested tuple addition with mixed types", "[casts]")
 {
     Environment env;
-    auto ast = env.parse("let a = [[1, 2], 3.0] + [[4.0, 5.0], 6]; a");
+    auto ast = env.parse("[[1, 2], 3.0] + [[4.0, 5.0], 6]");
     REQUIRE(ast != nullptr);
 }
 
 TEST_CASE("Casts: deeply nested tuple multiplication", "[casts]")
 {
     Environment env;
-    auto ast = env.parse("let a = [[[1, 2.0]], 3] * [[[4.0, 5]], 6]; a");
+    auto ast = env.parse("[[[1, 2.0]], 3] * [[[4.0, 5]], 6]");
     REQUIRE(ast != nullptr);
 }
 

@@ -43,7 +43,7 @@ TEST_CASE("Parser: complex expression parsing", "[parser][expressions]")
     SECTION("Function calls in expressions")
     {
         auto ast = env.parse(R"(
-            [[extern, pure]] fn abs(x:num) -> num;
+            @[extern, pure] fn abs(x:num) -> num;
             
             let result = abs(3.14) * 2.0 + abs(-2.5);
             

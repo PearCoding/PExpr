@@ -699,10 +699,10 @@ RVMProgram RVMMapper::mapProgram(const ssa::SSAProgram& ssaProgram)
     for (const auto& ssaFunc : ssaProgram.Functions) {
         if (ssaFunc.External) {
             // Create a comment for external function declaration
-            std::string comment = "[[extern";
+            std::string comment = "@[extern";
             if (!ssaFunc.HasSideEffect)
                 comment += ", pure";
-            comment += "]] fn " + ssaFunc.Name + "(";
+            comment += "] fn " + ssaFunc.Name + "(";
 
             for (size_t i = 0; i < ssaFunc.Parameters.size(); ++i) {
                 if (i > 0)

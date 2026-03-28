@@ -88,7 +88,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
     SECTION("Phi with else branch")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let x = if getBool() {
                 10
             } elif getBool() {
@@ -123,7 +123,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
     SECTION("Phi with single condition (no else)")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let mut x = 22;
             if getBool() {
                 x = 10;
@@ -154,7 +154,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
     SECTION("Phi with multiple conditions")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let x = if getBool() {
                 10
             } elif getBool() {
@@ -215,7 +215,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
     SECTION("Complex branch pattern with multiple variables")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let mut x = 1;
             let mut y = 2;
             let mut z = 3;
@@ -256,7 +256,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
     SECTION("Phi with same value in multiple branches")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let x = if getBool() {
                 42
             } elif getBool() {
@@ -323,7 +323,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
         // branches, removing the branch/label structure. The phi lowering must still
         // produce correct conditional code.
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let x = if getBool() { 1 } else { 0 };
             x
         )";
@@ -363,7 +363,7 @@ TEST_CASE("RVMMapper: phi node mapping", "[rvm][mapper][phi]")
     {
         // Simulates the checkerboard function's final if/else: if c % 2 == 0 { 1 } else { 0 }
         const char* source = R"(
-            [[extern, pure]] fn getInt() -> int;
+            @[extern, pure] fn getInt() -> int;
             let c = getInt();
             if c % 2 == 0 { 1 } else { 0 }
         )";
@@ -413,7 +413,7 @@ TEST_CASE("RVMMapper: phi node with full optimization pipeline", "[rvm][mapper][
     SECTION("Simple if/else survives full pipeline")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let x = if getBool() { 100 } else { 200 };
             x
         )";
@@ -428,7 +428,7 @@ TEST_CASE("RVMMapper: phi node with full optimization pipeline", "[rvm][mapper][
     SECTION("Nested if/else survives full pipeline")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let x = if getBool() {
                 if getBool() { 1 } else { 2 }
             } else {
@@ -448,7 +448,7 @@ TEST_CASE("RVMMapper: phi node with full optimization pipeline", "[rvm][mapper][
     SECTION("Mutable variable with conditional update survives full pipeline")
     {
         const char* source = R"(
-            [[extern, pure]] fn getBool() -> bool;
+            @[extern, pure] fn getBool() -> bool;
             let mut x = 5;
             if getBool() {
                 x = 42;
@@ -465,7 +465,7 @@ TEST_CASE("RVMMapper: phi node with full optimization pipeline", "[rvm][mapper][
     SECTION("Checkerboard-like pattern with force inline survives full pipeline")
     {
         const char* source = R"(
-            [[extern, pure]] fn getInt() -> int;
+            @[extern, pure] fn getInt() -> int;
             fn isEven(n: int) = if n % 2 == 0 { 1 } else { 0 };
             isEven(getInt())
         )";

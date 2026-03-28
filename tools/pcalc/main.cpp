@@ -170,18 +170,18 @@ ValueVariant io_print(const std::vector<ValueVariant>& args)
 
 static const char* SRC_HEADER = R"(
 //!location 1 "Header"
-[[extern, pure]] fn sqrt(x:num) -> num;
-[[extern, pure]] fn sin(x:num) -> num;
-[[extern, pure]] fn cos(x:num) -> num;
-[[extern, pure]] fn tan(x:num) -> num;
-[[extern, pure]] fn log(x:num) -> num;
-[[extern, pure]] fn exp(x:num) -> num;
-[[extern]] fn readInteger() -> int;
-[[extern]] fn readNumber() -> num;
-[[extern]] fn readString() -> str;
-[[extern]] fn print(b: bool) -> void;
-[[extern]] fn print(n: num) -> void;
-[[extern]] fn print(s: str) -> void;
+@[extern, pure] fn sqrt(x:num) -> num;
+@[extern, pure] fn sin(x:num) -> num;
+@[extern, pure] fn cos(x:num) -> num;
+@[extern, pure] fn tan(x:num) -> num;
+@[extern, pure] fn log(x:num) -> num;
+@[extern, pure] fn exp(x:num) -> num;
+@[extern] fn readInteger() -> int;
+@[extern] fn readNumber() -> num;
+@[extern] fn readString() -> str;
+@[extern] fn print(b: bool) -> void;
+@[extern] fn print(n: num) -> void;
+@[extern] fn print(s: str) -> void;
 let Pi = 3.141592;
 )";
 

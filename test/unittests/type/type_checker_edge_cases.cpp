@@ -151,8 +151,8 @@ TEST_CASE("TypeChecker: external function type checking", "[typechecker][extern]
     SECTION("External function with pure attribute")
     {
         auto ast = env.parse(R"(
-            [[extern, pure]] fn sin(x:num) -> num;
-            [[extern, pure]] fn cos(x:num) -> num;
+            @[extern, pure] fn sin(x:num) -> num;
+            @[extern, pure] fn cos(x:num) -> num;
             
             let result = sin(3.14) + cos(1.57);
             
@@ -167,7 +167,7 @@ TEST_CASE("TypeChecker: external function type checking", "[typechecker][extern]
     {
         env.reporter().setQuiet(true);
         auto ast = env.parse(R"(
-            [[extern]] fn externalFunc(x:num) -> num;
+            @[extern] fn externalFunc(x:num) -> num;
             
             let result = externalFunc(true);  // bool passed where num expected
             

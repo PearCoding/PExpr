@@ -26,6 +26,7 @@ enum class TokenType {
     ClosedBraces,        // }
     OpenSquareBracket,   // [
     ClosedSquareBracket, // ]
+    At,                  // @
     And,                 // &&
     Or,                  // ||
     Less,                // <

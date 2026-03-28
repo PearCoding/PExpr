@@ -55,6 +55,8 @@ std::string Token::toString(TokenType type)
         return "[";
     case TokenType::ClosedSquareBracket:
         return "]";
+    case TokenType::At:
+        return "@";
     case TokenType::And:
         return "&&";
     case TokenType::Or:

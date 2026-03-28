@@ -1,5 +1,5 @@
 // Branch with phi node and multiple variables
-[[extern, pure]] fn getInput() -> num;
+@[extern, pure] fn getInput() -> num;
 
 let mut x:num = 0;
 let branch_phi = if getInput() < 0.5 {

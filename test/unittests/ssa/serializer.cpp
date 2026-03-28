@@ -114,7 +114,7 @@ TEST_CASE("SSASerializer: round-trip with external function", "[serializer]")
 
     std::string serialized = SSASerializer::serialize(prog);
     REQUIRE(!serialized.empty());
-    REQUIRE(serialized.find("[[extern]]") != std::string::npos);
+    REQUIRE(serialized.find("@[extern]") != std::string::npos);
     REQUIRE(serialized.find("call[") != std::string::npos);
 
     SSAProgram deserialized  = SSASerializer::deserialize(serialized);
@@ -265,7 +265,7 @@ endfn
     {
         std::string program = R"(
 // Line comment before function
-[[extern, pure]] fn test_func():bool
+@[extern, pure] fn test_func():bool
   /* Block comment
      inside function */
   result.1:bool = assign(true:bool)

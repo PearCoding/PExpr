@@ -19,7 +19,7 @@ TEST_CASE("SSAOptimizer: constant propagation through branches", "[sscp][constan
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         let b = getInput();
         let cond = a == b;
@@ -49,7 +49,7 @@ TEST_CASE("SSAOptimizer: loop invariant code motion", "[sscp][licm]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getValue() -> num;
+        @[extern] fn getValue() -> num;
         
         // Simulate loop with recursion
         fn process(n:int, acc:num) -> num = {
@@ -79,7 +79,7 @@ TEST_CASE("SSAOptimizer: strength reduction", "[sscp][strength]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         
         // Multiplication by powers of 2 could be strength reduced to shifts
@@ -109,7 +109,7 @@ TEST_CASE("SSAOptimizer: algebraic simplifications", "[sscp][algebraic]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         let a = getInput();
         let b = getInput();
         
@@ -213,7 +213,7 @@ TEST_CASE("SSAOptimizer: a || false = a", "[sscp][identity][logical]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         a || false
     )");
@@ -228,7 +228,7 @@ TEST_CASE("SSAOptimizer: false || a = a", "[sscp][identity][logical]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         false || a
     )");
@@ -242,7 +242,7 @@ TEST_CASE("SSAOptimizer: a || true = true", "[sscp][identity][logical]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         a || true
     )");
@@ -257,7 +257,7 @@ TEST_CASE("SSAOptimizer: a && true = a", "[sscp][identity][logical]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         a && true
     )");
@@ -271,7 +271,7 @@ TEST_CASE("SSAOptimizer: a && false = false", "[sscp][identity][logical]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         a && false
     )");
@@ -286,7 +286,7 @@ TEST_CASE("SSAOptimizer: num self-identity NOT applied at O2 (IEEE-754 safe)", "
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         let a = getInput();
         a - a
     )");
@@ -302,7 +302,7 @@ TEST_CASE("SSAOptimizer: num self-identity applied at O3 (fast-math)", "[sscp][i
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         let a = getInput();
         a - a
     )");
@@ -320,7 +320,7 @@ TEST_CASE("SSAOptimizer: a - a = 0", "[sscp][identity][self]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         a - a
     )");
@@ -335,7 +335,7 @@ TEST_CASE("SSAOptimizer: a / a = 1", "[sscp][identity][self]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         a / a
     )");
@@ -349,7 +349,7 @@ TEST_CASE("SSAOptimizer: a == a = true", "[sscp][identity][self]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         a == a
     )");
@@ -364,7 +364,7 @@ TEST_CASE("SSAOptimizer: a != a = false", "[sscp][identity][self]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         a != a
     )");
@@ -379,7 +379,7 @@ TEST_CASE("SSAOptimizer: a && a = a (idempotent)", "[sscp][identity][self]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         a && a
     )");
@@ -393,7 +393,7 @@ TEST_CASE("SSAOptimizer: a || a = a (idempotent)", "[sscp][identity][self]")
 {
     Environment env;
     auto ast  = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getBool() -> bool;
         let a = getBool();
         a || a
     )");
@@ -407,7 +407,7 @@ TEST_CASE("SSAOptimizer: common expression elimination across functions", "[sscp
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         
         fn helper1(x:num) -> num = x * x + 2.0 * x + 1.0;
         fn helper2(y:num) -> num = y * y + 2.0 * y + 1.0;

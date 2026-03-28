@@ -15,7 +15,7 @@ function ::= [ attributes ] 'fn' Identifier '(' parameter_list ')' ':' type newl
              { instruction }
              'endfn' newline
 
-attributes ::= '[[' attribute ( ',' attribute )* ']]'
+attributes ::= '@[' attribute ( ',' attribute )* ']'
 attribute ::= 'extern' | 'pure'
 
 parameter_list ::= /* empty */
@@ -87,7 +87,7 @@ Examples
 
 ### Function definition
 ```
-[[extern]] fn _Z5print_Pn(n:num) : void
+@[extern] fn _Z5print_Pn(n:num) : void
 endfn
 ```
 
@@ -105,13 +105,13 @@ lbl.3:
 
 ### External and pure attributes
 ```
-[[extern]] fn readInt() : int
+@[extern] fn readInt() : int
 endfn
 
-[[extern, pure]] fn sqrt(x:num) : num
+@[extern, pure] fn sqrt(x:num) : num
 endfn
 
-[[pure]] fn add(x:int, y:int) : int
+@[pure] fn add(x:int, y:int) : int
   %.1:int = add(x:int, y:int)
   return %.1:int
 endfn
@@ -143,4 +143,4 @@ Implementation Notes
 - Phi instructions merge values from different control flow paths
 - Labels mark basic block boundaries
 - Functions can be external (no body) or internal (with body)
-- The `[[pure]]` attribute indicates a function has no side effects
+- The `@[pure]` attribute indicates a function has no side effects

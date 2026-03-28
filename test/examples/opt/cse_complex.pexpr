@@ -1,11 +1,11 @@
 // Common subexpression elimination (CSE) - complex nested expressions
 // Tests deep nesting and pattern recognition
 
-[[extern]] fn getInput() -> num;
-[[extern, pure]] fn sin(a:num) -> num;
-[[extern, pure]] fn cos(a:num) -> num;
-[[extern, pure]] fn sqrt(a:num) -> num;
-[[extern, pure]] fn log(a:num) -> num;
+@[extern] fn getInput() -> num;
+@[extern, pure] fn sin(a:num) -> num;
+@[extern, pure] fn cos(a:num) -> num;
+@[extern, pure] fn sqrt(a:num) -> num;
+@[extern, pure] fn log(a:num) -> num;
 
 let a = getInput();
 let b = getInput();

@@ -1,7 +1,7 @@
 // Common subexpression elimination (CSE) - vector operations
 // Duplicate vector operations should be eliminated
 
-[[extern]] fn getInput() -> num;
+@[extern] fn getInput() -> num;
 
 let a = getInput();
 let b = getInput();

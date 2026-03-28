@@ -46,9 +46,9 @@ std::string FuzzGenerator::generateRandomProgram(size_t maxDepth)
     // Add some external functions
     if (randomBool(0.2)) {
         if (randomBool(0.6))
-            ss << "[[extern]]";
+            ss << "@[extern]";
         else
-            ss << "[[extern, pure]]";
+            ss << "@[extern, pure]";
 
         ss << " fn " << randomIdentifier() << "(x:" << randomType() << ") -> " << randomType() << ";\n";
     }
@@ -141,7 +141,7 @@ std::string FuzzGenerator::generateMalformedSyntax()
     case 5:
         return "let x = 1 2 3;"; // Missing operators
     case 6:
-        return "[[extern fn f() -> int;"; // Missing bracket
+        return "@[extern fn f() -> int;"; // Missing bracket
     case 7:
         return "let mut x = 1 let y = 2;"; // Missing semicolon
     case 8:
@@ -261,7 +261,7 @@ std::string FuzzGenerator::generateUnmatchedBrackets()
     case 2:
         return "if true { let x = 1;"; // Missing closing brace
     case 3:
-        return "[[extern fn f() -> int;"; // Missing closing bracket
+        return "@[extern fn f() -> int;"; // Missing closing bracket
     default:
         return "";
     }
@@ -603,7 +603,7 @@ std::string FuzzGenerator::generateTupleExpression(size_t depth)
 std::string FuzzGenerator::generateAttributeList()
 {
     std::stringstream ss;
-    ss << "[[";
+    ss << "@[";
 
     int numAttrs                   = randomInt(1, 3);
     std::vector<std::string> attrs = { "extern", "pure" };
@@ -622,7 +622,7 @@ std::string FuzzGenerator::generateAttributeList()
         }
     }
 
-    ss << "]]";
+    ss << "]";
     return ss.str();
 }
 

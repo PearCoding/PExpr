@@ -23,8 +23,8 @@ TEST_CASE("RVMRegisterAllocator: reduces register count in simple case", "[rvm][
     // Without allocation: registers for a, b, c, d (4 registers)
     // With allocation: a and b can be reused after they're no longer live -> (3 registers)
     auto ast = env.parse(R"(
-        [[extern]] fn getInput1() -> int;
-        [[extern]] fn getInput2() -> int;
+        @[extern] fn getInput1() -> int;
+        @[extern] fn getInput2() -> int;
         
         let a = getInput1();
         let b = getInput2();
@@ -82,8 +82,8 @@ TEST_CASE("RVMRegisterAllocator: handles dead values", "[rvm][register-allocatio
     // a = input1 (used), b = input2 (dead - never used), c = a + 1, return c
     // b should not prevent register reuse
     auto ast = env.parse(R"(
-        [[extern]] fn getInput1() -> int;
-        [[extern]] fn getInput2() -> int;
+        @[extern] fn getInput1() -> int;
+        @[extern] fn getInput2() -> int;
         
         let a = getInput1();
         let b = getInput2(); // dead value
@@ -112,9 +112,9 @@ TEST_CASE("RVMRegisterAllocator: integration with RVMOptimizer", "[rvm][register
     Environment env;
 
     auto ast = env.parse(R"(
-        [[extern]] fn getInput1() -> int;
-        [[extern]] fn getInput2() -> int;
-        [[extern]] fn getInput3() -> int;
+        @[extern] fn getInput1() -> int;
+        @[extern] fn getInput2() -> int;
+        @[extern] fn getInput3() -> int;
         
         let x = getInput1();
         let y = getInput2();
@@ -166,11 +166,11 @@ TEST_CASE("RVMRegisterAllocator: handles nested control flow", "[rvm][register-a
 
     // Program with nested if-else statements
     auto ast = env.parse(R"(
-        [[extern]] fn getCond1() -> bool;
-        [[extern]] fn getCond2() -> bool;
-        [[extern]] fn getInput1() -> int;
-        [[extern]] fn getInput2() -> int;
-        [[extern]] fn getInput3() -> int;
+        @[extern] fn getCond1() -> bool;
+        @[extern] fn getCond2() -> bool;
+        @[extern] fn getInput1() -> int;
+        @[extern] fn getInput2() -> int;
+        @[extern] fn getInput3() -> int;
         
         let cond1 = getCond1();
         let cond2 = getCond2();
@@ -221,7 +221,7 @@ TEST_CASE("RVMRegisterAllocator: handles complex register pressure", "[rvm][regi
 
     // Program with many temporary values creating high register pressure
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         
         let a = getInput();
         let b = getInput();
@@ -274,7 +274,7 @@ TEST_CASE("RVMRegisterAllocator: handles many live values simultaneously", "[rvm
 
     // Program where many values are live at the same time
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         
         // All these values will be used together at the end
         let a = getInput();
@@ -314,8 +314,8 @@ TEST_CASE("RVMRegisterAllocator: interaction with move chain optimization", "[rv
 
     // Program that benefits from both move chain optimization and register allocation
     auto ast = env.parse(R"(
-        [[extern]] fn getInput1() -> int;
-        [[extern]] fn getInput2() -> int;
+        @[extern] fn getInput1() -> int;
+        @[extern] fn getInput2() -> int;
         
         let x = getInput1();
         let y = getInput2();
@@ -360,7 +360,7 @@ TEST_CASE("RVMRegisterAllocator: preserves program semantics", "[rvm][register-a
 
     // Complex program where we want to ensure semantics are preserved
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         
         let x = getInput();
         let y = getInput();
@@ -410,7 +410,7 @@ TEST_CASE("RVMRegisterAllocator: handles edge case with single register", "[rvm]
 
     // Program that already uses minimal registers
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         
         let x = getInput();
         x + 1
@@ -437,9 +437,9 @@ TEST_CASE("RVMRegisterAllocator: handles mixed type registers", "[rvm][register-
 
     // Program with registers of different types (int, num, bool)
     auto ast = env.parse(R"(
-        [[extern]] fn getInt() -> int;
-        [[extern]] fn getNum() -> num;
-        [[extern]] fn getBool() -> bool;
+        @[extern] fn getInt() -> int;
+        @[extern] fn getNum() -> num;
+        @[extern] fn getBool() -> bool;
 
         let i = getInt();
         let n = getNum();
@@ -482,8 +482,8 @@ TEST_CASE("RVMRegisterAllocator: no transitive interference in MOV chains with m
     // call's parameters must NOT be fully coalesced. If it is, %r0 gets reused for
     // both str and num, and the string write clobbers the numeric value.
     auto ast = env.parse(R"(
-        [[extern]] fn getUV() -> vec2;
-        [[extern]] fn sample(name:str, uv:vec2) -> num;
+        @[extern] fn getUV() -> vec2;
+        @[extern] fn sample(name:str, uv:vec2) -> num;
         let uv = getUV();
         sample("tex", uv)
     )");
@@ -532,8 +532,8 @@ TEST_CASE("RVMRegisterAllocator: transitive interference with long MOV chain", "
     // passed through to another extern that also takes a string parameter.
     // This tests the same transitive interference bug with a simpler (non-vec2) case.
     auto ast = env.parse(R"(
-        [[extern]] fn getValue() -> num;
-        [[extern]] fn lookup(name:str, v:num) -> num;
+        @[extern] fn getValue() -> num;
+        @[extern] fn lookup(name:str, v:num) -> num;
         let v = getValue();
         lookup("key", v)
     )");

@@ -36,8 +36,8 @@ TEST_CASE("Parser: simple arithmetic", "[parser]")
 TEST_CASE("Parser: complex expression parsing", "[parser]")
 {
     auto ast = parseOnly(R"(
-        [[extern]] fn foo(a:num) -> vec3;
-        [[extern]] fn bar(a:num, b:num, c:num) -> num;
+        @[extern] fn foo(a:num) -> vec3;
+        @[extern] fn bar(a:num, b:num, c:num) -> num;
         let Pi = 3.141592;
         let K = [111, 222];
         foo(231*22.231*2.42e-3).xyz*Pi-123*(K.x+bar(22^4, 1-2%2, --1))
@@ -98,7 +98,7 @@ TEST_CASE("Parser: attributes before fn keyword", "[parser]")
 {
     SECTION("Simple extern attribute")
     {
-        auto ast              = parseOnly("[[extern]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("@[extern] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
         REQUIRE(out.find("foo(") != std::string::npos);
@@ -106,14 +106,14 @@ TEST_CASE("Parser: attributes before fn keyword", "[parser]")
 
     SECTION("Multiple attributes")
     {
-        auto ast              = parseOnly("[[extern, pure]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("@[extern, pure] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
     }
 
     SECTION("Attributes with boolean values")
     {
-        auto ast              = parseOnly("[[extern=true, pure=false]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("@[extern=true, pure=false] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
     }
@@ -121,7 +121,7 @@ TEST_CASE("Parser: attributes before fn keyword", "[parser]")
     SECTION("Attributes with integer values")
     {
         // Note: integer attribute values are parsed but not used by FunctionAttributes
-        auto ast              = parseOnly("[[priority=2, extern=true]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("@[priority=2, extern=true] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
     }
@@ -129,7 +129,7 @@ TEST_CASE("Parser: attributes before fn keyword", "[parser]")
     SECTION("Attributes with string values")
     {
         // Note: string attribute values are parsed but not used by FunctionAttributes
-        auto ast              = parseOnly("[[name=\"test\", extern=true]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("@[name=\"test\", extern=true] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
     }
@@ -170,7 +170,7 @@ TEST_CASE("Parser: attributes on variable declarations", "[parser]")
     SECTION("Variable with attribute")
     {
         // Note: const attribute does not exist
-        auto ast              = parseOnly("[[const]] let x = 5; x");
+        auto ast              = parseOnly("@[const] let x = 5; x");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("x") != std::string::npos);
     }
@@ -178,7 +178,7 @@ TEST_CASE("Parser: attributes on variable declarations", "[parser]")
     SECTION("Mutable variable with attribute")
     {
         // Note: optimize attribute does not exist
-        auto ast              = parseOnly("[[optimize]] let mut y = 10; y");
+        auto ast              = parseOnly("@[optimize] let mut y = 10; y");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("mut y = 10;") != std::string::npos);
     }
@@ -188,14 +188,14 @@ TEST_CASE("Parser: attribute parsing edge cases", "[parser]")
 {
     SECTION("Empty attribute list")
     {
-        auto ast              = parseOnly("[[]] fn foo(v:int) -> int = v; foo(5)");
+        auto ast              = parseOnly("@[] fn foo(v:int) -> int = v; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("foo(") != std::string::npos);
     }
 
     SECTION("Boolean attribute without value (defaults to true)")
     {
-        auto ast              = parseOnly("[[extern, pure]] fn foo(v:int) -> int; foo(5)");
+        auto ast              = parseOnly("@[extern, pure] fn foo(v:int) -> int; foo(5)");
         const std::string out = StringVisitor::visit(ast);
         REQUIRE(out.find("extern") != std::string::npos);
     }

@@ -241,9 +241,9 @@ TEST_CASE("SSAMapper: complex expression trees", "[ssamapper][expressions]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern, pure]] fn sin(a:num) -> num;
-        [[extern, pure]] fn cos(a:num) -> num;
-        [[extern, pure]] fn exp(a:num) -> num;
+        @[extern, pure] fn sin(a:num) -> num;
+        @[extern, pure] fn cos(a:num) -> num;
+        @[extern, pure] fn exp(a:num) -> num;
         
         // Complex mathematical expression
         let a = 1.5;
@@ -281,7 +281,7 @@ TEST_CASE("SSAMapper: branch with mutables", "[ssamapper][controlflow]")
 
     Environment env;
     auto ast = env.parse(R"(
-        [[extern, pure]] fn getInput() -> num;
+        @[extern, pure] fn getInput() -> num;
 
         let mut x:num = 0;
         let branch_phi = if getInput() < 0.5 {

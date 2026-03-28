@@ -37,6 +37,8 @@ Token Lexer::next()
             return Token(prevLoc, TokenType::OpenSquareBracket);
         if (accept(']'))
             return Token(prevLoc, TokenType::ClosedSquareBracket);
+        if (accept('@'))
+            return Token(prevLoc, TokenType::At);
         if (accept('+')) {
             if (accept('='))
                 return Token(prevLoc, TokenType::PlusAssign);

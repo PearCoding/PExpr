@@ -69,16 +69,16 @@ Attributes
 ----------
 Attributes appear before statements in double square brackets.
 
-attributes ::= '[[' attribute ( ',' attribute )* ']]'
+attributes ::= '@[' attribute ( ',' attribute )* ']'
 attribute ::= Identifier [ '=' ( BooleanLiteral | IntegerLiteral | NumberLiteral | StringLiteral ) ]
 
 Common attributes:
-- `[[extern]]` or `[[extern=true]]`: marks function as external (no body)
-- `[[pure]]` or `[[pure=true]]`: marks function as having no side effects
+- `@[extern]` or `@[extern=true]`: marks function as external (no body)
+- `@[pure]` or `@[pure=true]`: marks function as having no side effects
 
 function_statement ::= [ attributes ] 'fn' Identifier '(' parameter_def_list ')' [ '->' type ] ( '=' expression ';' | ';' )
 
-Note: External functions (with `[[extern]]` attribute) end with `;` instead of `= expression ;`
+Note: External functions (with `@[extern]` attribute) end with `;` instead of `= expression ;`
 
 variable_statement ::= [ attributes ] ( 'let' [ 'mut' ] Identifier [ ':' type ] '=' expression ';'
                                      | Identifier '=' expression ';' )
@@ -196,7 +196,7 @@ Additional parser behavior notes
 - Closures (block expressions) are delimited by '{' '}' and return an expression as their body, plus optional statements inside
 - Function declarations:
   - Internal: 'fn name(params) = expression;' or 'fn name(params) -> type = expression;' or 'fn name(params) { closure }'
-  - External: '[[extern]] fn name(params) -> type;' (requires explicit return type)
+  - External: '@[extern] fn name(params) -> type;' (requires explicit return type)
 - Variable declarations:
   - Immutable: 'let name = expression;' or 'let name: type = expression;'
   - Mutable: 'let mut name = expression;' or 'let mut name: type = expression;'
@@ -216,8 +216,8 @@ Examples
    `t[1][0]`  // accesses index 0 of the tuple at index 1
 
 3. Function with attributes:
-   `[[extern]] fn sqrt(x: num) -> num;`
-   `[[pure]] fn add(x: int, y: int) -> int = x + y;`
+   `@[extern] fn sqrt(x: num) -> num;`
+   `@[pure] fn add(x: int, y: int) -> int = x + y;`
    `fn add(x: int, y: int) { x + y }`
 
 4. Swizzle expressions:

@@ -2,12 +2,12 @@
 // Duplicate calls to pure functions should be eliminated
 
 // Intrinsics (defined in Intrinsics.cpp)
-[[extern, pure]] fn sin(a:num) -> num;
-[[extern, pure]] fn cos(a:num) -> num;
-[[extern, pure]] fn sqrt(a:num) -> num;
-[[extern, pure]] fn log(a:num) -> num;
+@[extern, pure] fn sin(a:num) -> num;
+@[extern, pure] fn cos(a:num) -> num;
+@[extern, pure] fn sqrt(a:num) -> num;
+@[extern, pure] fn log(a:num) -> num;
 
-[[extern]] fn getInput() -> num;
+@[extern] fn getInput() -> num;
 
 let a = getInput();
 let b = getInput();

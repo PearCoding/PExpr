@@ -10,7 +10,7 @@ Optimized for computer graphics, HPC, and mathematical frameworks with a focus o
 - **Rich Type Support**: Built-in vector types (`vec2`, `vec3`, `vec4`), tuples, and destructuring patterns
 - **Optimization Pipeline**: Multiple optimization passes including constant folding, dead code elimination, common subexpression elimination (CSE), partial redundancy elimination (PRE), and function inlining
 - **SSA-Based IR**: Static Single Assignment intermediate representation for precise analysis and optimization
-- **External Function Integration**: Declare external functions with attributes (`[[extern]]`, `[[pure]]`) for seamless integration with host languages
+- **External Function Integration**: Declare external functions with attributes (`@[extern]`, `@[pure]`) for seamless integration with host languages
 - **CLI Compiler Tool**: `pexprc` command-line compiler with extensive optimization controls and output formats
 - **Zero Dependencies**: Only requires a C++20 compiler - no external libraries needed
 - **Syntax Highlighting**: VSCode extension available in `tools/syntax/`
@@ -41,7 +41,7 @@ Create a file `example.pexpr`:
 fn add(x: int, y: int) = x + y;
 
 // External function declaration (implemented by host)
-[[extern]] fn sqrt(x: num) -> num;
+@[extern] fn sqrt(x: num) -> num;
 
 // Vector operations
 let v: vec3 = [1.0, 2.0, 3.0];
@@ -102,8 +102,8 @@ fn add(x: int, y: int) -> int = x + y;
 fn add(x: num, y: num) -> num = x + y;
 
 // External function (implemented by host)
-[[extern]] fn sin(x: num) -> num;
-[[extern, pure]] fn cos(x: num) -> num;
+@[extern] fn sin(x: num) -> num;
+@[extern, pure] fn cos(x: num) -> num;
 
 // Function with statements
 fn complexOperation(x: num) -> num = {

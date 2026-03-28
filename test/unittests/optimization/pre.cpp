@@ -31,8 +31,8 @@ TEST_CASE("PRE: partial redundancy — insert on missing path", "[pre]")
     // a+b computed in one branch but used after join → PRE inserts on the other path
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getBool() -> bool;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let b = getNum();
         let c = getBool();
@@ -67,7 +67,7 @@ TEST_CASE("PRE: kill prevents optimization", "[pre]")
     // a+b computed, then a is redefined, then a+b again — second is NOT redundant
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let b = getNum();
         let x = a + b;
@@ -88,8 +88,8 @@ TEST_CASE("PRE: side-effecting calls not moved", "[pre]")
     // Side-effecting function calls should never be hoisted or eliminated
     Environment env;
     auto ast = env.parse(R"(
-        [[extern, side_effect]] fn sideEffect() -> num;
-        [[extern]] fn getBool() -> bool;
+        @[extern, side_effect] fn sideEffect() -> num;
+        @[extern] fn getBool() -> bool;
         let c = getBool();
         let x = if c { sideEffect() } else { sideEffect() };
         x
@@ -110,8 +110,8 @@ TEST_CASE("PRE: diamond CFG — hoist identical computation", "[pre]")
     // Same expression in both branches → hoist before the branch
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getBool() -> bool;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let b = getNum();
         let x = if getBool() { a + b } else { a + b };
@@ -144,7 +144,7 @@ TEST_CASE("PRE: does not crash on single block", "[pre]")
     // Single block — PRE should be a no-op
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let b = getNum();
         a + b
@@ -161,9 +161,9 @@ TEST_CASE("PRE: pure function call elimination", "[pre]")
     // Pure function called in one branch and after join → PRE can eliminate
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
-        [[extern]] fn pureFunc(x:num) -> num;
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getBool() -> bool;
+        @[extern] fn pureFunc(x:num) -> num;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let c = getBool();
         let x = if c { pureFunc(a) } else { a * 2.0 };
@@ -214,7 +214,7 @@ TEST_CASE("PRE: multi-predecessor successor — no undefined values after hoisti
     // should appear without a corresponding definition.
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getUV() -> vec2;
+        @[extern] fn getUV() -> vec2;
         fn trunc(a:num) = (a as int) as num;
         fn floor(a:num) = {
             let ta = trunc(a);
@@ -258,8 +258,8 @@ TEST_CASE("PRE: Case A — availability flows through intermediate block", "[pre
     // (operands not killed) but not computed there.
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getBool() -> bool;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let b = getNum();
         let c = getBool();
@@ -291,9 +291,9 @@ TEST_CASE("PRE: Case C — no dead hoisting when all successors have multiple pr
     // single-predecessor, so hoisting must be skipped.
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> num;
-        [[extern, pure]] fn sin(a:num) -> num;
-        [[extern, pure]] fn cos(a:num) -> num;
+        @[extern] fn getInput() -> num;
+        @[extern, pure] fn sin(a:num) -> num;
+        @[extern, pure] fn cos(a:num) -> num;
         let a = getInput();
         let b = getInput();
         let cond1 = getInput() > 0.0;
@@ -350,9 +350,9 @@ TEST_CASE("PRE: Case C — no dead hoisting when all successors have multiple pr
     // sin(a)*cos(b) in result4 branches → should be hoisted
     // All of these should result in fewer total operations than without PRE
     auto progNoPre = env.map(env.parse(R"(
-        [[extern]] fn getInput() -> num;
-        [[extern, pure]] fn sin(a:num) -> num;
-        [[extern, pure]] fn cos(a:num) -> num;
+        @[extern] fn getInput() -> num;
+        @[extern, pure] fn sin(a:num) -> num;
+        @[extern, pure] fn cos(a:num) -> num;
         let a = getInput();
         let b = getInput();
         let cond1 = getInput() > 0.0;
@@ -413,8 +413,8 @@ TEST_CASE("PRE: Case B — partial insertion rollback on copy failure", "[pre][r
     // available (flows through), the other doesn't have it.
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getBool() -> bool;
-        [[extern]] fn getNum() -> num;
+        @[extern] fn getBool() -> bool;
+        @[extern] fn getNum() -> num;
         let a = getNum();
         let b = getNum();
         let c = getBool();
@@ -465,8 +465,8 @@ TEST_CASE("PRE RVM: floor(a) + floor(b) — no use-before-definition after force
     // Before the fix, the second floor's computation used undefined registers
     // because PRE hoisted into the else-branch and replaced in the merge block.
     const char* source = R"(
-        [[extern]] fn getA() -> num;
-        [[extern]] fn getB() -> num;
+        @[extern] fn getA() -> num;
+        @[extern] fn getB() -> num;
         fn trunc(a:num) = (a as int) as num;
         fn floor(a:num) = {
             let ta = trunc(a);
@@ -496,9 +496,9 @@ TEST_CASE("PRE RVM: diamond pattern hoisting — no use-before-definition", "[pr
     // Verify that PRE's diamond pattern hoisting (Case C) does not produce
     // undefined registers when the expression appears in both branches.
     const char* source = R"(
-        [[extern]] fn getBool() -> bool;
-        [[extern]] fn getA() -> num;
-        [[extern]] fn getB() -> num;
+        @[extern] fn getBool() -> bool;
+        @[extern] fn getA() -> num;
+        @[extern] fn getB() -> num;
         let a = getA();
         let b = getB();
         let x = if getBool() { a * b + 1.0 } else { a * b - 1.0 };
@@ -522,10 +522,10 @@ TEST_CASE("PRE RVM: sequential branches with shared subexpressions — no use-be
     // subexpression. This triggers Case C hoisting into blocks whose
     // successors have multiple predecessors.
     const char* source = R"(
-        [[extern]] fn getCond1() -> bool;
-        [[extern]] fn getCond2() -> bool;
-        [[extern]] fn getA() -> num;
-        [[extern]] fn getB() -> num;
+        @[extern] fn getCond1() -> bool;
+        @[extern] fn getCond2() -> bool;
+        @[extern] fn getA() -> num;
+        @[extern] fn getB() -> num;
         let a = getA();
         let b = getB();
         let r1 = if getCond1() { a * b } else { a * b + 10.0 };

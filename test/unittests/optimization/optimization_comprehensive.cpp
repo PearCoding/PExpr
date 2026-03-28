@@ -52,7 +52,7 @@ TEST_CASE("SSAOptimizer: dead code elimination with unused branches", "[sscp][de
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern, pure]] fn getInputPure() -> num;
+        @[extern, pure] fn getInputPure() -> num;
         let a = getInputPure();
         let b = getInputPure();
         let cond = a > b;
@@ -94,11 +94,11 @@ TEST_CASE("SSAOptimizer: trigonometric identities simplification", "[sscp][ident
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern, pure]] fn sin(a:num) -> num;
-        [[extern, pure]] fn cos(a:num) -> num;
-        [[extern, pure]] fn asin(a:num) -> num;
-        [[extern, pure]] fn acos(a:num) -> num;
-        [[extern]] fn getInput() -> num;
+        @[extern, pure] fn sin(a:num) -> num;
+        @[extern, pure] fn cos(a:num) -> num;
+        @[extern, pure] fn asin(a:num) -> num;
+        @[extern, pure] fn acos(a:num) -> num;
+        @[extern] fn getInput() -> num;
         
         let a = getInput();
         
@@ -184,7 +184,7 @@ TEST_CASE("SSAOptimizer: math identities simplification", "[sscp][identities]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         
         let a = getInput();
         
@@ -288,7 +288,7 @@ TEST_CASE("SSAOptimizer: repeated addition identities", "[sscp][identities]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         
         let a1 = getInput();
         let a2 = getInput();
@@ -400,7 +400,7 @@ TEST_CASE("SSAOptimizer: function inlining with small functions", "[sscp][inlini
         // Small function that should be inlined
         fn addOne(x:num) -> num = x + 1.0;
         
-        [[extern]] fn getInput() -> num;
+        @[extern] fn getInput() -> num;
         let a = getInput();
         let b = addOne(a);
         let c = addOne(b);
@@ -433,9 +433,9 @@ TEST_CASE("SSAOptimizer: interaction between multiple optimizations", "[sscp][in
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> num;
-        [[extern, pure]] fn sin(a:num) -> num;
-        [[extern, pure]] fn cos(a:num) -> num;
+        @[extern] fn getInput() -> num;
+        @[extern, pure] fn sin(a:num) -> num;
+        @[extern, pure] fn cos(a:num) -> num;
         
         let a = getInput();
         let b = getInput();
@@ -533,7 +533,7 @@ TEST_CASE("SSAOptimizer: force function inlining", "[sscp][inlining][force]")
 {
     Environment env;
     auto ast = env.parse(R"(
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         // Functions called multiple times with non-constant arguments
         fn add(x: int, y: int) = x + y;
         fn multiply(x: int, y: int) = x * y;

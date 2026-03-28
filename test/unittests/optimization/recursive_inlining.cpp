@@ -85,7 +85,7 @@ TEST_CASE("SSAOptimizer: force inlining non-recursive function", "[sscp][inlinin
         fn addOne(x:int) -> int = x + 1;
         fn addTwo(x:int) -> int = addOne(addOne(x));
         
-        [[extern]] fn getInput() -> int;
+        @[extern] fn getInput() -> int;
         let a = getInput();
         let b = addTwo(a);
         b
