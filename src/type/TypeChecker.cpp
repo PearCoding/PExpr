@@ -296,6 +296,14 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
             expr->rightMut() = injectCastIfNeeded(expr->right(), leftType, &hadCastError);
             if (!hadCastError)
                 expr->setReturnType(leftType);
+        } else if (leftType.isTuple() && rightType.isTuple() && leftType.size() == rightType.size()) {
+            auto ct = commonArithmeticType(leftType, rightType);
+            if (ct) {
+                expr->leftMut()  = injectCastIfNeeded(expr->left(), *ct, &hadCastError);
+                expr->rightMut() = injectCastIfNeeded(expr->right(), *ct, &hadCastError);
+                if (!hadCastError)
+                    expr->setReturnType(*ct);
+            }
         }
         break;
     case BinaryOperation::Mul:
@@ -310,6 +318,14 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<BinaryExpres
             expr->rightMut() = injectCastIfNeeded(expr->right(), leftType, &hadCastError);
             if (!hadCastError)
                 expr->setReturnType(leftType);
+        } else if (leftType.isTuple() && rightType.isTuple() && leftType.size() == rightType.size()) { // < tuple * tuple with mixed types
+            auto ct = commonArithmeticType(leftType, rightType);
+            if (ct) {
+                expr->leftMut()  = injectCastIfNeeded(expr->left(), *ct, &hadCastError);
+                expr->rightMut() = injectCastIfNeeded(expr->right(), *ct, &hadCastError);
+                if (!hadCastError)
+                    expr->setReturnType(*ct);
+            }
         } else if (leftType.isTuple() && isConvertible(leftType, Type::AsVector(leftType.size())) && isConvertible(rightType, TypeKind::Number)) { // < v * f, v * i
             expr->leftMut()  = injectCastIfNeeded(expr->left(), Type::AsVector(leftType.size()), &hadCastError);
             expr->rightMut() = injectCastIfNeeded(expr->right(), Type(TypeKind::Number), &hadCastError);

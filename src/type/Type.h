@@ -2,6 +2,7 @@
 
 #include "PExpr.h"
 
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -211,6 +212,46 @@ inline bool isExplicitConvertible(const Type& from, const Type& to)
         return true;
 
     return false;
+}
+
+/// Computes the common arithmetic type for two types.
+/// For int vs num -> num. For tuples -> component-wise common type.
+/// Returns std::nullopt if no common arithmetic type exists.
+inline std::optional<Type> commonArithmeticType(const Type& a, const Type& b)
+{
+    if (a == b) {
+        if (a.isElementary())
+            return (a.kind() == TypeKind::Integer || a.kind() == TypeKind::Number) ? std::optional(a) : std::nullopt;
+        if (a.isTuple()) {
+            for (const auto& comp : a.components()) {
+                if (!commonArithmeticType(comp, comp))
+                    return std::nullopt;
+            }
+            return a;
+        }
+        return std::nullopt;
+    }
+
+    if (a.isElementary() && b.isElementary()) {
+        if (a.kind() == TypeKind::Integer && b.kind() == TypeKind::Number)
+            return b;
+        if (a.kind() == TypeKind::Number && b.kind() == TypeKind::Integer)
+            return a;
+        return std::nullopt;
+    }
+
+    if (a.isTuple() && b.isTuple() && a.size() == b.size()) {
+        std::vector<Type> components;
+        for (size_t i = 0; i < a.size(); ++i) {
+            auto ct = commonArithmeticType(a.components()[i], b.components()[i]);
+            if (!ct)
+                return std::nullopt;
+            components.push_back(*ct);
+        }
+        return Type(std::move(components));
+    }
+
+    return std::nullopt;
 }
 
 /// Checks if a conversion from one type to another is possible.

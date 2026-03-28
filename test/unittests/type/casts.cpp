@@ -69,3 +69,145 @@ TEST_CASE("Casts: implicit num->int assignment is rejected (requires explicit ca
     auto ast = env.parse("let mut a:int = 0; a = 1.0; a");
     REQUIRE(ast == nullptr); // typechecker should reject implicit num->int assignment
 }
+
+// --- Tuple implicit cast tests ---
+
+TEST_CASE("Casts: mixed int/num tuple multiplication", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1, 2.0, 3] * [2.0, 1, 1]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") != std::string::npos);
+}
+
+TEST_CASE("Casts: nested mixed int/num tuple multiplication", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("let a = [[1, 2.0], 3] * [[2.0, 1], 1]; a");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") != std::string::npos);
+}
+
+TEST_CASE("Casts: mixed int/num tuple addition", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1, 2.0] + [2.0, 1]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") != std::string::npos);
+}
+
+TEST_CASE("Casts: mixed int/num tuple subtraction", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1.0, 2] - [3, 4.0]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") != std::string::npos);
+}
+
+TEST_CASE("Casts: mixed int/num tuple division", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1, 2.0, 3] / [2.0, 1, 1]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") != std::string::npos);
+}
+
+TEST_CASE("Casts: same-type tuple arithmetic needs no cast", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1.0, 2.0] * [3.0, 4.0]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    // Both sides are already [num, num], no cast needed
+    REQUIRE(dumped.find("cast(") == std::string::npos);
+}
+
+TEST_CASE("Casts: all-int tuple arithmetic needs no cast", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1, 2, 3] * [4, 5, 6]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") == std::string::npos);
+}
+
+TEST_CASE("Casts: full implicit_casts.pexpr example compiles", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("let a = [1, 2.0, 3] * [2.0, 1, 1]; let b = [[1, 2.0], 3] * [[2.0, 1], 1]; a.x * b.y");
+    REQUIRE(ast != nullptr);
+}
+
+TEST_CASE("Casts: nested tuple addition with mixed types", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("let a = [[1, 2], 3.0] + [[4.0, 5.0], 6]; a");
+    REQUIRE(ast != nullptr);
+}
+
+TEST_CASE("Casts: deeply nested tuple multiplication", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("let a = [[[1, 2.0]], 3] * [[[4.0, 5]], 6]; a");
+    REQUIRE(ast != nullptr);
+}
+
+TEST_CASE("Casts: one-sided int tuple promoted to num tuple in mul", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1, 2, 3] * [1.0, 2.0, 3.0]");
+    REQUIRE(ast != nullptr);
+
+    auto prog   = env.map(ast);
+    auto dumped = SSASerializer::serialize(prog);
+    REQUIRE(dumped.find("cast(") != std::string::npos);
+}
+
+TEST_CASE("Casts: mismatched tuple sizes rejected in mul", "[casts]")
+{
+    Environment env;
+    env.reporter().setQuiet(true);
+    auto ast = env.parse("[1, 2] * [1, 2, 3]");
+    REQUIRE(ast == nullptr);
+}
+
+TEST_CASE("Casts: bool in tuple rejected for arithmetic", "[casts]")
+{
+    Environment env;
+    env.reporter().setQuiet(true);
+    auto ast = env.parse("[1, true] * [2, 3]");
+    REQUIRE(ast == nullptr);
+}
+
+TEST_CASE("Casts: mixed tuple member access after arithmetic", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("let a = [1, 2.0] + [3.0, 4]; a.x");
+    REQUIRE(ast != nullptr);
+}
+
+TEST_CASE("Casts: chained mixed tuple operations", "[casts]")
+{
+    Environment env;
+    auto ast = env.parse("[1, 2.0] * [3.0, 4] + [5, 6.0]");
+    REQUIRE(ast != nullptr);
+}
