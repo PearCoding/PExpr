@@ -359,6 +359,58 @@ TEST_CASE("SSAOptimizer: repeated addition identities", "[sscp][identities]")
     REQUIRE(after.find(" 5:num") != std::string::npos);
 }
 
+TEST_CASE("SSAOptimizer: mixed literal-variable arithmetic in vec3 does not crash", "[sscp][identities][regression]")
+{
+    // Regression test: expressions of the form `literal + literal * variable` inside
+    // a vec3 literal used to trigger a std::bad_variant_access (or assertion failure)
+    // because matchRepeatedAdditionIdentity called .name() on constant SSAValues
+    // when checking the n*a + a pattern.
+    Environment env;
+
+    // The crashing pattern: literal + literal * variable
+    auto ast = env.parse(R"(
+        @[extern, pure] fn getUV() -> vec2;
+        let uv = getUV();
+        [0.2 + 0.8 * uv.y, 0.5, 0.5]
+    )");
+    REQUIRE(ast != nullptr);
+
+    auto prog = env.map(ast);
+
+    // Run with -O2 level options (which enables ApplyMathIdentities)
+    auto opts = opt::OptimizerOptions::Medium();
+    REQUIRE_NOTHROW(opt::SSAOptimizer::Run(opts, prog));
+
+    auto after = SSASerializer::serialize(prog);
+
+    // The mul and add should still be present (not foldable)
+    REQUIRE(after.find("mul(") != std::string::npos);
+    REQUIRE(after.find("add(") != std::string::npos);
+
+    // Also test the same pattern in other vec3 positions
+    auto ast2 = env.parse(R"(
+        @[extern, pure] fn getUV() -> vec2;
+        let uv = getUV();
+        [0.5, 0.4 + 0.6 * uv.y, 0.5]
+    )");
+    REQUIRE(ast2 != nullptr);
+
+    auto prog2 = env.map(ast2);
+    REQUIRE_NOTHROW(opt::SSAOptimizer::Run(opts, prog2));
+
+    // Also verify -O3 doesn't crash
+    auto ast3 = env.parse(R"(
+        @[extern, pure] fn getUV() -> vec2;
+        let uv = getUV();
+        [0.2 + 0.8 * uv.y, 0.5, 0.5]
+    )");
+    REQUIRE(ast3 != nullptr);
+
+    auto prog3    = env.map(ast3);
+    auto highOpts = opt::OptimizerOptions::High();
+    REQUIRE_NOTHROW(opt::SSAOptimizer::Run(highOpts, prog3));
+}
+
 TEST_CASE("SSAOptimizer: vector constant folding", "[sscp][constantfolding]")
 {
     Environment env;

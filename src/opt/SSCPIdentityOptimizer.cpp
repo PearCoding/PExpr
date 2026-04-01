@@ -489,8 +489,8 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, std::
     Number constNum;
 
     // Check if left operand is a multiplication with a constant
-    if (isBinaryOp(left, BinaryOperation::Mul, mulLeft, mulRight)) {
-        if (isConstantNumber(mulLeft, constNum) && mulRight.name() == right.name()) {
+    if (!right.isConstant() && isBinaryOp(left, BinaryOperation::Mul, mulLeft, mulRight)) {
+        if (isConstantNumber(mulLeft, constNum) && !mulRight.isConstant() && mulRight.name() == right.name()) {
             // n*a + a = (n+1)*a
             Number newConst  = constNum + Number(1.0);
             auto newAsg      = std::make_shared<SSAInstrAssign>();
@@ -503,7 +503,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, std::
             currentInstruction                  = std::move(newAsg);
             return true;
         }
-        if (isConstantNumber(mulRight, constNum) && mulLeft.name() == right.name()) {
+        if (isConstantNumber(mulRight, constNum) && !mulLeft.isConstant() && mulLeft.name() == right.name()) {
             // a*n + a = (n+1)*a
             Number newConst  = constNum + Number(1.0);
             auto newAsg      = std::make_shared<SSAInstrAssign>();
@@ -519,8 +519,8 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, std::
     }
 
     // Check if right operand is a multiplication with a constant
-    if (isBinaryOp(right, BinaryOperation::Mul, mulLeft, mulRight)) {
-        if (isConstantNumber(mulLeft, constNum) && mulRight.name() == left.name()) {
+    if (!left.isConstant() && isBinaryOp(right, BinaryOperation::Mul, mulLeft, mulRight)) {
+        if (isConstantNumber(mulLeft, constNum) && !mulRight.isConstant() && mulRight.name() == left.name()) {
             // a + n*a = (n+1)*a
             Number newConst  = constNum + Number(1.0);
             auto newAsg      = std::make_shared<SSAInstrAssign>();
@@ -533,7 +533,7 @@ bool SSCPIdentityOptimizer::matchRepeatedAdditionIdentity(SSAContext* ctx, std::
             currentInstruction                  = std::move(newAsg);
             return true;
         }
-        if (isConstantNumber(mulRight, constNum) && mulLeft.name() == left.name()) {
+        if (isConstantNumber(mulRight, constNum) && !mulLeft.isConstant() && mulLeft.name() == left.name()) {
             // a + a*n = (n+1)*a
             Number newConst  = constNum + Number(1.0);
             auto newAsg      = std::make_shared<SSAInstrAssign>();
