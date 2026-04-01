@@ -32,8 +32,8 @@
 - [x] Handle implicit casts better. Maybe as a separate pass or similar?
 - [ ] Add modules (per file)
 - [x] Redo variables. Keep track where a variable was declared. Use, similar to mangledName of functions a unique name for variables. This extremely simplifies SSA and many other stages.
-- [ ] Add [[constant]] attribute for variables which have to be constant evaluated and must not be in the final SSA
-- [ ] Add [[constant]] attribute for expressions which have to be constant evaluated and must not be in the final SSA
+- [ ] Add @[constant] attribute for variables which have to be constant evaluated and must not be in the final SSA
+- [ ] Add @[constant] attribute for expressions which have to be constant evaluated and must not be in the final SSA
 - [x] Add syntactic sugar for variable assignments with "+=", "-=", ...
 - [x] Allow "fn foo(...) = { };" and "fn foo(...) { }" 
 - [x] Allow "if ... {...}" instead of "if ... {...};"
@@ -41,7 +41,8 @@
 - [x] RVM needs tuple dissolving implemented. -> Handled in SSA except for 'call' and 'return' instructions.
 - [x] Split the call of functions in RVM into two cases: "call_external" as the way we handled calls for now and "call_internal" which uses a standard order of registers (saved via push_frame) to call.
 - [x] There is no need to have 'tuple' and 'assign' for SSA. Merge 'tuple' functionality to 'assign'.
-- [ ] Fix some corner cases in the register allocator.
+- [x] Fix some corner cases in the register allocator.
 - [x] "--opt-force-inline-functions" is not working with recursive functions
 - [ ] The "//! location" might interfere with the unique naming of variables and other stuff! Verify this.
 - [x] Drop tuple dissolve and integrate it directly into the RVMMapper
+- [ ] Add fused multiplication add for RVM
