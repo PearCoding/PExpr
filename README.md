@@ -355,6 +355,13 @@ PExpr is licensed under the terms in [LICENSE.txt](LICENSE.txt).
 
 PExpr focuses on being lightweight and easy to transpile, making it ideal for embedding in projects where SeExpr might be too complex.
 
+## 🤖 AI Disclaimer
+
+Parts of this project were developed with the assistance of AI tools (Claude Code and others).
+AI-generated code has been reviewed and tested, but may contain errors or
+unconventional patterns. All contributions — human or AI-assisted — go through
+the same review and testing process.
+
 ---
 
 **PExpr** is developed and maintained by [Ömercan Yazici](https://github.com/PearCoding).
