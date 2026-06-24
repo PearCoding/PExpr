@@ -94,11 +94,15 @@ Token Lexer::next()
         if (accept('&')) {
             if (accept('&'))
                 return Token(prevLoc, TokenType::And);
+            mReporter.errorf(prevLoc, "Unexpected '&'; did you mean '&&'?");
+            return Token(prevLoc, TokenType::Error);
         }
 
         if (accept('|')) {
             if (accept('|'))
                 return Token(prevLoc, TokenType::Or);
+            mReporter.errorf(prevLoc, "Unexpected '|'; did you mean '||'?");
+            return Token(prevLoc, TokenType::Error);
         }
 
         if (accept('!')) {

@@ -123,3 +123,32 @@ TEST_CASE("Lexer: oversized location directive does not crash", "[lexer]")
     Token t = lexer.next();
     REQUIRE(t.Type == TokenType::IntegerLiteral); // reached the '42' without throwing
 }
+
+TEST_CASE("Lexer: a lone & or | is reported", "[lexer]")
+{
+    // Regression: a single & / | was consumed without a token or diagnostic, so
+    // the error pointed at the following character instead.
+    SECTION("lone &")
+    {
+        utils::Reporter reporter;
+        reporter.setQuiet(true);
+        std::stringstream stream("a & b");
+        Lexer lexer(stream, reporter);
+        lexer.next(); // a
+        Token t = lexer.next();
+        REQUIRE(t.Type == TokenType::Error);
+        REQUIRE(reporter.errorCount() > 0);
+    }
+
+    SECTION("lone |")
+    {
+        utils::Reporter reporter;
+        reporter.setQuiet(true);
+        std::stringstream stream("a | b");
+        Lexer lexer(stream, reporter);
+        lexer.next(); // a
+        Token t = lexer.next();
+        REQUIRE(t.Type == TokenType::Error);
+        REQUIRE(reporter.errorCount() > 0);
+    }
+}
