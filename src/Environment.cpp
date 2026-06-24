@@ -49,7 +49,9 @@ Ptr<Closure> Environment::parse(std::istream& stream, const std::filesystem::pat
 
 Ptr<Closure> Environment::parse(std::string_view str, const std::filesystem::path& filename)
 {
-    std::istringstream stream(str.data());
+    // Construct from a std::string: a string_view is not guaranteed to be
+    // null-terminated, so str.data() must not be treated as a C-string.
+    std::istringstream stream{ std::string(str) };
     return parse(stream, filename);
 }
 
