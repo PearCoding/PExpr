@@ -52,7 +52,7 @@ void UpliftPass::handle(const Ptr<Closure>& closureRoot)
 
                 newParams.push_back(pv);
                 if (!f->closure()->symbols().addVariable(pv))
-                    mReporter.errorf(f->location(), "Parameter '%s' for uplifted variable already exists in the current scope", pv->name().c_str());
+                    mReporter.errorf(f->location(), "Captured variable '%s' is shadowed by a local of the same name inside the function; this is not supported", pv->name().c_str());
             }
 
             // Update all captured variables such that the parameters are used instead

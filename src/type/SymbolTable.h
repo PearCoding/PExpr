@@ -47,7 +47,11 @@ public:
 
     [[nodiscard]] inline Ptr<VariableDef> lookupVariable(const parser::Location& loc, const std::string& name, const SymbolTable** tbl = nullptr) const
     {
-        if (const auto it = mVariables.find(name); it != mVariables.end()) {
+        // Resolve sequentially: a local is only visible at uses that come at or
+        // after its declaration. This lets a use that textually precedes a
+        // same-named inner declaration resolve to the outer (e.g. captured) one,
+        // matching how the SSA mapper scopes names.
+        if (const auto it = mVariables.find(name); it != mVariables.end() && it->second->location() <= loc) {
             if (tbl)
                 *tbl = this;
             return it->second;

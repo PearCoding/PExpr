@@ -94,3 +94,13 @@ TEST_CASE("UpliftPass: destructuring assignment with mutable capture", "[uplift]
     // Should return a tuple with three elements
     REQUIRE(out.find("[0, a, b]") != std::string::npos);
 }
+TEST_CASE("UpliftPass: capturing a variable shadowed by a same-name local is reported", "[uplift][mutable]")
+{
+    Environment env;
+    env.reporter().setQuiet(true);
+    // The first 'x = x + 1' refers to the captured outer x (sequential scoping),
+    // but f also declares its own local x. The name-keyed scope cannot represent
+    // both, so this must be reported instead of silently dropping the capture.
+    auto ast = env.parse("let mut x = 5; fn f() = { x = x + 1; let mut x = 99; x = x + 1; x }; f(); x");
+    REQUIRE(env.reporter().errorCount() > 0);
+}
