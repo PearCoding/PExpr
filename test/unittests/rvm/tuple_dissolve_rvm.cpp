@@ -1,11 +1,11 @@
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_approx.hpp>
 #include "Environment.h"
 #include "opt/SSAOptimizer.h"
-#include "rvm/RVMMapper.h"
 #include "rvm/RVMInterpreter.h"
+#include "rvm/RVMMapper.h"
 #include "rvm/RVMSerializer.h"
 #include "ssa/SSASerializer.h"
+#include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 using namespace PExpr;
 
@@ -316,7 +316,7 @@ TEST_CASE("Tuple dissolve - linear index: double nested access", "[tuple_dissolv
     // Execute and verify result
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 2);
 }
@@ -342,7 +342,7 @@ TEST_CASE("Tuple dissolve - linear index: triple nested access", "[tuple_dissolv
     // Execute and verify result
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 3);
 }
@@ -368,7 +368,7 @@ TEST_CASE("Tuple dissolve - linear index: multiple nested accesses", "[tuple_dis
     // Execute and verify result: 1 + 2 + 3 + 4 = 10
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 10);
 }
@@ -394,7 +394,7 @@ TEST_CASE("Tuple dissolve - linear index: deeply nested with mixed types", "[tup
     // Execute and verify result: 2.5 + 3.5 = 6.0
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Number));
-    
+
     REQUIRE(std::holds_alternative<Number>(result));
     REQUIRE(std::get<Number>(result) == Catch::Approx(6.0));
 }
@@ -420,7 +420,7 @@ TEST_CASE("Tuple dissolve - linear index: four-level nesting", "[tuple_dissolve]
     // Execute and verify result
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 3);
 }
@@ -451,7 +451,7 @@ TEST_CASE("Tuple dissolve - previously mapped: tuple copy then access", "[tuple_
     // Execute and verify result: 1 + 2 + 3 = 6
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 6);
 }
@@ -477,7 +477,7 @@ TEST_CASE("Tuple dissolve - previously mapped: multiple accesses to same element
     // Execute and verify result: 10+10+20+20+30+30 = 120
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 120);
 }
@@ -506,7 +506,7 @@ TEST_CASE("Tuple dissolve - previously mapped: tuple passed to function then acc
     // Execute and verify result
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 5);
 }
@@ -534,7 +534,7 @@ TEST_CASE("Tuple dissolve - previously mapped: tuple operation then access", "[t
     // Execute and verify result: 5 + 7 + 9 = 21
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 21);
 }
@@ -564,7 +564,7 @@ TEST_CASE("Tuple dissolve - edge case: single element tuple", "[tuple_dissolve][
     // Execute and verify result
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 42);
 }
@@ -590,7 +590,7 @@ TEST_CASE("Tuple dissolve - edge case: mixed types in tuple", "[tuple_dissolve][
     // Execute and verify result: 1 + 2.5 = 3.5
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Number));
-    
+
     REQUIRE(std::holds_alternative<Number>(result));
     REQUIRE(std::get<Number>(result) == Catch::Approx(3.5));
 }
@@ -616,7 +616,7 @@ TEST_CASE("Tuple dissolve - edge case: tuple with nested tuple as element", "[tu
     // Execute and verify result: 2 + 3 = 5
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 5);
 }
@@ -648,7 +648,7 @@ TEST_CASE("Tuple dissolve - edge case: tuple phi with constant branches", "[tupl
 
     // Execute and verify result (should be 1 from first branch)
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 1);
 }
@@ -676,7 +676,7 @@ TEST_CASE("Tuple dissolve - edge case: tuple parameters in function", "[tuple_di
     // Execute and verify result: 10 + 20 = 30
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 30);
 }
@@ -705,7 +705,7 @@ TEST_CASE("Tuple dissolve - edge case: tuple returns from function", "[tuple_dis
     // Execute and verify result: 7 + 8 = 15
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Integer));
-    
+
     REQUIRE(std::holds_alternative<Integer>(result));
     REQUIRE(std::get<Integer>(result) == 15);
 }
@@ -733,7 +733,7 @@ TEST_CASE("Tuple dissolve - edge case: scalar times tuple", "[tuple_dissolve][rv
     // Execute and verify result: 3 + 6 + 9 = 18
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Number));
-    
+
     REQUIRE(std::holds_alternative<Number>(result));
     REQUIRE(std::get<Number>(result) == 18);
 }
@@ -761,7 +761,52 @@ TEST_CASE("Tuple dissolve - edge case: tuple times scalar", "[tuple_dissolve][rv
     // Execute and verify result: 2 + 4 + 6 = 12
     rvm::RVMInterpreter interpreter;
     auto result = interpreter.execute(rvmProgram, type::Type(type::TypeKind::Number));
-    
+
     REQUIRE(std::holds_alternative<Number>(result));
     REQUIRE(std::get<Number>(result) == 12);
+}
+
+TEST_CASE("RVM external call returning a nested tuple unpacks correctly", "[tuple_dissolve][rvm]")
+{
+    // Regression: the external-return unpack iterated top-level tuple elements but
+    // the register layout is the flattened element count, so a nested tuple put a
+    // sub-tuple into a scalar register and left later registers unset.
+    const char* source = R"(
+        @[extern] fn ext() -> [num, [num, num]];
+        ext()
+    )";
+
+    Environment env;
+    auto closure = env.parse(source);
+    REQUIRE(closure);
+    auto program = env.map(closure);
+
+    rvm::RVMMapper mapper;
+    auto rvmProgram = mapper.mapProgram(program);
+
+    rvm::RVMInterpreter interpreter;
+    interpreter.registerExternalFunction("_Z3ext_P",
+                                         [](const std::vector<ValueVariant>&) -> ValueVariant {
+                                             auto inner      = std::make_shared<TupleVariant>();
+                                             inner->elements = { Number(2.0), Number(3.0) };
+                                             auto outer      = std::make_shared<TupleVariant>();
+                                             outer->elements = { Number(1.0), inner };
+                                             return outer;
+                                         });
+
+    // Declared return type [num, [num, num]] normalises to [num, vec2].
+    type::Type returnType({ type::Type(type::TypeKind::Number), type::Type::AsVector(2) });
+    auto result = interpreter.execute(rvmProgram, returnType);
+
+    REQUIRE(std::holds_alternative<Tuple>(result));
+    const auto& outer = std::get<Tuple>(result);
+    REQUIRE(outer->elements.size() == 2);
+    REQUIRE(std::holds_alternative<Number>(outer->elements[0]));
+    REQUIRE(std::get<Number>(outer->elements[0]) == Catch::Approx(1.0));
+
+    REQUIRE(std::holds_alternative<Tuple>(outer->elements[1]));
+    const auto& inner = std::get<Tuple>(outer->elements[1]);
+    REQUIRE(inner->elements.size() == 2);
+    REQUIRE(std::get<Number>(inner->elements[0]) == Catch::Approx(2.0));
+    REQUIRE(std::get<Number>(inner->elements[1]) == Catch::Approx(3.0));
 }

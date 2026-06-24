@@ -84,10 +84,21 @@ ValueVariant RVMInterpreter::execute(const RVMProgram& program, const type::Type
                     // RVM calls store results in registers starting from 0
                     if (call->returnCount() > 0) {
                         if (call->returnCount() > 1 && std::holds_alternative<Tuple>(result)) {
-                            // Unpack tuple into individual registers
-                            const auto& tuple = std::get<Tuple>(result);
-                            for (size_t i = 0; i < std::min(tuple->elements.size(), static_cast<size_t>(call->returnCount())); ++i)
-                                registers[i] = { tuple->elements[i], type::Type(type::TypeKind::Unspecified) };
+                            // Flatten the (possibly nested) tuple depth-first into
+                            // consecutive registers, matching the flat layout that
+                            // reconstructTuple reads back. A naive top-level unpack
+                            // would put a sub-tuple into a scalar register and leave
+                            // later registers unset.
+                            size_t regIndex                                  = 0;
+                            std::function<void(const ValueVariant&)> flatten = [&](const ValueVariant& v) {
+                                if (std::holds_alternative<Tuple>(v)) {
+                                    for (const auto& element : std::get<Tuple>(v)->elements)
+                                        flatten(element);
+                                } else {
+                                    registers[regIndex++] = { v, type::Type(type::TypeKind::Unspecified) };
+                                }
+                            };
+                            flatten(result);
                         } else {
                             registers[0] = { result, type::Type(type::TypeKind::Unspecified) };
                         }
