@@ -276,14 +276,15 @@ TEST_CASE("Parser: edge cases and boundary conditions", "[parser][edge]")
 
     SECTION("Very large integer literal")
     {
+        // The largest value that fits in a 64-bit signed Integer.
         auto ast = env.parse(R"(
-            let big = 12345678901234567890;
-            
+            let big = 9223372036854775807;
+
             big
         )");
 
         REQUIRE(ast != nullptr);
-        // Parser should handle large numbers
+        REQUIRE(env.reporter().errorCount() == 0);
     }
 
     SECTION("Scientific notation numbers")

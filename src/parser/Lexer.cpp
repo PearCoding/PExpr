@@ -334,7 +334,12 @@ Token Lexer::parseNumber()
 
     if (exp || fractional)
         return Token(startLoc, TokenType::NumberLiteral).With(Number(std::strtod(digit_ptr, nullptr)));
-    return Token(startLoc, TokenType::IntegerLiteral).With(Integer(std::strtoull(digit_ptr, nullptr, base)));
+
+    Integer value       = 0;
+    auto [parseEnd, ec] = std::from_chars(digit_ptr, last_ptr, value, base);
+    if (ec == std::errc::result_out_of_range)
+        mReporter.errorf(startLoc, "Integer literal '%s' is out of range", mTemp.c_str());
+    return Token(startLoc, TokenType::IntegerLiteral).With(Integer(value));
 }
 
 Token Lexer::parseString(uint8_t mark)

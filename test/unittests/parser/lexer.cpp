@@ -82,3 +82,31 @@ TEST_CASE("Lexer: combined complex example", "[lexer]")
                              TokenType::IntegerLiteral, TokenType::Comma, TokenType::Minus, TokenType::IntegerLiteral, TokenType::Comma,
                              TokenType::BooleanLiteral, TokenType::ClosedParentheses, TokenType::LessEqual, TokenType::Identifier, TokenType::Dot, TokenType::Identifier }));
 }
+
+TEST_CASE("Lexer: integer literal overflow is reported", "[lexer]")
+{
+    SECTION("INT64_MAX parses without error")
+    {
+        utils::Reporter reporter;
+        reporter.setQuiet(true);
+        std::stringstream stream("9223372036854775807");
+        Lexer lexer(stream, reporter);
+
+        Token t = lexer.next();
+        REQUIRE(t.Type == TokenType::IntegerLiteral);
+        REQUIRE(reporter.errorCount() == 0);
+        REQUIRE(std::get<Integer>(t.Value) == 9223372036854775807LL);
+    }
+
+    SECTION("Above INT64_MAX is reported instead of silently wrapping")
+    {
+        // Regression: this used strtoull + cast, so it became -9223372036854775808.
+        utils::Reporter reporter;
+        reporter.setQuiet(true);
+        std::stringstream stream("9223372036854775808");
+        Lexer lexer(stream, reporter);
+
+        lexer.next();
+        REQUIRE(reporter.errorCount() > 0);
+    }
+}
