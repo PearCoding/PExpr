@@ -593,8 +593,10 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
         size_t eq             = line.find('=');
         std::string targetStr = trim(line.substr(0, eq));
 
-        size_t bracketStart = line.find('[');
-        size_t bracketEnd   = line.find(']');
+        // Search after '=' so a tuple-typed target (e.g. "x:[int, int] = phi[...]")
+        // does not make us pick up the bracket of the target's type.
+        size_t bracketStart = line.find('[', eq);
+        size_t bracketEnd   = bracketStart == std::string::npos ? std::string::npos : line.find(']', bracketStart);
         if (bracketStart == std::string::npos || bracketEnd == std::string::npos)
             return nullptr;
 
@@ -623,8 +625,10 @@ std::shared_ptr<SSAInstr> SSASerializer::readInstruction(const std::string& line
         size_t eq             = line.find('=');
         std::string targetStr = trim(line.substr(0, eq));
 
-        size_t bracketStart = line.find('[');
-        size_t bracketEnd   = line.find(']');
+        // Search after '=' so a tuple-typed target (e.g. "x:[int, int] = call[f](...)")
+        // does not make us pick up the bracket of the target's type.
+        size_t bracketStart = line.find('[', eq);
+        size_t bracketEnd   = bracketStart == std::string::npos ? std::string::npos : line.find(']', bracketStart);
         if (bracketStart == std::string::npos || bracketEnd == std::string::npos)
             return nullptr;
 

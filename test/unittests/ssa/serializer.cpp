@@ -209,8 +209,8 @@ endfn
 
     // Verify round-trip
     std::string serialized   = SSASerializer::serialize(prog);
-    SSAProgram deserialized   = SSASerializer::deserialize(serialized);
-    std::string reserialized  = SSASerializer::serialize(deserialized);
+    SSAProgram deserialized  = SSASerializer::deserialize(serialized);
+    std::string reserialized = SSASerializer::serialize(deserialized);
     REQUIRE(serialized == reserialized);
 }
 
@@ -328,4 +328,60 @@ endfn
         REQUIRE(prog.Functions.size() == 1);
         REQUIRE(prog.Functions[0].Name == "actual_function");
     }
+}
+TEST_CASE("SSASerializer: tuple-typed call target preserves function name", "[serializer]")
+{
+    // Regression: parsing located the call bracket with line.find('['), which for
+    // a tuple-typed target picked up the '[' of the target's type, so the function
+    // name was parsed as "int, int" instead of the mangled name.
+    std::string program = R"(
+%.8:[int, int] = call[_Z6myfunc_Pi](a:int)
+)";
+
+    SSAProgram prog = SSASerializer::deserialize(program);
+    REQUIRE(prog.Body.size() == 1);
+
+    auto* call = dynamic_cast<SSAInstrCall*>(prog.Body[0].get());
+    REQUIRE(call != nullptr);
+    REQUIRE(call->FunctionName == "_Z6myfunc_Pi");
+    REQUIRE(call->Target.type().isTuple());
+    REQUIRE(call->Arguments.size() == 1);
+}
+
+TEST_CASE("SSASerializer: tuple-typed phi target parses conditions and branches", "[serializer]")
+{
+    std::string program = R"(
+%.6:[int, int] = phi[%.1:bool](%.5:[int, int], %.4:[int, int])
+)";
+
+    SSAProgram prog = SSASerializer::deserialize(program);
+    REQUIRE(prog.Body.size() == 1);
+
+    auto* phi = dynamic_cast<SSAInstrPhi*>(prog.Body[0].get());
+    REQUIRE(phi != nullptr);
+    REQUIRE(phi->Target.type().isTuple());
+    REQUIRE(phi->Conditions.size() == 1);
+    REQUIRE(phi->Branches.size() == 2);
+}
+
+TEST_CASE("SSASerializer: round-trip of a program with a tuple-returning call", "[serializer]")
+{
+    // A mutable-capturing function is uplifted into one that returns a tuple, so
+    // its call site has a tuple-typed target. This exercises the call-bracket fix
+    // through the full pipeline.
+    Environment env;
+    auto ast  = env.parse(R"(
+        let mut x = 5;
+        fn f() = { if x > 0 { x = x + 1; } else { x = x - 1; } };
+        f();
+        x
+    )");
+    auto prog = env.map(ast);
+
+    std::string serialized = SSASerializer::serialize(prog);
+    REQUIRE(serialized.find("call[") != std::string::npos);
+
+    SSAProgram deserialized  = SSASerializer::deserialize(serialized);
+    std::string reserialized = SSASerializer::serialize(deserialized);
+    REQUIRE(serialized == reserialized);
 }
