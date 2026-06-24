@@ -368,6 +368,24 @@ ValueVariant RVMInterpreter::applyBinaryOp(Opcode op, const ValueVariant& src1, 
             break;
         }
     }
+
+    if (op >= Opcode::AND && op <= Opcode::XOR) {
+        // Logical operations on boolean truthiness. The mapper emits AND/OR for
+        // the && / || operators and XOR (against 1) for the unary ! operator.
+        bool a = !isZero(src1);
+        bool b = !isZero(src2);
+        switch (op) {
+        case Opcode::AND:
+            return a && b;
+        case Opcode::OR:
+            return a || b;
+        case Opcode::XOR:
+            return a != b;
+        default:
+            break;
+        }
+    }
+
     return Integer(0);
 }
 
