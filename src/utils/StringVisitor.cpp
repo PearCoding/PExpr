@@ -164,7 +164,7 @@ std::string StringVisitor::dump(size_t, const Ptr<LiteralExpression>& expr)
     if (expr->returnType().kind() == type::TypeKind::Integer)
         return std::to_string(expr->getInteger());
     if (expr->returnType().kind() == type::TypeKind::Number)
-        return std::to_string(expr->getNumber());
+        return formatNumber(expr->getNumber());
     if (expr->returnType().kind() == type::TypeKind::String)
         return "\"" + escapeString(expr->getString()) + "\"";
     return "UNKNOWN";

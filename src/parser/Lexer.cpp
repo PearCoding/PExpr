@@ -236,7 +236,8 @@ void Lexer::parseLexerInstruction()
             mReporter.errorf(mLocation, "Invalid line number");
             return;
         }
-        size_t line = std::stoull(mTemp);
+        size_t line = 0;
+        std::from_chars(mTemp.data(), mTemp.data() + mTemp.size(), line); // digits only; ignore overflow (keeps 0)
 
         // Skip whitespace
         while (!eof() && std::isspace(peek()) && peek() != '\n')

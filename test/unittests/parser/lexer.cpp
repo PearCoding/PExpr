@@ -110,3 +110,16 @@ TEST_CASE("Lexer: integer literal overflow is reported", "[lexer]")
         REQUIRE(reporter.errorCount() > 0);
     }
 }
+
+TEST_CASE("Lexer: oversized location directive does not crash", "[lexer]")
+{
+    // Regression: the //! location line number was parsed with std::stoull, which
+    // threw std::out_of_range (uncaught) on an oversized value.
+    utils::Reporter reporter;
+    reporter.setQuiet(true);
+    std::stringstream stream("//! location 999999999999999999999999 \"f.pexpr\"\n42");
+    Lexer lexer(stream, reporter);
+
+    Token t = lexer.next();
+    REQUIRE(t.Type == TokenType::IntegerLiteral); // reached the '42' without throwing
+}

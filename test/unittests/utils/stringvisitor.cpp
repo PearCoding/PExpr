@@ -32,3 +32,12 @@ TEST_CASE("String visitor should produce a correct parsable version", "[stringvi
     const std::string src2 = StringVisitor::visit(ast2);
     REQUIRE(src1 == src2);
 }
+TEST_CASE("String visitor keeps number precision", "[stringvisitor]")
+{
+    // Regression: numbers were emitted with std::to_string (6 significant digits).
+    auto ast = parseOnly("3.141592653589793");
+    REQUIRE(ast != nullptr);
+
+    const std::string src = StringVisitor::visit(ast);
+    REQUIRE(src.find("3.141592653589793") != std::string::npos);
+}
