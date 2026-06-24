@@ -563,7 +563,7 @@ bool SSCPIdentityOptimizer::matchUnaryIdentity(SSAContext* ctx, std::shared_ptr<
         return false;
 
     // +a = a | Essentially just syntatic sugar
-    if (asg->UnaryOp != UnaryOperation::Pos) {
+    if (asg->UnaryOp == UnaryOperation::Pos) {
         auto newAsg      = std::make_shared<SSAInstrAssign>();
         newAsg->Target   = asg->Target;
         newAsg->Operator = SSAInstrAssign::OpKind::Assign;
