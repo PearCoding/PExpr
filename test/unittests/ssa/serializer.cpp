@@ -385,3 +385,16 @@ TEST_CASE("SSASerializer: round-trip of a program with a tuple-returning call", 
     std::string reserialized = SSASerializer::serialize(deserialized);
     REQUIRE(serialized == reserialized);
 }
+
+TEST_CASE("SSASerializer: number constants keep full precision", "[serializer]")
+{
+    Environment env;
+    auto ast  = env.parse("let x = 3.141592653589793; x");
+    auto prog = env.map(ast);
+
+    std::string serialized = SSASerializer::serialize(prog);
+    REQUIRE(serialized.find("3.141592653589793") != std::string::npos);
+
+    SSAProgram deserialized = SSASerializer::deserialize(serialized);
+    REQUIRE(SSASerializer::serialize(deserialized) == serialized);
+}

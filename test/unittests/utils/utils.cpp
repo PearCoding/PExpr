@@ -43,3 +43,17 @@ TEST_CASE("StringUtils: string escape/unescape", "[utils][string]")
         }
     }
 }
+TEST_CASE("StringUtils: formatNumber round-trips without precision loss", "[utils][number]")
+{
+    // Regression: serializers printed Numbers with the default 6-significant-digit
+    // stream precision, so values like pi did not survive a serialize/deserialize.
+    const double values[] = { 3.141592653589793, 0.1, 1e20, -2.5e-13, 123456789.123456789 };
+    for (double v : values) {
+        std::string s = formatNumber(v);
+        REQUIRE(std::stod(s) == v);
+    }
+
+    // Common values keep their short, human-friendly form.
+    REQUIRE(formatNumber(0.1) == "0.1");
+    REQUIRE(formatNumber(2.5) == "2.5");
+}

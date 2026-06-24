@@ -75,7 +75,7 @@ void SSASerializer::write(std::ostream& os, const Type& type, const ValueVariant
         os << *i;
     } else if (const auto* n = std::get_if<Number>(&value)) {
         PEXPR_ASSERT(type.kind() == TypeKind::Number, "Expected variant to have a Number value");
-        os << *n;
+        os << utils::formatNumber(*n);
     } else if (const auto* s = std::get_if<std::string>(&value)) {
         PEXPR_ASSERT(type.kind() == TypeKind::String, "Expected variant to have a string value");
         os << "\"" << utils::escapeString(*s) << "\"";

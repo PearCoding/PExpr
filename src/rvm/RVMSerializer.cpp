@@ -196,7 +196,7 @@ void RVMSerializer::write(std::ostream& os, const ValueVariant& value)
         } else if constexpr (std::is_same_v<T, Integer>) {
             os << arg;
         } else if constexpr (std::is_same_v<T, Number>) {
-            os << arg;
+            os << utils::formatNumber(arg);
         } else if constexpr (std::is_same_v<T, std::string>) {
             os << "\"" << utils::escapeString(arg) << "\"";
         } else {

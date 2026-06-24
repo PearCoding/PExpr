@@ -1,6 +1,20 @@
 #include "StringUtils.h"
 
+#include <array>
+#include <charconv>
+
 namespace PExpr::utils {
+
+std::string formatNumber(Number value)
+{
+    // std::to_chars with no format produces the shortest representation that
+    // round-trips exactly, so precision is not lost on serialize/deserialize.
+    std::array<char, 32> buffer;
+    auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    if (ec != std::errc())
+        return std::to_string(value); // fallback (should not happen for finite doubles)
+    return std::string(buffer.data(), ptr);
+}
 
 std::string escapeString(const std::string& str)
 {

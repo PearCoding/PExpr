@@ -8,4 +8,8 @@ namespace PExpr::utils {
 
 /// Unescape special characters in a string after deserialization
 [[nodiscard]] std::string unescapeString(const std::string& str);
+
+/// Format a Number as the shortest decimal string that round-trips back to the
+/// same value (used by the IR serializers so deserialize(serialize(x)) == x).
+[[nodiscard]] std::string formatNumber(Number value);
 } // namespace PExpr::utils
