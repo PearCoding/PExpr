@@ -289,9 +289,17 @@ ValueVariant RVMInterpreter::applyBinaryOp(Opcode op, const ValueVariant& src1, 
             case Opcode::MUL:
                 return a * b;
             case Opcode::DIV:
-                return (b == 0) ? static_cast<Integer>(0) : a / b; // Integer division
+                if (b == 0)
+                    return static_cast<Integer>(0);
+                if (a == std::numeric_limits<Integer>::min() && b == -1)
+                    return a; // avoid INT_MIN / -1 overflow (well-defined two's-complement result)
+                return a / b; // Integer division
             case Opcode::MOD:
-                return (b == 0) ? static_cast<Integer>(0) : a % b;
+                if (b == 0)
+                    return static_cast<Integer>(0);
+                if (a == std::numeric_limits<Integer>::min() && b == -1)
+                    return static_cast<Integer>(0);
+                return a % b;
             case Opcode::POW:
                 return static_cast<Integer>(std::pow(static_cast<Number>(a), static_cast<Number>(b)));
             default:

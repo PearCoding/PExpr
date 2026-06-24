@@ -1,6 +1,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <limits>
 
 #include "rvm/RVMInstruction.h"
 #include "rvm/RVMInterpreter.h"
@@ -837,7 +838,7 @@ TEST_CASE("RVMInterpreter: empty program with void return", "[rvm][interpreter][
     auto result = interpreter.execute(prog, Type(TypeKind::Void));
 
     // Void returns an empty variant (monostate)
-    REQUIRE(result.index() == 0);  // monostate is at index 0
+    REQUIRE(result.index() == 0); // monostate is at index 0
 }
 
 TEST_CASE("RVMInterpreter: default value for uninitialized register", "[rvm][interpreter][edgecase]")
@@ -970,5 +971,45 @@ TEST_CASE("RVMInterpreter: parseValue utility", "[rvm][interpreter][utility]")
         auto result = RVMInterpreter::parseValue("hello");
         REQUIRE(std::holds_alternative<std::string>(result));
         REQUIRE(std::get<std::string>(result) == "hello");
+    }
+}
+// Regression: integer DIV/MOD only guarded against b == 0, so INT_MIN / -1 (and
+// INT_MIN % -1) triggered signed-overflow UB (a SIGFPE trap on x86).
+TEST_CASE("RVMInterpreter: INT_MIN divided by -1 does not trap", "[rvm][interpreter][arithmetic]")
+{
+    const Integer intMin = std::numeric_limits<Integer>::min();
+
+    SECTION("DIV")
+    {
+        RVMProgram prog;
+        prog.push_back(std::make_shared<RVMInstrLabel>("entry"));
+        prog.push_back(std::make_shared<RVMInstr3Op>(
+            Opcode::DIV,
+            RVMValue::Register(0, Type(TypeKind::Integer)),
+            RVMValue::Constant(intMin),
+            RVMValue::Constant(Integer(-1))));
+        prog.push_back(std::make_shared<RVMInstrReturn>(1));
+
+        RVMInterpreter interpreter;
+        auto result = interpreter.execute(prog, Type(TypeKind::Integer));
+        REQUIRE(std::holds_alternative<Integer>(result));
+        REQUIRE(std::get<Integer>(result) == intMin);
+    }
+
+    SECTION("MOD")
+    {
+        RVMProgram prog;
+        prog.push_back(std::make_shared<RVMInstrLabel>("entry"));
+        prog.push_back(std::make_shared<RVMInstr3Op>(
+            Opcode::MOD,
+            RVMValue::Register(0, Type(TypeKind::Integer)),
+            RVMValue::Constant(intMin),
+            RVMValue::Constant(Integer(-1))));
+        prog.push_back(std::make_shared<RVMInstrReturn>(1));
+
+        RVMInterpreter interpreter;
+        auto result = interpreter.execute(prog, Type(TypeKind::Integer));
+        REQUIRE(std::holds_alternative<Integer>(result));
+        REQUIRE(std::get<Integer>(result) == 0);
     }
 }
