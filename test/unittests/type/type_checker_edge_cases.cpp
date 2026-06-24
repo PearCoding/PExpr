@@ -114,13 +114,40 @@ TEST_CASE("TypeChecker: error cases and type mismatches", "[typechecker][errors]
         auto ast = env.parse(R"(
             let v:vec2 = [1.0, 2.0];
             let comp = v.z;  // vec2 has no z component
-            
+
             comp
         )");
 
         // Should produce error
         REQUIRE(env.reporter().errorCount() > 0);
     }
+
+    SECTION("Tuple index equal to size is out of bounds")
+    {
+        // Regression: the bounds check used '<' instead of '<=', so index == size
+        // slipped through and crashed components().at(index) with std::out_of_range.
+        env.reporter().setQuiet(true);
+        auto ast = env.parse(R"(
+            let v = [1, 2, 3];
+            v[3]
+        )");
+
+        // Should report an error instead of crashing
+        REQUIRE(env.reporter().errorCount() > 0);
+    }
+}
+
+TEST_CASE("TypeChecker: last tuple element is accessible", "[typechecker][access]")
+{
+    Environment env;
+
+    auto ast = env.parse(R"(
+        let v = [1, 2, 3];
+        v[2]
+    )");
+
+    REQUIRE(ast != nullptr);
+    REQUIRE(env.reporter().errorCount() == 0);
 }
 
 TEST_CASE("TypeChecker: generic type patterns", "[typechecker][generics]")

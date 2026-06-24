@@ -413,7 +413,7 @@ std::optional<SSAValue> SSCPConstantFolder::foldAccessOp(const SSAValue& operand
     if (!extractInteger(index, idx))
         return std::nullopt;
 
-    if (ops.size() < (size_t)idx || idx < 0)
+    if (idx < 0 || ops.size() <= (size_t)idx)
         return std::nullopt;
 
     return SSAValue::Constant(ops.at(idx));

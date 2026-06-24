@@ -557,7 +557,7 @@ Type TypeChecker::handleNode(const Ptr<Closure>& closure, const Ptr<AccessExpres
 
     if (innerType.kind() == TypeKind::Tuple) {
         const size_t vec_size = innerType.size();
-        if (vec_size < expr->index()) {
+        if (vec_size <= expr->index()) {
             mReporter.errorf(expr->location(), "Trying to access element %zu of tuple of size %zu", expr->index(), vec_size);
             return Type::Error();
         }
