@@ -78,8 +78,13 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
         for (const auto& hash : currentHashes) {
             // Check if we've seen this expression before
             if (const auto itMap = mExpressionMap.find(hash); itMap != mExpressionMap.end()) {
-                // Found a duplicate expression! Replace with reference to previous result
-                const SSAValue& existingValue = itMap->second;
+                // Hashes match, but confirm the expressions are actually equivalent
+                // before reusing the result: a hash collision between two different
+                // expressions would otherwise be a silent miscompile.
+                if (!instrPtr->isEquivalent(itMap->second.Instr.get()))
+                    continue;
+
+                const SSAValue& existingValue = itMap->second.Target;
 
                 // Don't replace with ourselves
                 if (!existingValue.isConstant() && existingValue.name() == targetName)
@@ -97,9 +102,9 @@ bool SSCPCommonSubexpressionEliminator::applyCSEToRange(SSAContext* ctx, Instruc
             } else {
                 // First time seeing this expression, add to map
                 if (const auto asg = dynamic_cast<const SSAInstrAssign*>(instrPtr.get()))
-                    mExpressionMap[hash] = asg->Target;
+                    mExpressionMap[hash] = { asg->Target, instrPtr };
                 else if (const auto call = dynamic_cast<const SSAInstrCall*>(instrPtr.get()))
-                    mExpressionMap[hash] = call->Target;
+                    mExpressionMap[hash] = { call->Target, instrPtr };
             }
         }
     }

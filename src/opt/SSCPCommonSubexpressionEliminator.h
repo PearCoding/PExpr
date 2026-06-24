@@ -45,8 +45,16 @@ private:
     /// Generate hash for an SSA instruction
     [[nodiscard]] std::optional<ExpressionHash> hashInstruction(const ssa::SSAInstr* instr) const;
 
-    /// Map from expression hash to the SSA value that computes it
-    std::unordered_map<ExpressionHash, ssa::SSAValue, ExpressionHash::Hash> mExpressionMap;
+    /// A previously seen expression: the value that computes it plus the defining
+    /// instruction, kept so a hash hit can be confirmed structurally equivalent
+    /// (guarding against hash collisions between different expressions).
+    struct MappedExpression {
+        ssa::SSAValue Target;
+        std::shared_ptr<ssa::SSAInstr> Instr;
+    };
+
+    /// Map from expression hash to the value that computes it
+    std::unordered_map<ExpressionHash, MappedExpression, ExpressionHash::Hash> mExpressionMap;
 
     ssa::BasicBlockAnalyzer mBlockAnalyzer;
     const OptimizerOptions mOptions;
