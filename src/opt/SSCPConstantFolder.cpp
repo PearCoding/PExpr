@@ -155,8 +155,9 @@ std::optional<SSAValue> SSCPConstantFolder::foldBinaryOp(bool foldNumber, const 
                     }
                 }
                 if (binaryOp == BinaryOperation::Pow) {
-                    Number rr = std::pow(static_cast<Number>(li), static_cast<Number>(ri));
-                    return SSAValue::Constant(static_cast<Number>(rr));
+                    // int ^ int yields an Integer (matching the interpreter), not a Number.
+                    Integer r = static_cast<Integer>(std::pow(static_cast<Number>(li), static_cast<Number>(ri)));
+                    return SSAValue::Constant(static_cast<Integer>(r));
                 }
             } else {
                 Number lv = Lnum ? ld : static_cast<Number>(li);

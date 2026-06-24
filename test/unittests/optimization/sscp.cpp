@@ -87,3 +87,22 @@ TEST_CASE("SSAOptimizer: vector arithmetic operations", "[sscp]")
     // Check that constant folding occurred for vector operations
     REQUIRE(dumped.find("14.5") != std::string::npos);
 }
+
+TEST_CASE("SSAOptimizer: integer pow folds to an integer constant", "[sscp]")
+{
+    // Regression: int ^ int folded to a Number constant, diverging from the
+    // interpreter (which returns an Integer) and switching downstream integer
+    // operations to floating-point semantics.
+    std::stringstream stream("let r = 2 ^ 3; r");
+    Environment env;
+    auto ast  = env.parse(stream);
+    auto prog = env.map(ast);
+
+    opt::SSAOptimizer::Run(MakeConstantFoldingOptimizer(), prog);
+
+    auto dumped = SSASerializer::serialize(prog);
+
+    // Folded result must be the integer 8, never a number.
+    REQUIRE(dumped.find("8:int") != std::string::npos);
+    REQUIRE(dumped.find("8:num") == std::string::npos);
+}
