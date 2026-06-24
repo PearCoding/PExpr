@@ -650,3 +650,26 @@ TEST_CASE("SSAOptimizer: force function inlining", "[sscp][inlining][force]")
     REQUIRE(afterForce.find("add(") != std::string::npos);
     REQUIRE(afterForce.find("mul(") != std::string::npos);
 }
+
+TEST_CASE("SSAOptimizer: inverse-then-forward trig is not falsely simplified", "[sscp][identities]")
+{
+    // Regression: asin(sin(a)) (and acos(cos(a)), atan(tan(a))) were rewritten to
+    // a, but the inverse only returns the principal value, so this is a value
+    // error, not a precision one. Both calls must survive even at -O3.
+    Environment env;
+    auto ast = env.parse(R"(
+        @[extern, pure] fn sin(a:num) -> num;
+        @[extern, pure] fn asin(a:num) -> num;
+        @[extern] fn getInput() -> num;
+
+        let a = getInput();
+        asin(sin(a))
+    )");
+
+    auto prog = env.map(ast);
+    opt::SSAOptimizer::Run(opt::OptimizerOptions::High(), prog);
+
+    auto after = SSASerializer::serialize(prog);
+    REQUIRE(after.find("call[_Z3sin") != std::string::npos);
+    REQUIRE(after.find("call[_Z4asin") != std::string::npos);
+}

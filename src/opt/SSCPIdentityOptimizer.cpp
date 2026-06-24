@@ -688,6 +688,11 @@ bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, s
         return false;
 
     // Match: sin(asin(a)) = a, cos(acos(a)) = a, tan(atan(a)) = a
+    //
+    // Only the outer-trig / inner-inverse direction is applied. The reverse
+    // (e.g. asin(sin(a)) = a) is NOT an identity: sin/cos/tan are many-to-one,
+    // so the inverse only returns the principal value (asin(sin(3)) != 3). That
+    // is a value error, not a precision one, so it is invalid even under -O3.
     if (call->Arguments.size() != 1)
         return false;
 
@@ -696,10 +701,7 @@ bool SSCPIdentityOptimizer::matchInverseTrigonometricIdentity(SSAContext* ctx, s
     // Check if operand is a call to asin, acos, or atan
     if ((isIntrinsic(call, "sin") && isCallToIntrinsic(operand, "asin"))
         || (isIntrinsic(call, "cos") && isCallToIntrinsic(operand, "acos"))
-        || (isIntrinsic(call, "tan") && isCallToIntrinsic(operand, "atan"))
-        || (isIntrinsic(call, "asin") && isCallToIntrinsic(operand, "sin"))
-        || (isIntrinsic(call, "acos") && isCallToIntrinsic(operand, "cos"))
-        || (isIntrinsic(call, "atan") && isCallToIntrinsic(operand, "tan"))) {
+        || (isIntrinsic(call, "tan") && isCallToIntrinsic(operand, "atan"))) {
 
         if (const auto call2 = dynamic_cast<const SSAInstrCall*>(getDefinition(operand))) {
             auto newAsg      = std::make_shared<SSAInstrAssign>();
